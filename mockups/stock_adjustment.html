@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Adjustment</title>
+  <!-- Phase 3 #3 — increase/decrease + physical audit; theme locked -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
+            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
+            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link.is-disabled { opacity: 0.45; pointer-events: none; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .sa-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .sa-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 8px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .sa-table thead th:first-child,
+    .sa-table tbody td:first-child { text-align: left; padding-left: 16px; }
+    .sa-table thead th:last-child { border-right: none; }
+    .sa-table tbody td {
+      padding: 11px 8px;
+      font-size: 13.5px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .sa-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .sa-table tbody tr:hover { background: #FBF4EE; }
+    .search-wrap input { padding-left: 32px; }
+    #sa-modal.hidden, #view-modal.hidden { display: none; }
+    #sa-modal, #view-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+    .form-section-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8A4A1C;
+      margin-top: 4px;
+    }
+    .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lines-table th {
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 8px 6px;
+      border: 1px solid #D1D9D8;
+      text-align: center;
+    }
+    .lines-table td {
+      padding: 4px;
+      border: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .lines-table input, .lines-table select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+    }
+    .lines-table input:focus, .lines-table select:focus {
+      outline: none;
+      border-color: #C46B2D;
+      box-shadow: 0 0 0 1px #C46B2D;
+    }
+    .lines-table input:read-only { background: #F4F6F5; color: #3D5A5D; }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link is-active" aria-current="page"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock adjustment</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Stock adjustment</h1>
+        </div>
+        <button type="button" id="btn-new-sa"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          New adjustment
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-sa" placeholder="Search SA no., item, reason…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (4)</button>
+            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (1)</button>
+            <button type="button" data-filter="pending" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Pending approval (1)</button>
+            <button type="button" data-filter="posted" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Posted (1)</button>
+            <button type="button" data-filter="cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Cancelled (1)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Spec §6.3: Increase / Decrease only with <strong>reason + approval</strong> · Physical audit compares book qty vs counted qty
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="sa-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:10%" />
+              <col style="width:9%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
+              <col style="width:14%" />
+              <col style="width:8%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:12%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>SA no.</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Warehouse</th>
+                <th>Reason</th>
+                <th>Lines</th>
+                <th>Net qty</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="sa-row" data-search="sa-2025-001 physical audit main rm carton" data-status="posted" data-id="sa-2025-001">
+                <td class="text-ink-faint tabular-nums">1</td>
+                <td class="font-mono font-semibold text-ink">SA-2025-001</td>
+                <td class="tabular-nums">12 Sep 2025</td>
+                <td><span class="text-[12px] font-semibold text-brand-teal">Physical audit</span></td>
+                <td class="text-[13px]">Main RM Warehouse</td>
+                <td class="text-[12.5px]">Month-end stock count</td>
+                <td class="tabular-nums">1</td>
+                <td class="tabular-nums font-semibold text-stop">−15 PCS</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Posted
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sa-2025-001">View</button>
+                    <button type="button" class="px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">Print</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="sa-row" data-search="sa-2025-002 increase found copper pending" data-status="pending" data-id="sa-2025-002">
+                <td class="text-ink-faint tabular-nums">2</td>
+                <td class="font-mono font-semibold text-ink">SA-2025-002</td>
+                <td class="tabular-nums">15 Sep 2025</td>
+                <td><span class="text-[12px] font-semibold text-success">Increase</span></td>
+                <td class="text-[13px]">Main RM Warehouse</td>
+                <td class="text-[12.5px]">Found stock (unrecorded)</td>
+                <td class="tabular-nums">1</td>
+                <td class="tabular-nums font-semibold text-success">+5 KG</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Pending approval
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sa-2025-002">View</button>
+                    <button type="button" class="btn-approve px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white" data-id="sa-2025-002">Approve</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="sa-row" data-search="sa-2025-003 decrease damage solder draft" data-status="draft" data-id="sa-2025-003">
+                <td class="text-ink-faint tabular-nums">3</td>
+                <td class="font-mono font-semibold text-ink-faint sa-no">SA-2025-003</td>
+                <td class="tabular-nums text-ink-faint sa-date">—</td>
+                <td><span class="text-[12px] font-semibold text-stop">Decrease</span></td>
+                <td class="text-[13px] text-ink-faint">Main RM Warehouse</td>
+                <td class="text-[12.5px] text-ink-faint">Damaged in store</td>
+                <td class="tabular-nums text-ink-faint">1</td>
+                <td class="tabular-nums font-semibold text-ink-faint">−2 KG</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Draft
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sa-2025-003">View</button>
+                    <button type="button" class="btn-submit px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="sa-2025-003">Submit</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="sa-row opacity-75" data-search="sa-2025-004 cancelled excess" data-status="cancelled" data-id="sa-2025-004">
+                <td class="text-ink-faint tabular-nums">4</td>
+                <td class="font-mono font-semibold text-ink line-through decoration-ink-faint">SA-2025-004</td>
+                <td class="tabular-nums">08 Sep 2025</td>
+                <td><span class="text-[12px] font-semibold text-stop">Decrease</span></td>
+                <td class="text-[13px]">FG Warehouse</td>
+                <td class="text-[12.5px]">Wrong entry — cancelled</td>
+                <td class="tabular-nums">1</td>
+                <td class="tabular-nums">−10 PCS</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Cancelled
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sa-2025-004">View</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No adjustments found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search or create a new stock adjustment.</p>
+            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">New adjustment</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing 4 of 4 adjustments</span>
+          <span>Next: <a href="stock_valuation.html" class="text-brand-teal hover:underline">Stock valuation</a> (FIFO / WAVG)</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- New adjustment -->
+  <div id="sa-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="sa-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="sa-modal-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="sa-modal-title" class="text-[16px] font-bold text-ink">New stock adjustment</h2>
+          <p class="text-[12.5px] text-ink-faint">Reason required · posts only after approval (mock)</p>
+        </div>
+        <button type="button" id="btn-close-sa-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+
+      <form id="sa-form" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <p class="form-section-title">Header</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label for="sa-no" class="block text-[12.5px] font-semibold text-ink mb-1">SA no.</label>
+            <input type="text" id="sa-no" value="SA-2025-005" readonly class="w-full px-2.5 py-2 text-[13px] font-mono bg-mist border border-slate-300 rounded text-ink-faint" />
+          </div>
+          <div>
+            <label for="sa-date" class="block text-[12.5px] font-semibold text-ink mb-1">Date *</label>
+            <input type="date" id="sa-date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="sa-type" class="block text-[12.5px] font-semibold text-ink mb-1">Adjustment type *</label>
+            <select id="sa-type" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="increase">Increase (+)</option>
+              <option value="decrease">Decrease (−)</option>
+              <option value="audit">Physical audit (book vs count)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label for="sa-wh" class="block text-[12.5px] font-semibold text-ink mb-1">Warehouse *</label>
+            <select id="sa-wh" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="">Select…</option>
+              <option>Main RM Warehouse</option>
+              <option>QC Hold Bay</option>
+              <option>WIP Staging</option>
+              <option>FG Warehouse</option>
+              <option>Scrap Warehouse</option>
+            </select>
+          </div>
+          <div>
+            <label for="sa-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason *</label>
+            <select id="sa-reason" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="">Select reason…</option>
+              <option>Physical count / audit</option>
+              <option>Damaged in store</option>
+              <option>Found stock (unrecorded)</option>
+              <option>Evaporation / process loss</option>
+              <option>Data correction</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <hr class="border-slate-200" />
+        <div class="flex items-center justify-between gap-2">
+          <p class="form-section-title !mt-0">Lines</p>
+          <button type="button" id="btn-add-line" class="text-[12.5px] font-semibold text-copper-text px-2 py-1 border border-copper-border rounded bg-copper-soft hover:bg-copper hover:text-white">+ Add line</button>
+        </div>
+        <div class="overflow-x-auto border border-slate-200 rounded">
+          <table class="lines-table" id="sa-lines">
+            <thead>
+              <tr id="sa-lines-head">
+                <th style="width:26%">Item</th>
+                <th style="width:16%">Batch / lot</th>
+                <th style="width:12%">Book qty</th>
+                <th style="width:14%" class="col-adj">Adj. qty *</th>
+                <th style="width:10%">Unit</th>
+                <th style="width:14%" class="col-new">New qty</th>
+                <th style="width:8%"></th>
+              </tr>
+            </thead>
+            <tbody id="sa-lines-tbody">
+              <tr class="line-row">
+                <td>
+                  <select>
+                    <option>RM-CU-01 Copper wire 2mm</option>
+                    <option>RM-SW-01 Solder wire 0.8mm</option>
+                    <option>RM-PK-01 Carton box medium</option>
+                    <option>FG-WS-01 Soldered wire assembly</option>
+                  </select>
+                </td>
+                <td><input type="text" class="font-mono text-[12px]" value="CU-9921" /></td>
+                <td><input type="text" readonly class="tabular-nums book-qty" value="180" /></td>
+                <td><input type="number" required class="tabular-nums adj-qty" step="0.01" value="5" /></td>
+                <td><select><option>KG</option><option>PCS</option></select></td>
+                <td><input type="text" readonly class="tabular-nums new-qty bg-mist" value="185" /></td>
+                <td class="text-center"><button type="button" class="btn-remove-line text-ink-faint hover:text-stop text-lg leading-none">&times;</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p id="audit-hint" class="hidden text-[12px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">
+          Physical audit mode: enter <strong>counted qty</strong>. System will post the difference (counted − book) as the adjustment.
+        </p>
+
+        <div>
+          <label for="sa-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks / approval note</label>
+          <textarea id="sa-remarks" rows="2" placeholder="Who counted, photo ref…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        </div>
+        <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+          Mock flow: <strong>Save draft</strong> → <strong>Submit for approval</strong> → <strong>Approve</strong> (posts to stock ledger). Spec requires authorized approval before stock changes.
+        </p>
+      </form>
+
+      <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+        <button type="button" id="btn-save-sa-draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+        <button type="button" id="btn-cancel-sa" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="sa-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Submit for approval</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View -->
+  <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="view-title" class="text-[16px] font-bold text-ink">Stock adjustment</h2>
+          <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/erp-toast.js"></script>
+  <script>
+    const SA_DETAILS = {
+      'sa-2025-001': {
+        title: 'SA-2025-001 · Posted',
+        type: 'Physical audit',
+        wh: 'Main RM Warehouse',
+        date: '12 Sep 2025',
+        reason: 'Month-end stock count',
+        note: 'Book 485 PCS · Counted 470 PCS · Diff −15 posted to ledger.',
+        lines: [['RM-PK-01', 'Carton box medium', 'PK-772', '485', '470', '−15', 'PCS']]
+      },
+      'sa-2025-002': {
+        title: 'SA-2025-002 · Pending approval',
+        type: 'Increase',
+        wh: 'Main RM Warehouse',
+        date: '15 Sep 2025',
+        reason: 'Found stock (unrecorded)',
+        note: 'Awaiting store manager approval before ledger update.',
+        lines: [['RM-CU-01', 'Copper wire 2mm', 'CU-9921', '180', '—', '+5', 'KG']]
+      },
+      'sa-2025-003': {
+        title: 'SA-2025-003 · Draft',
+        type: 'Decrease',
+        wh: 'Main RM Warehouse',
+        date: 'Not submitted',
+        reason: 'Damaged in store',
+        note: 'Draft — submit when photos attached.',
+        lines: [['RM-SW-01', 'Solder wire 0.8mm', 'SC-2408-A', '16', '—', '−2', 'KG']]
+      },
+      'sa-2025-004': {
+        title: 'SA-2025-004 · Cancelled',
+        type: 'Decrease',
+        wh: 'FG Warehouse',
+        date: '08 Sep 2025',
+        reason: 'Wrong entry — cancelled',
+        note: 'Cancelled before approval — no stock impact.',
+        lines: [['FG-WS-01', 'Soldered wire assembly', 'BAT-FG-110', '12', '—', '−10', 'PCS']]
+      }
+    };
+
+    const saModal = document.getElementById('sa-modal');
+    const saForm = document.getElementById('sa-form');
+    const viewModal = document.getElementById('view-modal');
+    const searchInput = document.getElementById('search-sa');
+    const rows = Array.from(document.querySelectorAll('.sa-row'));
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
+    const tableEl = document.querySelector('.sa-table');
+    let activeFilter = 'all';
+
+    const pillHtml = {
+      draft: '<span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border"><span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Draft</span>',
+      pending: '<span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border"><span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Pending approval</span>',
+      posted: '<span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border"><span class="w-1.5 h-1.5 rounded-full bg-success"></span> Posted</span>',
+      cancelled: '<span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border"><span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Cancelled</span>'
+    };
+
+    function openSaModal() {
+      saModal.classList.remove('hidden');
+      saModal.setAttribute('aria-hidden', 'false');
+      document.getElementById('sa-type').focus();
+      syncTypeUi();
+    }
+    function closeSaModal() {
+      saModal.classList.add('hidden');
+      saModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function syncTypeUi() {
+      const type = document.getElementById('sa-type').value;
+      const isAudit = type === 'audit';
+      document.getElementById('audit-hint').classList.toggle('hidden', !isAudit);
+      const adjTh = document.querySelector('#sa-lines-head .col-adj');
+      if (adjTh) adjTh.textContent = isAudit ? 'Counted *' : 'Adj. qty *';
+      document.querySelectorAll('.line-row').forEach(recalcLine);
+    }
+
+    function recalcLine(tr) {
+      const book = parseFloat(tr.querySelector('.book-qty')?.value) || 0;
+      const adjInput = tr.querySelector('.adj-qty');
+      const newInput = tr.querySelector('.new-qty');
+      if (!adjInput || !newInput) return;
+      const type = document.getElementById('sa-type').value;
+      const raw = parseFloat(adjInput.value);
+      if (isNaN(raw)) {
+        newInput.value = '—';
+        return;
+      }
+      let next = book;
+      if (type === 'increase') next = book + Math.abs(raw);
+      else if (type === 'decrease') next = book - Math.abs(raw);
+      else next = raw; // audit: counted becomes new
+      newInput.value = String(Math.round(next * 100) / 100);
+    }
+
+    function openView(id) {
+      const d = SA_DETAILS[id];
+      if (!d) return;
+      document.getElementById('view-title').textContent = d.title;
+      document.getElementById('view-subtitle').textContent = d.type + ' · ' + d.wh;
+      let html = '<dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] mb-4">';
+      html += '<dt class="text-ink-faint">Date</dt><dd>' + d.date + '</dd>';
+      html += '<dt class="text-ink-faint">Reason</dt><dd>' + d.reason + '</dd></dl>';
+      html += '<p class="text-[13px] text-ink-muted mb-3">' + d.note + '</p>';
+      html += '<table class="w-full text-[13px] border border-slate-200 rounded overflow-hidden"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">';
+      html += '<th class="p-2 text-left">Item</th><th class="p-2 text-left">Desc</th><th class="p-2">Lot</th><th class="p-2">Book</th><th class="p-2">Counted</th><th class="p-2">Adj</th><th class="p-2">Unit</th></tr></thead><tbody>';
+      d.lines.forEach(function (line) {
+        html += '<tr class="border-t border-slate-100"><td class="p-2 font-mono text-[12px]">' + line[0] + '</td><td class="p-2">' + line[1] + '</td><td class="p-2 font-mono text-[12px]">' + line[2] + '</td><td class="p-2 text-center tabular-nums">' + line[3] + '</td><td class="p-2 text-center tabular-nums">' + line[4] + '</td><td class="p-2 text-center tabular-nums font-semibold">' + line[5] + '</td><td class="p-2 text-center">' + line[6] + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('view-body').innerHTML = html;
+      viewModal.classList.remove('hidden');
+      viewModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeView() {
+      viewModal.classList.add('hidden');
+      viewModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function updateFilterCounts() {
+      const counts = { all: 0, draft: 0, pending: 0, posted: 0, cancelled: 0 };
+      rows.forEach(function (row) {
+        const s = row.getAttribute('data-status');
+        counts.all++;
+        if (counts[s] !== undefined) counts[s]++;
+      });
+      document.querySelectorAll('.filter-btn').forEach(function (btn) {
+        const f = btn.getAttribute('data-filter');
+        const labels = { all: 'All', draft: 'Draft', pending: 'Pending approval', posted: 'Posted', cancelled: 'Cancelled' };
+        btn.textContent = labels[f] + ' (' + counts[f] + ')';
+      });
+    }
+
+    function applyFilters() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      let visible = 0;
+      rows.forEach(function (row) {
+        const blob = row.getAttribute('data-search') || '';
+        const status = row.getAttribute('data-status') || '';
+        const show = (!q || blob.indexOf(q) !== -1) && (activeFilter === 'all' || status === activeFilter);
+        row.classList.toggle('hidden', !show);
+        if (show) visible++;
+      });
+      emptyState.classList.toggle('hidden', visible > 0);
+      tableEl.classList.toggle('hidden', visible === 0);
+      resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' adjustments';
+    }
+
+    function submitRow(id) {
+      const row = document.querySelector('.sa-row[data-id="' + id + '"]');
+      if (!row || row.getAttribute('data-status') !== 'draft') return;
+      row.setAttribute('data-status', 'pending');
+      const dateCell = row.querySelector('.sa-date');
+      if (dateCell) {
+        dateCell.textContent = '16 Sep 2025';
+        dateCell.classList.remove('text-ink-faint');
+      }
+      row.querySelectorAll('.text-ink-faint').forEach(function (el) {
+        if (!el.classList.contains('status-pill') && !el.classList.contains('tabular-nums') || el.classList.contains('sa-no')) {
+          el.classList.remove('text-ink-faint');
+        }
+      });
+      const no = row.querySelector('.sa-no');
+      if (no) no.classList.remove('text-ink-faint');
+      row.querySelector('td:nth-child(9)').innerHTML = pillHtml.pending;
+      row.querySelector('.actions-cell').innerHTML =
+        '<button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="' + id + '">View</button>' +
+        '<button type="button" class="btn-approve px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white" data-id="' + id + '">Approve</button>';
+      wireActionButtons(row);
+      if (SA_DETAILS[id]) {
+        SA_DETAILS[id].title = id.toUpperCase() + ' · Pending approval';
+        SA_DETAILS[id].date = '16 Sep 2025';
+        SA_DETAILS[id].note = 'Submitted for approval (mock).';
+      }
+      updateFilterCounts();
+      applyFilters();
+    }
+
+    function approveRow(id) {
+      const row = document.querySelector('.sa-row[data-id="' + id + '"]');
+      if (!row || row.getAttribute('data-status') !== 'pending') return;
+      row.setAttribute('data-status', 'posted');
+      row.querySelector('td:nth-child(9)').innerHTML = pillHtml.posted;
+      row.querySelector('.actions-cell').innerHTML =
+        '<button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="' + id + '">View</button>' +
+        '<button type="button" class="px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">Print</button>';
+      wireActionButtons(row);
+      if (SA_DETAILS[id]) {
+        SA_DETAILS[id].title = id.toUpperCase() + ' · Posted';
+        SA_DETAILS[id].note = 'Approved & posted (mock) — stock ledger updated.';
+      }
+      updateFilterCounts();
+      applyFilters();
+    }
+
+    function wireActionButtons(scope) {
+      const root = scope || document;
+      root.querySelectorAll('.btn-view').forEach(function (btn) {
+        btn.onclick = function () { openView(btn.getAttribute('data-id')); };
+      });
+      root.querySelectorAll('.btn-submit').forEach(function (btn) {
+        btn.onclick = function () { submitRow(btn.getAttribute('data-id')); };
+      });
+      root.querySelectorAll('.btn-approve').forEach(function (btn) {
+        btn.onclick = function () { approveRow(btn.getAttribute('data-id')); };
+      });
+    }
+
+    function wireLineCalcs(tr) {
+      const adj = tr.querySelector('.adj-qty');
+      if (adj) adj.addEventListener('input', function () { recalcLine(tr); });
+      const rem = tr.querySelector('.btn-remove-line');
+      if (rem) rem.addEventListener('click', function () {
+        if (document.querySelectorAll('#sa-lines-tbody .line-row').length > 1) tr.remove();
+      });
+    }
+
+    document.getElementById('btn-new-sa').addEventListener('click', openSaModal);
+    document.getElementById('btn-empty-new').addEventListener('click', openSaModal);
+    document.getElementById('btn-close-sa-modal').addEventListener('click', closeSaModal);
+    document.getElementById('btn-cancel-sa').addEventListener('click', closeSaModal);
+    document.getElementById('sa-modal-backdrop').addEventListener('click', closeSaModal);
+    document.getElementById('btn-close-view').addEventListener('click', closeView);
+    document.getElementById('btn-close-view-2').addEventListener('click', closeView);
+    document.getElementById('view-backdrop').addEventListener('click', closeView);
+    document.getElementById('sa-type').addEventListener('change', syncTypeUi);
+
+    document.getElementById('btn-add-line').addEventListener('click', function () {
+      const tr = document.createElement('tr');
+      tr.className = 'line-row';
+      tr.innerHTML = '<td><select><option>RM-CU-01 Copper wire 2mm</option><option>RM-SW-01 Solder wire 0.8mm</option><option>RM-PK-01 Carton box medium</option></select></td>' +
+        '<td><input type="text" class="font-mono text-[12px]" placeholder="Lot" /></td>' +
+        '<td><input type="text" readonly class="tabular-nums book-qty" value="0" /></td>' +
+        '<td><input type="number" required class="tabular-nums adj-qty" step="0.01" value="0" /></td>' +
+        '<td><select><option>KG</option><option>PCS</option></select></td>' +
+        '<td><input type="text" readonly class="tabular-nums new-qty bg-mist" value="0" /></td>' +
+        '<td class="text-center"><button type="button" class="btn-remove-line text-ink-faint hover:text-stop text-lg leading-none">&times;</button></td>';
+      document.getElementById('sa-lines-tbody').appendChild(tr);
+      wireLineCalcs(tr);
+      recalcLine(tr);
+    });
+
+    document.querySelectorAll('#sa-lines-tbody .line-row').forEach(wireLineCalcs);
+
+    searchInput.addEventListener('input', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+          b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+        });
+        btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+        applyFilters();
+      });
+    });
+
+    saForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      showToast('Mock: Adjustment submitted for approval. Stock will change only after Approve.', 'success');
+      closeSaModal();
+    });
+    document.getElementById('btn-save-sa-draft').addEventListener('click', function () {
+      showToast('Mock: Adjustment saved as draft.', 'success');
+      closeSaModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!saModal.classList.contains('hidden')) closeSaModal();
+        if (!viewModal.classList.contains('hidden')) closeView();
+      }
+    });
+
+    wireActionButtons();
+    updateFilterCounts();
+    applyFilters();
+  </script>
+</body>
+</html>

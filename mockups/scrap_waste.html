@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scrap / Waste</title>
+  <!-- Phase 4 #5 — Scrap logging → Scrap Warehouse (spec §7.3); theme locked Ink/Copper -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
+            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
+            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link.is-disabled { opacity: 0.45; pointer-events: none; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .sc-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .sc-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 8px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .sc-table thead th:first-child,
+    .sc-table tbody td:first-child { text-align: left; padding-left: 16px; }
+    .sc-table thead th:last-child { border-right: none; }
+    .sc-table tbody td {
+      padding: 11px 8px;
+      font-size: 13.5px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .sc-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .sc-table tbody tr:hover { background: #FBF4EE; }
+    .search-wrap input { padding-left: 32px; }
+    #sc-modal.hidden, #view-modal.hidden { display: none; }
+    #sc-modal, #view-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+    .form-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8A4A1C;
+      margin: 0;
+    }
+    #sc-form .field-label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #0F2F32;
+      margin-bottom: 4px;
+    }
+    #sc-form .field-ctrl {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    #sc-form .field-ctrl:focus {
+      outline: none;
+      border-color: #C46B2D;
+      box-shadow: 0 0 0 1px #C46B2D;
+    }
+    #sc-form .field-ctrl:read-only { background: #F4F6F5; color: #6B7F82; }
+    #sc-form .qty-unit {
+      display: flex;
+      width: 100%;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #fff;
+    }
+    #sc-form .qty-unit:focus-within {
+      border-color: #C46B2D;
+      box-shadow: 0 0 0 1px #C46B2D;
+    }
+    #sc-form .qty-unit__num {
+      flex: 1 1 auto;
+      min-width: 5rem;
+      width: auto;
+      padding: 8px 10px;
+      font-size: 14px;
+      border: none;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    #sc-form .qty-unit__num:focus { outline: none; }
+    #sc-form .qty-unit__unit {
+      flex: 0 0 4.75rem;
+      width: 4.75rem;
+      padding: 8px 6px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-left: 1px solid #CBD5E1;
+      background: #F4F6F5;
+      color: #0F2F32;
+      box-sizing: border-box;
+    }
+    #sc-form .qty-unit__unit:focus { outline: none; }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link is-active" aria-current="page">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Scrap</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Scrap / waste</h1>
+        </div>
+        <button type="button" id="btn-new-sc"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Log scrap
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-sc" placeholder="Search scrap no., batch, type…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1" id="filter-bar">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (3)</button>
+            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (1)</button>
+            <button type="button" data-filter="posted" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Posted (2)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Spec §7.3: <strong>Saleable scrap</strong> goes to Scrap Warehouse (KG) · tiny process loss is not stocked · disposal later needs Scrap Tax Invoice + TCS rules
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="sc-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:11%" />
+              <col style="width:14%" />
+              <col style="width:11%" />
+              <col style="width:14%" />
+              <col style="width:10%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:8%" />
+              <col style="width:9%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Scrap no.</th>
+                <th>Batch / Lot</th>
+                <th>Prod. order</th>
+                <th>Scrap type</th>
+                <th>Kind</th>
+                <th>Qty</th>
+                <th>Stage</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sc-tbody">
+              <tr class="sc-row" data-search="sc-2025-001 batch-ws-20250910-001 metal slag saleable" data-status="posted" data-id="sc-001">
+                <td class="text-ink-faint tabular-nums">1</td>
+                <td class="font-mono font-semibold text-ink">SC-2025-001</td>
+                <td class="font-mono text-[12px]">BATCH-WS-20250910-001</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-001</a></td>
+                <td class="text-left !text-left text-[13px] pl-2">Metal slag</td>
+                <td><span class="text-[12px] font-semibold px-2 py-0.5 rounded border bg-brand-soft text-brand-teal border-brand-border">Saleable</span></td>
+                <td class="tabular-nums">12.5 KG</td>
+                <td class="text-[12.5px]">Soldering</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Posted
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sc-001">View</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="sc-row" data-search="sc-2025-002 batch-ws-20250914-002 burnt wire saleable" data-status="posted" data-id="sc-002">
+                <td class="text-ink-faint tabular-nums">2</td>
+                <td class="font-mono font-semibold text-ink">SC-2025-002</td>
+                <td class="font-mono text-[12px]">BATCH-WS-20250914-002</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-002</a></td>
+                <td class="text-left !text-left text-[13px] pl-2">Burnt wire</td>
+                <td><span class="text-[12px] font-semibold px-2 py-0.5 rounded border bg-brand-soft text-brand-teal border-brand-border">Saleable</span></td>
+                <td class="tabular-nums">3.2 KG</td>
+                <td class="text-[12.5px]">Soldering</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Posted
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sc-002">View</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="sc-row" data-search="sc-2025-003 batch-ws-20250916-003 cutting trim process loss draft" data-status="draft" data-id="sc-003">
+                <td class="text-ink-faint tabular-nums">3</td>
+                <td class="font-mono font-semibold text-ink-faint">SC-2025-003</td>
+                <td class="font-mono text-[12px] text-ink-faint">BATCH-WS-20250916-003</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-003</a></td>
+                <td class="text-left !text-left text-[13px] pl-2 text-ink-faint">Cutting trim</td>
+                <td><span class="text-[12px] font-semibold px-2 py-0.5 rounded border bg-neutral-bg text-neutral border-neutral-border">Process loss</span></td>
+                <td class="tabular-nums text-ink-faint">0.8 KG</td>
+                <td class="text-[12.5px] text-ink-faint">Cutting</td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Draft
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="sc-003">View</button>
+                    <button type="button" class="btn-post px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white" data-id="sc-003">Post</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No scrap entries found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search or log scrap against a production batch.</p>
+            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">Log scrap</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing 3 of 3 scrap entries</span>
+          <span>Phase 4 complete · open Consumption variance from sidebar</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Log scrap form -->
+  <div id="sc-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="sc-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="sc-modal-title" class="relative ml-auto h-full w-full max-w-xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="sc-modal-title" class="text-[16px] font-bold text-ink leading-tight">Log scrap / waste</h2>
+          <p class="text-[12.5px] text-ink-faint">Link to a batch · choose saleable vs process loss</p>
+        </div>
+        <button type="button" id="btn-close-sc-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+
+      <form id="sc-form" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+        <div>
+          <p class="form-section-title mb-2">Header</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="sc-no" class="field-label">Scrap no.</label>
+              <input type="text" id="sc-no" value="SC-2025-004" readonly class="field-ctrl font-mono text-[13px]" />
+            </div>
+            <div>
+              <label for="sc-date" class="field-label">Log date *</label>
+              <input type="date" id="sc-date" required value="2025-09-16" class="field-ctrl" />
+            </div>
+            <div class="col-span-2">
+              <label for="sc-batch" class="field-label">Batch / production order *</label>
+              <select id="sc-batch" required class="field-ctrl">
+                <option value="">Select batch…</option>
+                <option value="b1" selected>BATCH-WS-20250916-003 · PRO-2025-003 · FG-WS-01</option>
+                <option value="b2">BATCH-WS-20250914-002 · PRO-2025-002 · Heavy duty</option>
+                <option value="b3">BATCH-WS-20250910-001 · PRO-2025-001 · Completed</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p class="form-section-title mb-2">What was wasted</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="sc-kind" class="field-label">Kind *</label>
+              <select id="sc-kind" required class="field-ctrl">
+                <option value="saleable" selected>Saleable scrap (goes to Scrap WH)</option>
+                <option value="process">Process loss (not stocked)</option>
+              </select>
+            </div>
+            <div>
+              <label for="sc-type" class="field-label">Scrap type *</label>
+              <select id="sc-type" required class="field-ctrl">
+                <option>Metal slag</option>
+                <option>Burnt wire</option>
+                <option>Cutting trim</option>
+                <option>Plastic / insulation waste</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="sc-qty" class="field-label">Quantity *</label>
+              <div class="qty-unit">
+                <input type="number" id="sc-qty" required min="0.001" step="0.001" value="2.5" class="qty-unit__num tabular-nums" />
+                <select class="qty-unit__unit" aria-label="Unit"><option>KG</option><option>PCS</option></select>
+              </div>
+            </div>
+            <div>
+              <label for="sc-stage" class="field-label">Occurred at stage *</label>
+              <select id="sc-stage" required class="field-ctrl">
+                <option>Cutting</option>
+                <option selected>Soldering</option>
+                <option>Assembly</option>
+                <option>Testing</option>
+              </select>
+            </div>
+            <div class="col-span-2" id="sc-wh-wrap">
+              <label for="sc-wh" class="field-label">Scrap warehouse *</label>
+              <select id="sc-wh" class="field-ctrl">
+                <option>Scrap Warehouse</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label for="sc-notes" class="field-label">Remarks</label>
+              <textarea id="sc-notes" rows="2" class="field-ctrl" placeholder="e.g. Excess heat on station 2…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div id="sc-kind-hint" class="rounded border border-brand-border bg-brand-soft px-3 py-2.5 text-[13px] text-ink-muted">
+          <strong class="text-ink">Saleable scrap:</strong> physical waste you can sell later — stock increases in Scrap Warehouse (usually KG). Disposal later may need Scrap Tax Invoice + 1% TCS (mock note only).
+        </div>
+      </form>
+
+      <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2 shrink-0">
+        <button type="button" id="btn-save-draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+        <button type="button" id="btn-cancel-sc" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="sc-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post scrap</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View -->
+  <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="view-title" class="text-[16px] font-bold text-ink">Scrap detail</h2>
+          <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/erp-toast.js"></script>
+  <script>
+    var SC_DETAILS = {
+      'sc-001': {
+        title: 'SC-2025-001 · Posted',
+        batch: 'BATCH-WS-20250910-001',
+        pro: 'PRO-2025-001',
+        type: 'Metal slag',
+        kind: 'Saleable',
+        qty: '12.5 KG',
+        stage: 'Soldering',
+        wh: 'Scrap Warehouse',
+        date: '10 Sep 2025',
+        note: 'Posted to Scrap Warehouse. Can be sold later via Scrap Tax Invoice (future).'
+      },
+      'sc-002': {
+        title: 'SC-2025-002 · Posted',
+        batch: 'BATCH-WS-20250914-002',
+        pro: 'PRO-2025-002',
+        type: 'Burnt wire',
+        kind: 'Saleable',
+        qty: '3.2 KG',
+        stage: 'Soldering',
+        wh: 'Scrap Warehouse',
+        date: '14 Sep 2025',
+        note: 'Linked to batch for traceability.'
+      },
+      'sc-003': {
+        title: 'SC-2025-003 · Draft',
+        batch: 'BATCH-WS-20250916-003',
+        pro: 'PRO-2025-003',
+        type: 'Cutting trim',
+        kind: 'Process loss',
+        qty: '0.8 KG',
+        stage: 'Cutting',
+        wh: '— (not stocked)',
+        date: '16 Sep 2025',
+        note: 'Process loss within tolerance — recorded for cost analysis only, no Scrap Warehouse stock.'
+      }
+    };
+
+    var scModal = document.getElementById('sc-modal');
+    var viewModal = document.getElementById('view-modal');
+    var currentFilter = 'all';
+
+    function openScModal() {
+      scModal.classList.remove('hidden');
+      scModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeScModal() {
+      scModal.classList.add('hidden');
+      scModal.setAttribute('aria-hidden', 'true');
+    }
+    function openView(id) {
+      var d = SC_DETAILS[id];
+      if (!d) return;
+      document.getElementById('view-subtitle').textContent = d.title;
+      document.getElementById('view-body').innerHTML =
+        '<dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13.5px]">' +
+        '<dt class="text-ink-faint">Batch</dt><dd class="font-mono font-semibold">' + d.batch + '</dd>' +
+        '<dt class="text-ink-faint">Prod. order</dt><dd class="font-mono">' + d.pro + '</dd>' +
+        '<dt class="text-ink-faint">Scrap type</dt><dd>' + d.type + '</dd>' +
+        '<dt class="text-ink-faint">Kind</dt><dd>' + d.kind + '</dd>' +
+        '<dt class="text-ink-faint">Qty</dt><dd class="tabular-nums">' + d.qty + '</dd>' +
+        '<dt class="text-ink-faint">Stage</dt><dd>' + d.stage + '</dd>' +
+        '<dt class="text-ink-faint">Warehouse</dt><dd>' + d.wh + '</dd>' +
+        '<dt class="text-ink-faint">Date</dt><dd>' + d.date + '</dd>' +
+        '</dl><p class="mt-3 text-[12.5px] text-ink-faint">' + d.note + '</p>';
+      viewModal.classList.remove('hidden');
+      viewModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeView() {
+      viewModal.classList.add('hidden');
+      viewModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function applyFilters() {
+      var q = (document.getElementById('search-sc').value || '').trim().toLowerCase();
+      var rows = document.querySelectorAll('.sc-row');
+      var shown = 0;
+      rows.forEach(function (row) {
+        var status = row.getAttribute('data-status') || '';
+        var search = row.getAttribute('data-search') || '';
+        var ok = (currentFilter === 'all' || status === currentFilter) && (!q || search.indexOf(q) !== -1);
+        row.classList.toggle('hidden', !ok);
+        if (ok) shown++;
+      });
+      document.getElementById('result-count').textContent = 'Showing ' + shown + ' of ' + rows.length + ' scrap entries';
+      document.getElementById('empty-state').classList.toggle('hidden', shown > 0);
+    }
+
+    function updateFilterCounts() {
+      var rows = document.querySelectorAll('.sc-row');
+      var counts = { all: rows.length, draft: 0, posted: 0 };
+      rows.forEach(function (r) {
+        var s = r.getAttribute('data-status');
+        if (counts[s] !== undefined) counts[s]++;
+      });
+      document.querySelectorAll('.filter-btn').forEach(function (btn) {
+        var f = btn.getAttribute('data-filter');
+        var labels = { all: 'All', draft: 'Draft', posted: 'Posted' };
+        btn.textContent = labels[f] + ' (' + counts[f] + ')';
+      });
+    }
+
+    function markPosted(row) {
+      row.setAttribute('data-status', 'posted');
+      var pill = row.querySelector('.status-pill');
+      if (pill) {
+        pill.className = 'status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border';
+        pill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-success"></span> Posted';
+      }
+      var cell = row.querySelector('.actions-cell');
+      if (cell) {
+        var id = row.getAttribute('data-id');
+        cell.innerHTML = '<button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="' + id + '">View</button>';
+      }
+      row.querySelectorAll('.text-ink-faint').forEach(function (el) {
+        if (el.closest('td') !== row.cells[0]) el.classList.remove('text-ink-faint');
+      });
+    }
+
+    /* Kind change — process loss pe warehouse hide */
+    function syncKindUi() {
+      var kind = document.getElementById('sc-kind').value;
+      var whWrap = document.getElementById('sc-wh-wrap');
+      var hint = document.getElementById('sc-kind-hint');
+      if (kind === 'process') {
+        whWrap.classList.add('hidden');
+        hint.className = 'rounded border border-neutral-border bg-neutral-bg px-3 py-2.5 text-[13px] text-ink-muted';
+        hint.innerHTML = '<strong class="text-ink">Process loss:</strong> tiny invisible loss (evaporation, trim within tolerance). Recorded for analysis — <em>not</em> added to Scrap Warehouse stock.';
+      } else {
+        whWrap.classList.remove('hidden');
+        hint.className = 'rounded border border-brand-border bg-brand-soft px-3 py-2.5 text-[13px] text-ink-muted';
+        hint.innerHTML = '<strong class="text-ink">Saleable scrap:</strong> physical waste you can sell later — stock increases in Scrap Warehouse (usually KG). Disposal later may need Scrap Tax Invoice + 1% TCS (mock note only).';
+      }
+    }
+
+    document.getElementById('btn-new-sc').addEventListener('click', openScModal);
+    document.getElementById('btn-empty-new').addEventListener('click', openScModal);
+    document.getElementById('btn-close-sc-modal').addEventListener('click', closeScModal);
+    document.getElementById('btn-cancel-sc').addEventListener('click', closeScModal);
+    document.getElementById('sc-modal-backdrop').addEventListener('click', closeScModal);
+    document.getElementById('btn-close-view').addEventListener('click', closeView);
+    document.getElementById('btn-close-view-2').addEventListener('click', closeView);
+    document.getElementById('view-backdrop').addEventListener('click', closeView);
+    document.getElementById('sc-kind').addEventListener('change', syncKindUi);
+
+    document.getElementById('search-sc').addEventListener('input', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        currentFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+          b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+        });
+        btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+        applyFilters();
+      });
+    });
+
+    document.getElementById('sc-tbody').addEventListener('click', function (e) {
+      var viewBtn = e.target.closest('.btn-view');
+      if (viewBtn) {
+        openView(viewBtn.getAttribute('data-id'));
+        return;
+      }
+      var postBtn = e.target.closest('.btn-post');
+      if (postBtn) {
+        var row = document.querySelector('.sc-row[data-id="' + postBtn.getAttribute('data-id') + '"]');
+        if (!row) return;
+        markPosted(row);
+        updateFilterCounts();
+        applyFilters();
+        showToast('Scrap posted. Process loss stays off stock; saleable scrap would hit Scrap Warehouse.', 'success');
+      }
+    });
+
+    document.getElementById('sc-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var kind = document.getElementById('sc-kind').value;
+      if (kind === 'saleable') {
+        showToast('Scrap posted → Scrap Warehouse (+' + document.getElementById('sc-qty').value + ' KG mock).', 'success');
+      } else {
+        showToast('Process loss logged for cost analysis — no warehouse stock move.', 'info');
+      }
+      closeScModal();
+    });
+    document.getElementById('btn-save-draft').addEventListener('click', function () {
+      showToast('Scrap entry saved as draft.', 'success');
+      closeScModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!scModal.classList.contains('hidden')) closeScModal();
+        else if (!viewModal.classList.contains('hidden')) closeView();
+      }
+    });
+
+    syncKindUi();
+    updateFilterCounts();
+    applyFilters();
+  </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+# Project Tracker — Manufacturing ERP (Wire Soldering)
+
+Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan update hoga — taaki kabhi bhi dekh ke pata chal jaaye "hum abhi kahan hain" bina puri conversation history khangale.
+
+**Kaise use karein:** Har naye session/kaam ke start mein sabse pehle yeh file padho — "Current Focus" section batayega agla kaam kya hai.
+
+---
+
+## Current Focus
+
+> ⭐ **MOST IMPORTANT (2026-09-17): Manual Learning Mode** — Part 2 Flask backend me **user khud type karega**, AI sirf step-by-step sikhayega. Poora playbook: **`learning.md`**. Cursor rule: `.cursor/rules/manual-learning.mdc`. Claude: `CLAUDE.md` §0A.
+
+> Workflow: Sab mockups pehle (Part 1 mostly done) → phir backend micro-steps. UI text English, comments Hinglish.
+
+> **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
+
+**Abhi chal raha hai:** `Part2 / Foundation / F1` — venv + Flask install  
+User flow samajh chuka; ab banate hue seekhega. Jab F1 done bole / CHECK pass → F2.
+
+Tumhari taraf: neeche wale 3 commands PowerShell me chalao, phir yahan result batao.
+
+---
+
+## Overall Phase Progress (from Manufacturing_ERP_Unified_Requirements_Specification.md, Section 23)
+
+| Phase | Name | Status |
+|---|---|---|
+| 0 | Foundation, Auth & Multi-Tenancy | ⬜ Not Started |
+| 1 | Master Data Management & Dynamic Attributes | 🟡 In Progress (9 masters mocked: Unit/Machine/Vendor/Customer/Raw Material/Product/Warehouse/RM Category/Product Category) |
+| 2 | Procurement, GRN & Inward QC | 🟡 In Progress (mockups 5/5 built + verified) |
+| 3 | Inventory, Warehouse & Stock Valuation | 🟡 In Progress (stock mockups 4/4 + Warehouse Master mock added) |
+| 4 | Manufacturing Engine, BOM, Routing & WIP | 🟡 In Progress (mockups 6/6 built) |
+| 5 | Lab/QC & Finished Goods Traceability | ⬜ Not Started |
+| 6 | Sales, E-Way Bill & Mandatory E-Invoicing | ⬜ Not Started |
+| 7 | Tally-Grade Accounting & Bill-by-Bill | ⬜ Not Started |
+| 8 | Financial Reporting, GST & March Baki | ⬜ Not Started |
+| 9 | Expenses & Fixed Asset Management | ⬜ Not Started |
+| 10 | Dashboards, Approval Workflow & Notifications | ⬜ Not Started |
+| 11 | Documents, Global Search & UX | ⬜ Not Started |
+| 12 | Import/Export & Opening Balance Migration | ⬜ Not Started |
+| 13 | Future Integrations | ⬜ Not Started |
+
+Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
+
+---
+
+## Phase 1 — Module-wise Detail Tracker
+
+**Revised structure (2026-09-16):** Part 1 = sab 6 modules ka Step A (mockup). Part 2 = sab 6 modules ka Step B→C→D (backend), Part 1 poora hone ke baad shuru hoga. (Purana plan: har module ka poora A→D ek saath — `memory.md` me reasoning hai.)
+
+### Part 1 — Mockups (Step A, sab modules)
+- [x] Module 1: Unit Master — `mockups/unit_master.html` — **approved 2026-09-15**
+- [x] Module 2: Machine Master — `mockups/machine_master.html` — **approved 2026-09-16**
+- [x] Module 3: Vendor Master — `mockups/vendor_master.html` — **approved 2026-09-16**
+- [x] Module 4: Customer Master — `mockups/customer_master.html` — **approved 2026-09-16**
+- [x] Module 5: Raw Material Master — `mockups/raw_material_master.html` — **approved 2026-09-16**
+- [x] Module 6: Product Master + Dynamic Variants — `mockups/product_master.html` — **approved 2026-09-16**
+- [ ] Module 7 (gap-fill): Warehouse Master — `mockups/warehouse_master.html` — **Step A mock ready 2026-09-17** (spec §4.1; stock pages ispe depend karti hain)
+
+### Part 2 — Backend (Step B → C → D, sab modules) — Part 1 complete hone ke baad shuru
+
+- [ ] Module 1: Unit Master — Step B/C pehle ek baar ban chuke the (tested, working) phir jaan-boojhkar hataye gaye — dobara banana hoga
+  - [ ] Step B — Flask + Jinja2 conversion
+  - [ ] Step C — Database table (`Unit` model) + backend routes
+  - [ ] Step D — Connect + acceptance checklist
+- [ ] Module 2: Machine Master (Step B/C/D)
+- [ ] Module 3: Vendor Master (Step B/C/D + Auto-Ledger creation logic)
+- [ ] Module 4: Customer Master (Step B/C/D + Auto-Ledger creation logic)
+- [ ] Module 5: Raw Material Master (Step B/C/D + Unit foreign key)
+- [ ] Module 6: Product Master (Step B/C/D + JSONB-style dynamic attributes + SKU logic)
+
+### Phase 1 Wrap-up
+- [x] Cross-module sidebar navigation check *(2026-09-17 — saare 21 mockups me same nav: Masters → Procurement → Inventory → Manufacturing)*
+- [ ] Auto-Ledger verified (Vendor/Customer → ledger created)
+- [ ] Full demo walkthrough with user
+- [ ] Git checkpoint tagged `phase-1-complete`
+
+---
+
+## Work Log
+
+*(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-17 — ⭐ Manual Learning Mode locked (Claude limit se pehle plan incomplete tha — Cursor ne complete kiya):** User ne decide kiya Part 2 Flask **khud type** karega; AI ek-ek micro-step sikhayega. Files: `learning.md` (playbook), `CLAUDE.md` §0A, `.cursor/rules/manual-learning.mdc` (alwaysApply), `development.md` Part 2 update, `memory.md` decision. Current Focus → next = `Part2 / Foundation / F1` jab user ready bole.
+
+- **2026-09-17 — Flow-only verification pass (user ne clarify kiya: abhi data-value reconciliation nahi chahiye, backend banate waqt woh apne aap sahi hoga — filhaal sirf flow + fields check karo).** Poore Procurement/Inventory/Manufacturing chain ke cross-document `<a href>` links scan kiye, saari files mein decorative/dead buttons dhoonde. 2 real flow-breaks mile: (1) `purchase_order.html` ka "GRN" button sirf `<button>` tha, kahi navigate nahi karta tha — real `<a href="gate_inward_grn.html">` bana diya. (2) `production_order.html` mein "BOM-001"/"BOM-002" sirf plain text the (table cells + View panel dono mein) — ab `bom_recipe.html` tak clickable links hain. Baaki poora flow (PO↔GRN↔QC↔Invoice↔Return, Stock chain, Material Issue/Routing/Scrap/Consumption Variance → Production Order) already sahi tha. Standing rule save ki: mockup-stage verification ab se sirf flow+fields tak limited rahegi, deep data-value cross-check nahi (memory.md).
+
+- **2026-09-17 — "Sare pages verify kar de": poore 6 original Phase 1 masters ka disconnect-check.** User ke "pehle sare pages verify karde" instruction ke baad, Raw Material Master jaisa hi pattern do aur jagah mila:
+  - **Product Master disconnect thi** — `P-001 Wire Soldering` (Small/2MM, Medium/3MM, Large/5MM) poori Manufacturing chain ke `FG-WS-01`/`FG-WS-02` (Standard 1m, Heavy duty 2m, 3-core) se match nahi karta tha. Fix: dono products + variants + View-panel data rewrite kiye.
+  - **Machine Master disconnect thi** — `M-001..006` Production Routing ke `MC-CUT-01`/`MC-SLD-02`/`MC-ASM-01`/`MC-TST-01` se match nahi karte the. Fix: 4 machines exact codes se rename + Active kiye (Routing live use karta hai), 2 aur machines naming-scheme se consistent banayi, 1 naya row add kiya taaki Maintenance/Breakdown/Retired teeno demo-states bhi bani rahein.
+  - **Verified clean:** Unit Master (generic units), RM/Product Category Masters (already match karti hain), Customer Master (abhi koi Sales file exist nahi karti compare karne ko).
+  - Pattern samajh aaya: Phase 1 ke masters generic placeholder data ke saath bane the, baad mein Phase 2/3/4 ki elaborate story banane ke baad wapas update nahi hue the — isliye 3/6 masters (RM, Product, Machine) disconnect nikle.
+- **2026-09-17 — Raw Material Master ka code scheme poori codebase se disconnect tha (pehla catch).** User ne Purchase Order module PRD ke against verify karne ko kaha — usi verification mein pata chala Raw Material Master ke codes (`RM-001`..`RM-006`, generic names) 15+ Procurement/Inventory/Manufacturing files (`RM-CU-01`/`RM-SW-01`/`RM-PK-01`/`RM-FL-01` scheme use karti hain) se bilkul match nahi karte the. Decision: Raw Material Master ko us badi, already-interconnected story se match karaya (1 file rewrite, na ki 15+ files rewire). `raw_material_master.html` ki saari 6 rows + View panel data + filter counts rewrite kiye — ab codes RM-CU-01/02/03, RM-SW-01, RM-FL-01, RM-PK-01 hain (+ 1 naya RM-OLD-01 Stopped-demo row). Saath hi ek aur mismatch mila aur fix kiya: Purchase Order/GRN/QC/Invoice/Return ke vendor names ("ABC Copper Supplies" etc.) Vendor Master ke actual vendors se match nahi karte the — sab 5 files mein rename kiya (state/tax-type match karte hue: Shree Copper Traders/Precision Components/Gujarat Plastics/Speedway Logistics), display text + search-tokens dono update kiye. `development.md` mein poora likha hai.
+
+- **2026-09-17 — Warehouse-naming consistency poori codebase mein fix kiya (user ne khud verify karne ko kaha tha):** Pehle "QC Hold" vs "QC Hold Bay" aur "WIP Store"/"WIP Floor" vs "WIP Staging" ka mismatch flag kiya tha but fix nahi kiya tha ("cosmetic, low priority"). Ab poori codebase scan karke sab dropdown options, table cells, JS data objects Warehouse Master ke exact naam se match kiye — 7 files touch hue (`stock_transfer.html`, `stock_adjustment.html`, `stock_ledger.html`, `material_issue.html`, `production_order.html`, `purchase_return.html`, `gate_inward_grn.html`). Ek deeper gap bhi mila: `stock_transfer.html`'s cross-GSTIN example "Main RM (Ahmedabad)" → "Branch FG (Surat)" Warehouse Master ki kisi entry se match hi nahi karta tha — fix: destination ko real "Branch RM Store" (Surat) se badla (RM→RM transfer, zyada sahi story), Warehouse Master mein WH-RM02 ko Stopped se Active kiya, aur naya demo-Stopped row (WH-OLD1) add kiya taaki Stopped-example bhi bana rahe. RM/Product Category dropdowns bhi cross-check kiye — wo pehle se hi sahi the.
+
+- **2026-09-17 — Raw Material Category Master + Product Category Master banaye:** User ne Warehouse Master dekh ke poocha "Category ke liye bhi alag master banau kya" — Claude ne pehle recommend kiya tha ki sirf chhota inline picker (jaisa Branch ke liye) kaafi hai, alag page zaroorat se zyada hai. User ne explicitly override kiya: "in 3 (Warehouse + 2 Category) ke liye master pages bana de." Do naye files banaye: `mockups/raw_material_category_master.html` (Metals/Consumables/Plastics/Components/Packaging + 1 Stopped) aur `mockups/product_category_master.html` (Wire Harness/Connectors/Packaging/Other + 1 Stopped) — dono Unit Master ka exact pattern (Code/Name/Description/toggle-switch Active-Stopped). `raw_material_master.html` aur `product_master.html` ke Category field simplify kiye — purana inline +Add/Manage (`erp-list-picker.js`) hata ke plain dropdown + "Manage categories →" link (Base Unit field jaisa). Sab 24 mockup files ke sidebar me dono naye links add kiye (bulk sed insertion, Raw materials/Products ke turant baad).
+
+- **2026-09-17 — Cursor ke naye changes verify kiye (Warehouse Master + Scrap/waste + Consumption variance + bulk sidebar sync):** 3 naye files check kiye. Overall quality achhi — sab spec-compliant, Hinglish sirf comments me, status-buttons live. 3 fixes kiye: (1) `warehouse_master.html` ka `warning` color token galat tha (poori codebase ke locked value se match nahi karta tha) — fix kiya, `neutral` token bhi add kiya jo missing tha, `.type-qc` badge ka hardcoded hex bhi sahi kiya. (2) `consumption_variance.html` ke "actual" numbers `material_issue.html` ke "issued" numbers se match nahi karte the same batch ke liye (MI-2025-001: Copper 25→25.4 KG, Heat-shrink 500→498 PCS; MI-2025-002: 2 lines missing the jo Consumption Variance assume kar raha tha) — `material_issue.html` update kiya taaki dono pages same story batayein, list table ka stale "Lines: 6" count bhi "4" kiya. (3) "Finished Goods" → "FG Warehouse" rename kiya `stock_ledger.html`/`stock_transfer.html`/`stock_adjustment.html` me taaki Warehouse Master ke exact naam se match kare ("QC Hold"/"WIP Store" jaisi baaki naming drift abhi flag ki hai but fix nahi ki — cosmetic, mostly prose me hai). `development.md` Module 7 aur Section 10 me poora report likha.
+- **2026-09-17 — Warehouse Master mock (Step A):** User ne point kiya stock pages pe warehouse use ho raha tha lekin master nahi tha. Banaya `mockups/warehouse_master.html` (spec §4.1: name, type RM/WIP/FG/SCRAP/QC_HOLD, location, active + Branch). Fake rows stock screens se match (Main RM, FG, Scrap, QC Hold, WIP). Sab 22 mockups ke Masters sidebar me **Warehouses** link add.
+- **2026-09-17 — Sidebar unify (sab 21 mockups):** Pehle masters/procurement pages me Inventory+Manufacturing missing / incomplete the. Ab har page pe same nav: Masters → Procurement → Inventory → Manufacturing (21 links), current page pe `is-active`. Verified: no broken quotes, har file me exactly 1 active link.
+
+### 2026-09-17 (continued)
+- Phase 4 #6 — `mockups/consumption_variance.html` (spec §7.2: Planned vs Actual per material, Variance=Actual−Planned, Over/Under/On plan filters, Mark reviewed + toast). **Phase 4 manufacturing mocks 6/6 complete.**
+- Phase 4 #5 — `mockups/scrap_waste.html` (spec §7.3: Saleable scrap → Scrap Warehouse vs Process loss not stocked; batch link, stage, qty KG; Draft→Posted + toast). Sidebars linked. Remaining: Consumption variance.
+- **BOM cost calculator ko live (client-side JS) banaya** — flow-walkthrough ke dauraan user ko "New BOM" form ke Est. cost fields confuse kar rahe the (static numbers the, Scrap% factor hi nahi ho raha tha). Fix: har RM/Consumable line ab `Qty × Rate` (chhota `ITEM_RATES` lookup table, Stock Valuation ke FIFO rate se match) se live calculate hota hai, RM lines mein Scrap% bhi ab sahi se jud़ta hai (`gross qty = qty × (1+scrap%)`), Labor/Overhead bhi live hai. Total ₹98.8 (static, scrap ignore) se ₹99.62 (live, scrap included) ho gaya. Machine hours abhi bhi **combined** (4 stages ka total) hi rakha hai, per-stage breakdown nahi kiya (scope-creep avoid karne ke liye, chaho to baad mein bana sakte hain). `mockups/bom_recipe.html`.
+
+### 2026-09-17
+- **Flow-walkthrough shuru hote hi ek numbers-bug mila:** `stock_valuation.html` ke FIFO layers panel (RM-CU-01) me "remain" column samjhate waqt pata chala ki uska Closing Qty (180) us panel ki apni 3 transactions (Opening 50 + GRN 180 − Transfer 30 = 200) se match nahi karta tha. Root cause: `stock_ledger.html` ke isi item ke full ledger me ek 4th movement hai — **Purchase Return PR-2025-003 (−20 KG)** — jo valuation ke layers array me missing thi. Fix: Return ko GRN-2025-003 ki fresh lot se (business logic — jo abhi-abhi aaya, wahi return hota hai), aur Transfer ko Opening lot se (FIFO — sabse purani layer) nikalta hua dikhaya; ab 50+180−20−30=180, Stock Ledger se match karta hai. `stock_valuation.html`.
+- **Phase 3 (4 files) + Phase 4 (4 files) — sab 8 naye Cursor-built mockups Claude ne verify kiye**, requirements spec Section 6 (Inventory) aur Section 7 (Production) ke against, Phase 1/2 ke established design system ke against. Overall quality bahut achhi mili — koi visible Hinglish UI text nahi, `neutral` color token pehli baar bina fix ke sahi mila (ek file me comment tha "Phase 2 verify ke baad yehi locked"), saare fields spec se match, saare status-advance buttons (Dispatch/Receive, Submit/Approve, Release/Start/Complete, Post) functionally wired the, cross-document links (Phase 2 document IDs tak) real the.
+- **2 sidebar consistency bugs mile aur fix kiye:** (1) Phase 4 ki saari 4 files (`bom_recipe.html`, `production_order.html`, `production_routing.html`, `material_issue.html`) me sidebar se **Procurement section pura gayab tha** — Masters se seedha Inventory pe jump karta tha, Manufacturing screen se Procurement pages tak wapas jaane ka koi rasta nahi tha. (2) Phase 3 ki files me **Manufacturing section inconsistent tha** — `stock_ledger.html`/`stock_transfer.html`/`stock_adjustment.html` me bilkul nahi tha, `stock_valuation.html` me sirf BOM/Recipe link tha (baaki 3 items + 2 "coming later" placeholders missing). Sabhi 8 files me ab poora, consistent sidebar hai: Masters → Procurement → Inventory → Manufacturing.
+- **Minor fix:** `stock_ledger.html` ke alert filter pills me "Excess Stock" missing tha (Quick help text spec §6.3 ke sab 4 alert types cite karta hai: Low/Reorder/Out/Excess, lekin filter buttons sirf 3 the) — `Excess (0)` pill add kiya.
+- `development.md` update kiya — Section 9 (Phase 3) aur Section 10 (Phase 4) me poora verification report likha (Phase 2 ke Section 8 jaisa pattern), Section 11 "Immediate Next Action" ko update kiya (ab sab 14 Phase 2/3/4 screens ready hain walkthrough ke liye).
+
+### 2026-09-16
+- Phase 4 #4 — `mockups/production_routing.html` (spec §7: Cutting→Soldering→Assembly→Testing pipeline, Update stage panel with operator/machine, live Complete stage + toast). Linked from Material issue sidebar.
+- Chrome `alert()` hata ke shared in-app toast: `mockups/assets/erp-toast.js` (`showToast(msg, type)` — success/error/warning/info). Sab mockups me wire kiya.
+- Phase 4 #3 — `mockups/material_issue.html` (spec §7: issue vs released PRO, BOM-resolved lines, RM lot pick, Post = Dr WIP | Cr RM; live Draft→Posted). Linked from Production order / BOM sidebars.
+- Phase 4 #2 — `mockups/production_order.html` (spec §7.1: order + auto Batch/Lot, active BOM link, planned qty, warehouse, responsible user; statuses Draft→Released→In progress→Completed with live buttons). BOM sidebar linked.
+- BOM New form UX clarify — user ne kaha **left-right scroll nahi**, upar-neeche OK; phir **chhota + fields cut** fix: `bom_recipe.html` ab PO jaisa `max-w-4xl`, tables bina `table-layout:fixed`, header 4-col.
+- Phase 3 started — first mock `mockups/stock_ledger.html` (balances + Opening/In/Out/Closing ledger panel, warehouse + alert filters). Planned next: stock transfer → adjustment → valuation. `development.md` Section 10 added.
+- Phase 3 #2 — `mockups/stock_transfer.html` (WH→WH, transit statuses, cross-GSTIN E-Way checkbox, Dispatch/Receive live). Linked from stock ledger sidebar.
+- Phase 3 #3 — `mockups/stock_adjustment.html` (Increase/Decrease/Physical audit, reason + approval flow, Submit/Approve live).
+- Phase 3 #4 — `mockups/stock_valuation.html` (FIFO ↔ Moving WAVG toggle, layers panel, WIP note). Phase 3 inventory mock chain complete.
+- Phase 4 started — first mock `mockups/bom_recipe.html` (BOM per variant: RM/consumables/packaging/labor, routing stages, Activate live). `development.md` Section 11.
+- **Rejection Memo + status-change buttons live kiye** (user ne poocha "Memo kahan se dekhein, status kaise badlenge"). `inward_qc.html` me naya **Memo view panel** banaya (MEMO_DETAILS data + modal) — "Memo" button ab QC-2025-003/004 ke actual rejection details dikhata hai (material, qty, reason, GRN/vendor trace). Saath hi 4 files me **status-advance buttons live kiye** (Phase 1 ke toggle jaisa concept, client-side mock): PO "Confirm" (Draft→Open), GRN "Post GRN" (Draft→Pending QC), PI "Post" (Draft→Posted), PR "Post" (Draft→Posted) — click karte hi row ka status badge, related fields, aur filter counts turant update hote hain.
+- **Phase 2 mockups cross-verified by Claude against requirements spec Section 5** (5 files Cursor se bani thi — session limit ki wajah se). Overall quality bahut achhi mili: fields spec se match (QC parameter values tak exact match), cross-document linking (PO↔GRN↔QC↔PI↔Return) sahi kaam karta hai, TDS 194Q banner, accepted-qty caps, direct-invoice-without-PO — sab spec ke mutabik. 3 fixes kiye: (1) `neutral` color token Phase 1 se match kiya (5 files), (2) QC-2025-001/PI-2025-001 ke beech data-inconsistency thi (QC "Pending" dikha raha tha jabki PI usi qty ko already bill kar chuka tha) — QC ko "Passed" kiya, GRN-2025-001 ka status "Pending QC" se "Closed" kiya (dono lines resolve ho chuki), filter counts aur View details bhi update kiye, (3) ek stale comment hataya. `development.md` Section 8 me poora verification report likha hai. Koi visible Hinglish UI text nahi mila (poora sweep kiya).
+- PRD Phase 2 — first mock: `mockups/purchase_order.html` (PO list, filters, New PO wide form with line items + tax split, View panel). Theme matches Phase 1 masters. Sidebar Procurement section added.
+- PRD Phase 2 — second mock: `mockups/gate_inward_grn.html` (GRN list, gate inward fields per spec §5.1, New GRN from PO, View panel, Inward QC placeholder). PO sidebar link enabled.
+- PRD Phase 2 — third mock: `mockups/inward_qc.html` (QC list, RM templates, pass/reject qty, View + Inspect panel, Rejection Memo hint). Sidebar linked from PO/GRN.
+- PRD Phase 2 — fourth mock: `mockups/purchase_invoice.html` (PI list, from GRN/QC + direct invoice, spec §5.2 fields, Post mock). Procurement sidebar complete except Purchase return.
+- PRD Phase 2 — fifth mock: `mockups/purchase_return.html` (return vs posted PI, reason, partial qty, debit note, stock/payable mock). Full procurement sidebar chain linked.
+- Product Master ke Variant card mein labels missing the (sirf placeholder text tha, jo type karte hi gayab ho jaata) — "Variant name", "SKU" ke upar proper labels add kiye, aur Attributes list ke upar ek baar "Attribute name" / "Value" column-header hint add kiya (har row pe repeat nahi kiya). `mockups/product_master.html`.
+- **Raw Material Master approved.** User ne yaad dilaya ki teaching/explanation continue rakhni hai, sirf pehle modules tak limited nahi (feedback global memory + `memory.md` me save kiya). Product Master mockup banaya (`mockups/product_master.html`) — Phase 1 ka aakhri module, sabse complex: Product(parent)/Variant(child) two-level table with expand/collapse, dynamic key-value attribute rows (JSONB concept ka UI preview), "+ Add attribute"/"+ Add another variant" cloning JS, SKU per variant. Do bilkul alag products (Wire Soldering vs Packaging Box) jaan-boojhkar diye taaki dikhe ki attributes sach me flexible hain.
+- **Customer Master approved.** Raw Material Master mockup banaya (`mockups/raw_material_master.html`) — pehla module jisme "Base Unit" dropdown Unit Master ki list use karta hai (abhi mock me wahi fake units hardcoded hain, Part 2 me real DB relationship banega — "no hardcoded dropdowns" rule ko yahin se follow karna shuru kiya). Category dropdown bhi admin-extensible design me hai. Jaan-boojhkar koi Rate/Price field nahi rakha (spec ka rule: master price kabhi fix nahi hoti). Stock control fields (Reorder/Min/Max) aur Alternate Unit+Conversion pair bhi add kiye. Saare 5 mockups ke sidebar links cross-linked kiye.
+- **Machine Master + Vendor Master approved.** Customer Master mockup banaya (`mockups/customer_master.html`) — Vendor Master ka pattern reuse kiya (sectioned form, View button, curated table, tooltips): "Vendor Type" ki jagah "Credit Limit", ledger note "Sundry Debtors" (Sundry Creditors ki jagah), Opening Balance ka default Dr (Vendor me Cr tha, kyunki customer normally hume paisa dete hain). Saare 4 mockups (Unit/Machine/Vendor/Customer) ke sidebar links ab poori tarah cross-linked hain.
+- "Sundry Creditors" term confusing thi user ke liye — chat me explain kiya (Creditor = jise paisa dena hai, Sundry Creditors = sab vendors ka group; ulta "Sundry Debtors" Customers ke liye hoga). "Sundry Creditors" jaha bhi Vendor Master me dikhta hai (footer tip, Save note) wahan English tooltip add kiya. `mockups/vendor_master.html`.
+- **Important rule clarify hui: UI text hamesha English, sirf code comments Hinglish.** User ne View panel ke Hinglish notes dekh ke bataya "web me aisa Hinglish text nahi chahiye." Teeno files (`unit_master.html`, `machine_master.html`, `vendor_master.html`) me poora sweep kiya — saare visible strings (tooltips, empty-state messages, footer tips, alert() popups, Quick help text, View panel notes) English me convert kiye. Comments (`<!-- -->`, `//`) Hinglish me hi rahe — wo sirf code padhne wale (user) ko dikhte hain, end-user ko nahi. Yeh rule `CLAUDE.md`/`memory.md` me bhi add kiya taaki agle modules me shuru se hi sahi ho.
+- **Vendor Master improve kiya** (user confused tha Payment Terms/Opening Balance dekh ke): column headers pe hover-tooltip add kiya (Payment Terms aur Opening Bal. ka matlab), aur ek naya **"View" button** add kiya (Edit se alag, read-only) jo poori 15-field detail ek slide-over panel me dikhata hai (Contact, Mobile, Email, Address, PAN, Bank Details, Vendor Type) — saath mein Payment Terms/Opening Balance ke aage plain-language note bhi ("30 din ka credit period", "Hum vendor ko ₹X dena baaki hain"). `mockups/vendor_master.html`.
+- **Vendor Master mockup banaya** (`mockups/vendor_master.html`) — user ne kaha field-list khud decide karo, isliye requirements doc Section 4.3 se seedha nikala (Code, Name, Contact, Mobile, Email, Address, State, GSTIN, PAN, Payment Terms, Opening Balance, Bank Details, Vendor Type, Documents, Active/Inactive). 15 fields ke liye chhota slide-over kaafi nahi tha — sectioned form banaya (Basic Info / Tax / Payment & Bank / Type & Documents), table me sirf 9 curated columns rakhe (poori detail Edit form me). Unit/Machine Master ke sidebar me "Vendors" link real bana diya.
+- **`development.md` fully restructured** for Part 1/Part 2 approach — Section 3 ab har 6 modules ka apna detailed plan hai (sirf Unit Master ka template nahi): exact fields (requirements doc se verify kiye, guess nahi kiye), aur module-specific design notes — jaise Vendor/Customer ke liye sectioned form (bahut fields hain), Raw Material ke liye Unit Master se dropdown (pehla real cross-module relationship), Product ke liye dynamic attribute + variant + SKU pattern. Shared review checklist bhi add ki (har module isi checklist se pass hona chahiye). Part 2 ka Step B/C/D template alag section (Section 4) mein move kiya, reference ke liye.
+- **Comments audit:** User ne poocha ki kya sab .md files aur code comments naye approach ke hisaab se sahi hain. .md files check kiye — sab sahi the. Code check karne pe pata chala JS functions (`openModal`, `closeModal`, `applyFilters`, `updateFilterCounts`) ke upar "yeh kya karta hai" wala basic comment missing tha (sirf "why" wale comments the, "what" nahi) — dono `unit_master.html` aur `machine_master.html` me add kiya, taaki JS syntax se anjaan hone par bhi samajh aaye.
+- **Workflow revise (round 2):** User ne kaha Cursor use nahi karna, Claude khud mockups banaye. `CLAUDE.md`, `development.md`, `memory.md` update kiye. Phir Machine Master ka mockup khud banaya: `mockups/machine_master.html` — Unit Master ka exact theme/design copy kiya, fields Section 4.7 se (Code, Name, Work Center, Capacity, Installed Date, Status). Status ke 4 values hain (Active/Under Maintenance/Breakdown/Retired) isliye toggle switch ki jagah dropdown use kiya, 2 naye color tokens add kiye (warning=amber, neutral=gray). Unit Master ke sidebar me "Machines" link ko bhi real link bana diya (pehle `#` tha) taaki dono mockups ke beech navigation chale.
+- **Workflow revise kiya gaya:** User ne "sab modules ke mockup pehle, backend baad me" chuna (kal ke opposite decision se ulta). Unit Master ka bana hua backend (`app/`, `run.py`, `requirements.txt`, `instance/erp.db`) jaan-boojhkar delete kiya taaki sab 6 modules same stage (sirf mockup) pe ho. `development.md` aur `tracker.md` dono is naye Part-1/Part-2 structure ke hisaab se update kiye. Reasoning `memory.md` me.
+
+### 2026-09-15
+- **Step C complete — Unit Master ab real database use karta hai.** Files: `app/extensions.py` (db object), `app/models.py` (`Unit` model: code/name/is_base_unit/is_active), `app/__init__.py` update (SQLite config, `db.create_all()`, pehli baar 7 units seed karna), `app/units/routes.py` update (hardcoded list hata ke DB query; `/units/add` aur `/units/<id>/toggle` POST routes bana diye — backend ready hai, frontend abhi is se jud'a nahi hai, yeh Step D ka kaam hai). `.gitignore` bhi bana diya (database file git me na jaaye).
+  - Database file: `instance/erp.db` — directly query karke verify kiya, sahi 7 rows hain.
+  - Add/Toggle routes curl se seedha test kiye — dono sahi kaam karte hain (naya unit add hua, DB me dikha; TON ka status toggle hua, wapas set kiya). Test data cleanup bhi kiya.
+  - Ek bug mila tha (purana background server crash — file edits ke beech reloader confuse ho gaya) — clean restart se fix ho gaya, koi code bug nahi tha.
+- **Step B complete — Unit Master ab real Flask app hai.** Files banaye: `run.py`, `app/__init__.py`, `app/units/routes.py` (fake `UNITS` data + `/units` route), `app/templates/base.html` (shared sidebar/layout), `app/units/templates/units.html` (Jinja version of mockup), `requirements.txt`, logo `app/static/img/` me copy kiya. Server test kiya (`python run.py`) — `/units` aur `/` (redirect) dono HTTP 200/302 pe sahi kaam kar rahe hain, 7 rows sahi render ho rahi hain. Do Jinja comment bugs mile aur fix kiye (`memory.md` me note kiya).
+- **Layout final decision (user ne 2 options me se chuna):** "Full-width, spread evenly" — table poori width cover karta hai, extra space ek column me concentrate nahi, balki har column center-aligned hai (headers + data cells) taaki gap evenly spread ho, koi ek jagah bada khaali block na dikhe. Actions ke Edit+Toggle bhi center kiye. Colgroup: #5%, Code9%, Full name22%, Base unit14%, Status20%, Actions30%. `mockups/unit_master.html`.
+- **Table right side blank rehne ka bug fix:** ek "empty `<col>` bachi hui jagah khud le lega" wala tarika reliably kaam nahi kar raha tha (Actions column chhota reh raha tha, poora right side blank). Fix: Actions column ko explicit `width: calc(100% - 532px)` diya (532px = baaki 5 columns ka total) — ab table guaranteed poori card width cover karta hai. `mockups/unit_master.html`.
+- **Sahi khaali-space fix (pehla attempt galat tha):** page ka max-width cap pura hata diya (main ab dobara full-width hai, jaisa user chahta tha). Asli fix table ke andar kiya: colgroup ab %-based nahi, PX-based hai — #, Code, Full name, Base unit, Status sab fixed content-based px width lete hain, sirf "Actions" column ka `<col>` width-less hai (table-layout:fixed me yeh column hi saari bachi hui jagah leta hai). Isse Full name/Base unit ke beech ab koi khaali gap nahi, extra space sirf Actions column me (jahan dikhna normal hai) jaata hai. `mockups/unit_master.html`.
+- Khaali space fix (galat approach, revert kiya): page max-width 1680px→1120px kiya (Unit Master ki fields chhoti hain, itni wide screen nahi chahiye), "Full name" column 38%→24% kiya, Base Unit/Status badges center-align kiye taaki khaali cell mein akele "floating" na lagein. `mockups/unit_master.html`.
+- Actions column: "Stop"/"Start" text buttons hata ke ek sliding **toggle switch** laga diya (Active/Inactive ek hi on-off control se) — Edit button alag se rehta hai. Click karne par Status badge + row dim + filter counts (All/In use/Stopped) automatically update hote hain (JS). Column widths bhi adjust ki (Full name 38%, Actions 18%). `mockups/unit_master.html`.
+- Unit Master UI polish round 2 (screenshot feedback): font size overall bada kiya (body 13→14.5px, table 14px, headers 20px) taaki bade screen/monitor pe chota na dikhe; row/cell padding bhi badhaya. Font Inter se **IBM Plex Sans** kiya (zyada distinct/engineering look). `<main>` ko `max-w-[1680px]` cap diya taaki ultra-wide screen pe table khaali-khaali stretch na ho; column widths rebalance ki (Full name 35%→28%, Actions 20%→28%). `mockups/unit_master.html`.
+- Unit Master UI/UX fix (user feedback ke baad): Inter font add kiya (Section 20.2 compliant), "Category" aur "Used in" faltu columns hataye (schema me nahi the), status badges inline CSS se hata ke consistent `success`/`stop` Tailwind tokens pe move kiye, "Quick help" link ka stray teal/green color copper-text kar diya. Table ab 6 columns: #, Code, Full name, Base unit, Status, Actions. `mockups/unit_master.html`.
+- Unit Master UI density pass: kam whitespace, dark ink sidebar, ink table header, zebra rows, fixed column widths, stats strip, compact toolbar/modal. No gradients. `mockups/unit_master.html`.
+- Sidebar + logo fix: dark sidebar hata ke light white sidebar; naya transparent logo (coil + tip); brand color swatches user UI se hataaye; active nav copper left-bar. `mockups/unit_master.html` + `mockups/assets/wire_soldering_logo.png`.
+- Brand logo + color plate set: `mockups/assets/wire_soldering_logo.png`; theme Ink `#0F2F32` + Copper `#C46B2D` + Teal `#2A6B6E` + Mist `#F3F5F4`. Unit Master mock isi palette pe update. Decision `memory.md` me.
+- Unit Master mock UI/UX improve kiya (non-tech friendly): plain-language labels (In use/Stopped), tip banner, search + filter, numbered form fields with help text, sidebar icons. File: `mockups/unit_master.html`.
+- Unit Master Step A mock banaya: `mockups/unit_master.html` — sidebar, table (7 dummy units), Add Unit slide-over modal (Unit Code, Unit Name, Is Base Unit). Tailwind CDN, double-click se browser me khulta hai.
+- Requirements docs merge kiye: do purani files (`Dynamic_Manufacturing_ERP_Master_Requirements_Specification.md`, `manufacturing_erp_module_wise_phase_flow_requirements-1.md`) se ek `Manufacturing_ERP_Unified_Requirements_Specification.md` banaya. Purani files Downloads folder me move ki.
+- Tech stack decide kiya: Flask + Jinja2 + Tailwind CSS (CDN) + SQLite + SQLAlchemy. Reasoning `memory.md` me hai.
+- `development.md` banaya — Phase 1 ka Step A→B→C→D workflow plan, module build order tay kiya.
+- `tracker.md`, `memory.md`, `CLAUDE.md` set up kiye.

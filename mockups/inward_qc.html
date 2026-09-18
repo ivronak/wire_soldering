@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inward QC</title>
+  <!-- Theme: gate_inward_grn / PO se match — IBM Plex, Ink/Copper, no gradients -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
+            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
+            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link.is-disabled { opacity: 0.45; pointer-events: none; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .qc-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .qc-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 8px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .qc-table thead th:first-child,
+    .qc-table tbody td:first-child { text-align: left; padding-left: 16px; }
+    .qc-table thead th:last-child { border-right: none; }
+    .qc-table tbody td {
+      padding: 11px 8px;
+      font-size: 13.5px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .qc-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .qc-table tbody tr:hover { background: #FBF4EE; }
+    .search-wrap input { padding-left: 32px; }
+    #inspect-modal.hidden, #view-modal.hidden { display: none; }
+    #inspect-modal, #view-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+    .form-section-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8A4A1C;
+      margin-top: 4px;
+    }
+    .param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .param-table th {
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 8px 6px;
+      border: 1px solid #D1D9D8;
+      text-align: center;
+    }
+    .param-table td {
+      padding: 4px;
+      border: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .param-table input, .param-table select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+    }
+    .param-table input:focus, .param-table select:focus {
+      outline: none;
+      border-color: #C46B2D;
+      box-shadow: 0 0 0 1px #C46B2D;
+    }
+    .param-table input:read-only { background: #F4F6F5; color: #3D5A5D; }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link is-active" aria-current="page"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Inward lab QC</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Inward QC</h1>
+        </div>
+        <button type="button" id="btn-new-inspect"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          New inspection
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-qc" placeholder="Search QC no., GRN, material, lot…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (4)</button>
+            <button type="button" data-filter="pending" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Pending (0)</button>
+            <button type="button" data-filter="passed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Passed (2)</button>
+            <button type="button" data-filter="partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (1)</button>
+            <button type="button" data-filter="failed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Failed (1)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Test GRN lots against RM QC templates · <strong>Accepted qty</strong> → Available stock · <strong>Rejected qty</strong> → Material Rejection Memo (not billable)
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="qc-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:10%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+              <col style="width:11%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:10%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>QC no.</th>
+                <th>Date</th>
+                <th>GRN no.</th>
+                <th>Material</th>
+                <th>Lot / batch</th>
+                <th>Sample</th>
+                <th>Pass qty</th>
+                <th>Reject qty</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="qc-row" data-search="qc-2025-001 grn-2025-001 rm-sw-01 solder sc-2408-a" data-status="passed">
+                <td class="text-ink-faint tabular-nums">1</td>
+                <td class="font-mono font-semibold text-ink">QC-2025-001</td>
+                <td class="tabular-nums">03 Sep 2025</td>
+                <td><a href="gate_inward_grn.html" class="text-brand-teal font-medium hover:underline">GRN-2025-001</a></td>
+                <td class="text-left pl-3 !text-left text-[13px]">RM-SW-01 Solder wire</td>
+                <td class="font-mono text-[12.5px]">SC-2408-A</td>
+                <td class="tabular-nums">2 KG</td>
+                <td class="tabular-nums font-medium text-success">20</td>
+                <td class="tabular-nums">0</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Passed
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-qc-id="qc-2025-001">View</button>
+                    <button type="button" class="px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">Print</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="qc-row" data-search="qc-2025-002 grn-2025-002 rm-pk-01 carton pk-772" data-status="passed">
+                <td class="text-ink-faint tabular-nums">2</td>
+                <td class="font-mono font-semibold text-ink">QC-2025-002</td>
+                <td class="tabular-nums">06 Aug 2025</td>
+                <td><a href="gate_inward_grn.html" class="text-brand-teal font-medium hover:underline">GRN-2025-002</a></td>
+                <td class="text-left pl-3 !text-left text-[13px]">RM-PK-01 Carton box</td>
+                <td class="font-mono text-[12.5px]">PK-772</td>
+                <td class="tabular-nums">10 PCS</td>
+                <td class="tabular-nums font-medium text-success">500</td>
+                <td class="tabular-nums">0</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Passed
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-qc-id="qc-2025-002">View</button>
+                    <button type="button" class="px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">Print</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="qc-row" data-search="qc-2025-003 grn-2025-003 rm-cu-01 copper cu-9921" data-status="partial">
+                <td class="text-ink-faint tabular-nums">3</td>
+                <td class="font-mono font-semibold text-ink">QC-2025-003</td>
+                <td class="tabular-nums">12 Sep 2025</td>
+                <td><a href="gate_inward_grn.html" class="text-brand-teal font-medium hover:underline">GRN-2025-003</a></td>
+                <td class="text-left pl-3 !text-left text-[13px]">RM-CU-01 Copper wire</td>
+                <td class="font-mono text-[12.5px]">CU-9921</td>
+                <td class="tabular-nums">5 KG</td>
+                <td class="tabular-nums font-medium text-success">180</td>
+                <td class="tabular-nums font-medium text-stop">20</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-brand-soft text-brand-teal border-brand-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-brand-teal"></span> Partial
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-qc-id="qc-2025-003">View</button>
+                    <button type="button" class="btn-memo px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white" title="Rejection memo" data-memo-id="rm-2025-011">Memo</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="qc-row" data-search="qc-2025-004 grn-2025-001 rm-fl-01 flux sc-fl-88" data-status="failed">
+                <td class="text-ink-faint tabular-nums">4</td>
+                <td class="font-mono font-semibold text-ink">QC-2025-004</td>
+                <td class="tabular-nums">03 Sep 2025</td>
+                <td><a href="gate_inward_grn.html" class="text-brand-teal font-medium hover:underline">GRN-2025-001</a></td>
+                <td class="text-left pl-3 !text-left text-[13px]">RM-FL-01 Flux paste</td>
+                <td class="font-mono text-[12.5px]">SC-FL-88</td>
+                <td class="tabular-nums">1 KG</td>
+                <td class="tabular-nums">0</td>
+                <td class="tabular-nums font-medium text-stop">20</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Failed
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-qc-id="qc-2025-004">View</button>
+                    <button type="button" class="btn-memo px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white" title="Rejection memo" data-memo-id="rm-2025-009">Memo</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No QC inspections found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search or start inspection from a pending GRN.</p>
+            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">New inspection</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing 4 of 4 QC inspections</span>
+          <span>Next: <a href="purchase_invoice.html" class="text-brand-teal hover:underline">Purchase invoice</a> (accepted QC qty only)</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Inspect / New — QC entry against GRN lot -->
+  <div id="inspect-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="inspect-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="inspect-modal-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="inspect-modal-title" class="text-[16px] font-bold text-ink">Inward QC inspection</h2>
+          <p class="text-[12.5px] text-ink-faint">RM QC template + pass / reject quantities</p>
+        </div>
+        <button type="button" id="btn-close-inspect" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+
+      <form id="inspect-form" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <p class="form-section-title">Header</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label for="qc-no" class="block text-[12.5px] font-semibold text-ink mb-1">QC no.</label>
+            <input type="text" id="qc-no" value="QC-2025-005" readonly class="w-full px-2.5 py-2 text-[13px] font-mono bg-mist border border-slate-300 rounded text-ink-faint" />
+          </div>
+          <div>
+            <label for="qc-date" class="block text-[12.5px] font-semibold text-ink mb-1">Inspection date *</label>
+            <input type="date" id="qc-date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="qc-inspector" class="block text-[12.5px] font-semibold text-ink mb-1">Inspector *</label>
+            <select id="qc-inspector" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="">Select…</option>
+              <option>Ravi Patel (Lab)</option>
+              <option>Meera Shah (Lab)</option>
+              <option>Amit Desai (QC Lead)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label for="qc-grn" class="block text-[12.5px] font-semibold text-ink mb-1">GRN *</label>
+            <select id="qc-grn" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="">Select pending GRN…</option>
+              <option value="grn-2025-001">GRN-2025-001 · Precision Components · Pending QC</option>
+              <option value="grn-2025-003">GRN-2025-003 · Shree Copper · Partial QC</option>
+            </select>
+          </div>
+          <div>
+            <label for="qc-line" class="block text-[12.5px] font-semibold text-ink mb-1">Material / lot *</label>
+            <select id="qc-line" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="">Select after GRN…</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label for="qc-recv" class="block text-[12.5px] font-semibold text-ink mb-1">Received qty</label>
+            <input type="text" id="qc-recv" readonly value="—" class="w-full px-2.5 py-2 text-[14px] bg-mist border border-slate-300 rounded tabular-nums" />
+          </div>
+          <div>
+            <label for="qc-sample" class="block text-[12.5px] font-semibold text-ink mb-1">Sample size *</label>
+            <input type="number" id="qc-sample" required min="0" step="0.01" placeholder="0" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          </div>
+          <div>
+            <label for="qc-pass" class="block text-[12.5px] font-semibold text-ink mb-1">Passed qty *</label>
+            <input type="number" id="qc-pass" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          </div>
+          <div>
+            <label for="qc-reject" class="block text-[12.5px] font-semibold text-ink mb-1">Rejected qty *</label>
+            <input type="number" id="qc-reject" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          </div>
+        </div>
+
+        <hr class="border-slate-200" />
+        <div class="flex items-center justify-between gap-2">
+          <p class="form-section-title !mt-0">QC parameters (template)</p>
+          <span id="qc-template-label" class="text-[12px] text-ink-faint">Select material to load template</span>
+        </div>
+        <div class="overflow-x-auto border border-slate-200 rounded">
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th style="width:28%">Parameter</th>
+                <th style="width:18%">Standard</th>
+                <th style="width:14%">Unit</th>
+                <th style="width:20%">Actual value *</th>
+                <th style="width:20%">Result</th>
+              </tr>
+            </thead>
+            <tbody id="param-tbody">
+              <tr>
+                <td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">Parameters appear after you pick a GRN line</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <label for="qc-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+          <textarea id="qc-remarks" rows="2" placeholder="Visual notes, instrument ID…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        </div>
+        <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+          Mock only: Submit moves <strong>passed qty</strong> to Available stock and creates a <strong>Rejection Memo</strong> for rejected qty (blocks purchase invoice on rejected goods).
+        </p>
+      </form>
+
+      <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+        <button type="button" id="btn-save-qc-draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save draft</button>
+        <button type="button" id="btn-cancel-inspect" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="inspect-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Submit result</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View QC -->
+  <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="view-title" class="text-[16px] font-bold text-ink">QC inspection</h2>
+          <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rejection Memo — read-only panel. Spec Section 5.1 ke mutabik yeh QC
+       reject hone par AUTOMATIC banta hai (koi manually "Add Memo" nahi karta) —
+       isliye is panel me sirf "View" hai, "Add/Edit" nahi. Yeh billing ko
+       galti se rejected qty pe hone se rokta hai. -->
+  <div id="memo-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="memo-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="memo-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-stop-bg flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="memo-title" class="text-[16px] font-bold text-ink">Material rejection memo</h2>
+          <p id="memo-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-memo" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="memo-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" id="btn-close-memo-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/erp-toast.js"></script>
+  <script>
+    // GRN lines + RM QC templates — mock; real app me master/DB se
+    const GRN_LINES = {
+      'grn-2025-001': [
+        { id: 'l1', material: 'RM-SW-01 Solder wire 0.8mm', lot: 'SC-2408-A', recv: '20 KG', template: 'solder' },
+        { id: 'l2', material: 'RM-FL-01 Flux paste', lot: 'SC-FL-88', recv: '20 KG', template: 'flux' }
+      ],
+      'grn-2025-003': [
+        { id: 'l1', material: 'RM-CU-01 Copper wire 2mm', lot: 'CU-9921', recv: '200 KG', template: 'copper' },
+        { id: 'l2', material: 'RM-CU-02 Copper rod 8mm', lot: '—', recv: '100 KG', template: 'copper' }
+      ]
+    };
+
+    const TEMPLATES = {
+      copper: {
+        name: 'Copper wire / rod',
+        params: [
+          { name: 'Gauge / diameter', standard: '2.00 ± 0.05', unit: 'mm', actual: '2.02' },
+          { name: 'Purity (Cu)', standard: '≥ 99.90', unit: '%', actual: '99.94' },
+          { name: 'Insulation thickness', standard: '0.20–0.30', unit: 'mm', actual: '0.24' },
+          { name: 'Visual / surface', standard: 'No pits / oxide', unit: '—', actual: 'OK' }
+        ]
+      },
+      solder: {
+        name: 'Solder wire',
+        params: [
+          { name: 'Diameter', standard: '0.80 ± 0.05', unit: 'mm', actual: '0.81' },
+          { name: 'Alloy composition', standard: 'Sn60/Pb40', unit: '—', actual: 'Sn60/Pb40' },
+          { name: 'Flux core %', standard: '2.0–3.0', unit: '%', actual: '2.4' }
+        ]
+      },
+      flux: {
+        name: 'Flux paste',
+        params: [
+          { name: 'Viscosity', standard: '40–60', unit: 'Pa·s', actual: '72' },
+          { name: 'Acid number', standard: '≤ 25', unit: 'mg KOH/g', actual: '31' },
+          { name: 'Visual', standard: 'Homogeneous', unit: '—', actual: 'Separation' }
+        ]
+      },
+      carton: {
+        name: 'Packaging',
+        params: [
+          { name: 'Burst strength', standard: '≥ 12', unit: 'kg/cm²', actual: '14' },
+          { name: 'Dimensions', standard: 'As drawing', unit: 'mm', actual: 'OK' }
+        ]
+      }
+    };
+
+    const QC_DETAILS = {
+      'qc-2025-001': {
+        title: 'QC-2025-001 · Passed',
+        grn: 'GRN-2025-001',
+        material: 'RM-SW-01 Solder wire 0.8mm',
+        lot: 'SC-2408-A',
+        date: '03 Sep 2025',
+        inspector: 'Ravi Patel',
+        sample: '2 KG',
+        pass: '20 KG',
+        reject: '0',
+        note: 'Released to Main RM Warehouse',
+        params: [
+          ['Diameter', '0.80 ± 0.05 mm', '0.81', 'Pass'],
+          ['Alloy composition', 'Sn60/Pb40', 'Sn60/Pb40', 'Pass'],
+          ['Flux core %', '2.0–3.0 %', '2.4', 'Pass']
+        ]
+      },
+      'qc-2025-002': {
+        title: 'QC-2025-002 · Passed',
+        grn: 'GRN-2025-002',
+        material: 'RM-PK-01 Carton box medium',
+        lot: 'PK-772',
+        date: '06 Aug 2025',
+        inspector: 'Meera Shah',
+        sample: '10 PCS',
+        pass: '500 PCS',
+        reject: '0',
+        note: 'Released to Main RM Warehouse',
+        params: [
+          ['Burst strength', '≥ 12 kg/cm²', '14', 'Pass'],
+          ['Dimensions', 'As drawing', 'OK', 'Pass']
+        ]
+      },
+      'qc-2025-003': {
+        title: 'QC-2025-003 · Partial',
+        grn: 'GRN-2025-003',
+        material: 'RM-CU-01 Copper wire 2mm',
+        lot: 'CU-9921',
+        date: '12 Sep 2025',
+        inspector: 'Ravi Patel',
+        sample: '5 KG',
+        pass: '180 KG → Available',
+        reject: '20 KG → Rejection Memo RM-2025-011',
+        note: 'End-of-coil gauge out of tolerance on 2 spools',
+        params: [
+          ['Gauge / diameter', '2.00 ± 0.05 mm', '2.08 (fail lot)', 'Fail (partial)'],
+          ['Purity (Cu)', '≥ 99.90 %', '99.93', 'Pass'],
+          ['Insulation thickness', '0.20–0.30 mm', '0.25', 'Pass']
+        ]
+      },
+      'qc-2025-004': {
+        title: 'QC-2025-004 · Failed',
+        grn: 'GRN-2025-001',
+        material: 'RM-FL-01 Flux paste',
+        lot: 'SC-FL-88',
+        date: '03 Sep 2025',
+        inspector: 'Amit Desai',
+        sample: '1 KG',
+        pass: '0',
+        reject: '20 KG → Rejection Memo RM-2025-009',
+        note: 'Viscosity and acid number out of range; full lot rejected',
+        params: [
+          ['Viscosity', '40–60 Pa·s', '72', 'Fail'],
+          ['Acid number', '≤ 25', '31', 'Fail'],
+          ['Visual', 'Homogeneous', 'Separation', 'Fail']
+        ]
+      }
+    };
+
+    // Rejection Memo data — spec ke mutabik yeh QC reject hone par khud-ba-khud
+    // banta hai, isliye yahan bhi sirf "read" karne ke liye data hai, koi
+    // "add memo" form nahi. Har memo apne QC record se linked hai (jahan se
+    // reject hua tha) aur GRN/vendor tak trace hota hai.
+    const MEMO_DETAILS = {
+      'rm-2025-011': {
+        memoNo: 'RM-2025-011',
+        date: '12 Sep 2025',
+        qc: 'QC-2025-003',
+        grn: 'GRN-2025-003',
+        vendor: 'Shree Copper Traders',
+        material: 'RM-CU-01 Copper wire 2mm',
+        lot: 'CU-9921',
+        rejectedQty: '20 KG',
+        reason: 'Gauge / diameter out of tolerance (2.08mm vs 2.00 ± 0.05mm standard) on 2 spools at coil-end.',
+        status: 'Issued — awaiting vendor acknowledgement'
+      },
+      'rm-2025-009': {
+        memoNo: 'RM-2025-009',
+        date: '03 Sep 2025',
+        qc: 'QC-2025-004',
+        grn: 'GRN-2025-001',
+        vendor: 'Precision Components Pvt Ltd',
+        material: 'RM-FL-01 Flux paste',
+        lot: 'SC-FL-88',
+        rejectedQty: '20 KG (full lot)',
+        reason: 'Viscosity (72 vs 40–60 Pa·s standard) and acid number (31 vs ≤25 standard) both out of range.',
+        status: 'Issued — awaiting vendor acknowledgement'
+      }
+    };
+    const memoModal = document.getElementById('memo-modal');
+    function openMemo(memoId) {
+      const m = MEMO_DETAILS[memoId];
+      if (!m) return;
+      document.getElementById('memo-subtitle').textContent = m.memoNo + ' · ' + m.date;
+      document.getElementById('memo-body').innerHTML =
+        '<div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13px]">' +
+        '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">QC ref</div><div class="mt-0.5">' + m.qc + '</div></div>' +
+        '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">GRN ref</div><div class="mt-0.5">' + m.grn + '</div></div>' +
+        '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Vendor</div><div class="mt-0.5">' + m.vendor + '</div></div>' +
+        '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Rejected qty</div><div class="mt-0.5 font-semibold text-stop">' + m.rejectedQty + '</div></div>' +
+        '</div>' +
+        '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Material / lot</div><div class="mt-0.5">' + m.material + ' · ' + m.lot + '</div></div>' +
+        '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Reason</div><div class="mt-0.5">' + m.reason + '</div></div>' +
+        '<div class="text-[11.5px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">This memo blocks billing for the rejected quantity — Purchase Invoice can only bill the accepted qty from this GRN. Status: <strong class="text-ink">' + m.status + '</strong></div>';
+      memoModal.classList.remove('hidden');
+      memoModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeMemo() {
+      memoModal.classList.add('hidden');
+      memoModal.setAttribute('aria-hidden', 'true');
+    }
+    document.querySelectorAll('.btn-memo').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openMemo(btn.getAttribute('data-memo-id'));
+      });
+    });
+    document.getElementById('btn-close-memo').addEventListener('click', closeMemo);
+    document.getElementById('btn-close-memo-2').addEventListener('click', closeMemo);
+    document.getElementById('memo-backdrop').addEventListener('click', closeMemo);
+
+    const inspectModal = document.getElementById('inspect-modal');
+    const inspectForm = document.getElementById('inspect-form');
+    const viewModal = document.getElementById('view-modal');
+    const searchInput = document.getElementById('search-qc');
+    const paramTbody = document.getElementById('param-tbody');
+    const rows = Array.from(document.querySelectorAll('.qc-row'));
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
+    const tableEl = document.querySelector('.qc-table');
+    let activeFilter = 'all';
+
+    function openInspect() {
+      inspectModal.classList.remove('hidden');
+      inspectModal.setAttribute('aria-hidden', 'false');
+      document.getElementById('qc-grn').focus();
+    }
+    function closeInspect() {
+      inspectModal.classList.add('hidden');
+      inspectModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function loadGrnLines(grnId) {
+      const lineSelect = document.getElementById('qc-line');
+      const lines = GRN_LINES[grnId] || [];
+      lineSelect.innerHTML = '<option value="">Select material / lot…</option>';
+      lines.forEach(function (line) {
+        const opt = document.createElement('option');
+        opt.value = line.id;
+        opt.textContent = line.material + ' · ' + line.lot;
+        opt.dataset.recv = line.recv;
+        opt.dataset.template = line.template;
+        lineSelect.appendChild(opt);
+      });
+      document.getElementById('qc-recv').value = '—';
+      document.getElementById('qc-template-label').textContent = 'Select material to load template';
+      paramTbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">Parameters appear after you pick a GRN line</td></tr>';
+    }
+
+    function loadTemplate(templateKey) {
+      const tpl = TEMPLATES[templateKey];
+      if (!tpl) return;
+      document.getElementById('qc-template-label').textContent = 'Template: ' + tpl.name;
+      paramTbody.innerHTML = tpl.params.map(function (p) {
+        return '<tr>' +
+          '<td><input type="text" readonly value="' + p.name + '" /></td>' +
+          '<td><input type="text" readonly value="' + p.standard + '" /></td>' +
+          '<td><input type="text" readonly class="text-center" value="' + p.unit + '" /></td>' +
+          '<td><input type="text" required class="param-actual" value="' + p.actual + '" /></td>' +
+          '<td><select class="param-result"><option>Pass</option><option>Fail</option></select></td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    function openView(id) {
+      const d = QC_DETAILS[id];
+      if (!d) return;
+      document.getElementById('view-subtitle').textContent = d.grn + ' · ' + d.lot;
+      document.getElementById('view-title').textContent = d.title;
+      let html = '<dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] mb-4">';
+      html += '<dt class="text-ink-faint">Material</dt><dd>' + d.material + '</dd>';
+      html += '<dt class="text-ink-faint">Date</dt><dd>' + d.date + '</dd>';
+      html += '<dt class="text-ink-faint">Inspector</dt><dd>' + d.inspector + '</dd>';
+      html += '<dt class="text-ink-faint">Sample</dt><dd>' + d.sample + '</dd>';
+      html += '<dt class="text-ink-faint">Passed qty</dt><dd class="font-medium text-success">' + d.pass + '</dd>';
+      html += '<dt class="text-ink-faint">Rejected qty</dt><dd class="font-medium text-stop">' + d.reject + '</dd></dl>';
+      html += '<p class="text-[13px] text-ink-muted mb-3">' + d.note + '</p>';
+      html += '<table class="w-full text-[13px] border border-slate-200 rounded overflow-hidden"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">';
+      html += '<th class="p-2 text-left">Parameter</th><th class="p-2 text-left">Standard</th><th class="p-2">Actual</th><th class="p-2">Result</th></tr></thead><tbody>';
+      d.params.forEach(function (row) {
+        html += '<tr class="border-t border-slate-100"><td class="p-2">' + row[0] + '</td><td class="p-2 text-[12.5px]">' + row[1] + '</td><td class="p-2 text-center tabular-nums">' + row[2] + '</td><td class="p-2 text-center font-medium">' + row[3] + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('view-body').innerHTML = html;
+      viewModal.classList.remove('hidden');
+      viewModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeView() {
+      viewModal.classList.add('hidden');
+      viewModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function applyFilters() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      let visible = 0;
+      rows.forEach(function (row) {
+        const blob = row.getAttribute('data-search') || '';
+        const status = row.getAttribute('data-status') || '';
+        const matchesSearch = !q || blob.indexOf(q) !== -1;
+        const matchesFilter = activeFilter === 'all' || status === activeFilter;
+        const show = matchesSearch && matchesFilter;
+        row.classList.toggle('hidden', !show);
+        if (show) visible++;
+      });
+      emptyState.classList.toggle('hidden', visible > 0);
+      tableEl.classList.toggle('hidden', visible === 0);
+      resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' QC inspections';
+    }
+
+    document.getElementById('btn-new-inspect').addEventListener('click', openInspect);
+    document.getElementById('btn-empty-new').addEventListener('click', openInspect);
+    document.getElementById('btn-close-inspect').addEventListener('click', closeInspect);
+    document.getElementById('btn-cancel-inspect').addEventListener('click', closeInspect);
+    document.getElementById('inspect-modal-backdrop').addEventListener('click', closeInspect);
+    document.getElementById('btn-close-view').addEventListener('click', closeView);
+    document.getElementById('btn-close-view-2').addEventListener('click', closeView);
+    document.getElementById('view-backdrop').addEventListener('click', closeView);
+
+    document.getElementById('qc-grn').addEventListener('change', function (e) {
+      loadGrnLines(e.target.value);
+    });
+    document.getElementById('qc-line').addEventListener('change', function (e) {
+      const opt = e.target.selectedOptions[0];
+      if (!opt || !opt.value) {
+        document.getElementById('qc-recv').value = '—';
+        return;
+      }
+      document.getElementById('qc-recv').value = opt.dataset.recv || '—';
+      loadTemplate(opt.dataset.template);
+    });
+
+    searchInput.addEventListener('input', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+          b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+        });
+        btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+        applyFilters();
+      });
+    });
+
+    document.querySelectorAll('.btn-view').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openView(btn.getAttribute('data-qc-id'));
+      });
+    });
+    document.querySelectorAll('.btn-inspect').forEach(function (btn) {
+      btn.addEventListener('click', openInspect);
+    });
+
+    inspectForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const pass = document.getElementById('qc-pass').value;
+      const reject = document.getElementById('qc-reject').value;
+      showToast('Mock: QC submitted. Pass ' + pass + ' → Available stock. Reject ' + reject + ' → Rejection Memo (if any).', 'success');
+      closeInspect();
+    });
+    document.getElementById('btn-save-qc-draft').addEventListener('click', function () {
+      showToast('Mock: QC inspection saved as draft.', 'success');
+      closeInspect();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!inspectModal.classList.contains('hidden')) closeInspect();
+        if (!viewModal.classList.contains('hidden')) closeView();
+        if (!memoModal.classList.contains('hidden')) closeMemo();
+      }
+    });
+
+    applyFilters();
+  </script>
+</body>
+</html>

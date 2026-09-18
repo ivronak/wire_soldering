@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Ledger</title>
+  <!-- Phase 3 pehla page — theme Phase 1/2 se same (Ink/Copper, IBM Plex, no gradients) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
+            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
+            /* Machine Master ke saath match — Phase 2 verify pass ke baad yehi locked */
+            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link.is-disabled { opacity: 0.45; pointer-events: none; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .stock-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .stock-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 8px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .stock-table thead th:first-child,
+    .stock-table tbody td:first-child { text-align: left; padding-left: 16px; }
+    .stock-table thead th:last-child { border-right: none; }
+    .stock-table tbody td {
+      padding: 11px 8px;
+      font-size: 13.5px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .stock-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .stock-table tbody tr:hover { background: #FBF4EE; }
+    .search-wrap input { padding-left: 32px; }
+    #ledger-modal.hidden { display: none; }
+    #ledger-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+    .mov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .mov-table th {
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 8px 6px;
+      border: 1px solid #D1D9D8;
+      text-align: center;
+    }
+    .mov-table td {
+      padding: 8px 6px;
+      border: 1px solid #E2E8E7;
+      vertical-align: middle;
+      text-align: center;
+    }
+    .mov-table td:first-child { text-align: left; }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link is-active" aria-current="page"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock ledger</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Stock ledger</h1>
+        </div>
+        <p class="text-[12.5px] text-ink-faint max-w-md text-right leading-snug hidden sm:block">
+          Live balance per warehouse · Click <strong class="text-ink-muted font-semibold">Ledger</strong> to see Opening → Inward → Outward → Closing
+        </p>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-stock" placeholder="Search item code, name, batch…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <select id="filter-wh" class="px-2.5 py-1.5 text-[12.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="all">All warehouses</option>
+            <option value="main-rm">Main RM Warehouse</option>
+            <option value="qc-hold">QC Hold Bay</option>
+            <option value="fg">FG Warehouse</option>
+            <option value="scrap">Scrap Warehouse</option>
+          </select>
+          <div class="flex flex-wrap items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (5)</button>
+            <button type="button" data-filter="ok" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">OK (2)</button>
+            <button type="button" data-filter="low" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Low / reorder (2)</button>
+            <button type="button" data-filter="out" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Out of stock (1)</button>
+            <button type="button" data-filter="excess" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Excess (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Spec §6.1: every item tracks Opening, Purchase, Return, Production, Sales, Adjustment, Transfer, Closing — per warehouse. Alerts: Low / Reorder / Out / Excess (§6.3).
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="stock-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+              <col style="width:7%" />
+              <col style="width:12%" />
+              <col style="width:10%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item code</th>
+                <th>Item name</th>
+                <th>Type</th>
+                <th>Warehouse</th>
+                <th>Batch / lot</th>
+                <th>Opening</th>
+                <th>Closing</th>
+                <th>Unit</th>
+                <th>Alert</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="stock-row" data-search="rm-cu-01 copper wire main-rm cu-9921" data-wh="main-rm" data-alert="ok" data-id="bal-001">
+                <td class="text-ink-faint tabular-nums">1</td>
+                <td class="font-mono font-semibold text-ink">RM-CU-01</td>
+                <td class="text-left pl-3 !text-left text-[13px]">Copper wire 2mm</td>
+                <td><span class="text-[12px] font-medium text-brand-teal">RM</span></td>
+                <td class="text-[13px]">Main RM Warehouse</td>
+                <td class="font-mono text-[12.5px]">CU-9921</td>
+                <td class="tabular-nums">50.00</td>
+                <td class="tabular-nums font-semibold">180.00</td>
+                <td>KG</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> OK
+                  </span>
+                </td>
+                <td>
+                  <button type="button" class="btn-ledger px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="bal-001">Ledger</button>
+                </td>
+              </tr>
+              <tr class="stock-row" data-search="rm-sw-01 solder wire main-rm sc-2408-a" data-wh="main-rm" data-alert="low" data-id="bal-002">
+                <td class="text-ink-faint tabular-nums">2</td>
+                <td class="font-mono font-semibold text-ink">RM-SW-01</td>
+                <td class="text-left pl-3 !text-left text-[13px]">Solder wire 0.8mm</td>
+                <td><span class="text-[12px] font-medium text-brand-teal">RM</span></td>
+                <td class="text-[13px]">Main RM Warehouse</td>
+                <td class="font-mono text-[12.5px]">SC-2408-A</td>
+                <td class="tabular-nums">25.00</td>
+                <td class="tabular-nums font-semibold text-warning">16.00</td>
+                <td>KG</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Reorder
+                  </span>
+                </td>
+                <td>
+                  <button type="button" class="btn-ledger px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="bal-002">Ledger</button>
+                </td>
+              </tr>
+              <tr class="stock-row" data-search="rm-fl-01 flux qc-hold sc-fl-88" data-wh="qc-hold" data-alert="out" data-id="bal-003">
+                <td class="text-ink-faint tabular-nums">3</td>
+                <td class="font-mono font-semibold text-ink">RM-FL-01</td>
+                <td class="text-left pl-3 !text-left text-[13px]">Flux paste</td>
+                <td><span class="text-[12px] font-medium text-brand-teal">RM</span></td>
+                <td class="text-[13px]">QC Hold Bay</td>
+                <td class="font-mono text-[12.5px]">SC-FL-88</td>
+                <td class="tabular-nums">0.00</td>
+                <td class="tabular-nums font-semibold text-stop">0.00</td>
+                <td>KG</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Out of stock
+                  </span>
+                </td>
+                <td>
+                  <button type="button" class="btn-ledger px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="bal-003">Ledger</button>
+                </td>
+              </tr>
+              <tr class="stock-row" data-search="rm-pk-01 carton main-rm pk-772" data-wh="main-rm" data-alert="ok" data-id="bal-004">
+                <td class="text-ink-faint tabular-nums">4</td>
+                <td class="font-mono font-semibold text-ink">RM-PK-01</td>
+                <td class="text-left pl-3 !text-left text-[13px]">Carton box medium</td>
+                <td><span class="text-[12px] font-medium text-brand-teal">RM</span></td>
+                <td class="text-[13px]">Main RM Warehouse</td>
+                <td class="font-mono text-[12.5px]">PK-772</td>
+                <td class="tabular-nums">200</td>
+                <td class="tabular-nums font-semibold">470</td>
+                <td>PCS</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> OK
+                  </span>
+                </td>
+                <td>
+                  <button type="button" class="btn-ledger px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="bal-004">Ledger</button>
+                </td>
+              </tr>
+              <tr class="stock-row" data-search="fg-ws-01 soldered wire fg bat-fg-110" data-wh="fg" data-alert="low" data-id="bal-005">
+                <td class="text-ink-faint tabular-nums">5</td>
+                <td class="font-mono font-semibold text-ink">FG-WS-01</td>
+                <td class="text-left pl-3 !text-left text-[13px]">Soldered wire assembly</td>
+                <td><span class="text-[12px] font-medium text-copper-text">FG</span></td>
+                <td class="text-[13px]">FG Warehouse</td>
+                <td class="font-mono text-[12.5px]">BAT-FG-110</td>
+                <td class="tabular-nums">40</td>
+                <td class="tabular-nums font-semibold text-warning">12</td>
+                <td>PCS</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Low stock
+                  </span>
+                </td>
+                <td>
+                  <button type="button" class="btn-ledger px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="bal-005">Ledger</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No stock rows found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search or change warehouse / alert filter.</p>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing 5 of 5 stock balances</span>
+          <span>Next: <a href="stock_transfer.html" class="text-brand-teal hover:underline">Stock transfer</a> · then Stock adjustment</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Ledger movements panel -->
+  <div id="ledger-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="ledger-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="ledger-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="ledger-title" class="text-[16px] font-bold text-ink">Stock movements</h2>
+          <p id="ledger-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-ledger" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div id="ledger-summary" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[13px]"></div>
+        <table class="mov-table">
+          <thead>
+            <tr>
+              <th style="width:14%">Date</th>
+              <th style="width:18%">Type</th>
+              <th style="width:22%">Reference</th>
+              <th style="width:12%">In</th>
+              <th style="width:12%">Out</th>
+              <th style="width:12%">Balance</th>
+              <th style="width:10%">Cost</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-tbody"></tbody>
+        </table>
+        <p class="text-[11.5px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">
+          Mock only: movements mirror Phase 2 documents (GRN / QC / PI / Return). Production / Sales rows appear when those phases are mocked.
+        </p>
+      </div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" id="btn-close-ledger-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Fake ledger per balance row — Opening → transactions → Closing (§6.1)
+    const LEDGERS = {
+      'bal-001': {
+        title: 'RM-CU-01 · Copper wire 2mm',
+        wh: 'Main RM Warehouse',
+        batch: 'CU-9921',
+        unit: 'KG',
+        opening: '50.00',
+        closing: '180.00',
+        rows: [
+          ['01 Sep 2025', 'Opening', 'FY opening', '50.00', '—', '50.00', '820'],
+          ['12 Sep 2025', 'Purchase (QC pass)', 'GRN-2025-003 / QC-2025-003', '180.00', '—', '230.00', '820'],
+          ['14 Sep 2025', 'Purchase return', 'PR-2025-003 (draft → mock posted)', '—', '20.00', '210.00', '820'],
+          ['15 Sep 2025', 'Transfer out', 'ST-2025-001 → WIP (mock)', '—', '30.00', '180.00', '820']
+        ]
+      },
+      'bal-002': {
+        title: 'RM-SW-01 · Solder wire 0.8mm',
+        wh: 'Main RM Warehouse',
+        batch: 'SC-2408-A',
+        unit: 'KG',
+        opening: '25.00',
+        closing: '16.00',
+        rows: [
+          ['01 Sep 2025', 'Opening', 'FY opening', '25.00', '—', '25.00', '1,200'],
+          ['04 Sep 2025', 'Purchase (QC pass)', 'GRN-2025-001 / QC-2025-001', '20.00', '—', '45.00', '1,200'],
+          ['08 Sep 2025', 'Purchase return', 'PR-2025-001', '—', '4.00', '41.00', '1,200'],
+          ['10 Sep 2025', 'Production issue', 'PO-PROD-088 (mock)', '—', '25.00', '16.00', '1,200']
+        ]
+      },
+      'bal-003': {
+        title: 'RM-FL-01 · Flux paste',
+        wh: 'QC Hold Bay',
+        batch: 'SC-FL-88',
+        unit: 'KG',
+        opening: '0.00',
+        closing: '0.00',
+        rows: [
+          ['02 Sep 2025', 'GRN inward (QC Hold Bay)', 'GRN-2025-001', '20.00', '—', '20.00', '—'],
+          ['03 Sep 2025', 'QC reject → memo', 'QC-2025-004 / RM-2025-009', '—', '20.00', '0.00', '—']
+        ]
+      },
+      'bal-004': {
+        title: 'RM-PK-01 · Carton box medium',
+        wh: 'Main RM Warehouse',
+        batch: 'PK-772',
+        unit: 'PCS',
+        opening: '200',
+        closing: '470',
+        rows: [
+          ['01 Aug 2025', 'Opening', 'FY opening', '200', '—', '200', '21'],
+          ['06 Aug 2025', 'Purchase (QC pass)', 'GRN-2025-002 / QC-2025-002', '500', '—', '700', '21'],
+          ['10 Aug 2025', 'Purchase return', 'PR-2025-002', '—', '30', '670', '21'],
+          ['20 Aug 2025', 'Sales packing issue', 'SO-2025-044 (mock)', '—', '200', '470', '21']
+        ]
+      },
+      'bal-005': {
+        title: 'FG-WS-01 · Soldered wire assembly',
+        wh: 'FG Warehouse',
+        batch: 'BAT-FG-110',
+        unit: 'PCS',
+        opening: '40',
+        closing: '12',
+        rows: [
+          ['01 Sep 2025', 'Opening', 'FY opening', '40', '—', '40', '450'],
+          ['05 Sep 2025', 'Production output', 'BAT-FG-110', '80', '—', '120', '450'],
+          ['12 Sep 2025', 'Sales delivery', 'DC-2025-019 (mock)', '—', '108', '12', '450']
+        ]
+      }
+    };
+
+    const modal = document.getElementById('ledger-modal');
+    const searchInput = document.getElementById('search-stock');
+    const whSelect = document.getElementById('filter-wh');
+    const rows = Array.from(document.querySelectorAll('.stock-row'));
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
+    const tableEl = document.querySelector('.stock-table');
+    let activeFilter = 'all';
+
+    function openLedger(id) {
+      const d = LEDGERS[id];
+      if (!d) return;
+      document.getElementById('ledger-title').textContent = d.title;
+      document.getElementById('ledger-subtitle').textContent = d.wh + ' · Lot ' + d.batch + ' · Unit ' + d.unit;
+      document.getElementById('ledger-summary').innerHTML =
+        '<div class="bg-mist border border-slate-200 rounded p-2"><div class="text-[11px] text-ink-faint uppercase">Opening</div><div class="font-mono font-semibold">' + d.opening + '</div></div>' +
+        '<div class="bg-mist border border-slate-200 rounded p-2"><div class="text-[11px] text-ink-faint uppercase">Closing</div><div class="font-mono font-semibold text-copper-text">' + d.closing + '</div></div>' +
+        '<div class="bg-mist border border-slate-200 rounded p-2 md:col-span-2"><div class="text-[11px] text-ink-faint uppercase">Warehouse / batch</div><div class="font-medium">' + d.wh + ' · ' + d.batch + '</div></div>';
+      document.getElementById('ledger-tbody').innerHTML = d.rows.map(function (r) {
+        return '<tr><td class="tabular-nums text-[12.5px]">' + r[0] + '</td><td class="text-left text-[12.5px]">' + r[1] + '</td><td class="text-left font-mono text-[12px]">' + r[2] + '</td><td class="tabular-nums text-success font-medium">' + r[3] + '</td><td class="tabular-nums text-stop font-medium">' + r[4] + '</td><td class="tabular-nums font-semibold">' + r[5] + '</td><td class="tabular-nums text-[12.5px]">' + r[6] + '</td></tr>';
+      }).join('');
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+    function closeLedger() {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function applyFilters() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      const wh = whSelect.value;
+      let visible = 0;
+      rows.forEach(function (row) {
+        const blob = row.getAttribute('data-search') || '';
+        const alert = row.getAttribute('data-alert') || '';
+        const rowWh = row.getAttribute('data-wh') || '';
+        const matchesSearch = !q || blob.indexOf(q) !== -1;
+        const matchesWh = wh === 'all' || rowWh === wh;
+        let matchesFilter = activeFilter === 'all' || alert === activeFilter;
+        if (activeFilter === 'low') matchesFilter = alert === 'low';
+        const show = matchesSearch && matchesWh && matchesFilter;
+        row.classList.toggle('hidden', !show);
+        if (show) visible++;
+      });
+      emptyState.classList.toggle('hidden', visible > 0);
+      tableEl.classList.toggle('hidden', visible === 0);
+      resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' stock balances';
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    whSelect.addEventListener('change', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+          b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+        });
+        btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+        applyFilters();
+      });
+    });
+    document.querySelectorAll('.btn-ledger').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openLedger(btn.getAttribute('data-id'));
+      });
+    });
+    document.getElementById('btn-close-ledger').addEventListener('click', closeLedger);
+    document.getElementById('btn-close-ledger-2').addEventListener('click', closeLedger);
+    document.getElementById('ledger-backdrop').addEventListener('click', closeLedger);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeLedger();
+    });
+    applyFilters();
+  </script>
+</body>
+</html>

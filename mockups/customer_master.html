@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Master</title>
+  <!-- Design system Unit/Machine/Vendor Master se hi copy kiya hai (consistency).
+       Customer Master ka structure Vendor Master jaisa hi hai (development.md
+       Section 3 ka plan) — bas "Vendor Type" ki jagah "Credit Limit" hai, aur
+       ledger "Sundry Debtors" ke neeche banega (Sundry Creditors ke neeche nahi). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .customer-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .customer-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 12px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .customer-table thead th:first-child,
+    .customer-table tbody td:first-child { text-align: left; padding-left: 18px; }
+    .customer-table thead th:last-child { border-right: none; }
+    .customer-table tbody td {
+      padding: 11px 12px;
+      font-size: 14px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .customer-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .customer-table tbody tr:hover { background: #FBF4EE; }
+    .customer-table tbody tr.row-muted { opacity: 0.72; }
+    .search-wrap input { padding-left: 32px; }
+    #customer-modal.hidden { display: none; }
+    #customer-modal { display: flex; }
+    #view-modal.hidden { display: none; }
+    #view-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+    .form-section-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8A4A1C;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link is-active" aria-current="page"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Customers</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Customers</h1>
+        </div>
+        <button type="button" id="btn-add-customer"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add customer
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-customers" placeholder="Search code, name or GSTIN…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (5)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (4)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (1)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              "View" shows the full record (Contact/Bank/PAN), "Edit" lets you change it · Hover a column header (e.g. Credit Limit, Opening Bal.) to see what it means · Saving auto-creates a ledger under Sundry Debtors
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="customer-table">
+            <!-- Table me sirf 9 columns (Vendor Master jaisa hi pattern) — Contact
+                 Person, Mobile, Email, Address, PAN, Bank Details, Documents "View"/
+                 "Edit" me hain, table me nahi. -->
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:7%" />
+              <col style="width:16%" />
+              <col style="width:9%" />
+              <col style="width:12%" />
+              <col style="width:11%" />
+              <col style="width:10%" />
+              <col style="width:12%" />
+              <col style="width:19%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Customer name</th>
+                <th>State</th>
+                <th>GSTIN</th>
+                <th title="Maximum amount this customer can owe before new orders are held — a credit-control safeguard.">Credit limit</th>
+                <th title="Balance carried forward for this customer when you start using this system. Dr = customer owes you. Cr = you owe the customer (e.g. an advance received).">Opening bal.</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customers-tbody">
+              <tr class="customer-row" data-code="c-001" data-name="bright electricals pvt ltd" data-gstin="24brtel5678m1z4" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">1</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">C-001</span></td>
+                <td><span class="font-medium text-ink">Bright Electricals Pvt Ltd</span></td>
+                <td class="text-[13px] text-ink-muted">Gujarat</td>
+                <td class="font-mono text-[12px] text-ink-muted tabular-nums">24BRTEL5678M1Z4</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">₹2,00,000</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">₹0</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button" class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">View</button>
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Inactive">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="customer-row" data-code="c-002" data-name="metro hardware store" data-gstin="27metro1234n1z7" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">C-002</span></td>
+                <td><span class="font-medium text-ink">Metro Hardware Store</span></td>
+                <td class="text-[13px] text-ink-muted">Maharashtra</td>
+                <td class="font-mono text-[12px] text-ink-muted tabular-nums">27METRO1234N1Z7</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">₹50,000</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">₹12,000 Dr</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button" class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">View</button>
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Inactive">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="customer-row" data-code="c-003" data-name="sunrise trading co" data-gstin="24sunrs9012p1z3" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">3</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">C-003</span></td>
+                <td><span class="font-medium text-ink">Sunrise Trading Co</span></td>
+                <td class="text-[13px] text-ink-muted">Gujarat</td>
+                <td class="font-mono text-[12px] text-ink-muted tabular-nums">24SUNRS9012P1Z3</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">₹1,00,000</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">₹0</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button" class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">View</button>
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Inactive">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="customer-row" data-code="c-004" data-name="apex distributors" data-gstin="07apexd3456q1z9" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">4</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">C-004</span></td>
+                <td><span class="font-medium text-ink">Apex Distributors</span></td>
+                <td class="text-[13px] text-ink-muted">Delhi</td>
+                <td class="font-mono text-[12px] text-ink-muted tabular-nums">07APEXD3456Q1Z9</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">₹75,000</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">₹5,500 Dr</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button" class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">View</button>
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Inactive">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="customer-row row-muted" data-code="c-005" data-name="old retail chain" data-gstin="08oldrt7890r1z2" data-status="inactive">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">5</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink-faint bg-mist border border-slate-200 rounded px-2 py-1">C-005</span></td>
+                <td><span class="font-medium text-ink-faint">Old Retail Chain</span></td>
+                <td class="text-[13px] text-ink-faint">Rajasthan</td>
+                <td class="font-mono text-[12px] text-ink-faint tabular-nums">08OLDRT7890R1Z2</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">₹0</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">₹0</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button" class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">View</button>
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Inactive">
+                      <input type="checkbox" class="toggle-input sr-only peer">
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No customers found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new customer.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add customer</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing 5 of 5 customers</span>
+          <span title="Sundry Debtors = the accounting group for everyone who owes your business money (your customers). Its opposite is Sundry Creditors, used for Vendors.">Tip: saving auto-creates a ledger under Sundry Debtors</span>
+          <span class="text-ink-muted">Page 1 · Mock data</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Customer panel — bilkul Vendor Master jaisa structure, bas
+       "Vendor type" section "Credit limit" ban gaya hai. -->
+  <div id="customer-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add customer</h2>
+          <p class="text-[12.5px] text-ink-faint">Basic info, tax, credit &amp; bank details</p>
+        </div>
+        <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <form id="customer-form" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+
+        <p class="form-section-title">Basic info</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="customer-code" class="block text-[12.5px] font-semibold text-ink mb-1">Customer code *</label>
+            <input type="text" id="customer-code" placeholder="C-006" class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="customer-name" class="block text-[12.5px] font-semibold text-ink mb-1">Customer name *</label>
+            <input type="text" id="customer-name" placeholder="Customer Pvt Ltd" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="customer-contact" class="block text-[12.5px] font-semibold text-ink mb-1">Contact person</label>
+            <input type="text" id="customer-contact" placeholder="Priya Mehta" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="customer-mobile" class="block text-[12.5px] font-semibold text-ink mb-1">Mobile</label>
+            <input type="tel" id="customer-mobile" placeholder="98765 43210" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <div>
+          <label for="customer-email" class="block text-[12.5px] font-semibold text-ink mb-1">Email</label>
+          <input type="email" id="customer-email" placeholder="purchase@customer.com" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="customer-address" class="block text-[12.5px] font-semibold text-ink mb-1">Address</label>
+          <textarea id="customer-address" rows="2" placeholder="Street, City, PIN" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        </div>
+        <div>
+          <label for="customer-state" class="block text-[12.5px] font-semibold text-ink mb-1">State *</label>
+          <select id="customer-state" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="gujarat" selected>Gujarat</option>
+            <option value="maharashtra">Maharashtra</option>
+            <option value="rajasthan">Rajasthan</option>
+            <option value="delhi">Delhi</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <hr class="border-slate-200 !my-4" />
+        <p class="form-section-title">Tax &amp; compliance</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="customer-gstin" class="block text-[12.5px] font-semibold text-ink mb-1">GSTIN</label>
+            <input type="text" id="customer-gstin" placeholder="24BRTEL5678M1Z4" maxlength="15" class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="customer-pan" class="block text-[12.5px] font-semibold text-ink mb-1">PAN</label>
+            <input type="text" id="customer-pan" placeholder="BRTEL5678M" maxlength="10" class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+
+        <hr class="border-slate-200 !my-4" />
+        <p class="form-section-title">Credit &amp; bank</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="customer-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
+            <select id="customer-terms" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="advance">Advance</option>
+              <option value="net15">Net 15</option>
+              <option value="net30" selected>Net 30</option>
+              <option value="net45">Net 45</option>
+              <option value="net60">Net 60</option>
+            </select>
+          </div>
+          <div>
+            <label for="customer-credit-limit" class="block text-[12.5px] font-semibold text-ink mb-1">Credit limit (₹)</label>
+            <input type="number" id="customer-credit-limit" placeholder="0" min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <div>
+          <label for="customer-opening-balance" class="block text-[12.5px] font-semibold text-ink mb-1">Opening balance (₹)</label>
+          <div class="flex gap-1.5">
+            <input type="number" id="customer-opening-balance" placeholder="0" min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <!-- Customer ka default Dr hai (Vendor me Cr default tha) — kyunki
+                 customer aam taur pe humein paisa dete hain, ulta case rare hai. -->
+            <select id="customer-opening-balance-type" class="px-2 py-2 text-[13px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="dr" selected>Dr</option>
+              <option value="cr">Cr</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="customer-bank-name" class="block text-[12.5px] font-semibold text-ink mb-1">Bank name</label>
+            <input type="text" id="customer-bank-name" placeholder="HDFC Bank" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="customer-bank-ifsc" class="block text-[12.5px] font-semibold text-ink mb-1">IFSC code</label>
+            <input type="text" id="customer-bank-ifsc" placeholder="HDFC0001234" class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <div>
+          <label for="customer-bank-account" class="block text-[12.5px] font-semibold text-ink mb-1">Account number</label>
+          <input type="text" id="customer-bank-account" placeholder="000123456789" class="w-full px-2.5 py-2 text-[14px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+
+        <hr class="border-slate-200 !my-4" />
+        <p class="form-section-title">Documents</p>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Documents</label>
+          <div class="border border-dashed border-slate-300 rounded px-3 py-4 text-center text-[12.5px] text-ink-faint bg-mist">
+            Drag files here or <span class="text-copper-text font-semibold">browse</span> (mock only)
+          </div>
+        </div>
+
+        <p class="text-[11.5px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">
+          Saving this customer will auto-create a ledger under <strong class="text-ink" title="The accounting group for customers who owe your business money">Sundry Debtors</strong>.
+        </p>
+      </form>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+        <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="customer-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save customer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- "View" panel — read-only, poori 15-ish fields dikhata hai (Contact/Bank/PAN
+       jo table me nahi hain). Vendor Master jaisa hi pattern. -->
+  <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Customer details</h2>
+          <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="view-modal-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <!-- JS yahan fields bharega -->
+      </div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+        <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/erp-toast.js"></script>
+  <script>
+    const modal = document.getElementById('customer-modal');
+    const form = document.getElementById('customer-form');
+    const searchInput = document.getElementById('search-customers');
+    const rows = Array.from(document.querySelectorAll('.customer-row'));
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
+    const tableEl = document.querySelector('.customer-table');
+    let activeFilter = 'all';
+
+    function openModal() {
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      document.getElementById('customer-code').focus();
+    }
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      form.reset();
+    }
+    function applyFilters() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      let visible = 0;
+      rows.forEach(function (row) {
+        const code = row.getAttribute('data-code') || '';
+        const name = row.getAttribute('data-name') || '';
+        const gstin = row.getAttribute('data-gstin') || '';
+        const status = row.getAttribute('data-status') || '';
+        const matchesSearch = !q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1 || gstin.indexOf(q) !== -1;
+        const matchesFilter = activeFilter === 'all' || status === activeFilter;
+        const show = matchesSearch && matchesFilter;
+        row.classList.toggle('hidden', !show);
+        if (show) visible += 1;
+      });
+      const none = visible === 0;
+      emptyState.classList.toggle('hidden', !none);
+      if (tableEl) tableEl.classList.toggle('hidden', none);
+      resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' customers';
+    }
+    function updateFilterCounts() {
+      const activeCount = rows.filter(function (r) { return r.getAttribute('data-status') === 'active'; }).length;
+      const total = rows.length;
+      document.querySelector('[data-filter="all"]').textContent = 'All (' + total + ')';
+      document.querySelector('[data-filter="active"]').textContent = 'Active (' + activeCount + ')';
+      document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + (total - activeCount) + ')';
+    }
+
+    document.getElementById('btn-add-customer').addEventListener('click', openModal);
+    document.getElementById('btn-empty-add').addEventListener('click', openModal);
+    document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+    document.getElementById('btn-cancel').addEventListener('click', closeModal);
+    document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const code = document.getElementById('customer-code').value.trim();
+      const name = document.getElementById('customer-name').value.trim();
+      if (!code || !name) { showToast('Customer code and name are both required.', 'error'); return; }
+      showToast('Saved (mockup)!\n' + code.toUpperCase() + ' — ' + name + '\n(A ledger would auto-create under Sundry Debtors — visual only for now)', 'success');
+      closeModal();
+    });
+
+    document.querySelectorAll('.toggle-input').forEach(function (toggle) {
+      toggle.addEventListener('change', function () {
+        const row = toggle.closest('.customer-row');
+        const isActive = toggle.checked;
+        row.setAttribute('data-status', isActive ? 'active' : 'inactive');
+        row.classList.toggle('row-muted', !isActive);
+
+        const badge = row.querySelector('.status-badge');
+        badge.className = 'status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border ' +
+          (isActive ? 'bg-success-bg text-success border-success-border' : 'bg-stop-bg text-stop border-stop-border');
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + (isActive ? 'bg-success' : 'bg-stop') + '"></span> ' +
+          (isActive ? 'Active' : 'Inactive');
+
+        updateFilterCounts();
+        applyFilters();
+      });
+    });
+
+    searchInput.addEventListener('input', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          const on = b === btn;
+          b.classList.toggle('bg-copper', on);
+          b.classList.toggle('text-white', on);
+          b.classList.toggle('border-copper', on);
+          b.classList.toggle('font-semibold', on);
+          b.classList.toggle('bg-white', !on);
+          b.classList.toggle('text-ink', !on);
+          b.classList.toggle('border-slate-300', !on);
+        });
+        applyFilters();
+      });
+    });
+
+    // ---- View panel ----
+    const viewModal = document.getElementById('view-modal');
+    const viewModalBody = document.getElementById('view-modal-body');
+    const viewModalSubtitle = document.getElementById('view-modal-subtitle');
+    const CUSTOMER_DATA = {
+      'c-001': {
+        name: 'Bright Electricals Pvt Ltd', contact: 'Priya Mehta', mobile: '98765 12340', email: 'purchase@brightelec.com',
+        address: '22, Ring Road, Surat, Gujarat - 395002', state: 'Gujarat',
+        gstin: '24BRTEL5678M1Z4', pan: 'BRTEL5678M',
+        paymentTerms: 'Net 30', paymentTermsNote: '30-day credit period',
+        creditLimit: '₹2,00,000',
+        openingBalance: '₹0', openingBalanceNote: 'No opening balance',
+        bankName: 'HDFC Bank', ifsc: 'HDFC0005678', account: '500123456789',
+        status: 'Active'
+      },
+      'c-002': {
+        name: 'Metro Hardware Store', contact: 'Ramesh Jain', mobile: '90000 22334', email: 'accounts@metrohardware.in',
+        address: '18, Market Yard, Nagpur, Maharashtra - 440001', state: 'Maharashtra',
+        gstin: '27METRO1234N1Z7', pan: 'METRO1234N',
+        paymentTerms: 'Net 15', paymentTermsNote: '15-day credit period',
+        creditLimit: '₹50,000',
+        openingBalance: '₹12,000 Dr', openingBalanceNote: 'Customer owes you ₹12,000',
+        bankName: 'ICICI Bank', ifsc: 'ICIC0006789', account: '600234567890',
+        status: 'Active'
+      },
+      'c-003': {
+        name: 'Sunrise Trading Co', contact: 'Kiran Solanki', mobile: '99250 66778', email: 'orders@sunrisetrading.com',
+        address: '3, Commerce House, Rajkot, Gujarat - 360001', state: 'Gujarat',
+        gstin: '24SUNRS9012P1Z3', pan: 'SUNRS9012P',
+        paymentTerms: 'Net 30', paymentTermsNote: '30-day credit period',
+        creditLimit: '₹1,00,000',
+        openingBalance: '₹0', openingBalanceNote: 'No opening balance',
+        bankName: 'Bank of Baroda', ifsc: 'BARB0RAJKOT', account: '700345678901',
+        status: 'Active'
+      },
+      'c-004': {
+        name: 'Apex Distributors', contact: 'Neha Kapoor', mobile: '97230 55667', email: 'accounts@apexdist.in',
+        address: 'Karol Bagh, New Delhi - 110005', state: 'Delhi',
+        gstin: '07APEXD3456Q1Z9', pan: 'APEXD3456Q',
+        paymentTerms: 'Net 45', paymentTermsNote: '45-day credit period',
+        creditLimit: '₹75,000',
+        openingBalance: '₹5,500 Dr', openingBalanceNote: 'Customer owes you ₹5,500',
+        bankName: 'Axis Bank', ifsc: 'UTIB0007890', account: '800456789012',
+        status: 'Active'
+      },
+      'c-005': {
+        name: 'Old Retail Chain', contact: 'Suresh Yadav', mobile: '94140 44332', email: 'info@oldretailchain.in',
+        address: 'Station Road, Jodhpur, Rajasthan - 342001', state: 'Rajasthan',
+        gstin: '08OLDRT7890R1Z2', pan: 'OLDRT7890R',
+        paymentTerms: 'Net 30', paymentTermsNote: '30-day credit period',
+        creditLimit: '₹0',
+        openingBalance: '₹0', openingBalanceNote: 'No opening balance',
+        bankName: 'State Bank of India', ifsc: 'SBIN0008901', account: '900567890123',
+        status: 'Inactive'
+      }
+    };
+
+    function viewField(label, value) {
+      return '<div><div class="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">' + label + '</div>' +
+        '<div class="text-[14px] text-ink mt-0.5">' + (value || '—') + '</div></div>';
+    }
+    function viewSectionTitle(title) {
+      return '<p class="form-section-title">' + title + '</p>';
+    }
+    function openViewModal(code) {
+      const c = CUSTOMER_DATA[code];
+      if (!c) return;
+      viewModalSubtitle.textContent = code.toUpperCase() + ' — ' + c.name;
+      viewModalBody.innerHTML =
+        viewSectionTitle('Basic info') +
+        '<div class="grid grid-cols-2 gap-3">' + viewField('Contact person', c.contact) + viewField('Mobile', c.mobile) + '</div>' +
+        viewField('Email', c.email) +
+        viewField('Address', c.address) +
+        viewField('State', c.state) +
+        '<hr class="border-slate-200 !my-3" />' +
+        viewSectionTitle('Tax &amp; compliance') +
+        '<div class="grid grid-cols-2 gap-3">' + viewField('GSTIN', c.gstin) + viewField('PAN', c.pan) + '</div>' +
+        '<hr class="border-slate-200 !my-3" />' +
+        viewSectionTitle('Credit &amp; bank') +
+        viewField('Payment terms', c.paymentTerms + ' <span class="text-ink-faint font-normal">(' + c.paymentTermsNote + ')</span>') +
+        viewField('Credit limit', c.creditLimit) +
+        viewField('Opening balance', c.openingBalance + ' <span class="text-ink-faint font-normal">(' + c.openingBalanceNote + ')</span>') +
+        '<div class="grid grid-cols-2 gap-3">' + viewField('Bank name', c.bankName) + viewField('IFSC', c.ifsc) + '</div>' +
+        viewField('Account number', c.account) +
+        '<hr class="border-slate-200 !my-3" />' +
+        viewSectionTitle('Status') +
+        viewField('Status', c.status);
+      viewModal.classList.remove('hidden');
+      viewModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeViewModal() {
+      viewModal.classList.add('hidden');
+      viewModal.setAttribute('aria-hidden', 'true');
+    }
+    document.querySelectorAll('.btn-view-customer').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const row = btn.closest('.customer-row');
+        openViewModal(row.getAttribute('data-code'));
+      });
+    });
+    document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
+    document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
+    document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !viewModal.classList.contains('hidden')) closeViewModal();
+    });
+  </script>
+</body>
+</html>

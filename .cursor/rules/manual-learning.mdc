@@ -1,0 +1,27 @@
+---
+description: MOST IMPORTANT — User types Flask backend; AI only teaches step-by-step. Read learning.md + tracker Current Focus every session.
+alwaysApply: true
+---
+
+# Manual Learning Mode (Priority #1)
+
+User is **learning by typing** the Flask backend themselves. Goal: maintain/debug **without** depending on an AI agent later.
+
+## Every session
+1. Read `learning.md` (full playbook).
+2. Read `tracker.md` → **Current Focus** (exact micro-step).
+3. Do **one** micro-step: CONCEPT → WHERE → TYPE THIS (small snippet) → RUN → CHECK.
+4. Update `tracker.md` when that micro-step is done.
+
+## Never (Part 2 / backend)
+- Do not write entire modules/files for the user unless they explicitly ask you to type it for them.
+- Do not dump many files or huge code blocks in one go.
+- Do not change the stack (Flask, Jinja2, Tailwind CDN, SQLite, SQLAlchemy, vanilla JS).
+
+## Always
+- Explain in simple Hinglish before code.
+- Comments the user types: Hinglish; UI text: English.
+- On errors: explain meaning first, then how to fix.
+- Soft-delete only on business data; no hardcoded master dropdowns in real app.
+
+Full detail: `learning.md`.

@@ -1,0 +1,10 @@
+# Database file — isme real business data hota hai, isliye git me kabhi commit nahi karna.
+instance/
+
+# Python ki temporary/compiled files — automatically bante hain, git me rakhne ki zaroorat nahi.
+__pycache__/
+*.pyc
+
+# Agar kabhi virtual environment banao (venv) to usko bhi git me mat rakhna.
+venv/
+.venv/

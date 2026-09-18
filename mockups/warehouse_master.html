@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warehouse Master</title>
+  <!-- Spec §4.1 Warehouse Master: name, type (RM/WIP/FG/SCRAP/QC_HOLD), location, active.
+       Schema me branch_id bhi hai — isliye Branch dropdown rakha (Company/Branch master baad me).
+       Theme Unit Master jaisa Ink/Copper. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
+            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
+            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .wh-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .wh-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 14px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .wh-table thead th:first-child,
+    .wh-table tbody td:first-child { text-align: left; padding-left: 18px; }
+    .wh-table thead th:last-child { border-right: none; }
+    .wh-table tbody td {
+      padding: 11px 14px;
+      font-size: 14px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .wh-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .wh-table tbody tr:hover { background: #FBF4EE; }
+    .wh-table tbody tr.row-muted { opacity: 0.72; }
+    .search-wrap input { padding-left: 32px; }
+    #wh-modal.hidden { display: none; }
+    #wh-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+
+    /* Type badges — RM/WIP/FG/SCRAP/QC_HOLD alag color taaki table me turant pehchaan ho */
+    .type-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid;
+    }
+    .type-rm { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+    .type-wip { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+    .type-fg { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+    .type-scrap { background: #F4F6F5; color: #3D5A5D; border-color: #D1D9D8; }
+    .type-qc { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link is-active" aria-current="page"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Warehouses</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Warehouses</h1>
+        </div>
+        <button type="button" id="btn-add-wh"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add warehouse
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-wh" placeholder="Search code, name, location…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1 flex-wrap">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (7)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (6)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Stopped (1)</button>
+          </div>
+          <select id="filter-type" class="px-2.5 py-1.5 text-[12.5px] border border-slate-300 rounded bg-white text-ink focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">All types</option>
+            <option value="rm">RM — Raw material</option>
+            <option value="wip">WIP — Work in progress</option>
+            <option value="fg">FG — Finished goods</option>
+            <option value="scrap">SCRAP</option>
+            <option value="qc">QC_HOLD</option>
+          </select>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              Type decides what stock can live here · Stock transfer / issue / scrap screens pick warehouses from this list · Soft-stop only (no hard delete)
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="wh-table">
+            <!-- Spec §4.1 + schema branch_id. Code list me convenience ke liye (dusre masters jaisa). -->
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:9%" />
+              <col style="width:18%" />
+              <col style="width:12%" />
+              <col style="width:14%" />
+              <col style="width:18%" />
+              <col style="width:10%" />
+              <col style="width:15%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Warehouse name</th>
+                <th>Type</th>
+                <th>Branch</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="wh-tbody">
+              <!-- Names stock_transfer / material_issue / scrap pages se match — dropdown wahan se aayega -->
+              <tr class="wh-row" data-code="wh-rm01" data-name="main rm warehouse" data-type="rm" data-status="active" data-loc="shed a bay 1-4">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">1</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">WH-RM01</span></td>
+                <td><span class="font-medium text-ink">Main RM Warehouse</span></td>
+                <td><span class="type-badge type-rm">RM</span></td>
+                <td class="text-[13px] text-ink-muted">Main Plant</td>
+                <td class="text-[12.5px] text-ink-faint">Shed A, Bay 1–4</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="wh-row" data-code="wh-fg01" data-name="fg warehouse" data-type="fg" data-status="active" data-loc="packing hall">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">WH-FG01</span></td>
+                <td><span class="font-medium text-ink">FG Warehouse</span></td>
+                <td><span class="type-badge type-fg">FG</span></td>
+                <td class="text-[13px] text-ink-muted">Main Plant</td>
+                <td class="text-[12.5px] text-ink-faint">Packing hall</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="wh-row" data-code="wh-sc01" data-name="scrap warehouse" data-type="scrap" data-status="active" data-loc="yard west">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">3</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">WH-SC01</span></td>
+                <td><span class="font-medium text-ink">Scrap Warehouse</span></td>
+                <td><span class="type-badge type-scrap">SCRAP</span></td>
+                <td class="text-[13px] text-ink-muted">Main Plant</td>
+                <td class="text-[12.5px] text-ink-faint">Yard west</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="wh-row" data-code="wh-qc01" data-name="qc hold bay" data-type="qc" data-status="active" data-loc="gate inward area">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">4</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">WH-QC01</span></td>
+                <td><span class="font-medium text-ink">QC Hold Bay</span></td>
+                <td><span class="type-badge type-qc">QC_HOLD</span></td>
+                <td class="text-[13px] text-ink-muted">Main Plant</td>
+                <td class="text-[12.5px] text-ink-faint">Gate inward area</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="wh-row" data-code="wh-wip1" data-name="wip staging" data-type="wip" data-status="active" data-loc="shop floor">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">5</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">WH-WIP1</span></td>
+                <td><span class="font-medium text-ink">WIP Staging</span></td>
+                <td><span class="type-badge type-wip">WIP</span></td>
+                <td class="text-[13px] text-ink-muted">Main Plant</td>
+                <td class="text-[12.5px] text-ink-faint">Shop floor</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="wh-row" data-code="wh-rm02" data-name="branch rm store" data-type="rm" data-status="active" data-loc="surat godown">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">6</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">WH-RM02</span></td>
+                <td><span class="font-medium text-ink">Branch RM Store</span></td>
+                <td><span class="type-badge type-rm">RM</span></td>
+                <td class="text-[13px] text-ink-muted">Surat Branch</td>
+                <td class="text-[12.5px] text-ink-faint">Surat godown</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer" checked>
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              <tr class="wh-row row-muted" data-code="wh-old1" data-name="old finishing bay" data-type="wip" data-status="inactive" data-loc="main plant shed c">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">7</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink-faint bg-mist border border-slate-200 rounded px-2 py-1">WH-OLD1</span></td>
+                <td><span class="font-medium text-ink-faint">Old Finishing Bay</span></td>
+                <td><span class="type-badge type-wip">WIP</span></td>
+                <td class="text-[13px] text-ink-faint">Main Plant</td>
+                <td class="text-[12.5px] text-ink-faint">Shed C (decommissioned)</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                      <input type="checkbox" class="toggle-input sr-only peer">
+                      <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                      <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No warehouses found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear search/filters or add a new warehouse.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add warehouse</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing 7 of 7 warehouses</span>
+          <span>Tip: create RM + FG + Scrap + QC Hold first — stock screens need them</span>
+          <span class="text-ink-muted">Page 1 · Mock data</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="wh-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add warehouse</h2>
+          <p class="text-[12.5px] text-ink-faint">Name, type, branch, location</p>
+        </div>
+        <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <form id="wh-form" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div>
+          <label for="wh-code" class="block text-[12.5px] font-semibold text-ink mb-1">Short code *</label>
+          <input type="text" id="wh-code" placeholder="WH-RM01" maxlength="16" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <p class="mt-1 text-[11.5px] text-ink-faint">Unique code used in reports and stock docs.</p>
+        </div>
+        <div>
+          <label for="wh-name" class="block text-[12.5px] font-semibold text-ink mb-1">Warehouse name *</label>
+          <input type="text" id="wh-name" placeholder="Main RM Warehouse" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="wh-type" class="block text-[12.5px] font-semibold text-ink mb-1">Type *</label>
+          <!-- Spec enum — hardcoded nahi hona chahiye long-term; abhi mock me fixed list OK -->
+          <select id="wh-type" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select type…</option>
+            <option value="RM">RM — Raw material store</option>
+            <option value="WIP">WIP — Work in progress</option>
+            <option value="FG">FG — Finished goods</option>
+            <option value="SCRAP">SCRAP — Saleable scrap</option>
+            <option value="QC_HOLD">QC_HOLD — Under inspection</option>
+          </select>
+          <p class="mt-1 text-[11.5px] text-ink-faint">RM = purchase stock · QC_HOLD = GRN waiting QC · FG = ready to sell · SCRAP = metal waste.</p>
+        </div>
+        <div>
+          <!-- Branch list yahin dikhe + form se naya add — alag page pe jump nahi (user request).
+               Full Branch Master baad me bhi ban sakta hai; inline add usi list me jodta hai. -->
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <label for="wh-branch" class="text-[12.5px] font-semibold text-ink">Branch *</label>
+            <div class="flex items-center gap-2 text-[12px] font-semibold text-copper-text">
+              <button type="button" id="btn-show-add-branch" class="hover:underline">+ Add branch</button>
+              <span class="text-ink-faint font-normal">·</span>
+              <button type="button" id="btn-wh-branch-manage" class="hover:underline">Manage</button>
+            </div>
+          </div>
+          <select id="wh-branch" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select branch…</option>
+            <option value="Main Plant">Main Plant</option>
+            <option value="Surat Branch">Surat Branch</option>
+          </select>
+          <p class="mt-1 text-[11.5px] text-ink-faint">Existing list stays here. + Add for new plant · Manage to rename/remove.</p>
+
+          <!-- Inline mini-form — pehle chhupa; + Add branch pe khulta hai -->
+          <div id="branch-inline" class="hidden mt-2.5 border border-copper-border bg-copper-soft rounded-md p-3 space-y-2.5">
+            <div class="text-[12.5px] font-semibold text-ink">New branch</div>
+            <div>
+              <label for="new-branch-name" class="block text-[11.5px] font-semibold text-ink mb-0.5">Branch name *</label>
+              <input type="text" id="new-branch-name" placeholder="e.g. Ahmedabad Depot" autocomplete="off"
+                class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="new-branch-state" class="block text-[11.5px] font-semibold text-ink mb-0.5">State code</label>
+                <input type="text" id="new-branch-state" placeholder="24" maxlength="2" autocomplete="off"
+                  class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              </div>
+              <div>
+                <label for="new-branch-gstin" class="block text-[11.5px] font-semibold text-ink mb-0.5">GSTIN</label>
+                <input type="text" id="new-branch-gstin" placeholder="If separate reg." maxlength="15" autocomplete="off"
+                  class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              </div>
+            </div>
+            <p class="text-[11px] text-ink-faint leading-snug">Spec §4.1: branch can have its own GSTIN. Cross-GSTIN stock transfer later needs E-Way Bill.</p>
+            <div class="flex justify-end gap-2 pt-0.5">
+              <button type="button" id="btn-cancel-branch" class="px-2.5 py-1.5 text-[12.5px] text-ink-faint hover:bg-white rounded">Cancel</button>
+              <button type="button" id="btn-save-branch" class="px-2.5 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save to list</button>
+            </div>
+          </div>
+
+          <div id="wh-branch-manage" class="hidden mt-2.5 border border-slate-200 bg-mist rounded-md p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-[12.5px] font-semibold text-ink">Manage branches</div>
+              <button type="button" id="btn-wh-branch-manage-done" class="text-[12px] font-semibold text-copper-text hover:underline">Done</button>
+            </div>
+            <div id="wh-branch-manage-list" class="max-h-40 overflow-y-auto"></div>
+            <p class="text-[11px] text-ink-faint">Remove = soft. Warehouses already linked keep the old branch name on old records.</p>
+          </div>
+        </div>
+        <div>
+          <label for="wh-loc" class="block text-[12.5px] font-semibold text-ink mb-1">Location</label>
+          <input type="text" id="wh-loc" placeholder="Shed A, Bay 1–4" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <p class="mt-1 text-[11.5px] text-ink-faint">Physical place inside the branch (optional but useful for store staff).</p>
+        </div>
+        <label class="flex items-center gap-2 border border-slate-200 bg-mist rounded px-3 py-3 cursor-pointer">
+          <input type="checkbox" id="wh-active" class="h-4 w-4 rounded text-copper focus:ring-copper" checked />
+          <span class="text-[13.5px] font-medium text-ink">Active (can hold stock / appear in dropdowns)</span>
+        </label>
+      </form>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+        <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="wh-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save warehouse</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/erp-toast.js"></script>
+  <script src="assets/erp-list-picker.js"></script>
+  <script>
+    const modal = document.getElementById('wh-modal');
+    const form = document.getElementById('wh-form');
+    const searchInput = document.getElementById('search-wh');
+    const typeFilter = document.getElementById('filter-type');
+    const rows = Array.from(document.querySelectorAll('.wh-row'));
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
+    const tableEl = document.querySelector('.wh-table');
+    let activeFilter = 'all';
+
+    const branchSelect = document.getElementById('wh-branch');
+    const branchInline = document.getElementById('branch-inline');
+
+    // Manage shared helper se; Add custom (State + GSTIN fields)
+    const branchPicker = mountListPicker({
+      selectId: 'wh-branch',
+      itemLabel: 'branch',
+      wireAdd: false,
+      manageBtnId: 'btn-wh-branch-manage',
+      addPanelId: 'branch-inline',
+      managePanelId: 'wh-branch-manage',
+      manageListId: 'wh-branch-manage-list',
+      manageDoneBtnId: 'btn-wh-branch-manage-done',
+      placeholderValue: ''
+    });
+
+    function hideBranchInline() {
+      branchInline.classList.add('hidden');
+      document.getElementById('new-branch-name').value = '';
+      document.getElementById('new-branch-state').value = '';
+      document.getElementById('new-branch-gstin').value = '';
+    }
+
+    function openModal() {
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      hideBranchInline();
+      branchPicker.hidePanels();
+      document.getElementById('wh-code').focus();
+    }
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      form.reset();
+      document.getElementById('wh-active').checked = true;
+      hideBranchInline();
+      branchPicker.hidePanels();
+    }
+
+    // + Add branch — manage band; mini-form kholo
+    document.getElementById('btn-show-add-branch').addEventListener('click', function () {
+      branchPicker.hidePanels();
+      branchInline.classList.remove('hidden');
+      document.getElementById('new-branch-name').focus();
+    });
+    document.getElementById('btn-cancel-branch').addEventListener('click', hideBranchInline);
+    document.getElementById('btn-save-branch').addEventListener('click', function () {
+      const name = document.getElementById('new-branch-name').value.trim();
+      if (!name) {
+        showToast('Branch name is required.', 'error');
+        return;
+      }
+      const exists = Array.from(branchSelect.options).some(function (opt) {
+        return opt.value && opt.value.toLowerCase() === name.toLowerCase();
+      });
+      if (exists) {
+        showToast('That branch is already in the list. Select it from the dropdown.', 'info');
+        branchSelect.value = Array.from(branchSelect.options).find(function (opt) {
+          return opt.value.toLowerCase() === name.toLowerCase();
+        }).value;
+        hideBranchInline();
+        return;
+      }
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      branchSelect.appendChild(opt);
+      branchSelect.value = name;
+      hideBranchInline();
+      showToast('Branch added to list: ' + name, 'success');
+    });
+
+    // Manage pe add panel band
+    document.getElementById('btn-wh-branch-manage').addEventListener('click', hideBranchInline);
+
+    function applyFilters() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      const typeQ = typeFilter.value || '';
+      let visible = 0;
+      rows.forEach(function (row) {
+        const code = row.getAttribute('data-code') || '';
+        const name = row.getAttribute('data-name') || '';
+        const loc = row.getAttribute('data-loc') || '';
+        const status = row.getAttribute('data-status') || '';
+        const type = row.getAttribute('data-type') || '';
+        const matchesSearch = !q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1 || loc.indexOf(q) !== -1;
+        const matchesStatus =
+          activeFilter === 'all' ||
+          (activeFilter === 'active' && status === 'active') ||
+          (activeFilter === 'inactive' && status === 'inactive');
+        const matchesType = !typeQ || type === typeQ;
+        const show = matchesSearch && matchesStatus && matchesType;
+        row.classList.toggle('hidden', !show);
+        if (show) visible += 1;
+      });
+      const none = visible === 0;
+      emptyState.classList.toggle('hidden', !none);
+      if (tableEl) tableEl.classList.toggle('hidden', none);
+      resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' warehouses';
+    }
+
+    function updateFilterCounts() {
+      const activeCount = rows.filter(function (r) { return r.getAttribute('data-status') === 'active'; }).length;
+      const total = rows.length;
+      document.querySelector('[data-filter="all"]').textContent = 'All (' + total + ')';
+      document.querySelector('[data-filter="active"]').textContent = 'Active (' + activeCount + ')';
+      document.querySelector('[data-filter="inactive"]').textContent = 'Stopped (' + (total - activeCount) + ')';
+    }
+
+    document.getElementById('btn-add-wh').addEventListener('click', openModal);
+    document.getElementById('btn-empty-add').addEventListener('click', openModal);
+    document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+    document.getElementById('btn-cancel').addEventListener('click', closeModal);
+    document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const code = document.getElementById('wh-code').value.trim();
+      const name = document.getElementById('wh-name').value.trim();
+      const type = document.getElementById('wh-type').value;
+      const branch = document.getElementById('wh-branch').value;
+      if (!code || !name) { showToast('Code and Name are both required.', 'error'); return; }
+      if (!type) { showToast('Please select a warehouse type.', 'error'); return; }
+      if (!branch) { showToast('Please select a branch.', 'error'); return; }
+      showToast('Saved (mockup)!\n' + code.toUpperCase() + ' — ' + name + ' (' + type + ')', 'success');
+      closeModal();
+    });
+
+    document.querySelectorAll('.toggle-input').forEach(function (toggle) {
+      toggle.addEventListener('change', function () {
+        const row = toggle.closest('.wh-row');
+        const isActive = toggle.checked;
+        row.setAttribute('data-status', isActive ? 'active' : 'inactive');
+        row.classList.toggle('row-muted', !isActive);
+        const badge = row.querySelector('.status-badge');
+        badge.className = 'status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border ' +
+          (isActive ? 'bg-success-bg text-success border-success-border' : 'bg-stop-bg text-stop border-stop-border');
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + (isActive ? 'bg-success' : 'bg-stop') + '"></span> ' +
+          (isActive ? 'Active' : 'Stopped');
+        updateFilterCounts();
+        applyFilters();
+      });
+    });
+
+    searchInput.addEventListener('input', applyFilters);
+    typeFilter.addEventListener('change', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+          b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+        });
+        btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+        btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        applyFilters();
+      });
+    });
+  </script>
+</body>
+</html>

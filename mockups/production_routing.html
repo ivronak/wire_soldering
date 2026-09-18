@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Routing / Stages</title>
+  <!-- Phase 4 #4 — Multi-stage routing tracker (spec §7); theme locked Ink/Copper -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
+            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
+            mist: '#F4F6F5',
+            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
+            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
+            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
+            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
+            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14.5px;
+      color: #1C2B2D;
+      background: #F4F6F5;
+      margin: 0;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
+      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+    }
+    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
+    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link.is-disabled { opacity: 0.45; pointer-events: none; }
+    .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .rt-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .rt-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #EEF2F1;
+      color: #3D5A5D;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 12px 8px;
+      text-align: center;
+      border-bottom: 1px solid #D1D9D8;
+      border-right: 1px solid #E4EAE9;
+    }
+    .rt-table thead th:first-child,
+    .rt-table tbody td:first-child { text-align: left; padding-left: 16px; }
+    .rt-table thead th:last-child { border-right: none; }
+    .rt-table tbody td {
+      padding: 11px 8px;
+      font-size: 13.5px;
+      text-align: center;
+      border-bottom: 1px solid #E2E8E7;
+      vertical-align: middle;
+    }
+    .rt-table tbody tr:nth-child(even) { background: #F8FAF9; }
+    .rt-table tbody tr:hover { background: #FBF4EE; }
+    .search-wrap input { padding-left: 32px; }
+    #stage-modal.hidden, #view-modal.hidden { display: none; }
+    #stage-modal, #view-modal { display: flex; }
+    details.help-tip summary { cursor: pointer; list-style: none; }
+    details.help-tip summary::-webkit-details-marker { display: none; }
+    .form-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8A4A1C;
+      margin: 0;
+    }
+    #stage-form .field-label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #0F2F32;
+      margin-bottom: 4px;
+    }
+    #stage-form .field-ctrl {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    #stage-form .field-ctrl:focus {
+      outline: none;
+      border-color: #C46B2D;
+      box-shadow: 0 0 0 1px #C46B2D;
+    }
+    #stage-form .field-ctrl:read-only { background: #F4F6F5; color: #6B7F82; }
+
+    /* Stage pipeline chips */
+    .pipe {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .pipe-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      border: 1px solid #E2E8E0;
+      background: #F1F5F9;
+      color: #64748B;
+      white-space: nowrap;
+    }
+    .pipe-step.is-done {
+      background: #E6F5EC;
+      border-color: #B7E0C7;
+      color: #1F7A4D;
+    }
+    .pipe-step.is-current {
+      background: #FEF3E2;
+      border-color: #FBD9A5;
+      color: #B45309;
+      box-shadow: 0 0 0 1px #FBD9A5;
+    }
+    .pipe-arrow {
+      color: #CBD5E1;
+      font-size: 10px;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
+        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
+          <img src="assets/wire_soldering_logo.png" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
+        </div>
+        <div class="min-w-0 leading-tight">
+          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
+          <div class="text-[11px] text-ink-faint">Factory ERP</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
+        <a href="#" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+          Dashboard
+        </a>
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
+        <a href="unit_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
+        <a href="machine_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
+        <a href="vendor_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
+        <a href="customer_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
+        <a href="raw_material_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
+        <a href="raw_material_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
+        <a href="product_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
+        <a href="product_category_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
+        <a href="warehouse_master.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
+        <a href="purchase_order.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
+        <a href="gate_inward_grn.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
+        <a href="inward_qc.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
+        <a href="purchase_invoice.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
+        <a href="purchase_return.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
+        <a href="stock_ledger.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger</a>
+        <a href="stock_transfer.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
+        <a href="stock_adjustment.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
+        <a href="stock_valuation.html" class="nav-link"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+
+        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
+        <a href="bom_recipe.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          BOM / Recipe
+        </a>
+        <a href="production_order.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Production order
+        </a>
+        <a href="material_issue.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Material issue
+        </a>
+        <a href="production_routing.html" class="nav-link is-active" aria-current="page">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Routing / stages
+        </a>
+        <a href="scrap_waste.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Scrap / waste
+        </a>
+        <a href="consumption_variance.html" class="nav-link">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Consumption variance
+        </a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
+
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Routing</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Routing / stages</h1>
+        </div>
+        <p class="text-[12.5px] text-ink-faint max-w-sm text-right leading-snug hidden sm:block">
+          Stages come from the active BOM · advance one work center at a time
+        </p>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-rt" placeholder="Search batch, order, product…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1" id="filter-bar">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (4)</button>
+            <button type="button" data-filter="in_progress" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">In progress (2)</button>
+            <button type="button" data-filter="queued" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Queued (1)</button>
+            <button type="button" data-filter="done" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Routing done (1)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Spec §7: <strong>Cutting → Soldering → Assembly → Testing</strong> · each step logs operator + machine · no data loss between stages
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="rt-table">
+            <colgroup>
+              <col style="width:3%" />
+              <col style="width:13%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+              <col style="width:7%" />
+              <col style="width:32%" />
+              <col style="width:9%" />
+              <col style="width:12%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Batch / Lot</th>
+                <th>Prod. order</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Stage pipeline</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rt-tbody">
+              <!-- done: all 4 stages complete (stepIndex 4) -->
+              <tr class="rt-row" data-search="batch-ws-20250910-001 pro-2025-001 fg-ws-01 standard" data-status="done" data-id="rt-001" data-step="4">
+                <td class="text-ink-faint tabular-nums">1</td>
+                <td class="font-mono text-[12px] font-semibold text-ink">BATCH-WS-20250910-001</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-001</a></td>
+                <td class="text-left !text-left text-[13px] pl-2">FG-WS-01 · Standard 1m</td>
+                <td class="tabular-nums">500</td>
+                <td><div class="pipe" data-pipe></div></td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Routing done
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="rt-001">View</button>
+                  </div>
+                </td>
+              </tr>
+              <!-- in progress: Assembly current (stepIndex 2) -->
+              <tr class="rt-row" data-search="batch-ws-20250914-002 pro-2025-002 heavy assembly" data-status="in_progress" data-id="rt-002" data-step="2">
+                <td class="text-ink-faint tabular-nums">2</td>
+                <td class="font-mono text-[12px] font-semibold text-ink">BATCH-WS-20250914-002</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-002</a></td>
+                <td class="text-left !text-left text-[13px] pl-2">FG-WS-01 · Heavy duty 2m</td>
+                <td class="tabular-nums">200</td>
+                <td><div class="pipe" data-pipe></div></td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> In progress
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="rt-002">View</button>
+                    <button type="button" class="btn-update px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="rt-002">Update stage</button>
+                  </div>
+                </td>
+              </tr>
+              <!-- in progress: Soldering current (stepIndex 1) -->
+              <tr class="rt-row" data-search="batch-ws-20250916-003 pro-2025-003 soldering" data-status="in_progress" data-id="rt-003" data-step="1">
+                <td class="text-ink-faint tabular-nums">3</td>
+                <td class="font-mono text-[12px] font-semibold text-ink">BATCH-WS-20250916-003</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-003</a></td>
+                <td class="text-left !text-left text-[13px] pl-2">FG-WS-01 · Standard 1m</td>
+                <td class="tabular-nums">1000</td>
+                <td><div class="pipe" data-pipe></div></td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> In progress
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="rt-003">View</button>
+                    <button type="button" class="btn-update px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="rt-003">Update stage</button>
+                  </div>
+                </td>
+              </tr>
+              <!-- queued: not started (stepIndex 0) -->
+              <tr class="rt-row" data-search="batch-ws-20250916-005 pro-2025-005 queued cutting" data-status="queued" data-id="rt-004" data-step="0">
+                <td class="text-ink-faint tabular-nums">4</td>
+                <td class="font-mono text-[12px] font-semibold text-ink">BATCH-WS-20250916-005</td>
+                <td class="font-mono text-[12.5px]"><a href="production_order.html" class="text-brand-teal hover:underline">PRO-2025-005</a></td>
+                <td class="text-left !text-left text-[13px] pl-2">FG-WS-01 · Standard 1m</td>
+                <td class="tabular-nums">300</td>
+                <td><div class="pipe" data-pipe></div></td>
+                <td>
+                  <span class="status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Queued
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1 actions-cell">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="rt-004">View</button>
+                    <button type="button" class="btn-update px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="rt-004">Start Cutting</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No batches on the floor</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search, or release a production order and post material issue first.</p>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing 4 of 4 batches</span>
+          <span>Phase 4 manufacturing chain complete</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Update current stage -->
+  <div id="stage-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="stage-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="stage-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="stage-modal-title" class="text-[16px] font-bold text-ink leading-tight">Update stage</h2>
+          <p id="stage-modal-sub" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-stage-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+
+      <form id="stage-form" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+        <input type="hidden" id="stage-row-id" value="" />
+        <div>
+          <p class="form-section-title mb-2">Current work center</p>
+          <div class="rounded border border-warning-border bg-warning-bg px-3 py-2.5">
+            <p id="stage-current-label" class="text-[15px] font-bold text-warning">Soldering</p>
+            <p class="text-[12.5px] text-ink-muted mt-0.5">Complete this stage to move the batch to the next work center.</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-3">
+          <div>
+            <label for="stage-operator" class="field-label">Operator *</label>
+            <select id="stage-operator" required class="field-ctrl">
+              <option>Ravi Patel</option>
+              <option>Meena Shah</option>
+              <option>Amit Desai</option>
+            </select>
+          </div>
+          <div>
+            <label for="stage-machine" class="field-label">Machine / work center *</label>
+            <select id="stage-machine" required class="field-ctrl">
+              <option>MC-CUT-01 · Cutting bench</option>
+              <option selected>MC-SLD-02 · Soldering station</option>
+              <option>MC-ASM-01 · Assembly line</option>
+              <option>MC-TST-01 · Testing jig</option>
+            </select>
+          </div>
+          <div>
+            <label for="stage-qty" class="field-label">Qty processed *</label>
+            <input type="number" id="stage-qty" required min="1" value="200" class="field-ctrl tabular-nums" />
+          </div>
+          <div>
+            <label for="stage-notes" class="field-label">Notes</label>
+            <textarea id="stage-notes" rows="2" class="field-ctrl" placeholder="Optional floor notes…"></textarea>
+          </div>
+        </div>
+        <p class="text-[12.5px] text-ink-faint bg-mist border border-slate-200 rounded px-3 py-2">
+          Mock only: completing a stage keeps history (operator, machine, time) — stages are never deleted.
+        </p>
+      </form>
+
+      <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2 shrink-0">
+        <button type="button" id="btn-cancel-stage" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="stage-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Complete stage</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View history -->
+  <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="view-title" class="text-[16px] font-bold text-ink">Routing history</h2>
+          <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+        </div>
+        <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/erp-toast.js"></script>
+  <script>
+    /* Spec §7 stages — BOM se aate hain; mock me fixed wire-soldering flow */
+    var STAGES = ['Cutting', 'Soldering', 'Assembly', 'Testing'];
+
+    var RT_DETAILS = {
+      'rt-001': {
+        title: 'BATCH-WS-20250910-001 · Routing done',
+        pro: 'PRO-2025-001',
+        product: 'FG-WS-01 · Standard 1m',
+        qty: 500,
+        history: [
+          { stage: 'Cutting', op: 'Amit Desai', machine: 'MC-CUT-01', at: '10 Sep 09:12', qty: 500 },
+          { stage: 'Soldering', op: 'Ravi Patel', machine: 'MC-SLD-02', at: '10 Sep 11:40', qty: 500 },
+          { stage: 'Assembly', op: 'Meena Shah', machine: 'MC-ASM-01', at: '10 Sep 14:05', qty: 498 },
+          { stage: 'Testing', op: 'Ravi Patel', machine: 'MC-TST-01', at: '10 Sep 16:20', qty: 492 }
+        ]
+      },
+      'rt-002': {
+        title: 'BATCH-WS-20250914-002 · Assembly',
+        pro: 'PRO-2025-002',
+        product: 'FG-WS-01 · Heavy duty 2m',
+        qty: 200,
+        history: [
+          { stage: 'Cutting', op: 'Amit Desai', machine: 'MC-CUT-01', at: '14 Sep 08:50', qty: 200 },
+          { stage: 'Soldering', op: 'Ravi Patel', machine: 'MC-SLD-02', at: '14 Sep 12:15', qty: 200 },
+          { stage: 'Assembly', op: 'Meena Shah', machine: 'MC-ASM-01', at: 'In progress…', qty: 120 }
+        ]
+      },
+      'rt-003': {
+        title: 'BATCH-WS-20250916-003 · Soldering',
+        pro: 'PRO-2025-003',
+        product: 'FG-WS-01 · Standard 1m',
+        qty: 1000,
+        history: [
+          { stage: 'Cutting', op: 'Amit Desai', machine: 'MC-CUT-01', at: '16 Sep 07:30', qty: 1000 },
+          { stage: 'Soldering', op: 'Ravi Patel', machine: 'MC-SLD-02', at: 'In progress…', qty: 400 }
+        ]
+      },
+      'rt-004': {
+        title: 'BATCH-WS-20250916-005 · Queued',
+        pro: 'PRO-2025-005',
+        product: 'FG-WS-01 · Standard 1m',
+        qty: 300,
+        history: []
+      }
+    };
+
+    var stageModal = document.getElementById('stage-modal');
+    var viewModal = document.getElementById('view-modal');
+    var currentFilter = 'all';
+
+    /* Pipeline chips — step = kitne stages complete ho chuke (0..4) */
+    function renderPipe(container, step) {
+      step = parseInt(step, 10) || 0;
+      var html = '';
+      STAGES.forEach(function (name, i) {
+        if (i > 0) html += '<span class="pipe-arrow">→</span>';
+        var cls = 'pipe-step';
+        if (i < step) cls += ' is-done';
+        else if (i === step && step < STAGES.length) cls += ' is-current';
+        var mark = i < step ? '✓ ' : '';
+        html += '<span class="' + cls + '">' + mark + name + '</span>';
+      });
+      container.innerHTML = html;
+    }
+
+    function refreshAllPipes() {
+      document.querySelectorAll('.rt-row').forEach(function (row) {
+        var pipe = row.querySelector('[data-pipe]');
+        if (pipe) renderPipe(pipe, row.getAttribute('data-step'));
+      });
+    }
+
+    function statusMeta(status) {
+      if (status === 'done') return { label: 'Routing done', cls: 'bg-success-bg text-success border-success-border', dot: 'bg-success' };
+      if (status === 'in_progress') return { label: 'In progress', cls: 'bg-warning-bg text-warning border-warning-border', dot: 'bg-warning' };
+      return { label: 'Queued', cls: 'bg-neutral-bg text-neutral border-neutral-border', dot: 'bg-neutral' };
+    }
+
+    function renderRowChrome(row) {
+      var step = parseInt(row.getAttribute('data-step'), 10) || 0;
+      var status = step >= STAGES.length ? 'done' : (step === 0 ? 'queued' : 'in_progress');
+      row.setAttribute('data-status', status);
+      var meta = statusMeta(status);
+      var pill = row.querySelector('.status-pill');
+      if (pill) {
+        pill.className = 'status-pill inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border ' + meta.cls;
+        pill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + meta.dot + '"></span> ' + meta.label;
+      }
+      var pipe = row.querySelector('[data-pipe]');
+      if (pipe) renderPipe(pipe, step);
+      var id = row.getAttribute('data-id');
+      var cell = row.querySelector('.actions-cell');
+      if (!cell) return;
+      var html = '<button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-id="' + id + '">View</button>';
+      if (step < STAGES.length) {
+        var label = step === 0 ? 'Start ' + STAGES[0] : 'Update stage';
+        html += ' <button type="button" class="btn-update px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="' + id + '">' + label + '</button>';
+      }
+      cell.innerHTML = html;
+    }
+
+    function openStageModal(id) {
+      var row = document.querySelector('.rt-row[data-id="' + id + '"]');
+      if (!row) return;
+      var step = parseInt(row.getAttribute('data-step'), 10) || 0;
+      if (step >= STAGES.length) return;
+      var batch = row.cells[1].textContent.trim();
+      document.getElementById('stage-row-id').value = id;
+      document.getElementById('stage-modal-sub').textContent = batch + ' · step ' + (step + 1) + ' of ' + STAGES.length;
+      document.getElementById('stage-current-label').textContent = STAGES[step];
+      var qtyCell = row.cells[4];
+      document.getElementById('stage-qty').value = qtyCell ? qtyCell.textContent.trim() : '1';
+      // Machine dropdown rough match by stage name
+      var machineSel = document.getElementById('stage-machine');
+      var want = STAGES[step].toLowerCase().slice(0, 3);
+      for (var i = 0; i < machineSel.options.length; i++) {
+        if (machineSel.options[i].text.toLowerCase().indexOf(want) !== -1) {
+          machineSel.selectedIndex = i;
+          break;
+        }
+      }
+      stageModal.classList.remove('hidden');
+      stageModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeStageModal() {
+      stageModal.classList.add('hidden');
+      stageModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openView(id) {
+      var d = RT_DETAILS[id];
+      if (!d) return;
+      document.getElementById('view-subtitle').textContent = d.title;
+      var hist = '';
+      if (!d.history.length) {
+        hist = '<p class="text-ink-faint text-[13.5px]">No stages started yet — batch is queued after material issue.</p>';
+      } else {
+        hist = '<ol class="space-y-2">';
+        d.history.forEach(function (h, i) {
+          hist += '<li class="border border-slate-200 rounded px-3 py-2 bg-white">' +
+            '<div class="flex items-center justify-between gap-2"><span class="font-semibold text-ink">' + (i + 1) + '. ' + h.stage + '</span>' +
+            '<span class="text-[12px] text-ink-faint">' + h.at + '</span></div>' +
+            '<div class="mt-1 text-[13px] text-ink-muted">' + h.op + ' · ' + h.machine + ' · qty ' + h.qty + '</div></li>';
+        });
+        hist += '</ol>';
+      }
+      document.getElementById('view-body').innerHTML =
+        '<div><p class="form-section-title mb-1">Batch</p>' +
+        '<dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13.5px]">' +
+        '<dt class="text-ink-faint">Production order</dt><dd class="font-mono font-semibold">' + d.pro + '</dd>' +
+        '<dt class="text-ink-faint">Product</dt><dd>' + d.product + '</dd>' +
+        '<dt class="text-ink-faint">Planned qty</dt><dd class="tabular-nums">' + d.qty + ' PCS</dd>' +
+        '</dl></div>' +
+        '<div><p class="form-section-title mb-2">Stage log</p>' + hist + '</div>';
+      viewModal.classList.remove('hidden');
+      viewModal.setAttribute('aria-hidden', 'false');
+    }
+    function closeView() {
+      viewModal.classList.add('hidden');
+      viewModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function applyFilters() {
+      var q = (document.getElementById('search-rt').value || '').trim().toLowerCase();
+      var rows = document.querySelectorAll('.rt-row');
+      var shown = 0;
+      rows.forEach(function (row) {
+        var status = row.getAttribute('data-status') || '';
+        var search = row.getAttribute('data-search') || '';
+        var ok = (currentFilter === 'all' || status === currentFilter) && (!q || search.indexOf(q) !== -1);
+        row.classList.toggle('hidden', !ok);
+        if (ok) shown++;
+      });
+      document.getElementById('result-count').textContent = 'Showing ' + shown + ' of ' + rows.length + ' batches';
+      document.getElementById('empty-state').classList.toggle('hidden', shown > 0);
+    }
+
+    function updateFilterCounts() {
+      var rows = document.querySelectorAll('.rt-row');
+      var counts = { all: rows.length, queued: 0, in_progress: 0, done: 0 };
+      rows.forEach(function (r) {
+        var s = r.getAttribute('data-status');
+        if (counts[s] !== undefined) counts[s]++;
+      });
+      document.querySelectorAll('.filter-btn').forEach(function (btn) {
+        var f = btn.getAttribute('data-filter');
+        var labels = { all: 'All', queued: 'Queued', in_progress: 'In progress', done: 'Routing done' };
+        btn.textContent = labels[f] + ' (' + counts[f] + ')';
+      });
+    }
+
+    document.getElementById('btn-close-stage-modal').addEventListener('click', closeStageModal);
+    document.getElementById('btn-cancel-stage').addEventListener('click', closeStageModal);
+    document.getElementById('stage-modal-backdrop').addEventListener('click', closeStageModal);
+    document.getElementById('btn-close-view').addEventListener('click', closeView);
+    document.getElementById('btn-close-view-2').addEventListener('click', closeView);
+    document.getElementById('view-backdrop').addEventListener('click', closeView);
+
+    document.getElementById('search-rt').addEventListener('input', applyFilters);
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        currentFilter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.filter-btn').forEach(function (b) {
+          b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+          b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+        });
+        btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+        applyFilters();
+      });
+    });
+
+    document.getElementById('rt-tbody').addEventListener('click', function (e) {
+      var viewBtn = e.target.closest('.btn-view');
+      if (viewBtn) {
+        openView(viewBtn.getAttribute('data-id'));
+        return;
+      }
+      var upd = e.target.closest('.btn-update');
+      if (upd) openStageModal(upd.getAttribute('data-id'));
+    });
+
+    document.getElementById('stage-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var id = document.getElementById('stage-row-id').value;
+      var row = document.querySelector('.rt-row[data-id="' + id + '"]');
+      if (!row) return;
+      var step = parseInt(row.getAttribute('data-step'), 10) || 0;
+      var doneName = STAGES[step];
+      var op = document.getElementById('stage-operator').value;
+      var machine = document.getElementById('stage-machine').value;
+      var qty = document.getElementById('stage-qty').value;
+
+      // History mock update
+      if (!RT_DETAILS[id]) RT_DETAILS[id] = { title: id, pro: '—', product: '—', qty: qty, history: [] };
+      var hist = RT_DETAILS[id].history;
+      // Agar last entry same stage "In progress" thi toh replace
+      if (hist.length && hist[hist.length - 1].stage === doneName && String(hist[hist.length - 1].at).indexOf('progress') !== -1) {
+        hist[hist.length - 1] = { stage: doneName, op: op, machine: machine, at: 'Just now', qty: Number(qty) };
+      } else {
+        hist.push({ stage: doneName, op: op, machine: machine, at: 'Just now', qty: Number(qty) });
+      }
+
+      step += 1;
+      row.setAttribute('data-step', String(step));
+      renderRowChrome(row);
+      updateFilterCounts();
+      applyFilters();
+      closeStageModal();
+
+      if (step >= STAGES.length) {
+        showToast(doneName + ' complete — all routing stages done for this batch.', 'success');
+      } else {
+        showToast(doneName + ' complete → next: ' + STAGES[step], 'success');
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!stageModal.classList.contains('hidden')) closeStageModal();
+        else if (!viewModal.classList.contains('hidden')) closeView();
+      }
+    });
+
+    refreshAllPipes();
+    updateFilterCounts();
+    applyFilters();
+  </script>
+</body>
+</html>
