@@ -14,10 +14,8 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / Foundation / F1` — venv + Flask install  
-User flow samajh chuka; ab banate hue seekhega. Jab F1 done bole / CHECK pass → F2.
-
-Tumhari taraf: neeche wale 3 commands PowerShell me chalao, phir yahan result batao.
+**Abhi chal raha hai:** `Part2 / Foundation / F4` — Jinja: mockup → template (still fake data, `unit_master.html` jaisa look)  
+F3 (Blueprint `units_bp`, `app/units/routes.py` + `app/units/templates/units.html`, `register_blueprint`, `/units` page working) user ne complete kar diya (2026-09-18), Blueprint syntax bhi detail me samjhaya gaya.
 
 ---
 
@@ -80,6 +78,12 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-18 — F3 complete.** `app/units/routes.py` (Blueprint `units_bp`, fake `UNITS` list, `/units` route) + `app/units/templates/units.html` (Jinja `{% for %}` loop) user ne type kiye, `app/__init__.py` me `register_blueprint(units_bp)` add kiya. Browser pe `/units` plain list dikhi. User ne Blueprint syntax (constructor args, decorator, `render_template`, `register_blueprint` ka role) detail me samjhne ko kaha — line-by-line explain kiya gaya. Current Focus → `Part2 / Foundation / F4` (Jinja template ko `unit_master.html` mockup jaisa banana).
+
+- **2026-09-18 — F2 complete.** `app/__init__.py` (Flask app object + test `/` route) + `run.py` (server start) user ne type kiye, `python run.py` chalaya, browser me "Hello, ERP chal raha hai!" dikha. Current Focus → `Part2 / Foundation / F3` (Blueprint pattern + `/units` route).
+
+- **2026-09-18 — Part 2 (Manual Learning Mode) actually shuru hua.** User ne confirm kiya "manual development start karte hain, mockups base rahenge, saath me seekhte hue banayenge." `Part2 / Foundation / F1` (venv banaya + `pip install flask`) user ne khud type/run karke complete kiya. Current Focus → `Part2 / Foundation / F2` (`run.py` + minimal Flask app, "Hello" browser pe dikhna).
 
 - **2026-09-17 — ⭐ Manual Learning Mode locked (Claude limit se pehle plan incomplete tha — Cursor ne complete kiya):** User ne decide kiya Part 2 Flask **khud type** karega; AI ek-ek micro-step sikhayega. Files: `learning.md` (playbook), `CLAUDE.md` §0A, `.cursor/rules/manual-learning.mdc` (alwaysApply), `development.md` Part 2 update, `memory.md` decision. Current Focus → next = `Part2 / Foundation / F1` jab user ready bole.
 
