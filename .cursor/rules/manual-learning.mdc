@@ -24,4 +24,9 @@ User is **learning by typing** the Flask backend themselves. Goal: maintain/debu
 - On errors: explain meaning first, then how to fix.
 - Soft-delete only on business data; no hardcoded master dropdowns in real app.
 
+## Flask + HTML together (locked 2026-09-19)
+- Jab bhi feature me **dono** sides touch hoti hain (route + template), **dono sikhao** — pehle CONCEPT (Flask kya karega + HTML me kya badlega), phir TYPE THIS: Python snippet **aur** related Jinja/HTML snippet.
+- Template / HTML **chupke se mat edit karo** jab user seekh raha ho — kal ko user ko pata hona chahiye "Flask change → HTML me yahan `name` / `value` / form / button".
+- Exception: user explicitly bole "tum likh do" / sirf polish / mockup-only Part 1.
+
 Full detail: `learning.md`.

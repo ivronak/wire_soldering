@@ -14,8 +14,8 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / Foundation / F4` — Jinja: mockup → template (still fake data, `unit_master.html` jaisa look)  
-F3 (Blueprint `units_bp`, `app/units/routes.py` + `app/units/templates/units.html`, `register_blueprint`, `/units` page working) user ne complete kar diya (2026-09-18), Blueprint syntax bhi detail me samjhaya gaya.
+**Abhi chal raha hai:** `Part2 / Machine / M2` — seed + list from DB (`{% for m in machines %}`)  
+UI mockup static ready; form POST baad me.
 
 ---
 
@@ -57,11 +57,11 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 
 ### Part 2 — Backend (Step B → C → D, sab modules) — Part 1 complete hone ke baad shuru
 
-- [ ] Module 1: Unit Master — Step B/C pehle ek baar ban chuke the (tested, working) phir jaan-boojhkar hataye gaye — dobara banana hoga
-  - [ ] Step B — Flask + Jinja2 conversion
-  - [ ] Step C — Database table (`Unit` model) + backend routes
-  - [ ] Step D — Connect + acceptance checklist
-- [ ] Module 2: Machine Master (Step B/C/D)
+- [x] Module 1: Unit Master — **CRUD complete 2026-09-19** (manual learning: F1–F8 + search/filter/edit/soft-delete)
+  - [x] Step B — Flask + Jinja2 conversion
+  - [x] Step C — Database table (`Unit` model) + backend routes
+  - [x] Step D — Connect + acceptance (list/search/filter/add/edit/toggle/soft-delete)
+- [ ] Module 2: Machine Master (Step B/C/D) — **next** (Unit pattern repeat)
 - [ ] Module 3: Vendor Master (Step B/C/D + Auto-Ledger creation logic)
 - [ ] Module 4: Customer Master (Step B/C/D + Auto-Ledger creation logic)
 - [ ] Module 5: Raw Material Master (Step B/C/D + Unit foreign key)
@@ -78,6 +78,14 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-19 — ⭐ Unit Master full CRUD complete (manual learning):** User ne khud: List+seed, Search `q`, Status filter, Add, Edit (modal), Toggle Stop (`is_active`), Soft Delete (`is_deleted` — frontend hide), deleted-code restore on Add. Flask+HTML dono seekhe. Next: Machine Master (same pattern, kam naya concept).
+
+- **2026-09-19 — Flask+HTML teaching rule locked + Search done:** User ne bola AI HTML chupke change karta hai, batata nahi — ab har feature me Flask **aur** related Jinja/HTML dono sikhana (learning.md, manual-learning.mdc, CLAUDE §0A, memory). Unit Search (`?q=`) live. Next: `Flask-Status-Filter` (All / In use / Stopped).
+
+- **2026-09-19 — Part2 Unit Master F1–F8 complete (manual learning):** User ne khud type karke: venv/Flask, run.py+create_app, units blueprint, Jinja extends, SQLAlchemy Unit+erp.db, list from DB+seed, Add POST, soft is_active toggle. Next: Machine Master pattern ya Unit UI polish.
+
+- **2026-09-19 — F4 complete.** Naya `app/templates/base.html` banaya (Tailwind config + sidebar + `{% block title %}`/`{% block content %}` slots) — pehli baar **Jinja template inheritance** concept sikhaya: parent template (base.html) khaali "slots" define karta hai, child template (`units.html`) `{% extends "base.html" %}` se us parent ka structure leta hai aur apne blocks se slots bharta hai. `{{ }}` (value print) vs `{% %}` (logic/structure) ka fark bhi clarify kiya. `units.html` ko `extends` use karke rewrite kiya (ab poora HTML khud nahi likhta, sirf apna content deta hai). User ne dono files khud type ki, Claude ne verify ki (exact match). Browser pe `/units` ab sidebar + styled table ke saath dikhta hai (plain bullet list nahi). Current Focus → `Part2 / Unit / F5` (SQLAlchemy `Unit` model + real database).
 
 - **2026-09-18 — F3 complete.** `app/units/routes.py` (Blueprint `units_bp`, fake `UNITS` list, `/units` route) + `app/units/templates/units.html` (Jinja `{% for %}` loop) user ne type kiye, `app/__init__.py` me `register_blueprint(units_bp)` add kiya. Browser pe `/units` plain list dikhi. User ne Blueprint syntax (constructor args, decorator, `render_template`, `register_blueprint` ka role) detail me samjhne ko kaha — line-by-line explain kiya gaya. Current Focus → `Part2 / Foundation / F4` (Jinja template ko `unit_master.html` mockup jaisa banana).
 

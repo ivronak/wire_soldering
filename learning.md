@@ -30,13 +30,19 @@ Mockups (Part 1) pehle jaisi rah sakti hain — already mostly ban chuki hain.
 
 ```
 1. CONCEPT   — 2–5 lines Hinglish: yeh kya hai, kyun chahiye (code se PEHLE)
-2. WHERE     — kaunsi file / folder (path batao)
+               ★ Agar feature me Flask + HTML dono lagen → CONCEPT me dono sides batao
+                 (route kya karega + template me kahan kya badlega)
+2. WHERE     — kaunsi file / folder (path batao) — Python aur HTML dono paths
 3. TYPE THIS — chhota snippet (ideal 5–25 lines). User KHUD type kare.
+               ★ Flask snippet ke saath related Jinja/HTML bhi do — chupke HTML mat badlo
 4. RUN       — exact terminal command (Windows PowerShell friendly)
 5. CHECK     — kya dikhna chahiye (browser / terminal output)
 6. IF STUCK  — error ka matlab pehle explain, phir hint; poora file rewrite mat karo
 7. TICK      — tracker.md me micro-step tick + Current Focus update
 ```
+
+**Flask ↔ HTML rule (2026-09-19 — user ne explicitly bola):**  
+AI sirf Python mat sikhaye / HTML khud mat change kare. Jab develop kar rahe ho aur template touch hota hai, user ko clear batao: *“Flask me X → HTML me yahan `name` / form / button / `value`”* taaki kal ko khud pair mil sake.
 
 **Speed vs learning balance:**
 - Zyada chhote steps = zyada confident, thoda slow — **OK, yeh intentional hai.**
@@ -57,6 +63,7 @@ Mockups (Part 1) pehle jaisi rah sakti hain — already mostly ban chuki hain.
 
 ### NAHI KARNA
 - Part 2 me bina user ke poori `routes.py` / `models.py` khud mat likh do (unless user explicitly bole "tum likh do, main baad me padhunga").
+- **Jinja/HTML templates chupke se mat edit karo** jab feature seekhai chal rahi ho — pehle sikhao, user type kare (same Manual Learning Mode).
 - Ek message me 5 files / 200 lines mat dump karo.
 - Stack mat badlo (Flask + Jinja + SQLite + SQLAlchemy + Tailwind CDN + vanilla JS).
 - "Black box" shortcuts (copy-paste magic) mat do bina explain ke.

@@ -16,6 +16,8 @@ Yeh file Manufacturing ERP (Wire Soldering business) project ke liye Claude Code
 
 **Mana hai (default):** Part 2 me AI poori `routes.py` / module khud mat likh de — user type kare. Exception: user clearly bole "tum likh do".
 
+**Flask + HTML (2026-09-19):** Jab feature me route + template dono lagen, **dono sikhao** — HTML chupke mat badlo. CONCEPT me: Flask kya + HTML me kahan kya. TYPE THIS me Python **aur** related Jinja snippet.
+
 **Handoff:** Current Focus me hamesha exact micro-step ID likho (jaise `Part2 / Foundation / F2` ya `Part2 / Unit / F5`) taaki limit ke baad bhi continue ho sake.
 
 ---

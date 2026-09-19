@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+{% block title %}Machine Master{% endblock %}
+
+{% block page_css %}
+<style>
+  /* Machine table — Unit table jaisa; page-level taaki base clean rahe */
+  .machine-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .machine-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 12px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .machine-table thead th:first-child,
+  .machine-table tbody td:first-child { text-align: left; padding-left: 18px; }
+  .machine-table thead th:last-child { border-right: none; }
+  .machine-table tbody td {
+    padding: 11px 12px;
+    font-size: 14px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .machine-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .machine-table tbody tr:hover { background: #FBF4EE; }
+  /* Sirf Retired dim — Maintenance/Breakdown pe dhyaan chahiye */
+  .machine-table tbody tr.row-muted { opacity: 0.72; }
+  .search-wrap input { padding-left: 32px; }
+  #machine-modal.hidden { display: none; }
+  #machine-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .status-select {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 6px;
+    border-radius: 6px;
+    border: 1px solid #CBD5E1;
+    background: #fff;
+    color: #1C2B2D;
+  }
+  .status-select:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <!-- Page title row -->
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Machines</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Machines</h1>
+        </div>
+        <button type="button" id="btn-add-machine"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add machine
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <!-- Card toolbar — search/filter abhi mock JS; Flask baad me tum wire karoge -->
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-machines" placeholder="Search code or name…" autocomplete="off"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1 flex-wrap">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (7)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (4)</button>
+            <button type="button" data-filter="maintenance" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Maintenance (1)</button>
+            <button type="button" data-filter="breakdown" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Breakdown (1)</button>
+            <button type="button" data-filter="retired" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Retired (1)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              Work center = the production stage this machine is used in · Change status directly from the dropdown · Used by Production routing
+            </p>
+          </details>
+        </div>
+
+        <!-- Table scroll area -->
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="machine-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:8%" />
+              <col style="width:19%" />
+              <col style="width:12%" />
+              <col style="width:11%" />
+              <col style="width:12%" />
+              <col style="width:15%" />
+              <col style="width:19%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Machine name</th>
+                <th>Work center</th>
+                <th>Capacity</th>
+                <th>Installed</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="machines-tbody">
+              {% for m in machines %}       
+              <tr class="machine-row{% if m.status == 'retired' %} row-muted{% endif %}" data-code="{{ m.code|lower }}" data-name="{{ m.name|lower }}" data-status="{{ m.status }}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ m.code }}</span></td>
+                <td><span class="font-medium text-ink">{{ m.name }}</span></td>
+                <td class="text-[13px] text-ink-muted">{{ m.work_center }}</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">{{ m.capacity }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ installed_date or '_' }}</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="active">
+                      <option value="active" selected>Active</option>
+                      <option value="maintenance">Under Maintenance</option>
+                      <option value="breakdown">Breakdown</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr class="machine-row" data-code="mc-sld-02" data-name="soldering station" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-SLD-02</span></td>
+                <td><span class="font-medium text-ink">Soldering Station</span></td>
+                <td class="text-[13px] text-ink-muted">Soldering</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">300 units/hr</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2023-06-15</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="active">
+                      <option value="active" selected>Active</option>
+                      <option value="maintenance">Under Maintenance</option>
+                      <option value="breakdown">Breakdown</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr class="machine-row" data-code="mc-asm-01" data-name="assembly line" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">3</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-ASM-01</span></td>
+                <td><span class="font-medium text-ink">Assembly Line</span></td>
+                <td class="text-[13px] text-ink-muted">Assembly</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">800 units/hr</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2022-11-02</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="active">
+                      <option value="active" selected>Active</option>
+                      <option value="maintenance">Under Maintenance</option>
+                      <option value="breakdown">Breakdown</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr class="machine-row" data-code="mc-tst-01" data-name="testing jig" data-status="active">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">4</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-TST-01</span></td>
+                <td><span class="font-medium text-ink">Testing Jig</span></td>
+                <td class="text-[13px] text-ink-muted">Testing</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">150 units/hr</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2021-08-30</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="active">
+                      <option value="active" selected>Active</option>
+                      <option value="maintenance">Under Maintenance</option>
+                      <option value="breakdown">Breakdown</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr class="machine-row" data-code="mc-cut-02" data-name="wire stripper" data-status="maintenance">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">5</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-CUT-02</span></td>
+                <td><span class="font-medium text-ink">Wire Stripper</span></td>
+                <td class="text-[13px] text-ink-muted">Cutting</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">450 units/hr</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2024-01-20</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Under Maintenance
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="maintenance">
+                      <option value="active">Active</option>
+                      <option value="maintenance" selected>Under Maintenance</option>
+                      <option value="breakdown">Breakdown</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr class="machine-row" data-code="mc-sld-03" data-name="backup solder rig" data-status="breakdown">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">6</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-SLD-03</span></td>
+                <td><span class="font-medium text-ink">Backup Solder Rig</span></td>
+                <td class="text-[13px] text-ink-muted">Soldering</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">150 units/hr</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2021-08-30</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Breakdown
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="breakdown">
+                      <option value="active">Active</option>
+                      <option value="maintenance">Under Maintenance</option>
+                      <option value="breakdown" selected>Breakdown</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr class="machine-row row-muted" data-code="mc-asm-02" data-name="old crimping unit" data-status="retired">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">7</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink-faint bg-mist border border-slate-200 rounded px-2 py-1">MC-ASM-02</span></td>
+                <td><span class="font-medium text-ink-faint">Old Crimping Unit</span></td>
+                <td class="text-[13px] text-ink-faint">Assembly</td>
+                <td class="text-[13px] text-ink-faint tabular-nums">200 units/hr</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">2019-03-12</td>
+                <td class="text-center">
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Retired
+                  </span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
+                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
+                    <select class="status-select" data-current="retired">
+                      <option value="active">Active</option>
+                      <option value="maintenance">Under Maintenance</option>
+                      <option value="breakdown">Breakdown</option>
+                      <option value="retired" selected>Retired</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No machines found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new machine.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add machine</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing 7 of 7 machines</span>
+          <span>Tip: change status here — production routing sees the new status instantly</span>
+          <span class="text-ink-muted">Page 1 · Mock data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="machine-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+    <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+    <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add machine</h2>
+          <p class="text-[12.5px] text-ink-faint">Code, Name, Work Center, Capacity, Installed date, Status</p>
+        </div>
+        <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      </div>
+      <!-- method/action tum khud add karoge (Flask POST) — abhi sirf UI -->
+      <form id="machine-form" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div>
+          <label for="machine-code" class="block text-[12.5px] font-semibold text-ink mb-1">Machine code *</label>
+          <input type="text" id="machine-code" name="code" placeholder="MC-CUT-03" maxlength="20" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="machine-name" class="block text-[12.5px] font-semibold text-ink mb-1">Machine name *</label>
+          <input type="text" id="machine-name" name="name" placeholder="Wire Stripper 3" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="machine-workcenter" class="block text-[12.5px] font-semibold text-ink mb-1">Work center *</label>
+          <input type="text" id="machine-workcenter" name="work_center" placeholder="e.g. Cutting, Soldering, Assembly, Testing" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="machine-capacity" class="block text-[12.5px] font-semibold text-ink mb-1">Capacity / rated output</label>
+          <input type="text" id="machine-capacity" name="capacity" placeholder="e.g. 500 units/hr" autocomplete="off"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="machine-installed" class="block text-[12.5px] font-semibold text-ink mb-1">Installed date</label>
+          <input type="date" id="machine-installed" name="installed_date"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="machine-status" class="block text-[12.5px] font-semibold text-ink mb-1">Status</label>
+          <select id="machine-status" name="status" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="active" selected>Active</option>
+            <option value="maintenance">Under Maintenance</option>
+            <option value="breakdown">Breakdown</option>
+            <option value="retired">Retired</option>
+          </select>
+        </div>
+      </form>
+      <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+        <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+        <button type="submit" form="machine-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save machine</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  const modal = document.getElementById('machine-modal');
+  const form = document.getElementById('machine-form');
+  const searchInput = document.getElementById('search-machines');
+  const rows = Array.from(document.querySelectorAll('.machine-row'));
+  const emptyState = document.getElementById('empty-state');
+  const resultCount = document.getElementById('result-count');
+  const tableEl = document.querySelector('.machine-table');
+  let activeFilter = 'all';
+
+  const STATUS_META = {
+    active: { label: 'Active', classes: 'bg-success-bg text-success border-success-border', dot: 'bg-success' },
+    maintenance: { label: 'Under Maintenance', classes: 'bg-warning-bg text-warning border-warning-border', dot: 'bg-warning' },
+    breakdown: { label: 'Breakdown', classes: 'bg-stop-bg text-stop border-stop-border', dot: 'bg-stop' },
+    retired: { label: 'Retired', classes: 'bg-neutral-bg text-neutral border-neutral-border', dot: 'bg-neutral' }
+  };
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('machine-code').focus();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    form.reset();
+  }
+
+  function applyFilters() {
+    const q = (searchInput.value || '').trim().toLowerCase();
+    let visible = 0;
+    rows.forEach(function (row) {
+      const code = row.getAttribute('data-code') || '';
+      const name = row.getAttribute('data-name') || '';
+      const status = row.getAttribute('data-status') || '';
+      const matchesSearch = !q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1;
+      const matchesFilter = activeFilter === 'all' || status === activeFilter;
+      const show = matchesSearch && matchesFilter;
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    const none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' machines';
+  }
+
+  function updateFilterCounts() {
+    const counts = { active: 0, maintenance: 0, breakdown: 0, retired: 0 };
+    rows.forEach(function (row) {
+      const status = row.getAttribute('data-status');
+      if (counts[status] !== undefined) counts[status] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
+    document.querySelector('[data-filter="maintenance"]').textContent = 'Maintenance (' + counts.maintenance + ')';
+    document.querySelector('[data-filter="breakdown"]').textContent = 'Breakdown (' + counts.breakdown + ')';
+    document.querySelector('[data-filter="retired"]').textContent = 'Retired (' + counts.retired + ')';
+  }
+
+  document.getElementById('btn-add-machine').addEventListener('click', openModal);
+  var emptyAdd = document.getElementById('btn-empty-add');
+  if (emptyAdd) emptyAdd.addEventListener('click', openModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+
+  // Abhi Flask action nahi — submit pe page reload mat ho
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = document.getElementById('machine-code').value.trim();
+    var name = document.getElementById('machine-name').value.trim();
+    var workCenter = document.getElementById('machine-workcenter').value.trim();
+    if (!code || !name || !workCenter) {
+      if (typeof showToast === 'function') showToast('Code, Name and Work Center are all required.', 'error');
+      return;
+    }
+    if (typeof showToast === 'function') {
+      showToast('Saved (mockup)!\n' + code.toUpperCase() + ' — ' + name, 'success');
+    }
+    closeModal();
+  });
+
+  document.querySelectorAll('.status-select').forEach(function (select) {
+    select.addEventListener('change', function () {
+      var row = select.closest('.machine-row');
+      var newStatus = select.value;
+      row.setAttribute('data-status', newStatus);
+      row.classList.toggle('row-muted', newStatus === 'retired');
+      var meta = STATUS_META[newStatus];
+      var badge = row.querySelector('.status-badge');
+      badge.className = 'status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border ' + meta.classes;
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + meta.dot + '"></span> ' + meta.label;
+      updateFilterCounts();
+      applyFilters();
+    });
+  });
+
+  searchInput.addEventListener('input', applyFilters);
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-btn').forEach(function (b) {
+        var on = b === btn;
+        b.classList.toggle('bg-copper', on);
+        b.classList.toggle('text-white', on);
+        b.classList.toggle('border-copper', on);
+        b.classList.toggle('font-semibold', on);
+        b.classList.toggle('bg-white', !on);
+        b.classList.toggle('text-ink', !on);
+        b.classList.toggle('border-slate-300', !on);
+      });
+      applyFilters();
+    });
+  });
+</script>
+{% endblock %}

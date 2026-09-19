@@ -14,9 +14,26 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### Decision: Unit soft-delete = alag flag `is_deleted` (Stopped se alag)
+**Date:** 2026-09-19
+**Kya:** Toggle Stop = `is_active=False` (Stopped filter me dikhe). Delete = `is_deleted=True` (DB me row rahe, lekin Unit Master list ke teeno filters — All / In use / Stopped — me na dikhe). Hard `db.session.delete` nahi.
+**Kyun:** User ne clear kiya deleted rows frontend pe bilkul nahi; inactive/stopped alag concept hai.
+**How to apply:** List query hamesha `is_deleted == False` pehle; phir status se `is_active` filter. Delete route sirf `is_deleted=True`.
+
 ## Key Decisions
 
-### Decision: Manual Learning Mode — Part 2 me user type kare, AI sikhaye (MOST IMPORTANT)
+### Decision: Flask feature ke saath related HTML/Jinja bhi sikhao — chupke template mat badlo
+**Date:** 2026-09-19
+**Kya:** Part 2 me jab koi feature develop/seekhai ho (search, filter, form, toggle), AI sirf Python mat sikhayega / HTML khud silent edit nahi karega. Har aise step me CONCEPT + TYPE THIS me **Flask aur related HTML dono** — taaki user ko pata ho “backend change → template me yahan `name` / form / button / value”.
+**Kyun:** User ne explicitly bola: AI HTML khud change kar deta hai aur batata nahi; kal ko khud maintain karne ke liye pair samajhna zaroori hai. Search step pe ye gap clear hua.
+**How to apply:** Har micro-step jahan template touch ho: (1) CONCEPT me dono sides, (2) WHERE me dono paths, (3) TYPE THIS me chhota Python + chhota Jinja, (4) user type kare. Exception: user bole “tum likh do” / pure visual polish / Part 1 mockup-only.
+
+### Decision: List Search/Filter pehle Flask (server) seekho; JS sirf chhote UI helpers
+**Date:** 2026-09-19
+**Kya:** Unit Master jaisi list pe Search / status filter pehle `request.args` + SQLAlchemy query se banengen. Client-side JS search optional polish baad me. Modal open/close jaisa chhota JS OK.
+**Kyun:** User ko JS nahi aati; goal Flask se khud maintain karna hai. Server-side search ERP me badi data ke liye sahi bhi hai (pagination, security, bookmarkable URL).
+**How to apply:** Naya list feature pehle route + form GET sikhao; “sirf JS se filter” tab jab user deliberately UI polish maange.
+
 **Date:** 2026-09-17
 **Kya:** Flask backend (Part 2) AI dump nahi karega. Har micro-step: CONCEPT → WHERE → TYPE THIS (chhota) → RUN → CHECK. User khud type karega. Poora playbook `learning.md`; Cursor rule `.cursor/rules/manual-learning.mdc`; `CLAUDE.md` §0A.
 **Kyun:** User ka pehle se goal — AI/dost ke bina bhi maintain/debug. Claude session limit pe plan adhoora reh gaya tha; isliye rule files me permanently lock kiya taaki koi bhi agent continue kar sake.
