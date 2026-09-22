@@ -6,6 +6,7 @@ from app.machines.routes import machines_bp
 from app.work_stages.routes import work_stages_bp
 from app.rm_categories.routes import rm_categories_bp
 from app.raw_materials.routes import raw_materials_bp
+from app.product_categories.routes import product_categories_bp
 from app.extensions import db
 
 def create_app():
@@ -30,6 +31,7 @@ def create_app():
     app.register_blueprint(work_stages_bp)
     app.register_blueprint(rm_categories_bp)
     app.register_blueprint(raw_materials_bp)
+    app.register_blueprint(product_categories_bp)
 
     @app.route("/")
     def home():
