@@ -14,9 +14,9 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / RM-Category` — pehla micro-step jab user ready bole  
-Done: Unit → Work Stage → Machine (+ FK).  
-**Part 2 order (dependency, 2026-09-21):** RM Category → Raw Material → Product Category → Product → **Vendor** → Customer → Warehouse…
+**Abhi chal raha hai:** `Part2 / Product-Category / F1` — model + blueprint (RM Category clone)
+
+Done abhi: Raw Material Master CRUD complete (list/add/edit/toggle/soft-delete + Unit/Category FK).
 
 
 ---
@@ -64,9 +64,9 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 - [x] Unit Master — CRUD complete 2026-09-19
 - [x] Work Stage Master — CRUD complete 2026-09-21
 - [x] Machine Master (+ Work Stage FK) — complete 2026-09-21
-- [ ] **RM Category Master** — **next** (Raw Material dropdown ke liye)
-- [ ] Raw Material Master (Unit FK + RM Category FK)
-- [ ] Product Category Master
+- [x] **RM Category Master** — CRUD complete 2026-09-22 (list/add/edit/toggle/soft-delete)
+- [x] **Raw Material Master** (Unit FK + RM Category FK) — CRUD complete 2026-09-22
+- [ ] Product Category Master — **next**
 - [ ] Product Master (+ Category FK, dynamic variants later)
 - [ ] Vendor Master (rich form + Auto-Ledger; materials pe depend)
 - [ ] Customer Master (Vendor pattern + Debtors ledger)
@@ -83,6 +83,8 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-22 — Raw Material Master CRUD complete:** User ne list + Add (unique/restore) + Edit + Toggle + soft-delete khud type kiye; HTML form actions + FK display (`m.category.name`, `m.base_unit.code`) wired. Next: Product Category Master (RM Category jaisa pattern).
 
 - **2026-09-21 — Part 2 backend order = dependency-first:** User ne decide: Unit → Work Stage → Machine (done) → **RM Category → Raw Material → Product Category → Product → Vendor → Customer**. Vendor pehle nahi — materials pe depend. Tracker + memory + development.md update.
 

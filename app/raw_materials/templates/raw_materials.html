@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+{% block title %}Raw Material Master{% endblock %}
+
+{% block page_css %}
+<style>
+  .rm-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .rm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 10px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .rm-table thead th:first-child,
+  .rm-table tbody td:first-child { text-align: left; padding-left: 14px; }
+  .rm-table thead th:last-child { border-right: none; }
+  .rm-table tbody td {
+    padding: 10px;
+    font-size: 14px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rm-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .rm-table tbody tr:hover { background: #FBF4EE; }
+  .rm-table tbody tr.row-muted { opacity: 0.72; }
+  .search-wrap input { padding-left: 32px; }
+  #rm-modal.hidden, #view-modal.hidden { display: none; }
+  #rm-modal, #view-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6B7F82;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Raw Materials</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Raw Materials</h1>
+        </div>
+        <button type="button" id="btn-add-rm"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add material
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-rm" placeholder="Search code or name…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              Category from RM Category master · Base unit from Unit master · No price here — rate at purchase time
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="rm-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:9%" />
+              <col style="width:16%" />
+              <col style="width:11%" />
+              <col style="width:9%" />
+              <col style="width:11%" />
+              <col style="width:12%" />
+              <col style="width:11%" />
+              <col style="width:17%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Material name</th>
+                <th>Category</th>
+                <th title="From Unit Master">Base unit</th>
+                <th title="Low-stock flag level">Reorder level</th>
+                <th>Valuation</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rm-tbody">
+              {# Flask: materials list pass karega #}
+              {% for m in materials %}
+              <tr class="rm-row{% if not m.is_active %} row-muted{% endif %}"
+                  data-code="{{ m.code|lower }}"
+                  data-name="{{ m.name|lower }}"
+                  data-status="{% if m.is_active %}active{% else %}inactive{% endif %}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ m.code }}</span></td>
+                <td><span class="font-medium text-ink">{{ m.name }}</span></td>
+                <td class="text-[13px] text-ink-muted">{{ m.category.name if m.category else "—" }}</td>
+                <td><span class="inline-block font-mono text-[12.5px] font-semibold text-ink bg-mist border border-slate-200 rounded px-1.5 py-0.5">{{ m.base_unit.code if m.base_unit else "—" }}</span></td>
+                <td class="text-[13px] text-ink-muted tabular-nums">{{ m.reorder_level if m.reorder_level is not none else "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{% if m.valuation_method == 'weighted_avg' %}Weighted Average{% else %}FIFO{% endif %}</td>
+                <td class="text-center">
+                  {% if m.is_active %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                  {% else %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button"
+                      class="btn-view-rm px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                      data-code="{{ m.code }}"
+                      data-name="{{ m.name }}"
+                      data-category="{{ m.category.name if m.category else '' }}"
+                      data-description="{{ m.description or '' }}"
+                      data-base-unit="{{ m.base_unit.code if m.base_unit else '' }}"
+                      data-alt-unit="{{ m.alt_unit.code if m.alt_unit else '' }}"
+                      data-conversion="{{ m.conversion_note or '' }}"
+                      data-reorder="{{ m.reorder_level if m.reorder_level is not none else '' }}"
+                      data-min-stock="{{ m.min_stock if m.min_stock is not none else '' }}"
+                      data-max-stock="{{ m.max_stock if m.max_stock is not none else '' }}"
+                      data-hsn="{{ m.hsn_code or '' }}"
+                      data-valuation="{{ m.valuation_method or 'fifo' }}">
+                      View
+                    </button>
+                    <button type="button"
+                      class="btn-edit-rm px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-id="{{ m.id }}"
+                      data-code="{{ m.code }}"
+                      data-name="{{ m.name }}"
+                      data-category-id="{{ m.category_id or '' }}"
+                      data-description="{{ m.description or '' }}"
+                      data-base-unit-id="{{ m.base_unit_id or '' }}"
+                      data-alt-unit-id="{{ m.alt_unit_id or '' }}"
+                      data-conversion="{{ m.conversion_note or '' }}"
+                      data-reorder="{{ m.reorder_level if m.reorder_level is not none else '' }}"
+                      data-min-stock="{{ m.min_stock if m.min_stock is not none else '' }}"
+                      data-max-stock="{{ m.max_stock if m.max_stock is not none else '' }}"
+                      data-hsn="{{ m.hsn_code or '' }}"
+                      data-valuation="{{ m.valuation_method or 'fifo' }}">
+                      Edit
+                    </button>
+                    <form method="post" action="{{ url_for('raw_materials.raw_materials_delete', m_id=m.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Remove material"
+                          data-confirm-ok="Remove"
+                          data-confirm-message="Remove this material from the master list? It will be kept in the database but hidden.">
+                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">Delete</button>
+                    </form>
+                    <form method="post" action=" {{ url_for('raw_materials.raw_materials_toggle', m_id=m.id) }} " class="inline">
+                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
+                        <input type="checkbox" class="toggle-input sr-only peer" {% if m.is_active %}checked{% endif %}
+                               onchange="this.form.submit()">
+                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                      </label>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No materials found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new raw material.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add material</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} materials</span>
+          <span>Tip: set Reorder Level so low-stock alerts fire before you run out</span>
+          <span class="text-ink-muted">Page 1 · Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+{# ——— Add / Edit ——— #}
+<div id="rm-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add raw material</h2>
+        <p class="text-[12.5px] text-ink-faint">Basic info, units, stock control &amp; tax</p>
+      </div>
+      <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    {# method/action Flask Add se — Edit pe JS action badlega #}
+    <form id="rm-form" method="post" action="{{ url_for('raw_materials.raw_materials_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <p class="form-section-title">Basic info</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="rm-code" class="block text-[12.5px] font-semibold text-ink mb-1">Material code *</label>
+          <input type="text" id="rm-code" name="code" required placeholder="RM-CU-04" maxlength="20" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="rm-name" class="block text-[12.5px] font-semibold text-ink mb-1">Material name *</label>
+          <input type="text" id="rm-name" name="name" required placeholder="Copper Wire 3mm" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <label for="rm-category" class="text-[12.5px] font-semibold text-ink">Category *</label>
+          <a href="{{ url_for('rm_categories.rm_categories_list') }}" class="text-[12px] font-semibold text-copper-text hover:underline">Manage categories →</a>
+        </div>
+        <select id="rm-category" name="category_id" required
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="">Select category</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.code }} — {{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="rm-description" class="block text-[12.5px] font-semibold text-ink mb-1">Description</label>
+        <textarea id="rm-description" name="description" rows="2" placeholder="Short spec/notes"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Units &amp; conversion</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="rm-base-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Base unit *</label>
+          <select id="rm-base-unit" name="base_unit_id" required
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select unit</option>
+            {% for u in units %}
+            <option value="{{ u.id }}">{{ u.code }} — {{ u.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="rm-alt-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Alternate unit (optional)</label>
+          <select id="rm-alt-unit" name="alt_unit_id"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">None</option>
+            {% for u in units %}
+            <option value="{{ u.id }}">{{ u.code }} — {{ u.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="rm-conversion" class="block text-[12.5px] font-semibold text-ink mb-1">Conversion factor</label>
+        <input type="text" id="rm-conversion" name="conversion_note" placeholder="e.g. 1 Box = 25 PCS"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="text-[11px] text-ink-faint mt-1">Only if bought in one unit and issued in another.</p>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Stock control</p>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label for="rm-reorder" class="block text-[12.5px] font-semibold text-ink mb-1">Reorder level</label>
+          <input type="number" id="rm-reorder" name="reorder_level" placeholder="0" min="0"
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="rm-min-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Min stock</label>
+          <input type="number" id="rm-min-stock" name="min_stock" placeholder="0" min="0"
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="rm-max-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Max stock</label>
+          <input type="number" id="rm-max-stock" name="max_stock" placeholder="0" min="0"
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Tax &amp; valuation</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="rm-hsn" class="block text-[12.5px] font-semibold text-ink mb-1">HSN code</label>
+          <input type="text" id="rm-hsn" name="hsn_code" placeholder="7408" maxlength="8"
+            class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="rm-valuation" class="block text-[12.5px] font-semibold text-ink mb-1">Valuation method</label>
+          <select id="rm-valuation" name="valuation_method"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="fifo" selected>FIFO</option>
+            <option value="weighted_avg">Weighted Average</option>
+          </select>
+        </div>
+      </div>
+      <p class="text-[11.5px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">
+        No price field here — the rate is entered every time on the Purchase Invoice.
+      </p>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="rm-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save material</button>
+    </div>
+  </div>
+</div>
+
+{# ——— View (read-only) ——— #}
+<div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Raw material details</h2>
+        <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="view-modal-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var modal = document.getElementById('rm-modal');
+  var viewModal = document.getElementById('view-modal');
+  var form = document.getElementById('rm-form');
+  var searchInput = document.getElementById('search-rm');
+  var rows = Array.from(document.querySelectorAll('.rm-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.rm-table');
+  var modalTitle = document.getElementById('modal-title');
+  var activeFilter = 'all';
+  var FILTER_KEY = 'erp.raw_materials.statusFilter';
+  var SEARCH_KEY = 'erp.raw_materials.searchQ';
+  // Add action — Flask route ready hone pe url_for yahan / form pe
+  var addAction = " {{ url_for('raw_materials.raw_materials_add') }} ";
+
+  function saveActiveFilter() {
+    try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
+  }
+  function saveSearchQ() {
+    try { sessionStorage.setItem(SEARCH_KEY, searchInput.value || ''); } catch (e) {}
+  }
+  function applyFilterButtonStyles(btn) {
+    document.querySelectorAll('.filter-btn').forEach(function (b) {
+      var on = b === btn;
+      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-copper', on);
+      b.classList.toggle('font-semibold', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-ink', !on);
+      b.classList.toggle('border-slate-300', !on);
+    });
+  }
+  function restoreListState() {
+    var savedQ = null, savedFilter = null;
+    try {
+      savedQ = sessionStorage.getItem(SEARCH_KEY);
+      savedFilter = sessionStorage.getItem(FILTER_KEY);
+    } catch (e) {}
+    if (savedQ !== null) searchInput.value = savedQ;
+    if (savedFilter) {
+      var btn = document.querySelector('.filter-btn[data-filter="' + savedFilter + '"]');
+      if (btn) { activeFilter = savedFilter; applyFilterButtonStyles(btn); }
+    }
+    applyFilters();
+  }
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('rm-code').focus();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    form.reset();
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add raw material';
+  }
+  function openAddModal() {
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add raw material';
+    form.reset();
+    openModal();
+  }
+  function openEditModal(btn) {
+    var id = btn.getAttribute('data-id');
+    form.action = '/raw_materials/edit/' + id;
+    modalTitle.textContent = 'Edit raw material';
+    document.getElementById('rm-code').value = btn.getAttribute('data-code') || '';
+    document.getElementById('rm-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('rm-category').value = btn.getAttribute('data-category-id') || '';
+    document.getElementById('rm-description').value = btn.getAttribute('data-description') || '';
+    document.getElementById('rm-base-unit').value = btn.getAttribute('data-base-unit-id') || '';
+    document.getElementById('rm-alt-unit').value = btn.getAttribute('data-alt-unit-id') || '';
+    document.getElementById('rm-conversion').value = btn.getAttribute('data-conversion') || '';
+    document.getElementById('rm-reorder').value = btn.getAttribute('data-reorder') || '';
+    document.getElementById('rm-min-stock').value = btn.getAttribute('data-min-stock') || '';
+    document.getElementById('rm-max-stock').value = btn.getAttribute('data-max-stock') || '';
+    document.getElementById('rm-hsn').value = btn.getAttribute('data-hsn') || '';
+    document.getElementById('rm-valuation').value = btn.getAttribute('data-valuation') || 'fifo';
+    openModal();
+  }
+
+  function viewField(label, value) {
+    return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+  }
+  function openViewModal(btn) {
+    document.getElementById('view-modal-subtitle').textContent =
+      (btn.getAttribute('data-code') || '') + ' — ' + (btn.getAttribute('data-name') || '');
+    var val = btn.getAttribute('data-valuation') || 'fifo';
+    var valLabel = val === 'weighted_avg' ? 'Weighted Average' : 'FIFO';
+    document.getElementById('view-modal-body').innerHTML =
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Category', btn.getAttribute('data-category')) +
+      viewField('Base unit', btn.getAttribute('data-base-unit')) +
+      viewField('Alternate unit', btn.getAttribute('data-alt-unit')) +
+      viewField('Conversion', btn.getAttribute('data-conversion')) +
+      viewField('Reorder level', btn.getAttribute('data-reorder')) +
+      viewField('Min stock', btn.getAttribute('data-min-stock')) +
+      viewField('Max stock', btn.getAttribute('data-max-stock')) +
+      viewField('HSN', btn.getAttribute('data-hsn')) +
+      viewField('Valuation', valLabel) +
+      '</div>' +
+      '<div class="pt-2">' + viewField('Description', btn.getAttribute('data-description')) + '</div>';
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeViewModal() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var code = row.getAttribute('data-code') || '';
+      var name = row.getAttribute('data-name') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1) &&
+        (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' materials';
+  }
+  function updateFilterCounts() {
+    var counts = { active: 0, inactive: 0 };
+    rows.forEach(function (row) {
+      var s = row.getAttribute('data-status');
+      if (counts[s] !== undefined) counts[s] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
+  }
+
+  document.getElementById('btn-add-rm').addEventListener('click', openAddModal);
+  var emptyAdd = document.getElementById('btn-empty-add');
+  if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
+  document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
+  document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!viewModal.classList.contains('hidden')) closeViewModal();
+    else if (!modal.classList.contains('hidden')) closeModal();
+  });
+  document.querySelectorAll('.btn-edit-rm').forEach(function (btn) {
+    btn.addEventListener('click', function () { openEditModal(btn); });
+  });
+  document.querySelectorAll('.btn-view-rm').forEach(function (btn) {
+    btn.addEventListener('click', function () { openViewModal(btn); });
+  });
+
+  form.addEventListener('submit', function (e) {
+    var code = document.getElementById('rm-code').value.trim();
+    var name = document.getElementById('rm-name').value.trim();
+    var cat = document.getElementById('rm-category').value;
+    var unit = document.getElementById('rm-base-unit').value;
+    if (!code || !name || !cat || !unit) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Code, Name, Category and Base unit are required.', 'error');
+    }
+    // valid + action set → Flask POST; action khali ho to prevent
+    if (!form.action) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Wire Flask Add route first (form action).', 'error');
+    }
+  });
+
+  searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      saveActiveFilter();
+      applyFilterButtonStyles(btn);
+      applyFilters();
+    });
+  });
+  updateFilterCounts();
+  restoreListState();
+</script>
+{% endblock %}
