@@ -95,16 +95,27 @@ We will create the `app/` folder (and everything inside it) only when **Part 2 (
 
 ## 2. Module Build Order
 
-Phase 1 has 6 modules. We build their **mockups** in this order during Part 1, and later build their **backend** in this same order during Part 2 — each one unlocks understanding needed for the next:
+### Part 1 (Mockups) — original learning order (unchanged)
+Mockups is order me ban/approve hue: Unit → Machine → Vendor → Customer → Raw Material → Product (+ later Warehouse / category mocks).
 
-| # | Module | Why this order |
+### Part 2 (Backend) — dependency order (locked 2026-09-21)
+
+User ne decide: parties (Vendor) se pehle materials/products + unki categories, taaki FK dropdown real data se aaye.
+
+| # | Module | Status / why |
 |---|---|---|
-| 1 | **Unit Master** | Simplest table (few fields), no relationships to other tables — best for learning the pattern with least risk |
-| 2 | **Machine Master** | Also simple, standalone, but introduces a multi-value status (not just on/off) |
-| 3 | **Vendor Master** | First "rich" master — many fields, sectioned form, will later drive auto-ledger creation |
-| 4 | **Customer Master** | Nearly identical to Vendor — fast, since you'll already know the pattern |
-| 5 | **Raw Material Master** | Introduces a real cross-module relationship (Raw Material's Base Unit dropdown pulls from Unit Master) |
-| 6 | **Product Master + Dynamic Variants** | Most complex — dynamic JSONB-style attributes, variants, SKU generation — saved for last after you're comfortable |
+| 1 | **Unit Master** | Done — base for RM / Product units |
+| 2 | **Work Stage** | Done — Machine FK |
+| 3 | **Machine Master** | Done — Work Stage FK |
+| 4 | **RM Category** | **Next** — Raw Material category dropdown |
+| 5 | **Raw Material** | Unit FK + RM Category FK |
+| 6 | **Product Category** | Product category dropdown |
+| 7 | **Product Master** | Category FK; variants later |
+| 8 | **Vendor Master** | Rich form + Auto-Ledger; after materials exist |
+| 9 | **Customer Master** | Vendor pattern + Debtors |
+| 10 | **Warehouse** | Stock / inventory pages |
+
+*(Old Part 2 table put Vendor right after Machine — superseded by this dependency order.)*
 
 ---
 

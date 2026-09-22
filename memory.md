@@ -6,6 +6,12 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### Decision: Part 2 backend order = dependency chain (not original mockup order)
+**Date:** 2026-09-21
+**Kya:** Backend ab is sequence me: Unit → Work Stage → Machine → **RM Category → Raw Material → Product Category → Product → Vendor → Customer** (Warehouse baad me). Purana plan Vendor ko Machine ke turant baad rakh’ta tha.
+**Kyun:** User ne clear kiya — Vendor / procurement materials pe depend karta hai; pehle category + masters banao jahan se dropdown/FK aaye, phir parties.
+**How to apply:** Tracker Current Focus = RM Category next. Vendor Auto-Ledger tab jab Vendor module aaye. Mockup Part 1 order change nahi — sirf Part 2 typing order.
+
 ### Decision: Har module me teaching continue karo, sirf pehle module tak limited mat rakho
 **Date:** 2026-09-16
 **Kya:** Jaise-jaise similar modules (Vendor, Customer, Raw Material) bante gaye, explanation dheere-dheere sirf "kya badla pichle module se" tak simat gaya — asli teaching (kyun aisa design kiya, concept kya hai) kam hoti gayi. User ne yaad dilaya: "explain karo taaki main baad mein manual change kar paau, sikhate rehna, live project learning jaisa."
@@ -19,6 +25,12 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 **Kya:** Toggle Stop = `is_active=False` (Stopped filter me dikhe). Delete = `is_deleted=True` (DB me row rahe, lekin Unit Master list ke teeno filters — All / In use / Stopped — me na dikhe). Hard `db.session.delete` nahi.
 **Kyun:** User ne clear kiya deleted rows frontend pe bilkul nahi; inactive/stopped alag concept hai.
 **How to apply:** List query hamesha `is_deleted == False` pehle; phir status se `is_active` filter. Delete route sirf `is_deleted=True`.
+
+### Decision: Work Stage master + Machine FK; master list Search/Filter JS OK
+**Date:** 2026-09-21
+**Kya:** (1) Naya **Work Stage** master (code, name, sort_order, soft status) — Machine pe baad me `work_stage_id` FK dropdown. Free-text work_center hataenge. (2) Chhote masters pe search/filter **client-side JS** OK (Flask `?q=` har click pe zaroori nahi).
+**Kyun:** Routing stages se match; FK seekhna; typo/mismatch kam. User ne JS search prefer kiya (fast/easy).
+**How to apply:** Mock UI `/work-stages` pehle → model/CRUD → Machine FK. Badi lists pe Flask pagination baad me.
 
 ## Key Decisions
 

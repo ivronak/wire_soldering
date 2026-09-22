@@ -130,8 +130,10 @@
 
                     <form method="post"
                           action="{{ url_for('units.units_delete', unit_id=u.id) }}"
-                          class="inline"
-                          onsubmit="return confirm('Remove this unit from the master list? It will be kept in the database but hidden.');">
+                          class="inline js-confirm-submit"
+                          data-confirm-title="Remove unit"
+                          data-confirm-ok="Remove"
+                          data-confirm-message="Remove this unit from the master list? It will be kept in the database but hidden.">
                       <input type="hidden" name="q" value="{{ q or '' }}" />
                       <input type="hidden" name="status" value="{{ status or 'all' }}" />
                       <button type="submit"
@@ -268,6 +270,22 @@
   document.getElementById('modal-backdrop').addEventListener('click', closeModal);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+
+  // Required: Code + Name — khali / sirf spaces pe toast, Flask mat bhejo
+  form.addEventListener('submit', function (e) {
+    var code = document.getElementById('unit-code').value.trim();
+    var name = document.getElementById('unit-name').value.trim();
+    if (!code || !name) {
+      e.preventDefault();
+      if (typeof showToast === 'function') {
+        showToast('Code and Name are required.', 'error');
+      }
+      if (!code) document.getElementById('unit-code').focus();
+      else document.getElementById('unit-name').focus();
+      return;
+    }
+    // valid → preventDefault nahi → Add/Edit Flask POST
   });
 
   // --- Live search: typing ke thodi der baad GET form submit (filter Flask karta hai) ---

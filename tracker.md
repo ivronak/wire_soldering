@@ -14,8 +14,10 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / Machine / M2` — seed + list from DB (`{% for m in machines %}`)  
-UI mockup static ready; form POST baad me.
+**Abhi chal raha hai:** `Part2 / RM-Category` — pehla micro-step jab user ready bole  
+Done: Unit → Work Stage → Machine (+ FK).  
+**Part 2 order (dependency, 2026-09-21):** RM Category → Raw Material → Product Category → Product → **Vendor** → Customer → Warehouse…
+
 
 ---
 
@@ -55,17 +57,20 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 - [x] Module 6: Product Master + Dynamic Variants — `mockups/product_master.html` — **approved 2026-09-16**
 - [ ] Module 7 (gap-fill): Warehouse Master — `mockups/warehouse_master.html` — **Step A mock ready 2026-09-17** (spec §4.1; stock pages ispe depend karti hain)
 
-### Part 2 — Backend (Step B → C → D, sab modules) — Part 1 complete hone ke baad shuru
+### Part 2 — Backend (dependency order — updated 2026-09-21)
 
-- [x] Module 1: Unit Master — **CRUD complete 2026-09-19** (manual learning: F1–F8 + search/filter/edit/soft-delete)
-  - [x] Step B — Flask + Jinja2 conversion
-  - [x] Step C — Database table (`Unit` model) + backend routes
-  - [x] Step D — Connect + acceptance (list/search/filter/add/edit/toggle/soft-delete)
-- [ ] Module 2: Machine Master (Step B/C/D) — **next** (Unit pattern repeat)
-- [ ] Module 3: Vendor Master (Step B/C/D + Auto-Ledger creation logic)
-- [ ] Module 4: Customer Master (Step B/C/D + Auto-Ledger creation logic)
-- [ ] Module 5: Raw Material Master (Step B/C/D + Unit foreign key)
-- [ ] Module 6: Product Master (Step B/C/D + JSONB-style dynamic attributes + SKU logic)
+> Purana order Vendor pehle tha. Ab **FK/dependencies** se: categories → materials/products → phir parties (Vendor/Customer).
+
+- [x] Unit Master — CRUD complete 2026-09-19
+- [x] Work Stage Master — CRUD complete 2026-09-21
+- [x] Machine Master (+ Work Stage FK) — complete 2026-09-21
+- [ ] **RM Category Master** — **next** (Raw Material dropdown ke liye)
+- [ ] Raw Material Master (Unit FK + RM Category FK)
+- [ ] Product Category Master
+- [ ] Product Master (+ Category FK, dynamic variants later)
+- [ ] Vendor Master (rich form + Auto-Ledger; materials pe depend)
+- [ ] Customer Master (Vendor pattern + Debtors ledger)
+- [ ] Warehouse Master (stock pages ke liye)
 
 ### Phase 1 Wrap-up
 - [x] Cross-module sidebar navigation check *(2026-09-17 — saare 21 mockups me same nav: Masters → Procurement → Inventory → Manufacturing)*
@@ -78,6 +83,16 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-21 — Part 2 backend order = dependency-first:** User ne decide: Unit → Work Stage → Machine (done) → **RM Category → Raw Material → Product Category → Product → Vendor → Customer**. Vendor pehle nahi — materials pe depend. Tracker + memory + development.md update.
+
+- **2026-09-21 — Machine ↔ Work Stage FK complete:** `work_stage_id` + relationship; form dropdown; table stage name; `work_center` hata diya. Work Stage CRUD pehle se.
+
+- **2026-09-21 — Work Stage soft-delete done:** User ne HTML form + `work_stages_delete` (`is_deleted=True`); browser POST OK. Next: Toggle `is_active`.
+
+- **2026-09-21 — Work Stage Edit done:** User ne `work_stages_edit` likha; browser POST `/work_stages/edit/2` → 302 OK. Next: soft-delete.
+
+- **2026-09-21 — Work Stage Add done:** User ne `work_stages_add` (POST, unique code, soft-delete restore, flash) khud likha. HTML pehle ready tha. Next: Edit / Toggle / Soft-delete.
 
 - **2026-09-19 — ⭐ Unit Master full CRUD complete (manual learning):** User ne khud: List+seed, Search `q`, Status filter, Add, Edit (modal), Toggle Stop (`is_active`), Soft Delete (`is_deleted` — frontend hide), deleted-code restore on Add. Flask+HTML dono seekhe. Next: Machine Master (same pattern, kam naya concept).
 

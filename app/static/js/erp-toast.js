@@ -1,6 +1,7 @@
 /**
- * erp-toast.js — shared in-app toast (Chrome alert() ki jagah).
+ * erp-toast.js — shared toast + confirm (Chrome alert/confirm ki jagah).
  * Use: showToast('Saved successfully', 'success' | 'error' | 'warning' | 'info')
+ * Use: showConfirm('Remove…?', { confirmText: 'Remove', cancelText: 'Cancel' }).then(ok => …)
  * Theme: Ink / Copper / Success / Stop — mockups ke saath match.
  */
 (function () {
@@ -8,6 +9,7 @@
 
   var STYLE_ID = 'erp-toast-styles';
   var ROOT_ID = 'erp-toast-root';
+  var CONFIRM_ID = 'erp-confirm-root';
 
   function ensureDom() {
     if (!document.getElementById(STYLE_ID)) {
@@ -32,7 +34,21 @@
         '.erp-toast--info{border-color:#C5D9DA;background:#EAF3F3;}',
         '.erp-toast--info .erp-toast__title{color:#2A6B6E;}',
         '@keyframes erpToastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}',
-        '@keyframes erpToastOut{to{opacity:0;transform:translateY(-6px);}}'
+        '@keyframes erpToastOut{to{opacity:0;transform:translateY(-6px);}}',
+        /* Confirm dialog — toast jaisa look, center overlay */
+        '#erp-confirm-root{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;padding:1rem;font-family:\'IBM Plex Sans\',ui-sans-serif,system-ui,sans-serif;}',
+        '#erp-confirm-root.is-open{display:flex;}',
+        '.erp-confirm__backdrop{position:absolute;inset:0;background:rgba(15,47,50,0.4);}',
+        '.erp-confirm__panel{position:relative;width:100%;max-width:22rem;border-radius:10px;border:1px solid #FBD9A5;background:#FEF3E2;box-shadow:0 16px 40px rgba(15,47,50,0.18);padding:1rem 1.05rem;animation:erpToastIn 0.22s ease-out;}',
+        '.erp-confirm__top{display:flex;align-items:flex-start;gap:0.65rem;}',
+        '.erp-confirm__title{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:#B45309;margin-bottom:4px;}',
+        '.erp-confirm__msg{font-size:13.5px;line-height:1.45;color:#1C2B2D;white-space:pre-line;}',
+        '.erp-confirm__actions{display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;}',
+        '.erp-confirm__btn{font-size:13.5px;font-weight:600;padding:0.45rem 0.85rem;border-radius:6px;border:1px solid;cursor:pointer;font-family:inherit;}',
+        '.erp-confirm__btn--cancel{background:#fff;border-color:#CBD5E1;color:#3D5A5D;}',
+        '.erp-confirm__btn--cancel:hover{background:#F4F6F5;}',
+        '.erp-confirm__btn--ok{background:#B42318;border-color:#912018;color:#fff;}',
+        '.erp-confirm__btn--ok:hover{background:#912018;}'
       ].join('');
       document.head.appendChild(style);
     }
@@ -98,4 +114,88 @@
     }
     return { dismiss: dismiss };
   };
+
+  /**
+   * Toast-style confirm (browser confirm() ki jagah).
+   * options: { title, confirmText, cancelText }
+   * Returns Promise<boolean>
+   */
+  window.showConfirm = function (message, options) {
+    options = options || {};
+    ensureDom();
+
+    return new Promise(function (resolve) {
+      var existing = document.getElementById(CONFIRM_ID);
+      if (existing) existing.parentNode.removeChild(existing);
+
+      var root = document.createElement('div');
+      root.id = CONFIRM_ID;
+      root.className = 'is-open';
+      root.setAttribute('role', 'dialog');
+      root.setAttribute('aria-modal', 'true');
+      root.innerHTML =
+        '<div class="erp-confirm__backdrop" data-erp-confirm="cancel"></div>' +
+        '<div class="erp-confirm__panel">' +
+          '<div class="erp-confirm__top">' +
+            ICONS.warning +
+            '<div>' +
+              '<div class="erp-confirm__title"></div>' +
+              '<div class="erp-confirm__msg"></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="erp-confirm__actions">' +
+            '<button type="button" class="erp-confirm__btn erp-confirm__btn--cancel" data-erp-confirm="cancel"></button>' +
+            '<button type="button" class="erp-confirm__btn erp-confirm__btn--ok" data-erp-confirm="ok"></button>' +
+          '</div>' +
+        '</div>';
+
+      root.querySelector('.erp-confirm__title').textContent = options.title || 'Please confirm';
+      root.querySelector('.erp-confirm__msg').textContent = message == null ? '' : String(message);
+      root.querySelector('[data-erp-confirm="cancel"].erp-confirm__btn').textContent = options.cancelText || 'Cancel';
+      root.querySelector('[data-erp-confirm="ok"]').textContent = options.confirmText || 'Confirm';
+
+      function finish(ok) {
+        document.removeEventListener('keydown', onKey);
+        if (root.parentNode) root.parentNode.removeChild(root);
+        resolve(!!ok);
+      }
+
+      function onKey(e) {
+        if (e.key === 'Escape') finish(false);
+        if (e.key === 'Enter') finish(true);
+      }
+
+      root.addEventListener('click', function (e) {
+        var action = e.target.getAttribute('data-erp-confirm');
+        if (action === 'cancel') finish(false);
+        if (action === 'ok') finish(true);
+      });
+
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(root);
+      root.querySelector('[data-erp-confirm="ok"]').focus();
+    });
+  };
+
+  // Soft-delete / confirm forms: class="js-confirm-submit" + data-confirm-message
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || !form.classList || !form.classList.contains('js-confirm-submit')) return;
+    if (form.getAttribute('data-erp-confirmed') === '1') return;
+
+    e.preventDefault();
+    var msg = form.getAttribute('data-confirm-message') || 'Are you sure?';
+    var title = form.getAttribute('data-confirm-title') || 'Please confirm';
+    var okText = form.getAttribute('data-confirm-ok') || 'Confirm';
+
+    window.showConfirm(msg, {
+      title: title,
+      confirmText: okText,
+      cancelText: 'Cancel'
+    }).then(function (ok) {
+      if (!ok) return;
+      form.setAttribute('data-erp-confirmed', '1');
+      form.submit();
+    });
+  });
 })();

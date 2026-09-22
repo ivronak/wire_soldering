@@ -55,6 +55,100 @@
     color: #1C2B2D;
   }
   .status-select:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+
+  /* Status picker — native select ki jagah badge-style control */
+  .status-picker { position: relative; display: inline-block; text-align: left; }
+  .status-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 7.5rem;
+    max-width: 11rem;
+    padding: 5px 8px 5px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: box-shadow 0.12s ease, filter 0.12s ease;
+  }
+  .status-trigger:hover { filter: brightness(0.97); }
+  .status-trigger:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(196, 107, 45, 0.35);
+  }
+  .status-trigger .status-dot {
+    width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  .status-trigger .status-label {
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .status-trigger .status-chevron {
+    width: 12px; height: 12px; flex-shrink: 0; opacity: 0.7;
+  }
+  .status-picker.is-open .status-chevron { transform: rotate(180deg); }
+  .status-picker.is-open .status-trigger {
+    box-shadow: 0 0 0 2px rgba(196, 107, 45, 0.35);
+  }
+
+  .status-trigger[data-status="active"] {
+    background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7;
+  }
+  .status-trigger[data-status="active"] .status-dot { background: #1F7A4D; }
+  .status-trigger[data-status="maintenance"] {
+    background: #FEF3E2; color: #B45309; border-color: #FBD9A5;
+  }
+  .status-trigger[data-status="maintenance"] .status-dot { background: #B45309; }
+  .status-trigger[data-status="breakdown"] {
+    background: #FCEBEA; color: #B42318; border-color: #F0C4C0;
+  }
+  .status-trigger[data-status="breakdown"] .status-dot { background: #B42318; }
+  .status-trigger[data-status="retired"] {
+    background: #F1F5F9; color: #475569; border-color: #E2E8F0;
+  }
+  .status-trigger[data-status="retired"] .status-dot { background: #475569; }
+
+  .status-menu {
+    position: fixed; /* table overflow me cut na ho — viewport pe float */
+    z-index: 100;
+    min-width: 11.5rem;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #D1D9D8;
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(15, 47, 50, 0.12), 0 2px 6px rgba(15, 47, 50, 0.06);
+  }
+  .status-menu.hidden { display: none; }
+  .status-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #1C2B2D;
+    cursor: pointer;
+    text-align: left;
+  }
+  .status-option:hover { background: #F4F6F5; }
+  .status-option.is-current { background: #FBF4EE; }
+  .status-option .status-dot {
+    width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  .status-option[data-value="active"] .status-dot { background: #1F7A4D; }
+  .status-option[data-value="maintenance"] .status-dot { background: #B45309; }
+  .status-option[data-value="breakdown"] .status-dot { background: #B42318; }
+  .status-option[data-value="retired"] .status-dot { background: #475569; }
+  .status-option[data-value="active"] { color: #1F7A4D; }
+  .status-option[data-value="maintenance"] { color: #B45309; }
+  .status-option[data-value="breakdown"] { color: #B42318; }
+  .status-option[data-value="retired"] { color: #475569; }
 </style>
 {% endblock %}
 
@@ -91,7 +185,7 @@
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Work center = the production stage this machine is used in · Change status directly from the dropdown · Used by Production routing
+              Work Stage = the production stage this machine is used in · Change status directly from the dropdown · Used by Production routing
             </p>
           </details>
         </div>
@@ -114,7 +208,7 @@
                 <th>#</th>
                 <th>Code</th>
                 <th>Machine name</th>
-                <th>Work center</th>
+                <th>Work Stage</th>
                 <th>Capacity</th>
                 <th>Installed</th>
                 <th>Status</th>
@@ -127,171 +221,96 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ m.code }}</span></td>
                 <td><span class="font-medium text-ink">{{ m.name }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ m.work_center }}</td>
+                <td class="text-[13px] text-ink-muted">{{ m.work_stage.name if m.work_stage else "_" }}</td>
                 <td class="text-[13px] text-ink-muted tabular-nums">{{ m.capacity }}</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ installed_date or '_' }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ m.installed_date or '_' }}</td>
                 <td class="text-center">
+                  {% if m.status == 'active' %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="active">
-                      <option value="active" selected>Active</option>
-                      <option value="maintenance">Under Maintenance</option>
-                      <option value="breakdown">Breakdown</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-              <tr class="machine-row" data-code="mc-sld-02" data-name="soldering station" data-status="active">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2</td>
-                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-SLD-02</span></td>
-                <td><span class="font-medium text-ink">Soldering Station</span></td>
-                <td class="text-[13px] text-ink-muted">Soldering</td>
-                <td class="text-[13px] text-ink-muted tabular-nums">300 units/hr</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2023-06-15</td>
-                <td class="text-center">
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
-                  </span>
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="active">
-                      <option value="active" selected>Active</option>
-                      <option value="maintenance">Under Maintenance</option>
-                      <option value="breakdown">Breakdown</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-              <tr class="machine-row" data-code="mc-asm-01" data-name="assembly line" data-status="active">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">3</td>
-                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-ASM-01</span></td>
-                <td><span class="font-medium text-ink">Assembly Line</span></td>
-                <td class="text-[13px] text-ink-muted">Assembly</td>
-                <td class="text-[13px] text-ink-muted tabular-nums">800 units/hr</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2022-11-02</td>
-                <td class="text-center">
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
-                  </span>
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="active">
-                      <option value="active" selected>Active</option>
-                      <option value="maintenance">Under Maintenance</option>
-                      <option value="breakdown">Breakdown</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-              <tr class="machine-row" data-code="mc-tst-01" data-name="testing jig" data-status="active">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">4</td>
-                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-TST-01</span></td>
-                <td><span class="font-medium text-ink">Testing Jig</span></td>
-                <td class="text-[13px] text-ink-muted">Testing</td>
-                <td class="text-[13px] text-ink-muted tabular-nums">150 units/hr</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2021-08-30</td>
-                <td class="text-center">
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
-                  </span>
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="active">
-                      <option value="active" selected>Active</option>
-                      <option value="maintenance">Under Maintenance</option>
-                      <option value="breakdown">Breakdown</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-              <tr class="machine-row" data-code="mc-cut-02" data-name="wire stripper" data-status="maintenance">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">5</td>
-                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-CUT-02</span></td>
-                <td><span class="font-medium text-ink">Wire Stripper</span></td>
-                <td class="text-[13px] text-ink-muted">Cutting</td>
-                <td class="text-[13px] text-ink-muted tabular-nums">450 units/hr</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2024-01-20</td>
-                <td class="text-center">
+                  {% elif m.status == 'maintenance' %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
                     <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Under Maintenance
                   </span>
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="maintenance">
-                      <option value="active">Active</option>
-                      <option value="maintenance" selected>Under Maintenance</option>
-                      <option value="breakdown">Breakdown</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-              <tr class="machine-row" data-code="mc-sld-03" data-name="backup solder rig" data-status="breakdown">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">6</td>
-                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">MC-SLD-03</span></td>
-                <td><span class="font-medium text-ink">Backup Solder Rig</span></td>
-                <td class="text-[13px] text-ink-muted">Soldering</td>
-                <td class="text-[13px] text-ink-muted tabular-nums">150 units/hr</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2021-08-30</td>
-                <td class="text-center">
+                  {% elif m.status == 'breakdown' %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
                     <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Breakdown
                   </span>
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="breakdown">
-                      <option value="active">Active</option>
-                      <option value="maintenance">Under Maintenance</option>
-                      <option value="breakdown" selected>Breakdown</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-              <tr class="machine-row row-muted" data-code="mc-asm-02" data-name="old crimping unit" data-status="retired">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">7</td>
-                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink-faint bg-mist border border-slate-200 rounded px-2 py-1">MC-ASM-02</span></td>
-                <td><span class="font-medium text-ink-faint">Old Crimping Unit</span></td>
-                <td class="text-[13px] text-ink-faint">Assembly</td>
-                <td class="text-[13px] text-ink-faint tabular-nums">200 units/hr</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">2019-03-12</td>
-                <td class="text-center">
+                  {% else %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
                     <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Retired
                   </span>
+                  {% endif %}
                 </td>
                 <td>
                   <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button" class="px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white">Edit</button>
-                    <select class="status-select" data-current="retired">
-                      <option value="active">Active</option>
-                      <option value="maintenance">Under Maintenance</option>
-                      <option value="breakdown">Breakdown</option>
-                      <option value="retired" selected>Retired</option>
-                    </select>
+                    <button type="button"
+                      class="btn-edit-machine px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-id="{{ m.id }}"
+                      data-code="{{ m.code }}"
+                      data-name="{{ m.name }}"
+                      data-work-stage-id="{{ m.work_stage_id or '' }}"
+                      data-capacity="{{ m.capacity or '' }}"
+                      data-installed="{{ m.installed_date or '' }}"
+                      data-status="{{ m.status }}">
+                      Edit
+                    </button>
+                    {# Soft-delete — confirm = showConfirm (erp-toast.js), Flash route pe #}
+                    <form method="post"
+                          action="{{ url_for('machines.machines_delete', machine_id=m.id) }}"
+                          class="inline js-confirm-submit"
+                          data-confirm-title="Remove machine"
+                          data-confirm-ok="Remove"
+                          data-confirm-message="Remove this machine from the master list? It will be kept in the database but hidden.">
+                      <button type="submit"
+                              class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">
+                        Delete
+                      </button>
+                    </form>
+                    <form method="post"
+                          action="{{ url_for('machines.machines_status', machine_id=m.id) }}"
+                          class="status-picker inline">
+                      <input type="hidden" name="status" value="{{ m.status }}" class="status-hidden" />
+                      <button type="button"
+                              class="status-trigger"
+                              data-status="{{ m.status }}"
+                              aria-haspopup="listbox"
+                              aria-expanded="false"
+                              title="Change status">
+                        <span class="status-dot" aria-hidden="true"></span>
+                        <span class="status-label">
+                          {% if m.status == 'active' %}Active
+                          {% elif m.status == 'maintenance' %}Under Maintenance
+                          {% elif m.status == 'breakdown' %}Breakdown
+                          {% else %}Retired{% endif %}
+                        </span>
+                        <svg class="status-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </button>
+                      <div class="status-menu hidden" role="listbox">
+                        <button type="button" class="status-option{% if m.status == 'active' %} is-current{% endif %}" data-value="active" role="option">
+                          <span class="status-dot" aria-hidden="true"></span> Active
+                        </button>
+                        <button type="button" class="status-option{% if m.status == 'maintenance' %} is-current{% endif %}" data-value="maintenance" role="option">
+                          <span class="status-dot" aria-hidden="true"></span> Under Maintenance
+                        </button>
+                        <button type="button" class="status-option{% if m.status == 'breakdown' %} is-current{% endif %}" data-value="breakdown" role="option">
+                          <span class="status-dot" aria-hidden="true"></span> Breakdown
+                        </button>
+                        <button type="button" class="status-option{% if m.status == 'retired' %} is-current{% endif %}" data-value="retired" role="option">
+                          <span class="status-dot" aria-hidden="true"></span> Retired
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </td>
               </tr>
-            </tbody>
+              {% else %}
+              {# loop empty - empty-state JS/HTML handle karega #}
+              {% endfor %}
+            </tbody>  
           </table>
 
           <div id="empty-state" class="hidden py-12 text-center">
@@ -302,9 +321,9 @@
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
-          <span id="result-count">Showing 7 of 7 machines</span>
+          <span id="result-count">Showing {{ result_count}} of {{total_count}} machines</span>
           <span>Tip: change status here — production routing sees the new status instantly</span>
-          <span class="text-ink-muted">Page 1 · Mock data</span>
+          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
@@ -316,26 +335,31 @@
       <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
         <div>
           <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add machine</h2>
-          <p class="text-[12.5px] text-ink-faint">Code, Name, Work Center, Capacity, Installed date, Status</p>
+          <p class="text-[12.5px] text-ink-faint">Code, Name, Work Stage, Capacity, Installed date, Status</p>
         </div>
         <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
       </div>
       <!-- method/action tum khud add karoge (Flask POST) — abhi sirf UI -->
-      <form id="machine-form" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <form id="machine-form" method="post" action="{{ url_for('machines.machines_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <div>
           <label for="machine-code" class="block text-[12.5px] font-semibold text-ink mb-1">Machine code *</label>
-          <input type="text" id="machine-code" name="code" placeholder="MC-CUT-03" maxlength="20" autocomplete="off"
+          <input type="text" id="machine-code" name="code" required placeholder="MC-CUT-03" maxlength="20" autocomplete="off"
             class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
         <div>
           <label for="machine-name" class="block text-[12.5px] font-semibold text-ink mb-1">Machine name *</label>
-          <input type="text" id="machine-name" name="name" placeholder="Wire Stripper 3" autocomplete="off"
+          <input type="text" id="machine-name" name="name" required placeholder="Wire Stripper 3" autocomplete="off"
             class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
         <div>
-          <label for="machine-workcenter" class="block text-[12.5px] font-semibold text-ink mb-1">Work center *</label>
-          <input type="text" id="machine-workcenter" name="work_center" placeholder="e.g. Cutting, Soldering, Assembly, Testing" autocomplete="off"
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <label for="machine-stage" class="block text-[12.5px] font-semibold text-ink mb-1">Work stage *</label>
+          <select id="machine-stage" name="work_stage_id" required
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select work stage</option>
+            {% for s in stages %}
+            <option value="{{ s.id }}">{{ s.code }} — {{ s.name }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div>
           <label for="machine-capacity" class="block text-[12.5px] font-semibold text-ink mb-1">Capacity / rated output</label>
@@ -375,6 +399,57 @@
   const resultCount = document.getElementById('result-count');
   const tableEl = document.querySelector('.machine-table');
   let activeFilter = 'all';
+  // Filter + search yaad rakhna (page reload / status POST ke baad) — Flask nahi, sessionStorage
+  var FILTER_KEY = 'erp.machines.statusFilter';
+  var SEARCH_KEY = 'erp.machines.searchQ';
+
+  function saveActiveFilter() {
+    try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (err) { /* private mode etc. */ }
+  }
+
+  function saveSearchQ() {
+    try { sessionStorage.setItem(SEARCH_KEY, searchInput.value || ''); } catch (err) { /* private mode etc. */ }
+  }
+
+  // Status/delete se pehle dono save
+  function saveListState() {
+    saveActiveFilter();
+    saveSearchQ();
+  }
+
+  function applyFilterButtonStyles(selectedBtn) {
+    document.querySelectorAll('.filter-btn').forEach(function (b) {
+      var on = b === selectedBtn;
+      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-copper', on);
+      b.classList.toggle('font-semibold', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-ink', !on);
+      b.classList.toggle('border-slate-300', !on);
+    });
+  }
+
+  // Reload ke baad pehle wala filter + search wapas
+  function restoreListState() {
+    var savedQ = null;
+    var savedFilter = null;
+    try {
+      savedQ = sessionStorage.getItem(SEARCH_KEY);
+      savedFilter = sessionStorage.getItem(FILTER_KEY);
+    } catch (err) { /* ignore */ }
+
+    if (savedQ !== null) searchInput.value = savedQ;
+
+    if (savedFilter) {
+      var btn = document.querySelector('.filter-btn[data-filter="' + savedFilter + '"]');
+      if (btn) {
+        activeFilter = savedFilter;
+        applyFilterButtonStyles(btn);
+      }
+    }
+    applyFilters();
+  }
 
   const STATUS_META = {
     active: { label: 'Active', classes: 'bg-success-bg text-success border-success-border', dot: 'bg-success' },
@@ -392,6 +467,28 @@
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     form.reset();
+  }
+  var addAction = "{{ url_for('machines.machines_add') }}";
+  var modalTitle = document.getElementById('modal-title');
+
+  function openAddModal() {
+    form.action = addAction;
+    modalTitle.textContent = 'Add machine';
+    form.reset();
+    openModal();
+  }
+
+  function openEditModal(btn) {
+    var id = btn.getAttribute('data-id');
+    form.action = '/machines/edit/' + id;
+    modalTitle.textContent = 'Edit machine';
+    document.getElementById('machine-code').value = btn.getAttribute('data-code') || '';
+    document.getElementById('machine-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('machine-stage').value = btn.getAttribute('data-work-stage-id') || '';
+    document.getElementById('machine-capacity').value = btn.getAttribute('data-capacity') || '';
+    document.getElementById('machine-installed').value = btn.getAttribute('data-installed') || '';
+    document.getElementById('machine-status').value = btn.getAttribute('data-status') || 'active';
+    openModal();
   }
 
   function applyFilters() {
@@ -413,6 +510,25 @@
     resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' machines';
   }
 
+  // Required fields: khali / sirf spaces → toast, Flask mat bhejo
+  form.addEventListener('submit', function (e) {
+    var code = document.getElementById('machine-code').value.trim();
+    var name = document.getElementById('machine-name').value.trim();
+    var stageId = document.getElementById('machine-stage').value;
+
+    if (!code || !name || !stageId) {
+      e.preventDefault();  // sirf galat pe rokna — sahi pe Flask POST chale
+      if (typeof showToast === 'function') {
+        showToast('Code, Name and Work stage are required.', 'error');
+      }
+      if (!code) document.getElementById('machine-code').focus();
+      else if (!name) document.getElementById('machine-name').focus();
+      else document.getElementById('machine-stage').focus();
+      return;
+    }
+    // valid → preventDefault mat karo → browser form POST karega
+  });
+
   function updateFilterCounts() {
     const counts = { active: 0, maintenance: 0, breakdown: 0, retired: 0 };
     rows.forEach(function (row) {
@@ -426,63 +542,109 @@
     document.querySelector('[data-filter="retired"]').textContent = 'Retired (' + counts.retired + ')';
   }
 
-  document.getElementById('btn-add-machine').addEventListener('click', openModal);
+  document.getElementById('btn-add-machine').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
-  if (emptyAdd) emptyAdd.addEventListener('click', openModal);
+  if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
   document.getElementById('btn-close-modal').addEventListener('click', closeModal);
   document.getElementById('btn-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-backdrop').addEventListener('click', closeModal);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
   });
-
-  // Abhi Flask action nahi — submit pe page reload mat ho
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var code = document.getElementById('machine-code').value.trim();
-    var name = document.getElementById('machine-name').value.trim();
-    var workCenter = document.getElementById('machine-workcenter').value.trim();
-    if (!code || !name || !workCenter) {
-      if (typeof showToast === 'function') showToast('Code, Name and Work Center are all required.', 'error');
-      return;
-    }
-    if (typeof showToast === 'function') {
-      showToast('Saved (mockup)!\n' + code.toUpperCase() + ' — ' + name, 'success');
-    }
-    closeModal();
+  document.querySelectorAll('.btn-edit-machine').forEach(function (btn) {
+    btn.addEventListener('click', function () { openEditModal(btn); });
   });
 
-  document.querySelectorAll('.status-select').forEach(function (select) {
-    select.addEventListener('change', function () {
-      var row = select.closest('.machine-row');
-      var newStatus = select.value;
-      row.setAttribute('data-status', newStatus);
-      row.classList.toggle('row-muted', newStatus === 'retired');
-      var meta = STATUS_META[newStatus];
-      var badge = row.querySelector('.status-badge');
-      badge.className = 'status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border ' + meta.classes;
-      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + meta.dot + '"></span> ' + meta.label;
-      updateFilterCounts();
-      applyFilters();
+  // Status picker — badge-style dropdown (native <select> replace)
+  // Menu position:fixed — table/card overflow:hidden se cut na ho
+  function closeAllStatusMenus() {
+    document.querySelectorAll('.status-picker.is-open').forEach(function (picker) {
+      picker.classList.remove('is-open');
+      var menu = picker.querySelector('.status-menu');
+      var trigger = picker.querySelector('.status-trigger');
+      if (menu) {
+        menu.classList.add('hidden');
+        menu.style.top = '';
+        menu.style.left = '';
+      }
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function positionStatusMenu(trigger, menu) {
+    menu.classList.remove('hidden');
+    var rect = trigger.getBoundingClientRect();
+    var menuH = menu.offsetHeight || 160;
+    var menuW = menu.offsetWidth || 184;
+    var spaceBelow = window.innerHeight - rect.bottom;
+    var top = (spaceBelow < menuH + 8 && rect.top > menuH + 8)
+      ? rect.top - menuH - 4
+      : rect.bottom + 4;
+    var left = Math.min(rect.right - menuW, window.innerWidth - menuW - 8);
+    left = Math.max(8, left);
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+  }
+
+  document.querySelectorAll('.status-picker').forEach(function (picker) {
+    var trigger = picker.querySelector('.status-trigger');
+    var menu = picker.querySelector('.status-menu');
+    var hidden = picker.querySelector('.status-hidden');
+    if (!trigger || !menu || !hidden) return;
+
+    trigger.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var willOpen = !picker.classList.contains('is-open');
+      closeAllStatusMenus();
+      if (willOpen) {
+        picker.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+        positionStatusMenu(trigger, menu);
+      }
+    });
+
+    menu.querySelectorAll('.status-option').forEach(function (opt) {
+      opt.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var value = opt.getAttribute('data-value');
+        if (!value || value === hidden.value) {
+          closeAllStatusMenus();
+          return;
+        }
+        hidden.value = value;
+        saveListState(); // status POST se pehle filter + search yaad
+        picker.submit();
+      });
     });
   });
 
-  searchInput.addEventListener('input', applyFilters);
+  document.addEventListener('click', function () { closeAllStatusMenus(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAllStatusMenus();
+  });
+  var tableScroll = document.querySelector('.flex-1.overflow-auto');
+  if (tableScroll) tableScroll.addEventListener('scroll', closeAllStatusMenus);
+
+  // Delete form submit se pehle bhi filter + search save
+  document.querySelectorAll('td form').forEach(function (f) {
+    f.addEventListener('submit', function () { saveListState(); });
+  });
+
+  searchInput.addEventListener('input', function () {
+    saveSearchQ();
+    applyFilters();
+  });
   document.querySelectorAll('.filter-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       activeFilter = btn.getAttribute('data-filter');
-      document.querySelectorAll('.filter-btn').forEach(function (b) {
-        var on = b === btn;
-        b.classList.toggle('bg-copper', on);
-        b.classList.toggle('text-white', on);
-        b.classList.toggle('border-copper', on);
-        b.classList.toggle('font-semibold', on);
-        b.classList.toggle('bg-white', !on);
-        b.classList.toggle('text-ink', !on);
-        b.classList.toggle('border-slate-300', !on);
-      });
+      saveActiveFilter(); // pill click → browser me save
+      applyFilterButtonStyles(btn);
       applyFilters();
     });
   });
+  updateFilterCounts();
+  restoreListState(); // pehli load: search + filter wapas
 </script>
 {% endblock %}

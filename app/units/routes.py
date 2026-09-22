@@ -1,7 +1,7 @@
 # Ye Units module ka Blueprint hai - Unit Master ke saare routes (URLs) yahan honge.
 # Abhi sirf 3 kaam: list dikhao, add karo, soft-toggle (is_active).
 # Search / Edit / filter baad me sikh ke add karenge.
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from app.models import Unit
 from app.extensions import db
 from sqlalchemy import or_
@@ -69,7 +69,7 @@ def units_add():
     is_base = request.form.get("is_base_unit") == "1"
 
     if not code or not name:
-        # Abhi simple: wapas list pe bhej do
+        flash("Code and Name are required.", "error")
         return redirect(url_for("units.units_list"))
 
     # Duplicate code? (unique column — warna DB error)
@@ -81,7 +81,9 @@ def units_add():
             existing.is_base_unit = is_base
             existing.is_active = True
             db.session.commit()
+            flash("Unit restored with this code.", "success")
             return redirect(url_for("units.units_list"))
+        flash("A unit with this code already exists.", "error")
         return redirect(url_for("units.units_list"))
 
     db.session.add(Unit(
@@ -92,7 +94,7 @@ def units_add():
         is_deleted=False,
     ))
     db.session.commit()
-
+    flash("Unit saved.", "success")
     return redirect(url_for("units.units_list"))
 
 
@@ -119,18 +121,20 @@ def units_edit(unit_id):
     status = (request.form.get("status") or "all").strip().lower()
 
     if not code or not name:
+        flash("Code and Name are required.", "error")
         return redirect(url_for("units.units_list", q=q or None, status=status))
 
     # Dusri row pe same code? (apni id chhod ke)
     dup = Unit.query.filter(Unit.code == code, Unit.id != unit_id).first()
     if dup:
-        return redirect(url_for("units.units_list", q=q or None, status=status))    
+        flash("A unit with this code already exists.", "error")
+        return redirect(url_for("units.units_list", q=q or None, status=status))
 
     unit.code = code
     unit.name = name
     unit.is_base_unit = is_base
     db.session.commit()
-
+    flash("Unit updated.", "success")
     return redirect(url_for("units.units_list", q=q or None, status=status)) 
 
 @units_bp.route("/units/delete/<int:unit_id>", methods=["POST"])
@@ -139,6 +143,7 @@ def units_delete(unit_id):
     # Soft-delete - hard delete nahi; list filter is_deleted se hide karega
     unit.is_deleted = True
     db.session.commit()
+    flash("Unit removed from the list (kept in database).", "success")
 
     q = (request.form.get("q") or "").strip()
     status = (request.form.get("status") or "all").strip().lower()
