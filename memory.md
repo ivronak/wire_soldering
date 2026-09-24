@@ -6,6 +6,11 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### ⚠️ SUPERSEDED (same din baad me) — Product pe GST slab abhi nahi
+**Date:** 2026-09-23 (superseded 2026-09-23, neeche naya decision dekho: "Tax Rate Master banega")
+**Kya tha:** Product form se hardcoded Tax dropdown hata diya tha, `tax_rate` column unused chhod diya tha, socha tha HSN/Tax master baad me (Sales/GST phase me) banega.
+**Kyun ulta hua:** Usi din baad me user Product Master pe kaam karte waqt HSN/tax_rate field ke role ko leke confuse hua — poora tax flow discuss karne ke baad decide hua ki **abhi** (Product Master se pehle hi) chhota Tax Rate Master bana lena better hai, kyunki spec khud rates ko admin-configurable maangta hai (hardcode/unused chhodna galat). Poori reasoning neeche "Tax Rate Master banega" decision me hai — **wahi authoritative hai, yeh entry sirf history ke liye rakhi hai.**
+
 ### Decision: Part 2 backend order = dependency chain (not original mockup order)
 **Date:** 2026-09-21
 **Kya:** Backend ab is sequence me: Unit → Work Stage → Machine → **RM Category → Raw Material → Product Category → Product → Vendor → Customer** (Warehouse baad me). Purana plan Vendor ko Machine ke turant baad rakh’ta tha.
@@ -31,6 +36,18 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 **Kya:** (1) Naya **Work Stage** master (code, name, sort_order, soft status) — Machine pe baad me `work_stage_id` FK dropdown. Free-text work_center hataenge. (2) Chhote masters pe search/filter **client-side JS** OK (Flask `?q=` har click pe zaroori nahi).
 **Kyun:** Routing stages se match; FK seekhna; typo/mismatch kam. User ne JS search prefer kiya (fast/easy).
 **How to apply:** Mock UI `/work-stages` pehle → model/CRUD → Machine FK. Badi lists pe Flask pagination baad me.
+
+### Decision: Tax Rate Master banega, Product ka tax field FK hoga (not hardcoded/unused)
+**Date:** 2026-09-23
+**Kya:** Dedicated **Tax Rate Master** (Code, Rate %, Label, Active/Stopped) bana — CRUD complete. Product model ka `tax_rate` (String) field replace hoke `tax_rate_id` (FK → `tax_rates.id`) banega.
+**Kyun:** User Product Master pe HSN/tax_rate field samajhne me confuse hua ("GST me SGST/IGST alag hote hain, yeh field kis liye hai") — poora tax flow samjhaya (Product ka tax_rate = sirf SLAB %, CGST+SGST vs IGST split invoice pe customer/vendor state se decide hota hai, spec §1.2.2). Isi discussion me tay hua ki rate hardcode/unused chhodna galat hai — spec ka apna compliance disclaimer likhta hai *"make all thresholds/rates admin-configurable rather than hardcoded."* Isliye upar wala purana "abhi nahi" decision supersede hua.
+**How to apply:** Naya module banao to hamesha dependency order follow karo (lookup/master pehle, phir usko FK se use karne wala module) — abhi jaisa Tax Rate Master, Product se pehle bana. Product Add/Edit form me ab Tax Rate dropdown Category/Unit jaisa hi FK-based hoga.
+
+### Decision: Flask-Migrate use karo schema changes ke liye, baar-baar DB delete nahi
+**Date:** 2026-09-23
+**Kya:** Jab bhi koi SQLAlchemy model field add/remove/change ho (jaise Product ka `tax_rate` → `tax_rate_id`), ab se **Flask-Migrate** (Alembic wrapper) use karenge — `flask db migrate` + `flask db upgrade` — is existing data ko delete kiye bina schema update karega. Tech stack table (`CLAUDE.md` §2) me "DB Layer: SQLAlchemy" ke saath ab implicitly Flask-Migrate bhi shaamil hai.
+**Kyun:** Pehle approach tha "`instance/erp.db` delete karo, `db.create_all()` fresh tables bana dega" — yeh kaam karta tha jab masters kam the, lekin ab (Unit/WorkStage/Machine/RmCategory/RawMaterial/ProductCategory/TaxRate — 7 masters test data ke saath) har schema change pe sab test data dobara type karna painful ho gaya. User ne explicitly poocha "baar baar db delete karna sahi option nahi he, koi aur option he" aur step-by-step sikhna chuna.
+**How to apply:** Naya field/model badalne se pehle: model change karo → `flask db migrate -m "..."` (autogenerate diff) → migration script check karo → `flask db upgrade` (apply, data safe). `db.create_all()` (`app/__init__.py`) migrations setup ke baad hata diya jaayega — Migrate hi schema manage karega age se.
 
 ## Key Decisions
 

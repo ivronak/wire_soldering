@@ -145,7 +145,7 @@
                     </button>
                     {# Soft-delete — Flask route names niche match karo #}
                     <form method="post"
-                          action="TODO_DELETE_ACTION"
+                          action="{{ url_for('product_categories.product_categories_delete', c_id=c.id) }}"
                           class="inline js-confirm-submit"
                           data-confirm-title="Remove category"
                           data-confirm-ok="Remove"
@@ -300,7 +300,7 @@
   function openEditModal(btn) {
     var id = btn.getAttribute('data-id');
     // Flask Edit route ready hone pe yahan action set karo
-    form.action = '';
+    form.action = '/product_categories/edit/'+id;
     modalTitle.textContent = 'Edit category';
     document.getElementById('cat-code').value = btn.getAttribute('data-code') || '';
     document.getElementById('cat-name').value = btn.getAttribute('data-name') || '';

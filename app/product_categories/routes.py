@@ -37,10 +37,10 @@ def product_categories_add():
             existing.is_active =True
 
             db.session.commit()
-            flash("A Product Categories restored with this code.", "success")
+            flash("A Product Category restored with this code.", "success")
             return redirect(url_for('product_categories.product_categories_list'))
 
-        flash("A Product Categories with this code already exists.", "error")   
+        flash("A Product Category with this code already exists.", "error")   
         return redirect(url_for('product_categories.product_categories_list'))   
        
 
@@ -52,7 +52,7 @@ def product_categories_add():
         is_deleted=False,
     ))
     db.session.commit()
-    flash("Raw Material saved.", "success")
+    flash("Product Category saved.", "success")
     return redirect(url_for('product_categories.product_categories_list')) 
 
 @product_categories_bp.route('/product_categories/toggle/<int:c_id>', methods=['POST'])
@@ -63,3 +63,37 @@ def product_categories_toggle(c_id):
     db.session.commit()
 
     return redirect(url_for('product_categories.product_categories_list')) 
+
+@product_categories_bp.route('/product_categories/edit/<int:c_id>', methods=['POST'])
+def product_categories_edit(c_id):
+    c = ProductCategories.query.get_or_404(c_id)
+
+    code = (request.form.get('code') or "").strip().upper()
+    name = (request.form.get('name') or "").strip()
+    description = (request.form.get('description') or "").strip()
+
+    if not code or not name:
+        return redirect(url_for('product_categories.product_categories_list'))
+
+    dup = ProductCategories.query.filter(ProductCategories.code == code, ProductCategories.id != c_id ).first()
+    if dup :
+        flash("A Product Category with this code already exists.", "error")
+        return redirect(url_for('product_categories.product_categories_list'))
+
+    c.code = code
+    c.name = name
+    c.description = description
+    c.is_deleted = False
+
+    db.session.commit()
+    flash("Product Category updated.", "success")   
+    return redirect(url_for('product_categories.product_categories_list'))
+
+@product_categories_bp.route('/product_categories/delete/<int:c_id>', methods=['POST'])
+def product_categories_delete(c_id):
+    c = ProductCategories.query.get_or_404(c_id)
+
+    c.is_deleted = True
+    db.session.commit()
+    flash("Product Category removed from the list (kept in database).", "success")   
+    return redirect(url_for('product_categories.product_categories_list'))

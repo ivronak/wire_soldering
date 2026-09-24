@@ -74,6 +74,18 @@ class RawMaterial(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+class TaxRate(db.Model):
+    __tablename__ = 'tax_rates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    label = db.Column(db.String(100), nullable=False)
+    rate_percent = db.Column(db.Float, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    
+
+
 class ProductCategories(db.Model):
     __tablename__ = "product_categories"
 
@@ -83,3 +95,25 @@ class ProductCategories(db.Model):
     description = db.Column(db.String(255), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class Product(db.Model):
+    __tablename__ = "products"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False )
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+
+    category_id = db.Column(db.Integer, db.ForeignKey("product_categories.id"), nullable=False)
+    base_unit_id = db.Column(db.Integer, db.ForeignKey("units.id"), nullable=False)
+
+    category = db.relationship("ProductCategories", foreign_keys=[category_id])
+    base_unit = db.relationship("Unit", foreign_keys=[base_unit_id])
+
+    hsn_code = db.Column(db.String(8), nullable=True)
+    tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=False)
+    tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
+
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    

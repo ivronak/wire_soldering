@@ -6,8 +6,11 @@ from app.machines.routes import machines_bp
 from app.work_stages.routes import work_stages_bp
 from app.rm_categories.routes import rm_categories_bp
 from app.raw_materials.routes import raw_materials_bp
+from app.tax_rates.routes import tax_rates_bp
 from app.product_categories.routes import product_categories_bp
-from app.extensions import db
+from app.products.routes import products_bp
+from app.extensions import db, migrate
+
 
 def create_app():
     app = Flask(__name__)
@@ -20,6 +23,7 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
+    migrate.init_app(app, db)
 
     # Models import zaroori - warna create_all ko tables pata nahi chalte
     from app import models 
@@ -31,7 +35,10 @@ def create_app():
     app.register_blueprint(work_stages_bp)
     app.register_blueprint(rm_categories_bp)
     app.register_blueprint(raw_materials_bp)
+    app.register_blueprint(tax_rates_bp)
     app.register_blueprint(product_categories_bp)
+    app.register_blueprint(products_bp)
+    
 
     @app.route("/")
     def home():

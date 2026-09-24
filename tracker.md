@@ -14,9 +14,11 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / Product-Category / F1` — model + blueprint (RM Category clone)
+**Abhi chal raha hai:** `Part2 / Vendor / F1` — **Product Master fully complete + verified 2026-09-23** (neeche Work Log dekho). Ab dependency-order me agla: **Vendor Master** (rich form + Auto-Ledger; materials/products pe depend karta hai).
 
-Done abhi: Raw Material Master CRUD complete (list/add/edit/toggle/soft-delete + Unit/Category FK).
+⚠️ **Yaad rakhna (pending, koi bhi naya FK/master banate waqt):** `naming_convention` wala permanent fix (`app/extensions.py` me `db = SQLAlchemy()` ko `MetaData(naming_convention=...)` ke saath banana) abhi tak nahi kiya — user ne taal diya tha. Jab Vendor Master me naya FK banega aur wahi "Constraint must have a name" `ValueError` dobara aaye, tab yeh permanent fix yaad dilana.
+
+Done abhi: Tax Rate Master CRUD complete 2026-09-23. Flask-Migrate setup complete (`flask db migrate`/`upgrade` workflow ab standard hai, DB delete karne ki zaroorat nahi). Product Master CRUD complete + verified 2026-09-23 (list/add-with-restore/edit/toggle/soft-delete, Category+Base Unit+Tax Rate saare FK dropdowns).
 
 
 ---
@@ -66,9 +68,10 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 - [x] Machine Master (+ Work Stage FK) — complete 2026-09-21
 - [x] **RM Category Master** — CRUD complete 2026-09-22 (list/add/edit/toggle/soft-delete)
 - [x] **Raw Material Master** (Unit FK + RM Category FK) — CRUD complete 2026-09-22
-- [ ] Product Category Master — **next**
-- [ ] Product Master (+ Category FK, dynamic variants later)
-- [ ] Vendor Master (rich form + Auto-Ledger; materials pe depend)
+- [x] **Product Category Master** — CRUD complete 2026-09-23
+- [x] **Tax Rate Master (naya, 2026-09-23 decide hua)** — CRUD complete 2026-09-23 (list/add/edit/toggle/soft-delete, user ne khud type kiya)
+- [x] **Product Master** (+ Category FK, Base Unit FK, Tax Rate FK; variants later) — CRUD complete + verified 2026-09-23
+- [ ] Vendor Master (rich form + Auto-Ledger; materials pe depend) — **next**
 - [ ] Customer Master (Vendor pattern + Debtors ledger)
 - [ ] Warehouse Master (stock pages ke liye)
 
@@ -83,6 +86,16 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-23 — Product Master CRUD complete + verified (Flask-Migrate ke saath):** User ne poora CRUD khud type kiya (`app/products/routes.py`: list/add-with-restore/edit/toggle/soft-delete) — verify kiya, koi bug nahi mila (pichli baar jaisa `db.commit.session()` typo bhi nahi, saare `url_for` endpoint/param names template se match karte hain). Isi ke sath **Flask-Migrate poora setup hua** (naya standing tool, DB delete karne ki jagah): `pip install Flask-Migrate` → `extensions.py` me `migrate = Migrate()` (same bare-object pattern jaisa `db`) → `__init__.py` me `migrate.init_app(app, db)` → `flask db init` → baseline migration (ek chhota real diff bhi pakda: `machines.work_stage_id` DB me nullable tha, model me `nullable=False` — fix ho gaya) → `Product.tax_rate` (String) → `tax_rate_id` (FK) migration. Iss migration me ek real error mila aur fix hua: `ValueError: Constraint must have a name` — SQLite batch-mode table-recreate ke liye FK ka naam chahiye, `db` object me `naming_convention` set nahi tha isliye autogenerate FK ka naam `None` tha; is ek migration ke liye file me manually naam diya (`fk_products_tax_rate_id_tax_rates`) taaki aage badha ja sake. **Permanent fix (naming_convention `extensions.py` me) abhi PENDING hai** — user ne "baad me karenge" bola, agla naya FK/master banate waqt yaad dilana. Template me Add/Edit modal + View panel me Tax Rate dropdown/display bhi Claude ne add kiya (explicit request, Flask user khud likhega wala scoped exception jaisa Tax Rate Master me tha). DB verify kiya: `products` table me `tax_rate_id` (INTEGER, NOT NULL, FK→tax_rates.id) hai, purana `tax_rate` column gaya, 1 test row safe bachi (migration ka fayda — data loss nahi hua).
+
+- **2026-09-23 — Tax Rate Master CRUD complete:** User ne khud `app/tax_rates/routes.py` type kiya (list/add-with-restore/edit/toggle/soft-delete) + `TaxRate` model (`app/models.py`: code, rate_percent (Float), label, is_active, is_deleted) + blueprint register kiya `app/__init__.py` me. Ek bug mila aur flag kiya (fix user karega): `tax_rates_add` ke restore-branch me `db.commit.session()` likha tha, sahi hai `db.session.commit()` — sirf tab crash karega jab koi soft-deleted code restore hoga, fresh add pe safe hai. Seed rows recommend kiye: GST0/GST5/GST12/GST18/GST28 (standard India GST slabs), UI se Add button ke through add karne ko bola (data entry, code nahi). Next: Product Master wapas continue — `tax_rate_id` FK wire karna.
+
+- **2026-09-23 — Tax Rate Master: template + sidebar link Claude ne banaya (explicit user request, manual-typing rule ka scoped exception).** User ne kaha: "template banakar tax rate master me dal do aur base.html me sidebar me add kardo, baki template jesa UI rakhna, CRUD me khud karunga." Bana: `app/tax_rates/templates/tax_rates.html` — Product Category Master (`product_categories.html`) ka exact twin, fields badle: Code / Rate % / Label / Active-Stopped (Description column hata ke Rate % column). `base.html` sidebar me "Tax rates" link add kiya Product categories aur Products ke beech (dependency order ke hisaab se). Routes (`app/tax_rates/routes.py`) aur `TaxRate` model (`app/models.py`) **jaan-bujh kar nahi likhe** — woh user khud likhega (endpoint names template ke `url_for` calls se match karne hain: `tax_rates.tax_rates_list`, `_add`, `_edit`, `_toggle`, `_delete`, param name `r_id`). Blueprint register hone tak site ke sab pages error denge (sidebar ka `url_for` fail hoga) — yeh expected hai, agla kaam registration hai.
+
+- **2026-09-23 — Naya decision: Tax Rate Master banega, Product Master ke `tax_rate` ko hardcoded dropdown (18/12/5/0) nahi rakhenge.** User confused tha Product Master mein HSN/Tax rate field ke exact role ko leke ("GST me SGST/IGST alag hote hain, yeh field kis liye hai") — poora tax flow samjhaya (Product ke tax_rate = sirf SLAB %, CGST+SGST vs IGST split baad mein Invoice pe customer/vendor ke state se decide hota hai, spec §1.2.2). Isi discussion mein poocha gaya "tax rate hardcode rahe ya master bane" — spec ke apne compliance disclaimer mein explicit likha hai: *"make all thresholds/rates admin-configurable rather than hardcoded, so future notification changes don't require a code release."* Isliye decide: **Tax Rate Master banega** (chhota, Unit Master jaisa hi pattern — Rate%, Label, Active/Inactive), Product Master ka tax field ab FK hoga (`tax_rate_id`), hardcoded dropdown nahi. Order badla: Tax Rate Master pehle (jaldi banega, pattern already pata hai), phir Product Master wapas continue. Spec se ek aur field bhi mila jo mockup mein missing tha: `product_variants` table mein `min_selling_price` (Section 22 schema) — variant ki floor price, Sales module banne par kaam aayega.
+
+- **2026-09-23 — Product Category Master CRUD complete:** User ne list/add (restore)/edit/toggle/soft-delete + HTML `url_for` khud type kiye; blueprint registered. Next: Product Master parent model (variants later).
 
 - **2026-09-22 — Raw Material Master CRUD complete:** User ne list + Add (unique/restore) + Edit + Toggle + soft-delete khud type kiye; HTML form actions + FK display (`m.category.name`, `m.base_unit.code`) wired. Next: Product Category Master (RM Category jaisa pattern).
 
