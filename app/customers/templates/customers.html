@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+{% block title %}Customer Master{% endblock %}
+
+{% block page_css %}
+<style>
+  .customer-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .customer-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 12px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .customer-table thead th:first-child,
+  .customer-table tbody td:first-child { text-align: left; padding-left: 14px; }
+  .customer-table thead th:last-child { border-right: none; }
+  .customer-table tbody td {
+    padding: 10px 12px;
+    font-size: 14px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .customer-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .customer-table tbody tr:hover { background: #FBF4EE; }
+  .customer-table tbody tr.row-muted { opacity: 0.72; }
+  .search-wrap input { padding-left: 32px; }
+  #customer-modal.hidden, #view-modal.hidden { display: none; }
+  #customer-modal, #view-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6B7F82;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Customers</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Customers</h1>
+        </div>
+        <button type="button" id="btn-add-customer"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add customer
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-customers" placeholder="Search code or name…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              Saving a customer auto-creates a ledger under <span title="The accounting group for everyone who owes your business money (your customers). Its opposite is Sundry Creditors, used for Vendors." class="underline decoration-dotted">Sundry Debtors</span> · Click View for full details
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="customer-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:10%" />
+              <col style="width:19%" />
+              <col style="width:11%" />
+              <col style="width:15%" />
+              <col style="width:11%" />
+              <col style="width:12%" />
+              <col style="width:8%" />
+              <col style="width:14%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Customer name</th>
+                <th>State</th>
+                <th>GSTIN</th>
+                <th title="Maximum amount this customer can owe before new orders are held — a credit-control safeguard.">Credit limit</th>
+                <th title="Balance carried forward for this customer. Dr = customer owes you. Cr = you owe the customer (e.g. an advance received).">Opening bal.</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customers-tbody">
+              {# Flask: customers list pass karega #}
+              {% for c in customers %}
+              <tr class="customer-row{% if not c.is_active %} row-muted{% endif %}"
+                  data-code="{{ c.code|lower }}"
+                  data-name="{{ c.name|lower }}"
+                  data-status="{% if c.is_active %}active{% else %}inactive{% endif %}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold {% if c.is_active %}text-ink{% else %}text-ink-faint{% endif %} bg-mist border border-slate-200 rounded px-2 py-1">{{ c.code }}</span></td>
+                <td><span class="font-medium {% if c.is_active %}text-ink{% else %}text-ink-faint{% endif %}">{{ c.name }}</span></td>
+                <td class="text-[13px] text-ink-muted">{{ c.state or "—" }}</td>
+                <td class="text-[12.5px] text-ink-faint font-mono">{{ c.gstin or "—" }}</td>
+                {# credit_limit None ho sakta hai (blank = koi limit nahi) — isliye "is not none" check, warna 0 bhi "—" dikh jaata #}
+                <td class="text-[13px] text-ink-muted font-mono tabular-nums">
+                  {% if c.credit_limit is not none %}₹{{ "%.0f"|format(c.credit_limit) }}{% else %}—{% endif %}
+                </td>
+                <td class="text-[13px] text-ink-muted font-mono tabular-nums">
+                  {% if c.ledger %}₹{{ "%.0f"|format(c.ledger.opening_balance) }} {{ c.ledger.opening_balance_type }}{% else %}—{% endif %}
+                </td>
+                <td class="text-center">
+                  {% if c.is_active %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                  {% else %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button"
+                      class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                      data-code="{{ c.code }}"
+                      data-name="{{ c.name }}"
+                      data-contact="{{ c.contact_person or '' }}"
+                      data-mobile="{{ c.mobile or '' }}"
+                      data-email="{{ c.email or '' }}"
+                      data-address="{{ c.address or '' }}"
+                      data-state="{{ c.state or '' }}"
+                      data-gstin="{{ c.gstin or '' }}"
+                      data-pan="{{ c.pan or '' }}"
+                      data-terms="{{ c.payment_terms or '' }}"
+                      data-credit-limit="{% if c.credit_limit is not none %}₹{{ '%.2f'|format(c.credit_limit) }}{% endif %}"
+                      data-opening="{% if c.ledger %}₹{{ '%.2f'|format(c.ledger.opening_balance) }} {{ c.ledger.opening_balance_type }}{% endif %}"
+                      data-current-balance="{% if c.ledger %}₹{{ '%.2f'|format(c.ledger.current_balance|abs) }} {{ 'Cr' if c.ledger.current_balance >= 0 else 'Dr' }}{% endif %}"
+                      data-bank-name="{{ c.bank_name or '' }}"
+                      data-bank-ifsc="{{ c.bank_ifsc or '' }}"
+                      data-bank-account="{{ c.bank_account or '' }}"
+                      data-ledger-name="{{ c.ledger.name if c.ledger else '' }}">
+                      View
+                    </button>
+                    <button type="button"
+                      class="btn-edit-customer px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-id="{{ c.id }}"
+                      data-code="{{ c.code }}"
+                      data-name="{{ c.name }}"
+                      data-contact="{{ c.contact_person or '' }}"
+                      data-mobile="{{ c.mobile or '' }}"
+                      data-email="{{ c.email or '' }}"
+                      data-address="{{ c.address or '' }}"
+                      data-state="{{ c.state or '' }}"
+                      data-gstin="{{ c.gstin or '' }}"
+                      data-pan="{{ c.pan or '' }}"
+                      data-terms="{{ c.payment_terms or '' }}"
+                      data-credit-limit="{{ c.credit_limit if c.credit_limit is not none else '' }}"
+                      data-opening-amount="{{ c.ledger.opening_balance if c.ledger else '' }}"
+                      data-opening-type="{{ c.ledger.opening_balance_type if c.ledger else 'Dr' }}"
+                      data-bank-name="{{ c.bank_name or '' }}"
+                      data-bank-ifsc="{{ c.bank_ifsc or '' }}"
+                      data-bank-account="{{ c.bank_account or '' }}">
+                      Edit
+                    </button>
+                    {# TODO: Toggle route banne ke baad yahan action me url_for lagao #}
+                    <form method="post" action="#" class="inline">
+                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
+                        <input type="checkbox" class="toggle-input sr-only peer" {% if c.is_active %}checked{% endif %}
+                               onchange="this.form.submit()">
+                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                      </label>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {# list khali — empty-state JS/HTML #}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No customers found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new customer.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add customer</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} customers</span>
+          <span>Auto-creates a Sundry Debtors ledger on save</span>
+          <span class="text-ink-muted">Page 1 · Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="customer-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add customer</h2>
+        <p class="text-[12.5px] text-ink-faint">Basic info, tax, credit &amp; bank details</p>
+      </div>
+      <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    {# TODO: Add route banne ke baad action me url_for lagao #}
+    <form id="customer-form" method="post" action="#" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <p class="form-section-title">Basic info</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="customer-code" class="block text-[12.5px] font-semibold text-ink mb-1">Customer code *</label>
+          <input type="text" id="customer-code" name="code" required placeholder="C-006" maxlength="20" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="customer-name" class="block text-[12.5px] font-semibold text-ink mb-1">Customer name *</label>
+          <input type="text" id="customer-name" name="name" required placeholder="Customer Pvt Ltd" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="customer-contact" class="block text-[12.5px] font-semibold text-ink mb-1">Contact person</label>
+          <input type="text" id="customer-contact" name="contact_person" placeholder="Anil Patel" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="customer-mobile" class="block text-[12.5px] font-semibold text-ink mb-1">Mobile</label>
+          <input type="tel" id="customer-mobile" name="mobile" placeholder="98765 43210" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <label for="customer-email" class="block text-[12.5px] font-semibold text-ink mb-1">Email</label>
+        <input type="email" id="customer-email" name="email" placeholder="purchase@customer.com" autocomplete="off"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="customer-address" class="block text-[12.5px] font-semibold text-ink mb-1">Address</label>
+        <textarea id="customer-address" name="address" rows="2" placeholder="Street, City, PIN"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+      <div>
+        <label for="customer-state" class="block text-[12.5px] font-semibold text-ink mb-1">State *</label>
+        <select id="customer-state" name="state" required
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="Gujarat" selected>Gujarat</option>
+          <option value="Maharashtra">Maharashtra</option>
+          <option value="Rajasthan">Rajasthan</option>
+          <option value="Delhi">Delhi</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Tax &amp; compliance</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="customer-gstin" class="block text-[12.5px] font-semibold text-ink mb-1">GSTIN</label>
+          <input type="text" id="customer-gstin" name="gstin" placeholder="24ABCDE1234F1Z5" maxlength="15"
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="customer-pan" class="block text-[12.5px] font-semibold text-ink mb-1">PAN</label>
+          <input type="text" id="customer-pan" name="pan" placeholder="ABCDE1234F" maxlength="10"
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Credit &amp; bank</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="customer-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
+          <select id="customer-terms" name="payment_terms"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="Advance">Advance</option>
+            <option value="Net 15">Net 15</option>
+            <option value="Net 30" selected>Net 30</option>
+            <option value="Net 45">Net 45</option>
+            <option value="Net 60">Net 60</option>
+          </select>
+        </div>
+        <div>
+          <label for="customer-credit-limit" class="block text-[12.5px] font-semibold text-ink mb-1">Credit limit (₹)</label>
+          <input type="number" id="customer-credit-limit" name="credit_limit" min="0" step="0.01" placeholder="Leave blank for no limit"
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-[12.5px] font-semibold text-ink mb-1">Opening balance (₹)</label>
+        <div class="flex gap-1.5">
+          <input type="number" id="customer-opening-balance" name="opening_balance" min="0" step="0.01" placeholder="0.00"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          {# Customer ka normal balance Dr hota hai (customer hume paisa deta hai) — isliye default Dr, Vendor me Cr tha #}
+          <select id="customer-opening-balance-type" name="opening_balance_type"
+            class="px-2 py-2 text-[13px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="Dr" selected>Dr</option>
+            <option value="Cr">Cr</option>
+          </select>
+        </div>
+        <p class="text-[11.5px] text-ink-faint mt-1">Dr = customer owes you · Cr = advance received from customer</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="customer-bank-name" class="block text-[12.5px] font-semibold text-ink mb-1">Bank name</label>
+          <input type="text" id="customer-bank-name" name="bank_name" placeholder="HDFC Bank" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="customer-bank-ifsc" class="block text-[12.5px] font-semibold text-ink mb-1">IFSC code</label>
+          <input type="text" id="customer-bank-ifsc" name="bank_ifsc" placeholder="HDFC0001234" maxlength="11"
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <label for="customer-bank-account" class="block text-[12.5px] font-semibold text-ink mb-1">Account number</label>
+        <input type="text" id="customer-bank-account" name="bank_account" placeholder="000123456789" autocomplete="off"
+          class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+
+      <p class="text-[11.5px] text-ink-faint pt-1">Saving this customer will auto-create a ledger under <strong>Sundry Debtors</strong>.</p>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="customer-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save customer</button>
+    </div>
+  </div>
+</div>
+
+<div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Customer details</h2>
+        <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="view-modal-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var modal = document.getElementById('customer-modal');
+  var viewModal = document.getElementById('view-modal');
+  var form = document.getElementById('customer-form');
+  var searchInput = document.getElementById('search-customers');
+  var rows = Array.from(document.querySelectorAll('.customer-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.customer-table');
+  var modalTitle = document.getElementById('modal-title');
+  var activeFilter = 'all';
+  var FILTER_KEY = 'erp.customers.statusFilter';
+  var SEARCH_KEY = 'erp.customers.searchQ';
+  // TODO: Add route banne ke baad yahan Add route ka url_for lagao — Edit ke baad form wapas Add pe isi se aata hai
+  var addAction = '';
+
+  function saveActiveFilter() {
+    try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
+  }
+  function saveSearchQ() {
+    try { sessionStorage.setItem(SEARCH_KEY, searchInput.value || ''); } catch (e) {}
+  }
+  function applyFilterButtonStyles(btn) {
+    document.querySelectorAll('.filter-btn').forEach(function (b) {
+      var on = b === btn;
+      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-copper', on);
+      b.classList.toggle('font-semibold', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-ink', !on);
+      b.classList.toggle('border-slate-300', !on);
+    });
+  }
+  function restoreListState() {
+    var savedQ = null, savedFilter = null;
+    try {
+      savedQ = sessionStorage.getItem(SEARCH_KEY);
+      savedFilter = sessionStorage.getItem(FILTER_KEY);
+    } catch (e) {}
+    if (savedQ !== null) searchInput.value = savedQ;
+    if (savedFilter) {
+      var btn = document.querySelector('.filter-btn[data-filter="' + savedFilter + '"]');
+      if (btn) { activeFilter = savedFilter; applyFilterButtonStyles(btn); }
+    }
+    applyFilters();
+  }
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('customer-code').focus();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    form.reset();
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add customer';
+  }
+  function openAddModal() {
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add customer';
+    form.reset();
+    openModal();
+  }
+  function openEditModal(btn) {
+    var id = btn.getAttribute('data-id');
+    // TODO: Edit route banne ke baad yahan form.action = '/customers/edit/' + id jaisa set karo
+    modalTitle.textContent = 'Edit customer';
+    document.getElementById('customer-code').value = btn.getAttribute('data-code') || '';
+    document.getElementById('customer-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('customer-contact').value = btn.getAttribute('data-contact') || '';
+    document.getElementById('customer-mobile').value = btn.getAttribute('data-mobile') || '';
+    document.getElementById('customer-email').value = btn.getAttribute('data-email') || '';
+    document.getElementById('customer-address').value = btn.getAttribute('data-address') || '';
+    document.getElementById('customer-state').value = btn.getAttribute('data-state') || 'Gujarat';
+    document.getElementById('customer-gstin').value = btn.getAttribute('data-gstin') || '';
+    document.getElementById('customer-pan').value = btn.getAttribute('data-pan') || '';
+    document.getElementById('customer-terms').value = btn.getAttribute('data-terms') || 'Net 30';
+    document.getElementById('customer-credit-limit').value = btn.getAttribute('data-credit-limit') || '';
+    document.getElementById('customer-opening-balance').value = btn.getAttribute('data-opening-amount') || '';
+    document.getElementById('customer-opening-balance-type').value = btn.getAttribute('data-opening-type') || 'Dr';
+    document.getElementById('customer-bank-name').value = btn.getAttribute('data-bank-name') || '';
+    document.getElementById('customer-bank-ifsc').value = btn.getAttribute('data-bank-ifsc') || '';
+    document.getElementById('customer-bank-account').value = btn.getAttribute('data-bank-account') || '';
+    openModal();
+  }
+
+  function viewField(label, value) {
+    return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+  }
+  function openViewModal(btn) {
+    document.getElementById('view-modal-subtitle').textContent =
+      (btn.getAttribute('data-code') || '') + ' — ' + (btn.getAttribute('data-name') || '');
+    document.getElementById('view-modal-body').innerHTML =
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Contact person', btn.getAttribute('data-contact')) +
+      viewField('Mobile', btn.getAttribute('data-mobile')) +
+      viewField('Email', btn.getAttribute('data-email')) +
+      viewField('State', btn.getAttribute('data-state')) +
+      viewField('GSTIN', btn.getAttribute('data-gstin')) +
+      viewField('PAN', btn.getAttribute('data-pan')) +
+      viewField('Payment terms', btn.getAttribute('data-terms')) +
+      viewField('Credit limit', btn.getAttribute('data-credit-limit') || 'No limit') +
+      '</div>' +
+      '<div class="pt-2">' + viewField('Address', btn.getAttribute('data-address')) + '</div>' +
+      '<div class="grid grid-cols-2 gap-3 pt-2">' +
+      viewField('Bank name', btn.getAttribute('data-bank-name')) +
+      viewField('IFSC', btn.getAttribute('data-bank-ifsc')) +
+      viewField('Account number', btn.getAttribute('data-bank-account')) +
+      '</div>' +
+      '<div class="pt-3 border-t border-slate-200 mt-2">' +
+      '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Ledger (auto-created, Sundry Debtors)</div>' +
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Ledger name', btn.getAttribute('data-ledger-name')) +
+      viewField('Opening balance', btn.getAttribute('data-opening')) +
+      viewField('Current balance', btn.getAttribute('data-current-balance')) +
+      '</div></div>';
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeViewModal() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var code = row.getAttribute('data-code') || '';
+      var name = row.getAttribute('data-name') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1) &&
+        (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' customers';
+  }
+  function updateFilterCounts() {
+    var counts = { active: 0, inactive: 0 };
+    rows.forEach(function (row) {
+      var s = row.getAttribute('data-status');
+      if (counts[s] !== undefined) counts[s] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
+  }
+
+  document.getElementById('btn-add-customer').addEventListener('click', openAddModal);
+  var emptyAdd = document.getElementById('btn-empty-add');
+  if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
+  document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
+  document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!viewModal.classList.contains('hidden')) closeViewModal();
+    else if (!modal.classList.contains('hidden')) closeModal();
+  });
+  document.querySelectorAll('.btn-edit-customer').forEach(function (btn) {
+    btn.addEventListener('click', function () { openEditModal(btn); });
+  });
+  document.querySelectorAll('.btn-view-customer').forEach(function (btn) {
+    btn.addEventListener('click', function () { openViewModal(btn); });
+  });
+
+  form.addEventListener('submit', function (e) {
+    var code = document.getElementById('customer-code').value.trim();
+    var name = document.getElementById('customer-name').value.trim();
+    var state = document.getElementById('customer-state').value;
+    if (!code || !name || !state) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Code, Name and State are required.', 'error');
+    }
+  });
+
+  searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      saveActiveFilter();
+      applyFilterButtonStyles(btn);
+      applyFilters();
+    });
+  });
+  updateFilterCounts();
+  restoreListState();
+</script>
+{% endblock %}

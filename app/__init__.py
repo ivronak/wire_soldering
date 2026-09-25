@@ -9,6 +9,9 @@ from app.raw_materials.routes import raw_materials_bp
 from app.tax_rates.routes import tax_rates_bp
 from app.product_categories.routes import product_categories_bp
 from app.products.routes import products_bp
+from app.warehouses.routes import warehouses_bp
+from app.vendors.routes import vendors_bp
+from app.customers.routes import customers_bp
 from app.extensions import db, migrate
 
 
@@ -38,6 +41,9 @@ def create_app():
     app.register_blueprint(tax_rates_bp)
     app.register_blueprint(product_categories_bp)
     app.register_blueprint(products_bp)
+    app.register_blueprint(warehouses_bp)
+    app.register_blueprint(vendors_bp)
+    app.register_blueprint(customers_bp)
     
 
     @app.route("/")
@@ -47,8 +53,8 @@ def create_app():
         return redirect(url_for("units.units_list"))
 
     # pehli baar tables banano (agar pehle se hain to kuch nahi bigadta)
-    with app.app_context():
-        db.create_all()
+    # with app.app_context():
+    #     db.create_all()
 
     return app
 

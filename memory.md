@@ -11,11 +11,23 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 **Kya tha:** Product form se hardcoded Tax dropdown hata diya tha, `tax_rate` column unused chhod diya tha, socha tha HSN/Tax master baad me (Sales/GST phase me) banega.
 **Kyun ulta hua:** Usi din baad me user Product Master pe kaam karte waqt HSN/tax_rate field ke role ko leke confuse hua — poora tax flow discuss karne ke baad decide hua ki **abhi** (Product Master se pehle hi) chhota Tax Rate Master bana lena better hai, kyunki spec khud rates ko admin-configurable maangta hai (hardcode/unused chhodna galat). Poori reasoning neeche "Tax Rate Master banega" decision me hai — **wahi authoritative hai, yeh entry sirf history ke liye rakhi hai.**
 
-### Decision: Part 2 backend order = dependency chain (not original mockup order)
-**Date:** 2026-09-21
-**Kya:** Backend ab is sequence me: Unit → Work Stage → Machine → **RM Category → Raw Material → Product Category → Product → Vendor → Customer** (Warehouse baad me). Purana plan Vendor ko Machine ke turant baad rakh’ta tha.
-**Kyun:** User ne clear kiya — Vendor / procurement materials pe depend karta hai; pehle category + masters banao jahan se dropdown/FK aaye, phir parties.
-**How to apply:** Tracker Current Focus = RM Category next. Vendor Auto-Ledger tab jab Vendor module aaye. Mockup Part 1 order change nahi — sirf Part 2 typing order.
+### ⚠️ SUPERSEDED (2026-09-25) — Part 2 backend order = dependency chain
+**Date:** 2026-09-21 (superseded 2026-09-25)
+**Kya tha:** Backend sequence: Unit → Work Stage → Machine → RM Category → Raw Material → Product Category → Product → **Vendor → Customer** (Warehouse sabse last).
+**Kyun ulta hua:** User ne explicit maanga Warehouse ko Vendor se **pehle** banayein — spec khud Warehouse ko Phase-0-level foundation cheez maanta hai (stock/GRN/production sab isi pe depend karte hain), aur tracker.md already Warehouse ko "gap-fill, stock pages isपे depend karti hain" bol chuka tha. Naya order: ... → Product → **Warehouse (+ chhota Branch) → Vendor** → Customer. Poori Warehouse Master reasoning (fields, `warehouse_type` real-world gap, Branch approach) tracker.md ke 2026-09-25 Work Log entry me hai.
+**How to apply:** Agla module Vendor Master hai. Customer Master ke baad bhi order dobara confirm kar lena — abhi tak assume hai ki wahi order (Vendor → Customer) rahega.
+
+### Decision: Ledger `current_balance` user-editable nahi; opening edit = sirf delta
+**Date:** 2026-09-25
+**Kya:** Vendor/Customer ke ledger me `current_balance` **calculated** value hai (opening + transactions), form me uska input kabhi nahi hoga. Opening balance edit hone par `current_balance += (new_signed_opening - old_signed_opening)`. Signed convention: **Cr = plus, Dr = minus**; `current_balance` DB me signed store hota hai, display me `abs` + sign se Cr/Dr.
+**Kyun:** User ne Vendor edit banate waqt poocha — dono editable hon to mismatch pakka. Current ko overwrite karne se beech ki purchases/payments ka hisaab ud jaata; opening badle aur current na badle to bhi galat. Delta approach dono problem solve karta hai. Dr↔Cr type badalne par bhi sahi chalta hai (2,000 Dr → 2,000 Cr = +4,000).
+**How to apply:** Customer Master me same pattern. Phase 7 me har voucher bhi current ko isi signed tarike se +/- karega. FY close ke baad opening lock hoga (tab correction = adjustment entry). Money columns abhi `Float` hain — accounting shuru hone se pehle `Numeric(12, 2)` pe shift karna discuss karna.
+
+### Decision: Warehouse = logical stock bucket, physical building nahi; Branch abhi lightweight
+**Date:** 2026-09-25
+**Kya:** (1) `Warehouse.warehouse_type` (RM/WIP/FG/SCRAP/QC_HOLD) enum rakha, lekin ismein ek warehouse-row ≠ ek physical jagah — chhoti company me 1-2 physical sheds ke andar bhi 5 alag "logical" warehouse-rows ban sakte hain (sabka `location` same/blank). Jitne types abhi chahiye utne hi banao (e.g. sirf RM+FG), baaki baad me add kar sakte ho — koi migration nahi chahiye, bas naya row. (2) `Branch` poora master nahi bana — chhota table (name, state, gstin) + Warehouse form ke andar inline "+Add branch" (rename/soft-remove "Manage" wala hissa skip kiya). Poora Branch/Company Master **Phase 0 (multi-tenancy)** me banega jab uski zaroorat aayegi.
+**Kyun:** User ne khud sawaal uthaya — real business me shayad 1-2 hi physical warehouse hon, to fixed "1 type = 1 warehouse" assumption galat lagega. Resolution: "warehouse" software me sirf ek stock-tracking label hai, real jagah nahi — yeh QC_HOLD/Scrap jaisi automatic-routing logic (GRN → QC_HOLD → RM, production scrap → SCRAP) ke liye zaroori hai, isliye type hataya nahi, sirf uska matlab clarify kiya. Branch poora master banane se abhi over-engineering hoti (company single-location ho sakti hai), lekin `branch_id` FK schema me zaroori tha (spec ka DB hint) — isliye lightweight version.
+**How to apply:** Jab bhi koi naya warehouse banaना ho — user ko yaad dilane ki zaroorat nahi ki "physical jagah = warehouse", bas jitne stock-buckets chahiye utne bana lo. Jab Phase 0 (Auth/Multi-Tenancy) aaye, tab poora Branch Master banega — abhi ke chhote `Branch` table/rows migrate/reuse ho sakte hain.
 
 ### Decision: Har module me teaching continue karo, sirf pehle module tak limited mat rakho
 **Date:** 2026-09-16

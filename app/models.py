@@ -116,4 +116,128 @@ class Product(db.Model):
 
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def active_variants(self):
+        return [v for v in self.variants if not v.is_deleted]
+
+class ProductVariant(db.Model):
+    __tablename__ = "product_variants" 
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product = db.relationship("Product", foreign_keys=[product_id], backref="variants")
+
+    name = db.Column(db.String(100), nullable=False)
+    sku = db.Column(db.String(30), unique=True, nullable=False)
+    attributes = db.Column(db.JSON, nullable=True)
+    min_selling_price = db.Column(db.Float, nullable=True)
+
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class Branch(db.Model):
+    __tablename__ = "branches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    state = db.Column(db.String(2), nullable=False)
+    gstin = db.Column(db.String(15), nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class Warehouse(db.Model):
+    __tablename__ = "warehouses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    warehouse_type = db.Column(db.String(20), nullable=False)
+
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False)
+    branch = db.relationship("Branch", foreign_keys=[branch_id])
+
+    location = db.Column(db.String(100), nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class ChartOfAccountsGroup(db.Model):
+    __tablename__ = "chart_of_accounts_groups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    classification = db.Column(db.String(20), nullable=False)
+
+class Ledger(db.Model):
+    __tablename__ = "ledgers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+
+    group_id = db.Column(db.Integer, db.ForeignKey("chart_of_accounts_groups.id"), nullable=False)
+    group = db.relationship("ChartOfAccountsGroup", foreign_keys=[group_id])
+
+    opening_balance = db.Column(db.Float, default=0, nullable=False)
+    opening_balance_type = db.Column(db.String(2), default="Cr", nullable=False)
+    current_balance = db.Column(db.Float, default=0, nullable=False)
+    gstin = db.Column(db.String(15), nullable=True)
+
+class Vendor(db.Model):
+    __tablename__ = "vendors"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+
+    contact_person = db.Column(db.String(100), nullable=True)
+    mobile = db.Column(db.String(15), nullable=True)
+    email = db.Column(db.String(100), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    state = db.Column(db.String(50), nullable=False)
+
+    gstin = db.Column(db.String(15), nullable=True)
+    pan = db.Column(db.String(10), nullable=True)
+
+    payment_terms = db.Column(db.String(100), nullable=True)
+
+    bank_name = db.Column(db.String(100), nullable=True)
+    bank_ifsc = db.Column(db.String(11), nullable=True)
+    bank_account = db.Column(db.String(20), nullable=True)
+
+    vendor_type = db.Column(db.String(30), nullable=True)
+
+    ledger_id = db.Column(db.Integer, db.ForeignKey("ledgers.id"), nullable=False)
+    ledger = db.relationship("Ledger", foreign_keys=[ledger_id])
+
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class Customer(db.Model):
+    __tablename__ = "customers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+
+    contact_person = db.Column(db.String(100), nullable=True)
+    mobile = db.Column(db.String(15), nullable=True)
+    email = db.Column(db.String(100), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    state = db.Column(db.String(50), nullable=False)
     
+    gstin = db.Column(db.String(15), nullable=True)
+    pan = db.Column(db.String(10), nullable=True)
+
+    payment_terms = db.Column(db.String(100), nullable=True)
+    credit_limit = db.Column(db.Float, nullable=True)
+
+    bank_name = db.Column(db.String(100), nullable=True)
+    bank_ifsc = db.Column(db.String(11), nullable=True)
+    bank_account = db.Column(db.String(20), nullable=True)
+
+    ledger_id = db.Column(db.Integer, db.ForeignKey("ledgers.id"), nullable=False)
+    ledger = db.relationship("Ledger", foreign_keys=[ledger_id])
+
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)

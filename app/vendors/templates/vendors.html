@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% block title %}Vendor Master{% endblock %}
+
+{% block page_css %}
+<style>
+  .vendor-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .vendor-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 12px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .vendor-table thead th:first-child,
+  .vendor-table tbody td:first-child { text-align: left; padding-left: 14px; }
+  .vendor-table thead th:last-child { border-right: none; }
+  .vendor-table tbody td {
+    padding: 10px 12px;
+    font-size: 14px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .vendor-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .vendor-table tbody tr:hover { background: #FBF4EE; }
+  .vendor-table tbody tr.row-muted { opacity: 0.72; }
+  .search-wrap input { padding-left: 32px; }
+  #vendor-modal.hidden, #view-modal.hidden { display: none; }
+  #vendor-modal, #view-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6B7F82;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Vendors</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Vendors</h1>
+        </div>
+        <button type="button" id="btn-add-vendor"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add vendor
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-vendors" placeholder="Search code or name…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              Saving a vendor auto-creates a ledger under <span title="The accounting group for everyone your business owes money to (your suppliers/vendors). Its opposite is Sundry Debtors, used for Customers." class="underline decoration-dotted">Sundry Creditors</span> · Click View for full details
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="vendor-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:11%" />
+              <col style="width:20%" />
+              <col style="width:12%" />
+              <col style="width:15%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
+              <col style="width:8%" />
+              <col style="width:14%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Vendor name</th>
+                <th>State</th>
+                <th>GSTIN</th>
+                <th title="Number of days after the invoice date within which payment is due — e.g. Net 30 = 30-day credit period, Advance = paid before the order">Payment terms</th>
+                <th title="Balance carried forward for this vendor. Cr = payable to the vendor. Dr = advance paid, vendor owes you.">Opening bal.</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="vendors-tbody">
+              {# Flask: vendors list pass karega #}
+              {% for v in vendors %}
+              <tr class="vendor-row{% if not v.is_active %} row-muted{% endif %}"
+                  data-code="{{ v.code|lower }}"
+                  data-name="{{ v.name|lower }}"
+                  data-status="{% if v.is_active %}active{% else %}inactive{% endif %}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold {% if v.is_active %}text-ink{% else %}text-ink-faint{% endif %} bg-mist border border-slate-200 rounded px-2 py-1">{{ v.code }}</span></td>
+                <td><span class="font-medium {% if v.is_active %}text-ink{% else %}text-ink-faint{% endif %}">{{ v.name }}</span></td>
+                <td class="text-[13px] text-ink-muted">{{ v.state or "—" }}</td>
+                <td class="text-[12.5px] text-ink-faint font-mono">{{ v.gstin or "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ v.payment_terms or "—" }}</td>
+                <td class="text-[13px] text-ink-muted font-mono tabular-nums">
+                  {% if v.ledger %}₹{{ "%.0f"|format(v.ledger.opening_balance) }} {{ v.ledger.opening_balance_type }}{% else %}—{% endif %}
+                </td>
+                <td class="text-center">
+                  {% if v.is_active %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                  {% else %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button"
+                      class="btn-view-vendor px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                      data-code="{{ v.code }}"
+                      data-name="{{ v.name }}"
+                      data-contact="{{ v.contact_person or '' }}"
+                      data-mobile="{{ v.mobile or '' }}"
+                      data-email="{{ v.email or '' }}"
+                      data-address="{{ v.address or '' }}"
+                      data-state="{{ v.state or '' }}"
+                      data-gstin="{{ v.gstin or '' }}"
+                      data-pan="{{ v.pan or '' }}"
+                      data-terms="{{ v.payment_terms or '' }}"
+                      data-opening="{% if v.ledger %}₹{{ '%.2f'|format(v.ledger.opening_balance) }} {{ v.ledger.opening_balance_type }}{% endif %}"
+                      data-current-balance="{% if v.ledger %}₹{{ '%.2f'|format(v.ledger.current_balance|abs) }} {{ 'Cr' if v.ledger.current_balance >= 0 else 'Dr' }}{% endif %}"
+                      data-bank-name="{{ v.bank_name or '' }}"
+                      data-bank-ifsc="{{ v.bank_ifsc or '' }}"
+                      data-bank-account="{{ v.bank_account or '' }}"
+                      data-vendor-type="{{ v.vendor_type or '' }}"
+                      data-ledger-name="{{ v.ledger.name if v.ledger else '' }}">
+                      View
+                    </button>
+                    <button type="button"
+                      class="btn-edit-vendor px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-id="{{ v.id }}"
+                      data-code="{{ v.code }}"
+                      data-name="{{ v.name }}"
+                      data-contact="{{ v.contact_person or '' }}"
+                      data-mobile="{{ v.mobile or '' }}"
+                      data-email="{{ v.email or '' }}"
+                      data-address="{{ v.address or '' }}"
+                      data-state="{{ v.state or '' }}"
+                      data-gstin="{{ v.gstin or '' }}"
+                      data-pan="{{ v.pan or '' }}"
+                      data-terms="{{ v.payment_terms or '' }}"
+                      data-opening-amount="{{ v.ledger.opening_balance if v.ledger else '' }}"
+                      data-opening-type="{{ v.ledger.opening_balance_type if v.ledger else 'Cr' }}"
+                      data-bank-name="{{ v.bank_name or '' }}"
+                      data-bank-ifsc="{{ v.bank_ifsc or '' }}"
+                      data-bank-account="{{ v.bank_account or '' }}"
+                      data-vendor-type="{{ v.vendor_type or '' }}">
+                      Edit
+                    </button>
+                    <form method="post" action="{{ url_for('vendors.vendors_toggle', v_id=v.id) }}" class="inline">
+                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
+                        <input type="checkbox" class="toggle-input sr-only peer" {% if v.is_active %}checked{% endif %}
+                               onchange="this.form.submit()">
+                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                      </label>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {# list khali — empty-state JS/HTML #}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No vendors found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new vendor.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add vendor</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} vendors</span>
+          <span>Auto-creates a Sundry Creditors ledger on save</span>
+          <span class="text-ink-muted">Page 1 · Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="vendor-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add vendor</h2>
+        <p class="text-[12.5px] text-ink-faint">Basic info, tax, payment &amp; bank details</p>
+      </div>
+      <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="vendor-form" method="post" action="{{ url_for('vendors.vendors_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <p class="form-section-title">Basic info</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="vendor-code" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor code *</label>
+          <input type="text" id="vendor-code" name="code" required placeholder="V-006" maxlength="20" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="vendor-name" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor name *</label>
+          <input type="text" id="vendor-name" name="name" required placeholder="Vendor Pvt Ltd" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="vendor-contact" class="block text-[12.5px] font-semibold text-ink mb-1">Contact person</label>
+          <input type="text" id="vendor-contact" name="contact_person" placeholder="Rakesh Shah" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="vendor-mobile" class="block text-[12.5px] font-semibold text-ink mb-1">Mobile</label>
+          <input type="tel" id="vendor-mobile" name="mobile" placeholder="98765 43210" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <label for="vendor-email" class="block text-[12.5px] font-semibold text-ink mb-1">Email</label>
+        <input type="email" id="vendor-email" name="email" placeholder="accounts@vendor.com" autocomplete="off"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="vendor-address" class="block text-[12.5px] font-semibold text-ink mb-1">Address</label>
+        <textarea id="vendor-address" name="address" rows="2" placeholder="Street, City, PIN"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+      <div>
+        <label for="vendor-state" class="block text-[12.5px] font-semibold text-ink mb-1">State *</label>
+        <select id="vendor-state" name="state" required
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="Gujarat" selected>Gujarat</option>
+          <option value="Maharashtra">Maharashtra</option>
+          <option value="Rajasthan">Rajasthan</option>
+          <option value="Delhi">Delhi</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Tax &amp; compliance</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="vendor-gstin" class="block text-[12.5px] font-semibold text-ink mb-1">GSTIN</label>
+          <input type="text" id="vendor-gstin" name="gstin" placeholder="24ABCDE1234F1Z5" maxlength="15"
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="vendor-pan" class="block text-[12.5px] font-semibold text-ink mb-1">PAN</label>
+          <input type="text" id="vendor-pan" name="pan" placeholder="ABCDE1234F" maxlength="10"
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Payment &amp; bank</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="vendor-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
+          <select id="vendor-terms" name="payment_terms"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="Advance">Advance</option>
+            <option value="Net 15">Net 15</option>
+            <option value="Net 30" selected>Net 30</option>
+            <option value="Net 45">Net 45</option>
+            <option value="Net 60">Net 60</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Opening balance (₹)</label>
+          <div class="flex gap-1.5">
+            <input type="number" id="vendor-opening-balance" name="opening_balance" min="0" step="0.01" placeholder="0.00"
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <select id="vendor-opening-balance-type" name="opening_balance_type"
+              class="px-2 py-2 text-[13px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="Cr" selected>Cr</option>
+              <option value="Dr">Dr</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="vendor-bank-name" class="block text-[12.5px] font-semibold text-ink mb-1">Bank name</label>
+          <input type="text" id="vendor-bank-name" name="bank_name" placeholder="HDFC Bank" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="vendor-bank-ifsc" class="block text-[12.5px] font-semibold text-ink mb-1">IFSC code</label>
+          <input type="text" id="vendor-bank-ifsc" name="bank_ifsc" placeholder="HDFC0001234" maxlength="11"
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <label for="vendor-bank-account" class="block text-[12.5px] font-semibold text-ink mb-1">Account number</label>
+        <input type="text" id="vendor-bank-account" name="bank_account" placeholder="000123456789" autocomplete="off"
+          class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Type</p>
+      <div>
+        <label for="vendor-type" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor type</label>
+        <select id="vendor-type" name="vendor_type"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="Raw Material Supplier" selected>Raw Material Supplier</option>
+          <option value="Job Worker / Sub-contractor">Job Worker / Sub-contractor</option>
+          <option value="Transporter">Transporter</option>
+          <option value="Service Provider">Service Provider</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <p class="text-[11.5px] text-ink-faint pt-1">Saving this vendor will auto-create a ledger under <strong>Sundry Creditors</strong>.</p>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="vendor-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save vendor</button>
+    </div>
+  </div>
+</div>
+
+<div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Vendor details</h2>
+        <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="view-modal-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var modal = document.getElementById('vendor-modal');
+  var viewModal = document.getElementById('view-modal');
+  var form = document.getElementById('vendor-form');
+  var searchInput = document.getElementById('search-vendors');
+  var rows = Array.from(document.querySelectorAll('.vendor-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.vendor-table');
+  var modalTitle = document.getElementById('modal-title');
+  var activeFilter = 'all';
+  var FILTER_KEY = 'erp.vendors.statusFilter';
+  var SEARCH_KEY = 'erp.vendors.searchQ';
+  var addAction = "{{ url_for('vendors.vendors_add') }}";
+
+  function saveActiveFilter() {
+    try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
+  }
+  function saveSearchQ() {
+    try { sessionStorage.setItem(SEARCH_KEY, searchInput.value || ''); } catch (e) {}
+  }
+  function applyFilterButtonStyles(btn) {
+    document.querySelectorAll('.filter-btn').forEach(function (b) {
+      var on = b === btn;
+      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-copper', on);
+      b.classList.toggle('font-semibold', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-ink', !on);
+      b.classList.toggle('border-slate-300', !on);
+    });
+  }
+  function restoreListState() {
+    var savedQ = null, savedFilter = null;
+    try {
+      savedQ = sessionStorage.getItem(SEARCH_KEY);
+      savedFilter = sessionStorage.getItem(FILTER_KEY);
+    } catch (e) {}
+    if (savedQ !== null) searchInput.value = savedQ;
+    if (savedFilter) {
+      var btn = document.querySelector('.filter-btn[data-filter="' + savedFilter + '"]');
+      if (btn) { activeFilter = savedFilter; applyFilterButtonStyles(btn); }
+    }
+    applyFilters();
+  }
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('vendor-code').focus();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    form.reset();
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add vendor';
+  }
+  function openAddModal() {
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add vendor';
+    form.reset();
+    openModal();
+  }
+  function openEditModal(btn) {
+    var id = btn.getAttribute('data-id');
+    // Flask Edit route ready hone pe yahan action set karo
+    form.action = '/vendors/edit/' + id;
+    modalTitle.textContent = 'Edit vendor';
+    document.getElementById('vendor-code').value = btn.getAttribute('data-code') || '';
+    document.getElementById('vendor-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('vendor-contact').value = btn.getAttribute('data-contact') || '';
+    document.getElementById('vendor-mobile').value = btn.getAttribute('data-mobile') || '';
+    document.getElementById('vendor-email').value = btn.getAttribute('data-email') || '';
+    document.getElementById('vendor-address').value = btn.getAttribute('data-address') || '';
+    document.getElementById('vendor-state').value = btn.getAttribute('data-state') || 'Gujarat';
+    document.getElementById('vendor-gstin').value = btn.getAttribute('data-gstin') || '';
+    document.getElementById('vendor-pan').value = btn.getAttribute('data-pan') || '';
+    document.getElementById('vendor-terms').value = btn.getAttribute('data-terms') || 'Net 30';
+    document.getElementById('vendor-opening-balance').value = btn.getAttribute('data-opening-amount') || '';
+    document.getElementById('vendor-opening-balance-type').value = btn.getAttribute('data-opening-type') || 'Cr';
+    document.getElementById('vendor-bank-name').value = btn.getAttribute('data-bank-name') || '';
+    document.getElementById('vendor-bank-ifsc').value = btn.getAttribute('data-bank-ifsc') || '';
+    document.getElementById('vendor-bank-account').value = btn.getAttribute('data-bank-account') || '';
+    document.getElementById('vendor-type').value = btn.getAttribute('data-vendor-type') || 'Raw Material Supplier';
+    openModal();
+  }
+
+  function viewField(label, value) {
+    return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+  }
+  function openViewModal(btn) {
+    document.getElementById('view-modal-subtitle').textContent =
+      (btn.getAttribute('data-code') || '') + ' — ' + (btn.getAttribute('data-name') || '');
+    document.getElementById('view-modal-body').innerHTML =
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Contact person', btn.getAttribute('data-contact')) +
+      viewField('Mobile', btn.getAttribute('data-mobile')) +
+      viewField('Email', btn.getAttribute('data-email')) +
+      viewField('State', btn.getAttribute('data-state')) +
+      viewField('GSTIN', btn.getAttribute('data-gstin')) +
+      viewField('PAN', btn.getAttribute('data-pan')) +
+      viewField('Payment terms', btn.getAttribute('data-terms')) +
+      viewField('Vendor type', btn.getAttribute('data-vendor-type')) +
+      '</div>' +
+      '<div class="pt-2">' + viewField('Address', btn.getAttribute('data-address')) + '</div>' +
+      '<div class="grid grid-cols-2 gap-3 pt-2">' +
+      viewField('Bank name', btn.getAttribute('data-bank-name')) +
+      viewField('IFSC', btn.getAttribute('data-bank-ifsc')) +
+      viewField('Account number', btn.getAttribute('data-bank-account')) +
+      '</div>' +
+      '<div class="pt-3 border-t border-slate-200 mt-2">' +
+      '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Ledger (auto-created, Sundry Creditors)</div>' +
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Ledger name', btn.getAttribute('data-ledger-name')) +
+      viewField('Opening balance', btn.getAttribute('data-opening')) +
+      viewField('Current balance', btn.getAttribute('data-current-balance')) +
+      '</div></div>';
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeViewModal() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var code = row.getAttribute('data-code') || '';
+      var name = row.getAttribute('data-name') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1) &&
+        (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' vendors';
+  }
+  function updateFilterCounts() {
+    var counts = { active: 0, inactive: 0 };
+    rows.forEach(function (row) {
+      var s = row.getAttribute('data-status');
+      if (counts[s] !== undefined) counts[s] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
+  }
+
+  document.getElementById('btn-add-vendor').addEventListener('click', openAddModal);
+  var emptyAdd = document.getElementById('btn-empty-add');
+  if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
+  document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
+  document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!viewModal.classList.contains('hidden')) closeViewModal();
+    else if (!modal.classList.contains('hidden')) closeModal();
+  });
+  document.querySelectorAll('.btn-edit-vendor').forEach(function (btn) {
+    btn.addEventListener('click', function () { openEditModal(btn); });
+  });
+  document.querySelectorAll('.btn-view-vendor').forEach(function (btn) {
+    btn.addEventListener('click', function () { openViewModal(btn); });
+  });
+
+  form.addEventListener('submit', function (e) {
+    var code = document.getElementById('vendor-code').value.trim();
+    var name = document.getElementById('vendor-name').value.trim();
+    var state = document.getElementById('vendor-state').value;
+    if (!code || !name || !state) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Code, Name and State are required.', 'error');
+    }
+  });
+
+  searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      saveActiveFilter();
+      applyFilterButtonStyles(btn);
+      applyFilters();
+    });
+  });
+  updateFilterCounts();
+  restoreListState();
+</script>
+{% endblock %}

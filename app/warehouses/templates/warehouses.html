@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% block title %}Warehouse Master{% endblock %}
+
+{% block page_css %}
+<style>
+  .wh-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .wh-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 14px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .wh-table thead th:first-child,
+  .wh-table tbody td:first-child { text-align: left; padding-left: 18px; }
+  .wh-table thead th:last-child { border-right: none; }
+  .wh-table tbody td {
+    padding: 11px 14px;
+    font-size: 14px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .wh-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .wh-table tbody tr:hover { background: #FBF4EE; }
+  .wh-table tbody tr.row-muted { opacity: 0.72; }
+  .search-wrap input { padding-left: 32px; }
+  #wh-modal.hidden { display: none; }
+  #wh-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+
+  /* Type badges — RM/WIP/FG/SCRAP/QC_HOLD alag color taaki table me turant pehchaan ho */
+  .type-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid;
+  }
+  .type-rm { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .type-wip { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  .type-fg { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .type-scrap { background: #F4F6F5; color: #3D5A5D; border-color: #D1D9D8; }
+  .type-qc { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Warehouses</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Warehouses</h1>
+        </div>
+        <button type="button" id="btn-add-wh"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add warehouse
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-wh" placeholder="Search code, name, location…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1 flex-wrap">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Stopped (0)</button>
+          </div>
+          <select id="filter-type" class="px-2.5 py-1.5 text-[12.5px] border border-slate-300 rounded bg-white text-ink focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">All types</option>
+            <option value="RM">RM — Raw material</option>
+            <option value="WIP">WIP — Work in progress</option>
+            <option value="FG">FG — Finished goods</option>
+            <option value="SCRAP">SCRAP</option>
+            <option value="QC_HOLD">QC_HOLD</option>
+          </select>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              Type decides what stock can live here · Stock transfer / issue / scrap screens pick warehouses from this list · Soft-stop only (no hard delete)
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="wh-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:10%" />
+              <col style="width:20%" />
+              <col style="width:12%" />
+              <col style="width:15%" />
+              <col style="width:17%" />
+              <col style="width:10%" />
+              <col style="width:12%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Code</th>
+                <th>Warehouse name</th>
+                <th>Type</th>
+                <th>Branch</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="wh-tbody">
+              {# Flask: list route se warehouses pass hoga #}
+              {% set type_class = {'RM': 'type-rm', 'WIP': 'type-wip', 'FG': 'type-fg', 'SCRAP': 'type-scrap', 'QC_HOLD': 'type-qc'} %}
+              {% for w in warehouses %}
+              <tr class="wh-row{% if not w.is_active %} row-muted{% endif %}"
+                  data-code="{{ w.code|lower }}"
+                  data-name="{{ w.name|lower }}"
+                  data-loc="{{ (w.location or '')|lower }}"
+                  data-type="{{ w.warehouse_type }}"
+                  data-status="{% if w.is_active %}active{% else %}inactive{% endif %}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td>
+                  <span class="inline-block font-mono text-[13.5px] font-bold {% if w.is_active %}text-ink{% else %}text-ink-faint{% endif %} bg-mist border border-slate-200 rounded px-2 py-1">
+                    {{ w.code }}
+                  </span>
+                </td>
+                <td>
+                  <span class="font-medium {% if w.is_active %}text-ink{% else %}text-ink-faint{% endif %}">{{ w.name }}</span>
+                </td>
+                <td class="text-center">
+                  <span class="type-badge {{ type_class.get(w.warehouse_type, 'type-scrap') }}">{{ w.warehouse_type }}</span>
+                </td>
+                <td class="text-[13px] {% if w.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %}">{{ w.branch.name if w.branch else "—" }}</td>
+                <td class="text-[12.5px] text-ink-faint">{{ w.location or "—" }}</td>
+                <td class="text-center">
+                  {% if w.is_active %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                  {% else %}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-3 flex-wrap">
+                    <button type="button"
+                      class="btn-edit-wh px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-id="{{ w.id }}"
+                      data-code="{{ w.code }}"
+                      data-name="{{ w.name }}"
+                      data-type="{{ w.warehouse_type }}"
+                      data-branch-id="{{ w.branch_id or '' }}"
+                      data-location="{{ w.location or '' }}"
+                      data-active="{{ '1' if w.is_active else '0' }}">
+                      Edit
+                    </button>
+                    <form method="post" action="{{ url_for('warehouses.warehouses_toggle', w_id=w.id) }}" class="inline">
+                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
+                        <input type="checkbox" class="toggle-input sr-only peer" {% if w.is_active %}checked{% endif %}
+                               onchange="this.form.submit()">
+                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                      </label>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {# list khali — empty-state JS/HTML #}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No warehouses found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear search/filters or add a new warehouse.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add warehouse</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} warehouses</span>
+          <span>Create RM + FG + Scrap + QC Hold first — stock screens need them</span>
+          <span class="text-ink-muted">Page 1 · Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="wh-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add warehouse</h2>
+        <p class="text-[12.5px] text-ink-faint">Name, type, branch, location</p>
+      </div>
+      <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="wh-form" method="post" action="{{ url_for('warehouses.warehouses_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div>
+        <label for="wh-code" class="block text-[12.5px] font-semibold text-ink mb-1">Short code *</label>
+        <input type="text" id="wh-code" name="code" required placeholder="WH-RM01" maxlength="20" autocomplete="off"
+          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="mt-1 text-[11.5px] text-ink-faint">Unique code used in reports and stock docs.</p>
+      </div>
+      <div>
+        <label for="wh-name" class="block text-[12.5px] font-semibold text-ink mb-1">Warehouse name *</label>
+        <input type="text" id="wh-name" name="name" required placeholder="Main RM Warehouse" autocomplete="off"
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="wh-type" class="block text-[12.5px] font-semibold text-ink mb-1">Type *</label>
+        <select id="wh-type" name="warehouse_type" required
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="">Select type…</option>
+          <option value="RM">RM — Raw material store</option>
+          <option value="WIP">WIP — Work in progress</option>
+          <option value="FG">FG — Finished goods</option>
+          <option value="SCRAP">SCRAP — Saleable scrap</option>
+          <option value="QC_HOLD">QC_HOLD — Under inspection</option>
+        </select>
+        <p class="mt-1 text-[11.5px] text-ink-faint">RM = purchase stock · QC_HOLD = GRN waiting QC · FG = ready to sell · SCRAP = metal waste.</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <label for="wh-branch" class="text-[12.5px] font-semibold text-ink">Branch *</label>
+          <button type="button" id="btn-show-add-branch" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add branch</button>
+        </div>
+        <select id="wh-branch" name="branch_id" required
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="">Select branch…</option>
+          {% for b in branches %}
+          <option value="{{ b.id }}">{{ b.name }}</option>
+          {% endfor %}
+        </select>
+
+        {# Inline mini-form — pehle chhupa; +Add branch pe khulta hai. fetch() se real-time add hota hai, form reload nahi hota. #}
+        <div id="branch-inline" class="hidden mt-2.5 border border-copper-border bg-copper-soft rounded-md p-3 space-y-2.5">
+          <div class="text-[12.5px] font-semibold text-ink">New branch</div>
+          <div>
+            <label for="new-branch-name" class="block text-[11.5px] font-semibold text-ink mb-0.5">Branch name *</label>
+            <input type="text" id="new-branch-name" placeholder="e.g. Ahmedabad Depot" autocomplete="off"
+              class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="new-branch-state" class="block text-[11.5px] font-semibold text-ink mb-0.5">State code</label>
+              <input type="text" id="new-branch-state" placeholder="24" maxlength="2" autocomplete="off"
+                class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+            <div>
+              <label for="new-branch-gstin" class="block text-[11.5px] font-semibold text-ink mb-0.5">GSTIN</label>
+              <input type="text" id="new-branch-gstin" placeholder="If separate reg." maxlength="15" autocomplete="off"
+                class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-0.5">
+            <button type="button" id="btn-cancel-branch" class="px-2.5 py-1.5 text-[12.5px] text-ink-faint hover:bg-white rounded">Cancel</button>
+            <button type="button" id="btn-save-branch" class="px-2.5 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save to list</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label for="wh-loc" class="block text-[12.5px] font-semibold text-ink mb-1">Location</label>
+        <input type="text" id="wh-loc" name="location" placeholder="Shed A, Bay 1–4" autocomplete="off"
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="mt-1 text-[11.5px] text-ink-faint">Physical place inside the branch (optional but useful for store staff).</p>
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="wh-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save warehouse</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var modal = document.getElementById('wh-modal');
+  var form = document.getElementById('wh-form');
+  var searchInput = document.getElementById('search-wh');
+  var typeFilter = document.getElementById('filter-type');
+  var rows = Array.from(document.querySelectorAll('.wh-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.wh-table');
+  var modalTitle = document.getElementById('modal-title');
+  var activeFilter = 'all';
+  var FILTER_KEY = 'erp.warehouses.statusFilter';
+  var SEARCH_KEY = 'erp.warehouses.searchQ';
+  // Flask Add route ready hone pe url_for yahan / form pe
+  var addAction = "{{ url_for('warehouses.warehouses_add') }}";
+
+  function saveActiveFilter() {
+    try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (err) {}
+  }
+  function saveSearchQ() {
+    try { sessionStorage.setItem(SEARCH_KEY, searchInput.value || ''); } catch (err) {}
+  }
+  function applyFilterButtonStyles(selectedBtn) {
+    document.querySelectorAll('.filter-btn').forEach(function (b) {
+      var on = b === selectedBtn;
+      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-copper', on);
+      b.classList.toggle('font-semibold', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-ink', !on);
+      b.classList.toggle('border-slate-300', !on);
+    });
+  }
+  function restoreListState() {
+    var savedQ = null, savedFilter = null;
+    try {
+      savedQ = sessionStorage.getItem(SEARCH_KEY);
+      savedFilter = sessionStorage.getItem(FILTER_KEY);
+    } catch (err) {}
+    if (savedQ !== null) searchInput.value = savedQ;
+    if (savedFilter) {
+      var btn = document.querySelector('.filter-btn[data-filter="' + savedFilter + '"]');
+      if (btn) { activeFilter = savedFilter; applyFilterButtonStyles(btn); }
+    }
+    applyFilters();
+  }
+
+  function hideBranchInline() {
+    document.getElementById('branch-inline').classList.add('hidden');
+    document.getElementById('new-branch-name').value = '';
+    document.getElementById('new-branch-state').value = '';
+    document.getElementById('new-branch-gstin').value = '';
+  }
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    hideBranchInline();
+    document.getElementById('wh-code').focus();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    form.reset();
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add warehouse';
+    hideBranchInline();
+  }
+  function openAddModal() {
+    if (addAction) form.action = addAction;
+    modalTitle.textContent = 'Add warehouse';
+    form.reset();
+    openModal();
+  }
+  function openEditModal(btn) {
+    var id = btn.getAttribute('data-id');
+    // Flask Edit route ready hone pe yahan action set karo
+    form.action = '/warehouses/edit/' + id;
+    modalTitle.textContent = 'Edit warehouse';
+    document.getElementById('wh-code').value = btn.getAttribute('data-code') || '';
+    document.getElementById('wh-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('wh-type').value = btn.getAttribute('data-type') || '';
+    document.getElementById('wh-branch').value = btn.getAttribute('data-branch-id') || '';
+    document.getElementById('wh-loc').value = btn.getAttribute('data-location') || '';
+    openModal();
+  }
+
+  // ---- Inline "+ Add branch" — fetch() se real-time add (page reload nahi hota) ----
+  document.getElementById('btn-show-add-branch').addEventListener('click', function () {
+    document.getElementById('branch-inline').classList.remove('hidden');
+    document.getElementById('new-branch-name').focus();
+  });
+  document.getElementById('btn-cancel-branch').addEventListener('click', hideBranchInline);
+  document.getElementById('btn-save-branch').addEventListener('click', function () {
+    var name = document.getElementById('new-branch-name').value.trim();
+    var state = document.getElementById('new-branch-state').value.trim();
+    var gstin = document.getElementById('new-branch-gstin').value.trim();
+    if (!name) {
+      if (typeof showToast === 'function') showToast('Branch name is required.', 'error');
+      return;
+    }
+    var formData = new FormData();
+    formData.append('name', name);
+    formData.append('state', state);
+    formData.append('gstin', gstin);
+
+    fetch('/warehouses/branches/add', { method: 'POST', body: formData })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data.success) {
+          if (typeof showToast === 'function') showToast(data.error || 'Could not add branch.', 'error');
+          return;
+        }
+        var branchSelect = document.getElementById('wh-branch');
+        var opt = document.createElement('option');
+        opt.value = data.id;
+        opt.textContent = data.name;
+        branchSelect.appendChild(opt);
+        branchSelect.value = data.id;
+        hideBranchInline();
+        if (typeof showToast === 'function') showToast('Branch added: ' + data.name, 'success');
+      })
+      .catch(function () {
+        if (typeof showToast === 'function') showToast('Something went wrong adding the branch.', 'error');
+      });
+  });
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var typeQ = typeFilter.value || '';
+    var visible = 0;
+    rows.forEach(function (row) {
+      var code = row.getAttribute('data-code') || '';
+      var name = row.getAttribute('data-name') || '';
+      var loc = row.getAttribute('data-loc') || '';
+      var status = row.getAttribute('data-status') || '';
+      var type = row.getAttribute('data-type') || '';
+      var matchesSearch = !q || code.indexOf(q) !== -1 || name.indexOf(q) !== -1 || loc.indexOf(q) !== -1;
+      var matchesFilter = activeFilter === 'all' || status === activeFilter;
+      var matchesType = !typeQ || type === typeQ;
+      var show = matchesSearch && matchesFilter && matchesType;
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' warehouses';
+  }
+
+  function updateFilterCounts() {
+    var counts = { active: 0, inactive: 0 };
+    rows.forEach(function (row) {
+      var status = row.getAttribute('data-status');
+      if (counts[status] !== undefined) counts[status] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Stopped (' + counts.inactive + ')';
+  }
+
+  document.getElementById('btn-add-wh').addEventListener('click', openAddModal);
+  var emptyAdd = document.getElementById('btn-empty-add');
+  if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+  document.querySelectorAll('.btn-edit-wh').forEach(function (btn) {
+    btn.addEventListener('click', function () { openEditModal(btn); });
+  });
+
+  form.addEventListener('submit', function (e) {
+    var code = document.getElementById('wh-code').value.trim();
+    var name = document.getElementById('wh-name').value.trim();
+    var type = document.getElementById('wh-type').value;
+    var branch = document.getElementById('wh-branch').value;
+    if (!code || !name || !type || !branch) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Code, Name, Type and Branch are required.', 'error');
+    }
+  });
+
+  document.querySelectorAll('td form').forEach(function (f) {
+    f.addEventListener('submit', function () { saveListState(); });
+  });
+  function saveListState() {
+    saveActiveFilter();
+    saveSearchQ();
+  }
+
+  searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
+  typeFilter.addEventListener('change', applyFilters);
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      saveActiveFilter();
+      applyFilterButtonStyles(btn);
+      applyFilters();
+    });
+  });
+  updateFilterCounts();
+  restoreListState();
+</script>
+{% endblock %}

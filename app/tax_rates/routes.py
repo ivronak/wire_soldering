@@ -12,6 +12,7 @@ def tax_rates_list():
     return render_template(
         "tax_rates.html",
         tax_rates=tax_rates,
+        active_nav="tax_rates",
         total_count=total_count,
         result_count=total_count,
     )

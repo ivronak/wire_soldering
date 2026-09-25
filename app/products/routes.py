@@ -1,5 +1,5 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash
-from app.models import Product, ProductCategories, Unit, TaxRate
+from app.models import Product, ProductCategories, Unit, TaxRate, ProductVariant
 from app.extensions import db
 
 products_bp = Blueprint("products", __name__, template_folder="templates")
@@ -57,7 +57,7 @@ def products_add():
         flash("A Product with this code already exists.", "error")    
         return redirect(url_for('products.products_list'))
 
-    db.session.add(Product(
+    product = Product(
         code=code,
         name=name,
         description=description,
@@ -67,7 +67,39 @@ def products_add():
         hsn_code=hsn_code,
         is_active=True,
         is_deleted=False,
-    ))    
+    )
+    db.session.add(product)   
+    db.session.flush()
+
+    i = 0
+    while True:
+
+        variants_name = (request.form.get(f'variant_name_{i}') or "").strip()
+        variants_sku = (request.form.get(f'variant_sku_{i}') or "").strip().upper()
+
+        if not variants_name and not variants_sku:
+            break
+
+        attr_keys = request.form.getlist(f'attr_key_{i}[]')
+        attr_values = request.form.getlist(f'attr_value_{i}[]')
+
+        attributes={}
+        for k,v in zip(attr_keys, attr_values):
+            k = k.strip()
+            if k:
+                attributes[k] = v.strip()
+
+        if variants_name and variants_sku:
+            db.session.add(ProductVariant(
+                product_id = product.id,
+                name = variants_name,
+                sku = variants_sku,
+                attributes = attributes,
+                is_active = True,
+                is_deleted = False,
+            ))   
+        i += 1       
+
     db.session.commit()
     flash("Product saved.", "success")
 
@@ -124,3 +156,90 @@ def products_delete(p_id):
     flash("Product removed from the list (kept in database).", "success")
     return redirect(url_for('products.products_list'))
 
+@products_bp.route('/products/<int:p_id>/variants/add', methods=['POST'])
+def products_variants_add(p_id):
+    p = Product.query.get_or_404(p_id)
+
+    variant_name = (request.form.get('name') or "").strip()
+    variant_sku = (request.form.get('sku') or "").strip().upper()
+    attr_keys = request.form.getlist('attr_key[]')
+    attr_values = request.form.getlist('attr_value[]')
+
+    if not variant_name or not variant_sku:
+        return redirect(url_for('products.products_list'))
+
+    attributes = {}
+    for k, v in zip(attr_keys, attr_values):
+        k = k.strip()
+        if k:
+            attributes[k] = v.strip()
+
+    existing = ProductVariant.query.filter_by(sku=variant_sku).first()
+    if existing:
+        if existing.is_deleted:    
+            existing.is_deleted = False
+            existing.product_id = p_id
+            existing.sku = variant_sku
+            existing.name = variant_name
+            existing.attributes = attributes
+            existing.is_active = True
+            
+            db.session.commit()
+            flash("A Product Variant restored with this SKU.", "success")
+            return redirect(url_for('products.products_list'))
+
+        flash("A Product Variant with this SKU already exists.", "error")
+        return redirect(url_for('products.products_list'))        
+
+    db.session.add(ProductVariant(
+        product_id = p_id,
+        sku = variant_sku,
+        name = variant_name,
+        attributes = attributes,
+        is_active = True,
+        is_deleted = False,
+    ))
+    db.session.commit()
+    flash("Product Variant added.", "success")
+    return redirect(url_for('products.products_list'))
+
+@products_bp.route('/products/variants/edit/<int:v_id>', methods=['POST'])
+def products_variants_edit(v_id):
+    pv = ProductVariant.query.get_or_404(v_id)
+
+    variant_name = (request.form.get('name') or "").strip()
+    variant_sku = (request.form.get('sku') or "").strip().upper()
+    attr_keys = request.form.getlist('attr_key[]')
+    attr_values = request.form.getlist('attr_value[]')
+
+    if not variant_name or not variant_sku:
+        return redirect(url_for('products.products_list'))
+
+    dup = ProductVariant.query.filter(ProductVariant.sku == variant_sku, ProductVariant.id != v_id).first()
+    if dup:
+        flash("A Product Variant with this SKU already exists.", "error") 
+        return redirect(url_for('products.products_list'))
+
+    attributes = {}    
+    for k, v in zip(attr_keys, attr_values):
+        k = k.strip()
+        if k:
+            attributes[k] = v.strip()           
+
+    pv.sku = variant_sku
+    pv.name = variant_name
+    pv.attributes = attributes
+    pv.is_deleted = False
+
+    db.session.commit()
+    flash("Product Variant updated.", "success")   
+    return redirect(url_for('products.products_list'))
+
+@products_bp.route('/products/variants/delete/<int:v_id>', methods=['POST'])
+def products_variants_delete(v_id):
+    pv = ProductVariant.query.get_or_404(v_id)
+
+    pv.is_deleted = True
+    db.session.commit()
+    flash("Product Variant removed (kept in database).", "success")
+    return redirect(url_for('products.products_list'))

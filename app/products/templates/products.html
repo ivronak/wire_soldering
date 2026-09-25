@@ -3,42 +3,167 @@
 
 {% block page_css %}
 <style>
-  /* Product parent table — variants baad me */
+  /* Product (parent) + Variant (child) table — parent white, child indented grey group */
   .product-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     table-layout: fixed;
   }
   .product-table thead th {
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
-    font-size: 12.5px;
-    font-weight: 600;
+    background: #F4F6F5;
+    color: #6B7F82;
+    font-size: 11.5px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 12px 10px;
+    letter-spacing: 0.06em;
+    padding: 11px 12px;
     text-align: center;
     border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
   }
-  .product-table thead th:first-child,
-  .product-table tbody td:first-child { text-align: left; padding-left: 14px; }
-  .product-table thead th:last-child { border-right: none; }
+  .product-table thead th:first-child { text-align: left; padding-left: 14px; }
+  .product-table .cell-left { text-align: left !important; }
   .product-table tbody td {
-    padding: 10px;
+    padding: 11px 12px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E7ECEB;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .product-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .product-table tbody tr:hover { background: #FBF4EE; }
-  .product-table tbody tr.row-muted { opacity: 0.72; }
+  .product-table tbody td:first-child { text-align: left; padding-left: 12px; }
+
+  /* Parent row — hover/open pe left copper bar + soft copper bg */
+  .product-row { cursor: pointer; }
+  .product-row td:last-child { cursor: default; }
+  .product-row td { background: #FFFFFF; padding-top: 14px; padding-bottom: 14px; transition: background-color 0.12s; }
+  .product-row:hover td { background: #FCF8F4; }
+  .product-row:hover td:first-child { box-shadow: inset 3px 0 0 #E8C9A8; }
+  .product-row:has(.expand-btn.is-open) td { background: #FBF4EE; border-bottom-color: #E8C9A8; }
+  .product-row:has(.expand-btn.is-open) td:first-child { box-shadow: inset 3px 0 0 #C46B2D; }
+  .product-row.row-muted { opacity: 0.72; }
+
+  /* Row action icon buttons — ek size, tooltip title se */
+  .act-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid #D1D9D8;
+    background: #FFFFFF;
+    color: #3D5A5D;
+    transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .act-btn svg { width: 15px; height: 15px; }
+  .act-btn:hover { background: #F4F6F5; color: #0F2F32; }
+  .act-btn.act-edit { color: #8A4A1C; border-color: #E8C9A8; background: #FBF4EE; }
+  .act-btn.act-edit:hover { background: #C46B2D; border-color: #A35522; color: #FFFFFF; }
+  .act-btn.act-delete { color: #B42318; border-color: #F0C4C0; background: #FCEBEA; }
+  .act-btn.act-delete:hover { background: #B42318; border-color: #B42318; color: #FFFFFF; }
+  .act-sep { width: 1px; height: 20px; background: #E2E8E7; }
+  .act-btn.act-sm { width: 26px; height: 26px; }
+  .act-btn.act-sm svg { width: 13px; height: 13px; }
+
+  /* Child rows — halka grey group + left copper line, taaki parent ke andar dikhein */
+  .variant-row td {
+    background: #F8FAF9;
+    font-size: 13px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #EDF1F0;
+  }
+  .variant-row.variant-item td { padding-top: 10px; padding-bottom: 10px; }
+  .variant-row.variant-item:hover td { background: #F1F5F4; }
+
+  /* Tree connector — expand button ke center (≈24px) se neeche line, har variant pe branch,
+     last (Add variant) row pe rounded elbow. Sirf CSS, markup me koi extra element nahi. */
+  .variant-row td:first-child { position: relative; overflow: visible; }
+  .variant-row td:first-child::before {
+    content: '';
+    position: absolute;
+    left: 23px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #D5DDDB;
+  }
+  .variant-row.variant-item td:first-child::after {
+    content: '';
+    position: absolute;
+    left: 23px;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    background: #D5DDDB;
+  }
+  .variant-row.variant-add td:first-child::before {
+    bottom: 50%;
+    right: 0;
+    width: auto;
+    background: none;
+    border-left: 2px solid #D5DDDB;
+    border-bottom: 2px solid #D5DDDB;
+    border-bottom-left-radius: 8px;
+    margin-bottom: -1px;
+  }
+  .variant-row.variant-item:hover td:first-child::after { background: #E8C9A8; }
+  .variant-row.variant-item td:nth-child(2),
+  .variant-row.variant-add td:nth-child(2) { padding-left: 0; }
+  .variant-row.variant-head td {
+    background: #F1F4F3;
+    color: #6B7F82;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .variant-row.variant-add td {
+    padding-top: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #D1D9D8;
+  }
+  /* Attribute = label | value segmented chip — naam aur value alag dikhein */
+  .attr-chip {
+    display: inline-flex;
+    align-items: stretch;
+    margin: 3px 6px 3px 0;
+    border: 1px solid #D1D9D8;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #FFFFFF;
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .attr-chip .attr-k {
+    display: flex;
+    align-items: center;
+    padding: 5px 7px;
+    background: #EEF2F1;
+    border-right: 1px solid #D1D9D8;
+    color: #3D5A5D;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .attr-chip .attr-v {
+    display: flex;
+    align-items: center;
+    padding: 5px 9px;
+    color: #0F2F32;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .variant-row.variant-item:hover .attr-chip { border-color: #E8C9A8; }
   .search-wrap input { padding-left: 32px; }
   #product-modal.hidden, #view-modal.hidden { display: none; }
   #product-modal, #view-modal { display: flex; }
@@ -51,6 +176,10 @@
     letter-spacing: 0.04em;
     color: #6B7F82;
   }
+
+  .expand-btn svg { transition: transform 0.15s; }
+  .expand-btn.is-open { color: #8A4A1C; background: #FFFFFF; border-color: #E8C9A8; }
+  .expand-btn.is-open svg { transform: rotate(90deg); }
 </style>
 {% endblock %}
 
@@ -82,7 +211,7 @@
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Category from Product Category master · Base unit from Unit master · Variants (SKU) later
+              Category from Product Category master · Base unit from Unit master · Expand a row (▸) to view/add/edit variants
             </p>
           </details>
         </div>
@@ -90,20 +219,20 @@
         <div class="flex-1 overflow-auto min-h-0">
           <table class="product-table">
             <colgroup>
-              <col style="width:4%" />
+              <col style="width:6%" />
               <col style="width:12%" />
-              <col style="width:20%" />
-              <col style="width:14%" />
+              <col style="width:27%" />
+              <col style="width:13%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
               <col style="width:10%" />
-              <col style="width:10%" />
-              <col style="width:10%" />
-              <col style="width:20%" />
+              <col style="width:16%" />
             </colgroup>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Code</th>
-                <th>Product name</th>
+                <th class="cell-left">Code / SKU</th>
+                <th class="cell-left">Product name</th>
                 <th>Category</th>
                 <th title="From Unit Master">Base unit</th>
                 <th>HSN</th>
@@ -118,12 +247,45 @@
                   data-code="{{ p.code|lower }}"
                   data-name="{{ p.name|lower }}"
                   data-status="{% if p.is_active %}active{% else %}inactive{% endif %}">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
-                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ p.code }}</span></td>
-                <td><span class="font-medium text-ink">{{ p.name }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ p.category.name if p.category else "—" }}</td>
-                <td><span class="inline-block font-mono text-[12.5px] font-semibold text-ink bg-mist border border-slate-200 rounded px-1.5 py-0.5">{{ p.base_unit.code if p.base_unit else "—" }}</span></td>
-                <td class="text-[13px] text-ink-muted font-mono">{{ p.hsn_code or "—" }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">
+                  <div class="flex items-center gap-1.5">
+                    <button type="button"
+                      class="expand-btn inline-flex items-center justify-center w-6 h-6 shrink-0 rounded-md border border-slate-200 bg-white text-ink-faint hover:border-copper-border hover:text-copper-text focus:outline-none focus-visible:ring-1 focus-visible:ring-copper"
+                      data-target="variants-{{ p.id }}" aria-label="Show variants" title="Show / hide variants">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                    <span>{{ loop.index }}</span>
+                  </div>
+                </td>
+                <td class="cell-left"><span class="inline-block max-w-full truncate align-middle font-mono text-[12.5px] font-bold text-ink bg-mist border border-slate-200 rounded-md px-2 py-1">{{ p.code }}</span></td>
+                <td class="cell-left">
+                  <div class="flex items-center min-w-0">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="font-semibold text-ink truncate">{{ p.name }}</span>
+                        {% set vcount = p.active_variants|length %}
+                        {% if vcount %}
+                        <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/></svg>
+                          {{ vcount }} variant{{ 's' if vcount != 1 else '' }}
+                        </span>
+                        {% else %}
+                        <span class="shrink-0 inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-neutral-bg text-neutral border border-neutral-border">No variants</span>
+                        {% endif %}
+                      </div>
+                      <div class="text-[12px] text-ink-faint truncate mt-0.5">{{ p.description or "No description" }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  {% if p.category %}
+                  <span class="inline-flex items-center max-w-full truncate text-[12.5px] font-medium px-2 py-1 rounded-md bg-brand-soft text-brand-teal border border-brand-border">{{ p.category.name }}</span>
+                  {% else %}
+                  <span class="text-ink-faint">—</span>
+                  {% endif %}
+                </td>
+                <td><span class="inline-block font-mono text-[12px] font-semibold text-ink bg-white border border-slate-300 rounded-md px-2 py-0.5">{{ p.base_unit.code if p.base_unit else "—" }}</span></td>
+                <td class="text-[13px] text-ink-muted font-mono tabular-nums">{{ p.hsn_code or "—" }}</td>
                 <td class="text-center">
                   {% if p.is_active %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
@@ -136,20 +298,21 @@
                   {% endif %}
                 </td>
                 <td>
-                  <div class="flex items-center justify-center gap-2 flex-wrap">
-                    <button type="button"
-                      class="btn-view-product px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                  <div class="flex items-center justify-center gap-1.5">
+                    <button type="button" title="View details" aria-label="View details"
+                      class="btn-view-product act-btn"
                       data-code="{{ p.code }}"
                       data-name="{{ p.name }}"
                       data-category="{{ p.category.name if p.category else '' }}"
                       data-description="{{ p.description or '' }}"
                       data-base-unit="{{ p.base_unit.code if p.base_unit else '' }}"
                       data-hsn="{{ p.hsn_code or '' }}"
+                      data-id="{{ p.id }}"
                       data-tax-rate="{{ (p.tax_rate.code ~ ' — ' ~ p.tax_rate.rate_percent ~ '%') if p.tax_rate else '' }}">
-                      View
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
-                    <button type="button"
-                      class="btn-edit-product px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                    <button type="button" title="Edit product" aria-label="Edit product"
+                      class="btn-edit-product act-btn act-edit"
                       data-id="{{ p.id }}"
                       data-code="{{ p.code }}"
                       data-name="{{ p.name }}"
@@ -158,15 +321,18 @@
                       data-base-unit-id="{{ p.base_unit_id or '' }}"
                       data-hsn="{{ p.hsn_code or '' }}"
                       data-tax-rate-id="{{ p.tax_rate_id or '' }}">
-                      Edit
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
-                    <form method="post" action="{{ url_for('products.products_delete', p_id=p.id) }}" class="inline js-confirm-submit"
+                    <form method="post" action="{{ url_for('products.products_delete', p_id=p.id) }}" class="inline-flex js-confirm-submit"
                           data-confirm-title="Remove product"
                           data-confirm-ok="Remove"
                           data-confirm-message="Remove this product from the master list? It will be kept in the database but hidden.">
-                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">Delete</button>
+                      <button type="submit" title="Delete product" aria-label="Delete product" class="act-btn act-delete">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
                     </form>
-                    <form method="post" action="{{ url_for('products.products_toggle', p_id=p.id) }}" class="inline">
+                    <span class="act-sep" aria-hidden="true"></span>
+                    <form method="post" action="{{ url_for('products.products_toggle', p_id=p.id) }}" class="inline-flex">
                       <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
                         <input type="checkbox" class="toggle-input sr-only peer" {% if p.is_active %}checked{% endif %}
                                onchange="this.form.submit()">
@@ -177,10 +343,110 @@
                   </div>
                 </td>
               </tr>
+              {% if p.active_variants %}
+              <tr class="variant-row variant-head hidden" data-parent="variants-{{ p.id }}">
+                <td></td>
+                <td class="cell-left">SKU</td>
+                <td class="cell-left">Variant</td>
+                <td class="cell-left" colspan="3">Attributes</td>
+                <td>Status</td>
+                <td>Actions</td>
+              </tr>
+              {% endif %}
+              {% for v in p.active_variants %}
+              <tr class="variant-row variant-item hidden" data-parent="variants-{{ p.id }}">
+                <td></td>
+                <td class="cell-left">
+                  <span class="inline-block max-w-full font-mono text-[12px] font-semibold text-copper-text bg-copper-soft border border-copper-border rounded px-2 py-1 truncate align-middle">{{ v.sku }}</span>
+                </td>
+                <td class="cell-left text-[13.5px] text-ink font-medium truncate">{{ v.name }}</td>
+                <td class="cell-left" colspan="3">
+                  {% set attrs = v.attributes or {} %}
+                  {% if attrs %}
+                  <div class="flex flex-wrap items-center">
+                    {% for k, val in attrs.items() %}
+                    <span class="attr-chip"><span class="attr-k">{{ k }}</span><span class="attr-v">{{ val }}</span></span>
+                    {% endfor %}
+                  </div>
+                  {% else %}
+                  <span class="text-[12px] text-ink-faint">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if v.is_active %}
+                  <span class="inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-1.5 py-0.5 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-1.5 py-0.5 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-1.5">
+                    <button type="button"
+                      class="btn-edit-variant act-btn act-edit act-sm"
+                      title="Edit variant" aria-label="Edit variant"
+                      data-id="{{ v.id }}"
+                      data-name="{{ v.name }}"
+                      data-sku="{{ v.sku }}"
+                      data-attributes='{{ (v.attributes or {}) | tojson }}'>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                    <form method="post" action="/products/variants/delete/{{ v.id }}" class="inline-flex js-confirm-submit"
+                          data-confirm-title="Remove variant"
+                          data-confirm-ok="Remove"
+                          data-confirm-message="Remove this variant? It will be kept in the database but hidden.">
+                      <button type="submit" class="act-btn act-delete act-sm" title="Delete variant" aria-label="Delete variant">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+              <tr class="variant-row variant-add hidden" data-parent="variants-{{ p.id }}">
+                <td></td>
+                <td class="cell-left" colspan="7">
+                  <div class="flex items-center gap-3">
+                    <button type="button"
+                      class="btn-add-variant-to-product inline-flex items-center gap-1 px-2.5 py-1 text-[12px] font-semibold text-copper-text bg-white border border-dashed border-copper-border rounded hover:bg-copper-soft"
+                      data-product-id="{{ p.id }}">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                      Add variant
+                    </button>
+                    {% if not p.active_variants %}
+                    <span class="text-[12px] text-ink-faint">No variants yet — each variant gets its own SKU and attributes.</span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
               {% else %}
               {% endfor %}
             </tbody>
           </table>
+
+          {% for p in products %}
+          <div id="variant-summary-{{ p.id }}" class="hidden">
+            {% for v in p.active_variants %}
+            <div class="border border-slate-200 rounded-lg p-2.5 mb-2 bg-mist/40">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[13px] font-semibold text-ink">{{ v.name }}</span>
+                <span class="font-mono text-[11.5px] font-semibold text-copper-text bg-copper-soft border border-copper-border rounded px-1.5 py-0.5">{{ v.sku }}</span>
+              </div>
+              {% set attrs = v.attributes or {} %}
+              {% if attrs %}
+              <div class="flex flex-wrap mt-1.5">
+                {% for k, val in attrs.items() %}
+                <span class="attr-chip"><span class="attr-k">{{ k }}</span><span class="attr-v">{{ val }}</span></span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
 
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No products found</p>
@@ -191,7 +457,7 @@
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} products</span>
-          <span>Parent product only — SKU variants later</span>
+          <span>Expand a row (▸) to view, add or edit its variants</span>
           <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
@@ -204,7 +470,7 @@
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add product</h2>
-        <p class="text-[12.5px] text-ink-faint">Code, name, category, unit &amp; HSN</p>
+        <p class="text-[12.5px] text-ink-faint">Code, name, category, unit, tax rate &amp; HSN — plus variants when adding</p>
       </div>
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -271,6 +537,47 @@
           {% endfor %}
         </select>
       </div>
+      <div id="variant-section">
+        <hr class="border-slate-200 !my-4" />
+        <p class="form-section-title">Variants</p>
+        <p class="text-[11.5px] text-ink-faint -mt-1 mb-2">
+          Each variant is what actually gets stocked and sold — give it its own SKU and its own attributes below. (Editing an existing product? Manage its variants from the expanded row in the list instead.)
+        </p>
+
+        <div id="variant-list" class="space-y-3">
+          <div class="variant-card border border-slate-200 rounded-lg p-3 bg-mist/40" data-index="0">
+            <div class="flex items-center justify-between mb-2">
+              <span class="variant-card-label text-[11.5px] font-semibold text-ink-faint uppercase tracking-wide">Variant 1</span>
+              <button type="button" class="btn-remove-variant text-[11.5px] text-stop hover:underline hidden">Remove</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="block text-[11px] font-semibold text-ink mb-1">Variant name *</label>
+                <input type="text" name="variant_name_0" placeholder="e.g. Small / 2MM" class="variant-name w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-ink mb-1">SKU *</label>
+                <input type="text" name="variant_sku_0" placeholder="e.g. WSH-SM-2MM" class="variant-sku w-full px-2 py-1.5 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+              </div>
+            </div>
+
+            <label class="block text-[11px] font-semibold text-ink mb-1">Attributes</label>
+            <div class="grid grid-cols-2 gap-1.5 mb-1 pr-6">
+              <span class="text-[10px] text-ink-faint uppercase tracking-wide">Attribute name</span>
+              <span class="text-[10px] text-ink-faint uppercase tracking-wide">Value</span>
+            </div>
+            <div class="attribute-list space-y-1.5 mb-2">
+              <div class="attribute-row flex gap-1.5">
+                <input type="text" name="attr_key_0[]" placeholder="e.g. Size" class="attr-key w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+                <input type="text" name="attr_value_0[]" placeholder="e.g. Small" class="attr-value w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+                <button type="button" class="btn-remove-attr text-ink-faint hover:text-stop px-1" aria-label="Remove attribute">&times;</button>
+              </div>
+            </div>
+            <button type="button" class="btn-add-attr text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
+          </div>
+        </div>
+        <button type="button" id="btn-add-variant" class="mt-1 w-full px-3 py-2 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add another variant</button>
+      </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
@@ -295,6 +602,51 @@
     </div>
   </div>
 </div>
+
+<div id="variant-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="variant-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="variant-modal-title" class="relative ml-auto h-full w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="variant-modal-title" class="text-[16px] font-bold text-ink">Add variant</h2>
+        <p class="text-[12.5px] text-ink-faint">Name, SKU &amp; attributes</p>
+      </div>
+      <button type="button" id="btn-close-variant-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="variant-form" method="post" action="" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div>
+        <label for="variant-modal-name" class="block text-[12.5px] font-semibold text-ink mb-1">Variant name *</label>
+        <input type="text" id="variant-modal-name" name="name" required placeholder="e.g. Small / 2MM"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="variant-modal-sku" class="block text-[12.5px] font-semibold text-ink mb-1">SKU *</label>
+        <input type="text" id="variant-modal-sku" name="sku" required placeholder="e.g. WSH-SM-2MM"
+          class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-ink mb-1">Attributes</label>
+        <div class="grid grid-cols-2 gap-1.5 mb-1 pr-6">
+          <span class="text-[10px] text-ink-faint uppercase tracking-wide">Attribute name</span>
+          <span class="text-[10px] text-ink-faint uppercase tracking-wide">Value</span>
+        </div>
+        <div id="variant-modal-attr-list" class="attribute-list space-y-1.5 mb-2">
+          <div class="attribute-row flex gap-1.5">
+            <input type="text" name="attr_key[]" placeholder="e.g. Size" class="attr-key w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <input type="text" name="attr_value[]" placeholder="e.g. Small" class="attr-value w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <button type="button" class="btn-remove-attr text-ink-faint hover:text-stop px-1" aria-label="Remove attribute">&times;</button>
+          </div>
+        </div>
+        <button type="button" id="btn-add-variant-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-variant" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="variant-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save variant</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block page_js %}
@@ -346,6 +698,14 @@
     applyFilters();
   }
 
+  function resetVariantSection() {
+    // Extra clone kiye hue variant-cards hatao, sirf pehla wala rakho
+    var list = document.getElementById('variant-list');
+    var cards = list.querySelectorAll('.variant-card');
+    cards.forEach(function (card, i) { if (i > 0) card.remove(); });
+    renumberVariants();
+  }
+
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -357,11 +717,14 @@
     form.reset();
     if (addAction) form.action = addAction;
     modalTitle.textContent = 'Add product';
+    resetVariantSection();
   }
   function openAddModal() {
     if (addAction) form.action = addAction;
     modalTitle.textContent = 'Add product';
     form.reset();
+    resetVariantSection();
+    document.getElementById('variant-section').classList.remove('hidden');
     openModal();
   }
   function openEditModal(btn) {
@@ -376,6 +739,8 @@
     document.getElementById('product-base-unit').value = btn.getAttribute('data-base-unit-id') || '';
     document.getElementById('product-hsn').value = btn.getAttribute('data-hsn') || '';
     document.getElementById('product-tax-rate').value = btn.getAttribute('data-tax-rate-id') || '';
+    // Variants ab is bade form se edit nahi hote — expanded row se alag manage hote hain
+    document.getElementById('variant-section').classList.add('hidden');
     openModal();
   }
 
@@ -383,7 +748,12 @@
     return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
       '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
   }
+
   function openViewModal(btn) {
+    var id = btn.getAttribute('data-id');
+    var summaryEl = document.getElementById('variant-summary-' + id);
+    var variantsHtml = summaryEl ? summaryEl.innerHTML : '';
+
     document.getElementById('view-modal-subtitle').textContent =
       (btn.getAttribute('data-code') || '') + ' — ' + (btn.getAttribute('data-name') || '');
     document.getElementById('view-modal-body').innerHTML =
@@ -393,7 +763,10 @@
       viewField('HSN', btn.getAttribute('data-hsn')) +
       viewField('Tax rate', btn.getAttribute('data-tax-rate')) +
       '</div>' +
-      '<div class="pt-2">' + viewField('Description', btn.getAttribute('data-description')) + '</div>';
+      '<div class="pt-2">' + viewField('Description', btn.getAttribute('data-description')) + '</div>'+
+      '<div class="pt-3"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1">Variants</div>' +
+      (variantsHtml || '<div class="text-ink-faint text-[13px]">No variants</div>') +
+      '</div>';
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
   }
@@ -401,6 +774,104 @@
     viewModal.classList.add('hidden');
     viewModal.setAttribute('aria-hidden', 'true');
   }
+
+  // ---- Variant modal — reused for "Add variant" (existing product) aur "Edit variant" ----
+  var variantModal = document.getElementById('variant-modal');
+  var variantForm = document.getElementById('variant-form');
+  var variantModalTitle = document.getElementById('variant-modal-title');
+
+  function resetVariantModalAttrs() {
+    var list = document.getElementById('variant-modal-attr-list');
+    var rows = list.querySelectorAll('.attribute-row');
+    rows.forEach(function (row, i) { if (i > 0) row.remove(); });
+    var firstRow = list.querySelector('.attribute-row');
+    firstRow.querySelector('.attr-key').value = '';
+    firstRow.querySelector('.attr-value').value = '';
+  }
+  function openVariantModal() {
+    variantModal.classList.remove('hidden');
+    variantModal.setAttribute('aria-hidden', 'false');
+    document.getElementById('variant-modal-name').focus();
+  }
+  function closeVariantModal() {
+    variantModal.classList.add('hidden');
+    variantModal.setAttribute('aria-hidden', 'true');
+    variantForm.reset();
+    resetVariantModalAttrs();
+  }
+  function openAddVariantModal(productId) {
+    variantForm.action = '/products/' + productId + '/variants/add';
+    variantModalTitle.textContent = 'Add variant';
+    variantForm.reset();
+    resetVariantModalAttrs();
+    openVariantModal();
+  }
+  function openEditVariantModal(btn) {
+    var id = btn.getAttribute('data-id');
+    variantForm.action = '/products/variants/edit/' + id;
+    variantModalTitle.textContent = 'Edit variant';
+    document.getElementById('variant-modal-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('variant-modal-sku').value = btn.getAttribute('data-sku') || '';
+
+    resetVariantModalAttrs();
+    var attrs = JSON.parse(btn.getAttribute('data-attributes') || '{}');
+    var keys = Object.keys(attrs);
+    var list = document.getElementById('variant-modal-attr-list');
+    var firstRow = list.querySelector('.attribute-row');
+    keys.forEach(function (key, i) {
+      var row = i === 0 ? firstRow : firstRow.cloneNode(true);
+      row.querySelector('.attr-key').value = key;
+      row.querySelector('.attr-value').value = attrs[key];
+      if (i > 0) list.appendChild(row);
+    });
+    openVariantModal();
+  }
+
+  document.getElementById('btn-close-variant-modal').addEventListener('click', closeVariantModal);
+  document.getElementById('btn-cancel-variant').addEventListener('click', closeVariantModal);
+  document.getElementById('variant-modal-backdrop').addEventListener('click', closeVariantModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !variantModal.classList.contains('hidden')) closeVariantModal();
+  });
+
+  document.querySelectorAll('.btn-add-variant-to-product').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openAddVariantModal(btn.getAttribute('data-product-id'));
+    });
+  });
+  document.querySelectorAll('.btn-edit-variant').forEach(function (btn) {
+    btn.addEventListener('click', function () { openEditVariantModal(btn); });
+  });
+
+  // Variant-modal ke andar apna "+Add attribute" / remove — delegated, isi modal tak scoped
+  variantModal.addEventListener('click', function (e) {
+    var addBtn = e.target.closest('#btn-add-variant-attr');
+    if (addBtn) {
+      var list = document.getElementById('variant-modal-attr-list');
+      var newRow = list.querySelector('.attribute-row').cloneNode(true);
+      newRow.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+      list.appendChild(newRow);
+      return;
+    }
+    var removeBtn = e.target.closest('.btn-remove-attr');
+    if (removeBtn) {
+      var row = removeBtn.closest('.attribute-row');
+      var rowList = row.closest('.attribute-list');
+      if (rowList.querySelectorAll('.attribute-row').length > 1) {
+        row.remove();
+      }
+      return;
+    }
+  });
+
+  variantForm.addEventListener('submit', function (e) {
+    var vname = document.getElementById('variant-modal-name').value.trim();
+    var vsku = document.getElementById('variant-modal-sku').value.trim();
+    if (!vname || !vsku) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Variant name and SKU are required.', 'error');
+    }
+  });
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -466,6 +937,83 @@
       e.preventDefault();
       if (typeof showToast === 'function') showToast('Wire Flask Add route first (form action).', 'error');
     }
+  });
+
+  document.querySelectorAll('.expand-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var targetId = btn.getAttribute('data-target');
+      var variantRows = document.querySelectorAll('[data-parent="' + targetId + '"]');
+      var isOpening = btn.classList.toggle('is-open');
+      variantRows.forEach(function (row) { row.classList.toggle('hidden', !isOpening); });
+    });
+  });
+
+  // Poori product row pe click = variants drawer toggle.
+  // Buttons / Delete form / toggle switch pe click ignore — unka apna kaam hi chale.
+  document.querySelectorAll('.product-row').forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('button, a, input, label, form, select, textarea')) return;
+      var btn = row.querySelector('.expand-btn');
+      if (btn) btn.click();
+    });
+  });
+
+
+  document.getElementById('variant-list').addEventListener('click', function (e) {
+    var addAttrBtn = e.target.closest('.btn-add-attr');
+    if (addAttrBtn) {
+      var card = addAttrBtn.closest('.variant-card');
+      var list = card.querySelector('.attribute-list');
+      var firstRow = list.querySelector('.attribute-row');
+      var newRow = firstRow.cloneNode(true);
+      newRow.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+      list.appendChild(newRow);
+      return;
+    }
+
+    var removeAttrBtn = e.target.closest('.btn-remove-attr');
+    if (removeAttrBtn) {
+      var row = removeAttrBtn.closest('.attribute-row');
+      var rowList = row.closest('.attribute-list');
+      if (rowList.querySelectorAll('.attribute-row').length > 1) {
+        row.remove();
+      }
+      return;
+    }
+
+    var removeVariantBtn = e.target.closest('.btn-remove-variant');
+    if (removeVariantBtn) {
+      var card = removeVariantBtn.closest('.variant-card');
+      if (document.querySelectorAll('.variant-card').length > 1) {
+        card.remove();
+        renumberVariants();
+      }
+      return;
+    }
+
+  });
+
+  function renumberVariants() {
+    var cards = document.querySelectorAll('.variant-card');
+    cards.forEach(function (card, index) {
+      card.setAttribute('data-index', index);
+      card.querySelector('.variant-card-label').textContent = 'Variant ' + (index + 1);
+      card.querySelector('.variant-name').name = 'variant_name_' + index;
+      card.querySelector('.variant-sku').name = 'variant_sku_' + index;
+      card.querySelectorAll('.attr-key').forEach(function (input) { input.name = 'attr_key_' + index + '[]'; });
+      card.querySelectorAll('.attr-value').forEach(function (input) { input.name = 'attr_value_' + index + '[]'; });
+      card.querySelector('.btn-remove-variant').classList.toggle('hidden', index === 0);
+    });
+  }
+
+  document.getElementById('btn-add-variant').addEventListener('click', function () {
+    var list = document.getElementById('variant-list');
+    var newCard = list.querySelector('.variant-card').cloneNode(true);
+    newCard.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+    var attrRows = newCard.querySelectorAll('.attribute-row');
+    attrRows.forEach(function (row, i) { if (i > 0) row.remove(); });
+    list.appendChild(newCard);
+    renumberVariants();
   });
 
   searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
