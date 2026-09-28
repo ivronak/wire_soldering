@@ -143,7 +143,7 @@ class Branch(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    state = db.Column(db.String(2), nullable=False)
+    state = db.Column(db.String(50), nullable=False)
     gstin = db.Column(db.String(15), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
@@ -260,6 +260,9 @@ class PurchaseOrder(db.Model):
     expected_delivery_date = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(20), default="Draft", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
+    payment_terms = db.Column(db.String(20), nullable=True)
+
+    freight = db.Column(db.Float, default=0, nullable=False)
 
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -275,3 +278,10 @@ class PurchaseOrderLine(db.Model):
 
     ordered_qty = db.Column(db.Float, nullable=False)
     rate = db.Column(db.Float, nullable=False)
+    unit_id = db.Column(db.Integer, db.ForeignKey("units.id"), nullable=False)
+    unit = db.relationship("Unit", foreign_keys=[unit_id])
+
+    tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=False)
+    tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
+
+    discount_percent = db.Column(db.Float, default=0, nullable=False)

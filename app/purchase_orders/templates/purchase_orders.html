@@ -147,10 +147,15 @@
                       data-expected="{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else '' }}"
                       data-status="{{ o.status }}"
                       data-remarks="{{ o.remarks or '' }}"
-                      data-lines='{{ (o.lines | rejectattr("raw_material", "equalto", none) | map(attribute="raw_material.name") | list) | tojson }}'
+                      data-terms="{{ o.payment_terms or '' }}"
+                      data-freight="{{ o.freight }}"
+                      data-tax-type="{{ 'intra' if (o.vendor and o.warehouse and o.warehouse.branch and o.vendor.state == o.warehouse.branch.state) else 'inter' }}"
+                      data-lines='{{ (o.lines | map(attribute="raw_material.name") | list) | tojson }}'
                       data-qtys='{{ (o.lines | map(attribute="ordered_qty") | list) | tojson }}'
                       data-rates='{{ (o.lines | map(attribute="rate") | list) | tojson }}'
-                      data-units='{{ (o.lines | map(attribute="raw_material.base_unit.code") | list) | tojson }}'>
+                      data-units='{{ (o.lines | map(attribute="unit.code") | list) | tojson }}'
+                      data-discs='{{ (o.lines | map(attribute="discount_percent") | list) | tojson }}'
+                      data-taxpcts='{{ (o.lines | map(attribute="tax_rate.rate_percent") | list) | tojson }}'>
                       View
                     </button>
                   </div>
@@ -192,78 +197,139 @@
       <p class="form-section-title">Order info</p>
       <div class="grid grid-cols-2 gap-3">
         <div>
+          <label for="po-date" class="block text-[12.5px] font-semibold text-ink mb-1">PO date *</label>
+          <input type="date" id="po-date" name="po_date" required
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
           <label for="po-vendor" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor *</label>
           <select id="po-vendor" name="vendor_id" required
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
-            <option value="">Select vendor</option>
+            <option value="">Select vendor…</option>
             {% for v in vendors %}
-            <option value="{{ v.id }}">{{ v.code }} — {{ v.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label for="po-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Deliver to warehouse *</label>
-          <select id="po-warehouse" name="warehouse_id" required
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
-            <option value="">Select warehouse</option>
-            {% for w in warehouses %}
-            <option value="{{ w.id }}">{{ w.code }} — {{ w.name }}</option>
+            <option value="{{ v.id }}" data-state="{{ v.state or '' }}" data-terms="{{ v.payment_terms or '' }}">{{ v.code }} — {{ v.name }}</option>
             {% endfor %}
           </select>
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label for="po-date" class="block text-[12.5px] font-semibold text-ink mb-1">PO date *</label>
-          <input type="date" id="po-date" name="po_date" required
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-        </div>
-        <div>
           <label for="po-expected" class="block text-[12.5px] font-semibold text-ink mb-1">Expected delivery</label>
           <input type="date" id="po-expected" name="expected_delivery_date"
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
+        <div>
+          <label for="po-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Deliver to warehouse *</label>
+          <select id="po-warehouse" name="warehouse_id" required
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select warehouse…</option>
+            {% for w in warehouses %}
+            <option value="{{ w.id }}" data-state="{{ w.branch.state if w.branch else '' }}">{{ w.code }} — {{ w.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div>
-        <label for="po-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
-        <textarea id="po-remarks" name="remarks" rows="2" placeholder="Any notes for this order"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Tax type *</label>
+          <div id="po-tax-type" class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-mist text-ink-faint">
+            Select vendor &amp; warehouse first
+          </div>
+        </div>
+        <div>
+          <label for="po-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
+          <select id="po-terms" name="payment_terms"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="Advance">Advance</option>
+            <option value="Net 15">Net 15</option>
+            <option value="Net 30" selected>Net 30</option>
+            <option value="Net 45">Net 45</option>
+            <option value="Net 60">Net 60</option>
+          </select>
+        </div>
       </div>
 
       <hr class="border-slate-200 !my-4" />
-      <p class="form-section-title">Line items</p>
-      <p class="text-[11.5px] text-ink-faint -mt-1 mb-2">Add each raw material you're ordering, with quantity and rate.</p>
+      <div class="flex items-center justify-between">
+        <p class="form-section-title !mb-0">Line items</p>
+        <button type="button" id="btn-add-line" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add line</button>
+      </div>
 
-      <div id="po-line-list" class="space-y-2.5">
-        <div class="po-line-card border border-slate-200 rounded-lg p-3 bg-mist/40" data-index="0">
-          <div class="flex items-center justify-between mb-2">
-            <span class="line-card-label text-[11.5px] font-semibold text-ink-faint uppercase tracking-wide">Line 1</span>
-            <button type="button" class="btn-remove-line text-[11.5px] text-stop hover:underline hidden">Remove</button>
-          </div>
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <label class="block text-[11px] font-semibold text-ink mb-1">Raw material *</label>
-              <select name="material_id_0" class="line-material w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
-                <option value="">Select material</option>
-                {% for m in raw_materials %}
-                <option value="{{ m.id }}">{{ m.code }} — {{ m.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div>
-              <label class="block text-[11px] font-semibold text-ink mb-1">Qty *</label>
-              <input type="number" name="ordered_qty_0" min="0" step="0.01" placeholder="0"
-                class="line-qty w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-semibold text-ink mb-1">Rate (₹) *</label>
-              <input type="number" name="rate_0" min="0" step="0.01" placeholder="0.00"
-                class="line-rate w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-            </div>
-          </div>
+      <div class="overflow-x-auto border border-slate-200 rounded-lg mt-2">
+        <table class="w-full text-[13px]" style="min-width:760px">
+          <thead>
+            <tr class="bg-mist text-[11px] uppercase tracking-wide text-ink-faint">
+              <th class="text-left px-2 py-2">Material</th>
+              <th class="px-2 py-2" style="width:80px">Qty</th>
+              <th class="px-2 py-2" style="width:90px">Unit</th>
+              <th class="px-2 py-2" style="width:90px">Rate (₹)</th>
+              <th class="px-2 py-2" style="width:70px">Disc %</th>
+              <th class="px-2 py-2" style="width:110px">Tax %</th>
+              <th class="px-2 py-2 text-right" style="width:100px">Amount (₹)</th>
+              <th style="width:30px"></th>
+            </tr>
+          </thead>
+          <tbody id="po-line-list">
+            <tr class="po-line-row border-t border-slate-200" data-index="0">
+              <td class="px-2 py-1.5">
+                <select name="material_id_0" class="line-material w-full px-1.5 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+                  <option value="">Select material…</option>
+                  {% for m in raw_materials %}
+                  <option value="{{ m.id }}"
+                    data-desc="{{ m.description or '' }}"
+                    data-unit="{{ m.base_unit_id or '' }}"
+                    data-tax="{{ m.tax_rate_id or '' }}">{{ m.code }} — {{ m.name }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="px-1 py-1.5"><input type="number" name="ordered_qty_0" min="0" step="0.01" placeholder="0" class="line-qty w-full px-1.5 py-1.5 text-[12.5px] text-center border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" /></td>
+              <td class="px-1 py-1.5">
+                <select name="unit_id_0" class="line-unit w-full px-1 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+                  <option value="">—</option>
+                  {% for u in units %}
+                  <option value="{{ u.id }}">{{ u.code }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="px-1 py-1.5"><input type="number" name="rate_0" min="0" step="0.01" placeholder="0.00" class="line-rate w-full px-1.5 py-1.5 text-[12.5px] text-center border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" /></td>
+              <td class="px-1 py-1.5"><input type="number" name="discount_percent_0" min="0" max="100" step="0.01" value="0" class="line-disc w-full px-1.5 py-1.5 text-[12.5px] text-center border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" /></td>
+              <td class="px-1 py-1.5">
+                <select name="tax_rate_id_0" class="line-tax w-full px-1 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+                  <option value="">—</option>
+                  {% for t in tax_rates %}
+                  <option value="{{ t.id }}" data-pct="{{ t.rate_percent }}">{{ t.code }} ({{ t.rate_percent }}%)</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="px-2 py-1.5 text-right line-amount font-semibold text-ink tabular-nums">₹0.00</td>
+              <td class="px-1 py-1.5 text-center">
+                <button type="button" class="btn-remove-line text-ink-faint hover:text-stop hidden" aria-label="Remove line">&times;</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <label for="po-remarks" class="block text-[12.5px] font-semibold text-ink mb-1 mt-3">Remarks</label>
+        <textarea id="po-remarks" name="remarks" rows="2" placeholder="Delivery instructions, QC notes…"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+
+      <div class="bg-mist border border-slate-200 rounded-lg p-3 space-y-1.5 text-[13px] mt-3">
+        <div class="flex items-center justify-between text-ink-muted">
+          <span>Subtotal</span><span id="po-subtotal" class="tabular-nums">₹0.00</span>
+        </div>
+        <div id="po-tax-rows" class="text-ink-muted"></div>
+        <div class="flex items-center justify-between text-ink-muted">
+          <span>Freight (₹)</span>
+          <input type="number" id="po-freight" name="freight" min="0" step="0.01" value="0"
+            class="w-28 px-2 py-1 text-[13px] text-right border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">
+          <span>Grand total</span><span id="po-grand-total" class="tabular-nums">₹0.00</span>
         </div>
       </div>
-      <button type="button" id="btn-add-line" class="mt-1 w-full px-3 py-2 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add another line</button>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
@@ -340,15 +406,21 @@
 
   function resetLines() {
     var list = document.getElementById('po-line-list');
-    var cards = list.querySelectorAll('.po-line-card');
-    cards.forEach(function (card, i) { if (i > 0) card.remove(); });
+    var rows = list.querySelectorAll('.po-line-row');
+    rows.forEach(function (row, i) { if (i > 0) row.remove(); });
     renumberLines();
+    var firstAmount = list.querySelector('.line-amount');
+    if (firstAmount) firstAmount.textContent = '₹0.00';
+    var taxBox = document.getElementById('po-tax-type');
+    taxBox.textContent = 'Select vendor & warehouse first';
+    taxBox.className = 'w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-mist text-ink-faint';
+    calcTotals();
   }
 
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('po-vendor').focus();
+    document.getElementById('po-date').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -360,6 +432,79 @@
     form.reset();
     resetLines();
     openModal();
+  }
+
+  // ---- Line calculation (qty x rate x (1-disc%) per line, tax on top) ----
+  function calcLineAmount(row) {
+    var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
+    var rate = parseFloat(row.querySelector('.line-rate').value) || 0;
+    var disc = parseFloat(row.querySelector('.line-disc').value) || 0;
+    var amount = qty * rate * (1 - disc / 100);
+    row.querySelector('.line-amount').textContent = '₹' + amount.toFixed(2);
+    return amount;
+  }
+
+  // ---- Tax type: Vendor ka State vs Warehouse->Branch ka State compare karke ----
+  function getTaxType() {
+    var vendorOpt = document.getElementById('po-vendor').selectedOptions[0];
+    var whOpt = document.getElementById('po-warehouse').selectedOptions[0];
+    var vState = vendorOpt ? vendorOpt.getAttribute('data-state') : '';
+    var wState = whOpt ? whOpt.getAttribute('data-state') : '';
+    if (!vState || !wState) return null;
+    return (vState === wState) ? 'intra' : 'inter';
+  }
+
+  function updateTaxType() {
+    var type = getTaxType();
+    var box = document.getElementById('po-tax-type');
+    if (!type) {
+      box.textContent = 'Select vendor & warehouse first';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-mist text-ink-faint';
+    } else if (type === 'intra') {
+      box.textContent = 'Intra-state (CGST + SGST)';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-brand-border rounded bg-brand-soft text-brand-teal font-medium';
+    } else {
+      box.textContent = 'Inter-state (IGST)';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-copper-border rounded bg-copper-soft text-copper-text font-medium';
+    }
+    calcTotals();
+  }
+
+  function calcTotals() {
+    var lineRows = document.querySelectorAll('.po-line-row');
+    var subtotal = 0;
+    var totalTax = 0;
+    lineRows.forEach(function (row) {
+      var amount = calcLineAmount(row);
+      subtotal += amount;
+      var taxOpt = row.querySelector('.line-tax').selectedOptions[0];
+      var pct = taxOpt ? (parseFloat(taxOpt.getAttribute('data-pct')) || 0) : 0;
+      totalTax += amount * pct / 100;
+    });
+    var freight = parseFloat(document.getElementById('po-freight').value) || 0;
+    var type = getTaxType();
+    var taxRowsEl = document.getElementById('po-tax-rows');
+    if (type === 'inter') {
+      taxRowsEl.innerHTML = '<div class="flex items-center justify-between"><span>IGST</span><span class="tabular-nums">₹' + totalTax.toFixed(2) + '</span></div>';
+    } else {
+      var half = totalTax / 2;
+      taxRowsEl.innerHTML =
+        '<div class="flex items-center justify-between"><span>CGST</span><span class="tabular-nums">₹' + half.toFixed(2) + '</span></div>' +
+        '<div class="flex items-center justify-between"><span>SGST</span><span class="tabular-nums">₹' + half.toFixed(2) + '</span></div>';
+    }
+    document.getElementById('po-subtotal').textContent = '₹' + subtotal.toFixed(2);
+    document.getElementById('po-grand-total').textContent = '₹' + (subtotal + totalTax + freight).toFixed(2);
+  }
+
+  // ---- Material select hote hi uski Unit + Tax Rate auto-fill (Raw Material Master se) ----
+  function onMaterialChange(row) {
+    var opt = row.querySelector('.line-material').selectedOptions[0];
+    if (!opt) return;
+    var unitId = opt.getAttribute('data-unit');
+    var taxId = opt.getAttribute('data-tax');
+    if (unitId) row.querySelector('.line-unit').value = unitId;
+    if (taxId) row.querySelector('.line-tax').value = taxId;
+    calcTotals();
   }
 
   function viewField(label, value) {
@@ -374,20 +519,34 @@
     var qtys = JSON.parse(btn.getAttribute('data-qtys') || '[]');
     var rates = JSON.parse(btn.getAttribute('data-rates') || '[]');
     var units = JSON.parse(btn.getAttribute('data-units') || '[]');
+    var discs = JSON.parse(btn.getAttribute('data-discs') || '[]');
+    var taxPcts = JSON.parse(btn.getAttribute('data-taxpcts') || '[]');
+    var freight = parseFloat(btn.getAttribute('data-freight')) || 0;
+    var taxType = btn.getAttribute('data-tax-type');
+
     var linesHtml = '';
-    var grandTotal = 0;
+    var subtotal = 0;
+    var totalTax = 0;
     materials.forEach(function (name, i) {
       var qty = qtys[i] || 0;
       var rate = rates[i] || 0;
-      var lineTotal = qty * rate;
-      grandTotal += lineTotal;
+      var disc = discs[i] || 0;
+      var pct = taxPcts[i] || 0;
+      var amount = qty * rate * (1 - disc / 100);
+      subtotal += amount;
+      totalTax += amount * pct / 100;
       linesHtml += '<div class="flex items-center justify-between border-b border-slate-100 py-1.5 text-[13px]">' +
         '<span class="text-ink">' + name + '</span>' +
-        '<span class="text-ink-faint">' + qty + ' ' + (units[i] || '') + ' × ₹' + rate + '</span>' +
-        '<span class="font-semibold text-ink">₹' + lineTotal.toFixed(2) + '</span>' +
+        '<span class="text-ink-faint">' + qty + ' ' + (units[i] || '') + ' × ₹' + rate + (disc ? ' (−' + disc + '%)' : '') + ' · ' + pct + '% tax</span>' +
+        '<span class="font-semibold text-ink">₹' + amount.toFixed(2) + '</span>' +
         '</div>';
     });
     if (!linesHtml) linesHtml = '<div class="text-ink-faint text-[13px]">No line items</div>';
+
+    var taxHtml = taxType === 'inter'
+      ? '<div class="flex items-center justify-between"><span>IGST</span><span>₹' + totalTax.toFixed(2) + '</span></div>'
+      : '<div class="flex items-center justify-between"><span>CGST</span><span>₹' + (totalTax / 2).toFixed(2) + '</span></div>' +
+        '<div class="flex items-center justify-between"><span>SGST</span><span>₹' + (totalTax / 2).toFixed(2) + '</span></div>';
 
     document.getElementById('view-modal-body').innerHTML =
       '<div class="grid grid-cols-2 gap-3">' +
@@ -395,13 +554,20 @@
       viewField('Status', btn.getAttribute('data-status')) +
       viewField('PO date', btn.getAttribute('data-date')) +
       viewField('Expected delivery', btn.getAttribute('data-expected')) +
+      viewField('Payment terms', btn.getAttribute('data-terms')) +
+      viewField('Tax type', taxType === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)') +
       '</div>' +
       '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>' +
       '<div class="pt-3 border-t border-slate-200 mt-2">' +
       '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Line items</div>' +
       linesHtml +
-      '<div class="flex items-center justify-between pt-2 mt-1 border-t border-slate-200 text-[13.5px] font-bold text-ink">' +
-      '<span>Total (before tax)</span><span>₹' + grandTotal.toFixed(2) + '</span></div>' +
+      '</div>' +
+      '<div class="bg-mist border border-slate-200 rounded-lg p-3 mt-2 space-y-1 text-[13px] text-ink-muted">' +
+      '<div class="flex items-center justify-between"><span>Subtotal</span><span>₹' + subtotal.toFixed(2) + '</span></div>' +
+      taxHtml +
+      '<div class="flex items-center justify-between"><span>Freight</span><span>₹' + freight.toFixed(2) + '</span></div>' +
+      '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">' +
+      '<span>Grand total</span><span>₹' + (subtotal + totalTax + freight).toFixed(2) + '</span></div>' +
       '</div>';
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
@@ -476,35 +642,62 @@
   });
 
   function renumberLines() {
-    var cards = document.querySelectorAll('.po-line-card');
-    cards.forEach(function (card, index) {
-      card.setAttribute('data-index', index);
-      card.querySelector('.line-card-label').textContent = 'Line ' + (index + 1);
-      card.querySelector('.line-material').name = 'material_id_' + index;
-      card.querySelector('.line-qty').name = 'ordered_qty_' + index;
-      card.querySelector('.line-rate').name = 'rate_' + index;
-      card.querySelector('.btn-remove-line').classList.toggle('hidden', index === 0);
+    var lineRows = document.querySelectorAll('.po-line-row');
+    lineRows.forEach(function (row, index) {
+      row.setAttribute('data-index', index);
+      row.querySelector('.line-material').name = 'material_id_' + index;
+      row.querySelector('.line-qty').name = 'ordered_qty_' + index;
+      row.querySelector('.line-unit').name = 'unit_id_' + index;
+      row.querySelector('.line-rate').name = 'rate_' + index;
+      row.querySelector('.line-disc').name = 'discount_percent_' + index;
+      row.querySelector('.line-tax').name = 'tax_rate_id_' + index;
+      row.querySelector('.btn-remove-line').classList.toggle('hidden', index === 0);
     });
   }
 
   document.getElementById('btn-add-line').addEventListener('click', function () {
     var list = document.getElementById('po-line-list');
-    var newCard = list.querySelector('.po-line-card').cloneNode(true);
-    newCard.querySelectorAll('input, select').forEach(function (el) { el.value = ''; });
-    list.appendChild(newCard);
+    var newRow = list.querySelector('.po-line-row').cloneNode(true);
+    newRow.querySelectorAll('input, select').forEach(function (el) {
+      el.value = el.classList.contains('line-disc') ? '0' : '';
+    });
+    newRow.querySelector('.line-amount').textContent = '₹0.00';
+    list.appendChild(newRow);
     renumberLines();
   });
 
   document.getElementById('po-line-list').addEventListener('click', function (e) {
     var removeBtn = e.target.closest('.btn-remove-line');
     if (removeBtn) {
-      var card = removeBtn.closest('.po-line-card');
-      if (document.querySelectorAll('.po-line-card').length > 1) {
-        card.remove();
+      var row = removeBtn.closest('.po-line-row');
+      if (document.querySelectorAll('.po-line-row').length > 1) {
+        row.remove();
         renumberLines();
+        calcTotals();
       }
     }
   });
+  document.getElementById('po-line-list').addEventListener('input', function (e) {
+    if (e.target.classList.contains('line-qty') || e.target.classList.contains('line-rate') || e.target.classList.contains('line-disc')) {
+      calcTotals();
+    }
+  });
+  document.getElementById('po-line-list').addEventListener('change', function (e) {
+    if (e.target.classList.contains('line-material')) {
+      onMaterialChange(e.target.closest('.po-line-row'));
+    } else if (e.target.classList.contains('line-tax')) {
+      calcTotals();
+    }
+  });
+
+  document.getElementById('po-vendor').addEventListener('change', function () {
+    var opt = this.selectedOptions[0];
+    var terms = opt ? opt.getAttribute('data-terms') : '';
+    if (terms) document.getElementById('po-terms').value = terms;
+    updateTaxType();
+  });
+  document.getElementById('po-warehouse').addEventListener('change', updateTaxType);
+  document.getElementById('po-freight').addEventListener('input', calcTotals);
 
   searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
   document.querySelectorAll('.filter-btn').forEach(function (btn) {

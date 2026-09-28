@@ -1,6 +1,7 @@
 from flask import render_template, redirect, url_for, Blueprint, request, flash
 from app.models import ChartOfAccountsGroup, Ledger, Vendor
 from app.extensions import db
+from app.constants import INDIAN_STATES
 
 vendors_bp = Blueprint("vendors", __name__, template_folder="templates")
 
@@ -15,6 +16,7 @@ def vendors_list():
         total_count=total_count,
         result_count=total_count,
         active_nav="vendors",
+        states=INDIAN_STATES,
     )
 
 @vendors_bp.route('/vendors/add', methods=['POST'])

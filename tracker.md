@@ -14,11 +14,20 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** 🎉 **Phase 1 ke saare 11 backend masters complete + poori tarah test + seed ho chuke (2026-09-28)!** Claude ne ek script se saare masters ke **real Flask routes** hit kiye (test client se, raw SQL nahi — isliye Auto-Ledger/validations/restore-logic sab asli waali chali) — 65 actions (Add/Edit/Toggle/Delete jahan applicable) test kiye, **64/65 pass**. Ek real bug mila aur fix hua: [Vendor list route](app/vendors/routes.py) `@vendors_bp.route("/Vendors")` (capital "V") tha — baaki 10 masters sab lowercase — `url_for()` se app ke andar kaam kar raha tha (isliye browser me kabhi dikha nahi), lekin koi bhi hardcoded `/vendors` (lowercase) link 404 deta. Fix: lowercase kiya.
+**Abhi chal raha hai:** `Part2 / Phase2 / PurchaseOrder` — **Purchase Order List + Add complete + verified 2026-09-28**, poora mockup-jaisa UI/UX (table-based line items, live calculation, tax-type auto-detect). DB se verify: `PO-2026-001` auto-generated, header (payment_terms/freight) + line item (unit/tax/discount) sab sahi save hue.
 
-Realistic wire-harness-manufacturing (Gujarat) data seed hua sab masters me — final counts: Units 7, Work Stages 7, Machines 5, RM Categories 8 (6 visible), Raw Materials 7 (5 visible), Product Categories 5 (3 visible), Tax Rates 5, Products 6 (5 visible) + Variants 7 (6 visible), Branches 2, Warehouses 5 (RM/WIP/FG/SCRAP/QC_HOLD), Vendors 5, Customers 3, Ledgers 8, Chart-of-Accounts-Groups 2 (Sundry Creditors + Sundry Debtors). Phase 2 (Purchase Order, GRN etc.) ke dropdowns ab meaningful data se bhare hain.
+**Is module me kya-kya bana (poori tarah naya):**
+- `PurchaseOrder` (header) + `PurchaseOrderLine` (child, Product+Variant jaisa hi pattern) — 2 tables, FK chain
+- `po_no` **auto-generate** hota hai (`PO-<saal>-<seq>`) — pehli baar transaction-numbering pattern use hua (masters ke manual "code" se alag)
+- Line items: Material select karte hi Unit + Tax Rate **auto-fill** hote hain (Raw Material Master se), lekin **configurable/overridable** hain
+- **Tax type (Intra-state CGST+SGST vs Inter-state IGST) DB me store nahi hota** — Vendor.state vs Warehouse→Branch.state compare karke **live compute** hota hai (JS me bhi, aur List/View me bhi)
+- Live calculation: per-line Amount, Subtotal, CGST+SGST/IGST split, Freight, Grand total
 
-Ab **Phase 1 Wrap-up** ke baaki items (neeche checklist — git checkpoint, user ka apna browser walkthrough) ya seedha **Phase 2 (Procurement/GRN/Inward QC)** backend — user decide karega.
+**Side-fix (isi kaam ke dauraan mila aur theek kiya):** Vendor.state poora naam store karta tha ("Gujarat"), Branch.state sirf 2-digit code ("24") — compare kabhi match nahi karta. Naya shared `app/constants.py` (`INDIAN_STATES`, 36 states+UTs) banaya, **Vendor + Customer + Branch teeno** ab isi se dropdown lete hain (poora naam, consistent format). Purane 2 branches ka data (`"02"`, `"24"`) `"Gujarat"` me fix kiya.
+
+**Baaki bugs jo mile is module banate waqt (user ne khud fix kiye):** list route ka missing `units`/`tax_rates` pass; Add route ka `rate__raw` (double underscore) typo jo `rate_raw` se match nahi karta tha; **sabse important** — `commit()`/`flash()`/`return` galti se `while` loop ke andar the (isliye sirf pehla line-item hi save hota, baaki silently chhoot jaate) — ab loop ke bahar, sab lines save hoti hain.
+
+Ab decide karna hai: **Purchase Order me Edit + status-transition (Draft→Open) add karein**, ya seedha **agla Phase 2 module — Gate Inward/GRN** shuru karein.
 
 ⚠️ **Yaad rakhna (pending, koi bhi naya FK/master banate waqt):** `naming_convention` wala permanent fix (`app/extensions.py` me `db = SQLAlchemy()` ko `MetaData(naming_convention=...)` ke saath banana) abhi tak nahi kiya. Ab tak koi bhi FK migration is issue me nahi phansi (Vendor/Customer/Ledger/Group sab naye tables the) — Phase 2 me existing table pe naya FK aaya to yaad dilana.
 
@@ -33,7 +42,7 @@ Done abhi: Tax Rate Master CRUD complete 2026-09-23. Flask-Migrate setup complet
 |---|---|---|
 | 0 | Foundation, Auth & Multi-Tenancy | ⬜ Not Started |
 | 1 | Master Data Management & Dynamic Attributes | 🟡 In Progress (9 masters mocked: Unit/Machine/Vendor/Customer/Raw Material/Product/Warehouse/RM Category/Product Category) |
-| 2 | Procurement, GRN & Inward QC | 🟡 In Progress (mockups 5/5 built + verified) |
+| 2 | Procurement, GRN & Inward QC | 🟡 In Progress (mockups 5/5 built + verified; backend: Purchase Order List+Add done 2026-09-28) |
 | 3 | Inventory, Warehouse & Stock Valuation | 🟡 In Progress (stock mockups 4/4 + Warehouse Master mock added) |
 | 4 | Manufacturing Engine, BOM, Routing & WIP | 🟡 In Progress (mockups 6/6 built) |
 | 5 | Lab/QC & Finished Goods Traceability | ⬜ Not Started |

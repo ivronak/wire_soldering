@@ -102,7 +102,6 @@ def products_add():
 
     db.session.commit()
     flash("Product saved.", "success")
-
     return redirect(url_for('products.products_list'))
 
 @products_bp.route('/products/toggle/<int:p_id>', methods=['POST'])

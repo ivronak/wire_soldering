@@ -262,9 +262,14 @@
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label for="new-branch-state" class="block text-[11.5px] font-semibold text-ink mb-0.5">State code</label>
-              <input type="text" id="new-branch-state" placeholder="24" maxlength="2" autocomplete="off"
-                class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              <label for="new-branch-state" class="block text-[11.5px] font-semibold text-ink mb-0.5">State</label>
+              <select id="new-branch-state"
+                class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+                <option value="">Select state…</option>
+                {% for s in states %}
+                <option value="{{ s }}"{% if s == "Gujarat" %} selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div>
               <label for="new-branch-gstin" class="block text-[11.5px] font-semibold text-ink mb-0.5">GSTIN</label>

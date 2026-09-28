@@ -1,6 +1,7 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash
 from app.models import Customer, Ledger, ChartOfAccountsGroup
 from app.extensions import db
+from app.constants import INDIAN_STATES
 
 customers_bp = Blueprint("customers", __name__, template_folder='templates')
 
@@ -15,6 +16,7 @@ def customers_list():
         active_nav="customers",
         total_count=total_count,
         result_count=total_count,
+        states=INDIAN_STATES,
     )
 
 @customers_bp.route('/customers/add', methods=['POST'])

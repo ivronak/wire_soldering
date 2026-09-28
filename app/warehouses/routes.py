@@ -1,6 +1,7 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
 from app.extensions import db
 from app.models import Warehouse, Branch
+from app.constants import INDIAN_STATES
 
 warehouses_bp = Blueprint("warehouses", __name__, template_folder="templates" )
 
@@ -16,6 +17,7 @@ def warehouses_list():
         total_count=total_count,
         result_count=total_count,
         active_nav = "warehouses",
+        states=INDIAN_STATES,
     )
 
 @warehouses_bp.route('/warehouses/branches/add', methods=['POST'])
