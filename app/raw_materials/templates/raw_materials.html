@@ -169,6 +169,7 @@
                       data-min-stock="{{ m.min_stock if m.min_stock is not none else '' }}"
                       data-max-stock="{{ m.max_stock if m.max_stock is not none else '' }}"
                       data-hsn="{{ m.hsn_code or '' }}"
+                      data-tax-rate="{{ m.tax_rate_id or '' }}"
                       data-valuation="{{ m.valuation_method or 'fifo' }}">
                       Edit
                     </button>
@@ -323,6 +324,19 @@
           </select>
         </div>
       </div>
+      <div>
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <label for="rm-tax-rate" class="text-[12.5px] font-semibold text-ink">Tax rate</label>
+          <a href="{{ url_for('tax_rates.tax_rates_list') }}" class="text-[12px] font-semibold text-copper-text hover:underline">Manage tax rates →</a>
+        </div>
+        <select id="rm-tax-rate" name="tax_rate_id"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="">Select tax rate</option>
+          {% for t in tax_rates %}
+          <option value="{{ t.id }}">{{ t.code }} — {{ t.rate_percent }}%</option>
+          {% endfor %}
+        </select>
+      </div>
       <p class="text-[11.5px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">
         No price field here — the rate is entered every time on the Purchase Invoice.
       </p>
@@ -435,6 +449,7 @@
     document.getElementById('rm-min-stock').value = btn.getAttribute('data-min-stock') || '';
     document.getElementById('rm-max-stock').value = btn.getAttribute('data-max-stock') || '';
     document.getElementById('rm-hsn').value = btn.getAttribute('data-hsn') || '';
+    document.getElementById('rm-tax-rate').value = btn.getAttribute('data-tax-rate') || '';
     document.getElementById('rm-valuation').value = btn.getAttribute('data-valuation') || 'fifo';
     openModal();
   }

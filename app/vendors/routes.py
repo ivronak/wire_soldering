@@ -4,7 +4,7 @@ from app.extensions import db
 
 vendors_bp = Blueprint("vendors", __name__, template_folder="templates")
 
-@vendors_bp.route("/Vendors")
+@vendors_bp.route("/vendors")
 def vendors_list():
     vendors = Vendor.query.filter(Vendor.is_deleted == False).order_by(Vendor.code).all()
     total_count = len(vendors)

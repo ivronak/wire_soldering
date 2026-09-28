@@ -12,6 +12,7 @@ from app.products.routes import products_bp
 from app.warehouses.routes import warehouses_bp
 from app.vendors.routes import vendors_bp
 from app.customers.routes import customers_bp
+from app.purchase_orders.routes import purchase_orders_bp
 from app.extensions import db, migrate
 
 
@@ -44,6 +45,7 @@ def create_app():
     app.register_blueprint(warehouses_bp)
     app.register_blueprint(vendors_bp)
     app.register_blueprint(customers_bp)
+    app.register_blueprint(purchase_orders_bp)
     
 
     @app.route("/")

@@ -58,10 +58,12 @@ class RawMaterial(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('rm_categories.id'), nullable=False)
     base_unit_id = db.Column(db.Integer, db.ForeignKey('units.id'), nullable=False)
     alt_unit_id = db.Column(db.Integer, db.ForeignKey('units.id'), nullable=True)
+    tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=True)
 
     category = db.relationship("RmCategories", foreign_keys=[category_id])
     base_unit = db.relationship("Unit", foreign_keys=[base_unit_id])
     alt_unit = db.relationship("Unit", foreign_keys=[alt_unit_id])
+    tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
 
     conversion_note = db.Column(db.String(100), nullable=True)
     reorder_level = db.Column(db.Integer, nullable=True)
@@ -241,3 +243,35 @@ class Customer(db.Model):
 
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class PurchaseOrder(db.Model):
+    __tablename__ = "purchase_orders"
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=False)
+    vendor = db.relationship("Vendor", foreign_keys=[vendor_id])
+
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
+
+    po_date = db.Column(db.Date, nullable=False)
+    expected_delivery_date = db.Column(db.Date, nullable=True)
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class PurchaseOrderLine(db.Model):
+    __tablename__ = "purchase_order_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_id = db.Column(db.Integer, db.ForeignKey("purchase_orders.id"), nullable=False)
+    po = db.relationship("PurchaseOrder", foreign_keys=[po_id], backref="lines")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+
+    ordered_qty = db.Column(db.Float, nullable=False)
+    rate = db.Column(db.Float, nullable=False)

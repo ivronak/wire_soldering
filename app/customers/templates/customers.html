@@ -187,7 +187,7 @@
                       Edit
                     </button>
                     {# TODO: Toggle route banne ke baad yahan action me url_for lagao #}
-                    <form method="post" action="#" class="inline">
+                    <form method="post" action="{{url_for('customers.customers_toggle', c_id=c.id)}}" class="inline">
                       <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
                         <input type="checkbox" class="toggle-input sr-only peer" {% if c.is_active %}checked{% endif %}
                                onchange="this.form.submit()">
@@ -231,7 +231,7 @@
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
     {# TODO: Add route banne ke baad action me url_for lagao #}
-    <form id="customer-form" method="post" action="#" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+    <form id="customer-form" method="post" action="{{url_for('customers.customers_add')}}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
       <p class="form-section-title">Basic info</p>
       <div class="grid grid-cols-2 gap-3">
         <div>
@@ -388,7 +388,7 @@
   var FILTER_KEY = 'erp.customers.statusFilter';
   var SEARCH_KEY = 'erp.customers.searchQ';
   // TODO: Add route banne ke baad yahan Add route ka url_for lagao — Edit ke baad form wapas Add pe isi se aata hai
-  var addAction = '';
+  var addAction = '{{url_for("customers.customers_add")}}';
 
   function saveActiveFilter() {
     try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
@@ -443,6 +443,7 @@
   function openEditModal(btn) {
     var id = btn.getAttribute('data-id');
     // TODO: Edit route banne ke baad yahan form.action = '/customers/edit/' + id jaisa set karo
+    form.action = '/customers/edit/'+id
     modalTitle.textContent = 'Edit customer';
     document.getElementById('customer-code').value = btn.getAttribute('data-code') || '';
     document.getElementById('customer-name').value = btn.getAttribute('data-name') || '';

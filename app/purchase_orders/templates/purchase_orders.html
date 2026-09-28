@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+{% block title %}Purchase Orders{% endblock %}
+
+{% block page_css %}
+<style>
+  .po-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .po-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 14px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .po-table thead th:first-child,
+  .po-table tbody td:first-child { text-align: left; padding-left: 18px; }
+  .po-table thead th:last-child { border-right: none; }
+  .po-table tbody td {
+    padding: 11px 14px;
+    font-size: 14px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .po-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .po-table tbody tr:hover { background: #FBF4EE; }
+  .search-wrap input { padding-left: 32px; }
+  #po-modal.hidden, #view-modal.hidden { display: none; }
+  #po-modal, #view-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6B7F82;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid;
+  }
+  .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .status-open { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .status-partial { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .status-closed { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .status-cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Purchase Orders</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Purchase Orders</h1>
+        </div>
+        <button type="button" id="btn-add-po"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          New purchase order
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-po" placeholder="Search PO no. or vendor…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex items-center gap-1 flex-wrap">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (0)</button>
+            <button type="button" data-filter="open" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Open (0)</button>
+            <button type="button" data-filter="partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (0)</button>
+            <button type="button" data-filter="closed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Closed (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
+              PO number auto-generates · Add one or more raw materials as line items · Click View for full line-item detail
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="po-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:14%" />
+              <col style="width:20%" />
+              <col style="width:13%" />
+              <col style="width:13%" />
+              <col style="width:15%" />
+              <col style="width:10%" />
+              <col style="width:11%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>PO no.</th>
+                <th>Vendor</th>
+                <th>PO date</th>
+                <th>Expected</th>
+                <th>Warehouse</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="po-tbody">
+              {# Flask: purchase_orders list pass karega #}
+              {% for o in orders %}
+              <tr class="po-row"
+                  data-po="{{ o.po_no|lower }}"
+                  data-vendor="{{ o.vendor.name|lower if o.vendor else '' }}"
+                  data-status="{{ o.status|lower }}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ o.po_no }}</span></td>
+                <td class="text-left"><span class="font-medium text-ink">{{ o.vendor.name if o.vendor else "—" }}</span></td>
+                <td class="text-[13px] text-ink-muted">{{ o.po_date.strftime('%d-%b-%Y') if o.po_date else "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ o.warehouse.name if o.warehouse else "—" }}</td>
+                <td class="text-center">
+                  <span class="status-pill status-{{ o.status|lower }}">{{ o.status }}</span>
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button"
+                      class="btn-view-po px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                      data-po="{{ o.po_no }}"
+                      data-vendor="{{ o.vendor.name if o.vendor else '' }}"
+                      data-warehouse="{{ o.warehouse.name if o.warehouse else '' }}"
+                      data-date="{{ o.po_date.strftime('%d-%b-%Y') if o.po_date else '' }}"
+                      data-expected="{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else '' }}"
+                      data-status="{{ o.status }}"
+                      data-remarks="{{ o.remarks or '' }}"
+                      data-lines='{{ (o.lines | rejectattr("raw_material", "equalto", none) | map(attribute="raw_material.name") | list) | tojson }}'
+                      data-qtys='{{ (o.lines | map(attribute="ordered_qty") | list) | tojson }}'
+                      data-rates='{{ (o.lines | map(attribute="rate") | list) | tojson }}'
+                      data-units='{{ (o.lines | map(attribute="raw_material.base_unit.code") | list) | tojson }}'>
+                      View
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {# list khali — empty-state JS/HTML #}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No purchase orders found</p>
+            <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or create a new purchase order.</p>
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ New purchase order</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} purchase orders</span>
+          <span>PO number auto-generated on save</span>
+          <span class="text-ink-muted">Page 1 · Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="po-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="modal-title" class="text-[16px] font-bold text-ink">New purchase order</h2>
+        <p class="text-[12.5px] text-ink-faint">PO number auto-generates on save</p>
+      </div>
+      <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="po-form" method="post" action="{{ url_for('purchase_orders.purchase_orders_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <p class="form-section-title">Order info</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="po-vendor" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor *</label>
+          <select id="po-vendor" name="vendor_id" required
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select vendor</option>
+            {% for v in vendors %}
+            <option value="{{ v.id }}">{{ v.code }} — {{ v.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="po-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Deliver to warehouse *</label>
+          <select id="po-warehouse" name="warehouse_id" required
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select warehouse</option>
+            {% for w in warehouses %}
+            <option value="{{ w.id }}">{{ w.code }} — {{ w.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="po-date" class="block text-[12.5px] font-semibold text-ink mb-1">PO date *</label>
+          <input type="date" id="po-date" name="po_date" required
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="po-expected" class="block text-[12.5px] font-semibold text-ink mb-1">Expected delivery</label>
+          <input type="date" id="po-expected" name="expected_delivery_date"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div>
+        <label for="po-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+        <textarea id="po-remarks" name="remarks" rows="2" placeholder="Any notes for this order"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+
+      <hr class="border-slate-200 !my-4" />
+      <p class="form-section-title">Line items</p>
+      <p class="text-[11.5px] text-ink-faint -mt-1 mb-2">Add each raw material you're ordering, with quantity and rate.</p>
+
+      <div id="po-line-list" class="space-y-2.5">
+        <div class="po-line-card border border-slate-200 rounded-lg p-3 bg-mist/40" data-index="0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="line-card-label text-[11.5px] font-semibold text-ink-faint uppercase tracking-wide">Line 1</span>
+            <button type="button" class="btn-remove-line text-[11.5px] text-stop hover:underline hidden">Remove</button>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-[11px] font-semibold text-ink mb-1">Raw material *</label>
+              <select name="material_id_0" class="line-material w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+                <option value="">Select material</option>
+                {% for m in raw_materials %}
+                <option value="{{ m.id }}">{{ m.code }} — {{ m.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-ink mb-1">Qty *</label>
+              <input type="number" name="ordered_qty_0" min="0" step="0.01" placeholder="0"
+                class="line-qty w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-ink mb-1">Rate (₹) *</label>
+              <input type="number" name="rate_0" min="0" step="0.01" placeholder="0.00"
+                class="line-rate w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="btn-add-line" class="mt-1 w-full px-3 py-2 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add another line</button>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="po-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save purchase order</button>
+    </div>
+  </div>
+</div>
+
+<div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Purchase order details</h2>
+        <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="view-modal-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var modal = document.getElementById('po-modal');
+  var viewModal = document.getElementById('view-modal');
+  var form = document.getElementById('po-form');
+  var searchInput = document.getElementById('search-po');
+  var rows = Array.from(document.querySelectorAll('.po-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.po-table');
+  var modalTitle = document.getElementById('modal-title');
+  var activeFilter = 'all';
+  var FILTER_KEY = 'erp.po.statusFilter';
+  var SEARCH_KEY = 'erp.po.searchQ';
+  var addAction = "{{ url_for('purchase_orders.purchase_orders_add') }}";
+
+  function saveActiveFilter() {
+    try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
+  }
+  function saveSearchQ() {
+    try { sessionStorage.setItem(SEARCH_KEY, searchInput.value || ''); } catch (e) {}
+  }
+  function applyFilterButtonStyles(btn) {
+    document.querySelectorAll('.filter-btn').forEach(function (b) {
+      var on = b === btn;
+      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-copper', on);
+      b.classList.toggle('font-semibold', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-ink', !on);
+      b.classList.toggle('border-slate-300', !on);
+    });
+  }
+  function restoreListState() {
+    var savedQ = null, savedFilter = null;
+    try {
+      savedQ = sessionStorage.getItem(SEARCH_KEY);
+      savedFilter = sessionStorage.getItem(FILTER_KEY);
+    } catch (e) {}
+    if (savedQ !== null) searchInput.value = savedQ;
+    if (savedFilter) {
+      var btn = document.querySelector('.filter-btn[data-filter="' + savedFilter + '"]');
+      if (btn) { activeFilter = savedFilter; applyFilterButtonStyles(btn); }
+    }
+    applyFilters();
+  }
+
+  function resetLines() {
+    var list = document.getElementById('po-line-list');
+    var cards = list.querySelectorAll('.po-line-card');
+    cards.forEach(function (card, i) { if (i > 0) card.remove(); });
+    renumberLines();
+  }
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('po-vendor').focus();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    form.reset();
+    resetLines();
+  }
+  function openAddModal() {
+    form.reset();
+    resetLines();
+    openModal();
+  }
+
+  function viewField(label, value) {
+    return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+  }
+  function openViewModal(btn) {
+    document.getElementById('view-modal-subtitle').textContent =
+      (btn.getAttribute('data-po') || '') + ' — ' + (btn.getAttribute('data-vendor') || '');
+
+    var materials = JSON.parse(btn.getAttribute('data-lines') || '[]');
+    var qtys = JSON.parse(btn.getAttribute('data-qtys') || '[]');
+    var rates = JSON.parse(btn.getAttribute('data-rates') || '[]');
+    var units = JSON.parse(btn.getAttribute('data-units') || '[]');
+    var linesHtml = '';
+    var grandTotal = 0;
+    materials.forEach(function (name, i) {
+      var qty = qtys[i] || 0;
+      var rate = rates[i] || 0;
+      var lineTotal = qty * rate;
+      grandTotal += lineTotal;
+      linesHtml += '<div class="flex items-center justify-between border-b border-slate-100 py-1.5 text-[13px]">' +
+        '<span class="text-ink">' + name + '</span>' +
+        '<span class="text-ink-faint">' + qty + ' ' + (units[i] || '') + ' × ₹' + rate + '</span>' +
+        '<span class="font-semibold text-ink">₹' + lineTotal.toFixed(2) + '</span>' +
+        '</div>';
+    });
+    if (!linesHtml) linesHtml = '<div class="text-ink-faint text-[13px]">No line items</div>';
+
+    document.getElementById('view-modal-body').innerHTML =
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Warehouse', btn.getAttribute('data-warehouse')) +
+      viewField('Status', btn.getAttribute('data-status')) +
+      viewField('PO date', btn.getAttribute('data-date')) +
+      viewField('Expected delivery', btn.getAttribute('data-expected')) +
+      '</div>' +
+      '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>' +
+      '<div class="pt-3 border-t border-slate-200 mt-2">' +
+      '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Line items</div>' +
+      linesHtml +
+      '<div class="flex items-center justify-between pt-2 mt-1 border-t border-slate-200 text-[13.5px] font-bold text-ink">' +
+      '<span>Total (before tax)</span><span>₹' + grandTotal.toFixed(2) + '</span></div>' +
+      '</div>';
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeViewModal() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var po = row.getAttribute('data-po') || '';
+      var vendor = row.getAttribute('data-vendor') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || po.indexOf(q) !== -1 || vendor.indexOf(q) !== -1) &&
+        (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' purchase orders';
+  }
+  function updateFilterCounts() {
+    var counts = { draft: 0, open: 0, partial: 0, closed: 0 };
+    rows.forEach(function (row) {
+      var s = row.getAttribute('data-status');
+      if (counts[s] !== undefined) counts[s] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="draft"]').textContent = 'Draft (' + counts.draft + ')';
+    document.querySelector('[data-filter="open"]').textContent = 'Open (' + counts.open + ')';
+    document.querySelector('[data-filter="partial"]').textContent = 'Partial (' + counts.partial + ')';
+    document.querySelector('[data-filter="closed"]').textContent = 'Closed (' + counts.closed + ')';
+  }
+
+  document.getElementById('btn-add-po').addEventListener('click', openAddModal);
+  var emptyAdd = document.getElementById('btn-empty-add');
+  if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
+  document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
+  document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!viewModal.classList.contains('hidden')) closeViewModal();
+    else if (!modal.classList.contains('hidden')) closeModal();
+  });
+  document.querySelectorAll('.btn-view-po').forEach(function (btn) {
+    btn.addEventListener('click', function () { openViewModal(btn); });
+  });
+
+  form.addEventListener('submit', function (e) {
+    var vendor = document.getElementById('po-vendor').value;
+    var warehouse = document.getElementById('po-warehouse').value;
+    var date = document.getElementById('po-date').value;
+    if (!vendor || !warehouse || !date) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Vendor, Warehouse and PO date are required.', 'error');
+      return;
+    }
+    var firstMaterial = document.querySelector('.line-material').value;
+    if (!firstMaterial) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Add at least one line item.', 'error');
+    }
+  });
+
+  function renumberLines() {
+    var cards = document.querySelectorAll('.po-line-card');
+    cards.forEach(function (card, index) {
+      card.setAttribute('data-index', index);
+      card.querySelector('.line-card-label').textContent = 'Line ' + (index + 1);
+      card.querySelector('.line-material').name = 'material_id_' + index;
+      card.querySelector('.line-qty').name = 'ordered_qty_' + index;
+      card.querySelector('.line-rate').name = 'rate_' + index;
+      card.querySelector('.btn-remove-line').classList.toggle('hidden', index === 0);
+    });
+  }
+
+  document.getElementById('btn-add-line').addEventListener('click', function () {
+    var list = document.getElementById('po-line-list');
+    var newCard = list.querySelector('.po-line-card').cloneNode(true);
+    newCard.querySelectorAll('input, select').forEach(function (el) { el.value = ''; });
+    list.appendChild(newCard);
+    renumberLines();
+  });
+
+  document.getElementById('po-line-list').addEventListener('click', function (e) {
+    var removeBtn = e.target.closest('.btn-remove-line');
+    if (removeBtn) {
+      var card = removeBtn.closest('.po-line-card');
+      if (document.querySelectorAll('.po-line-card').length > 1) {
+        card.remove();
+        renumberLines();
+      }
+    }
+  });
+
+  searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      saveActiveFilter();
+      applyFilterButtonStyles(btn);
+      applyFilters();
+    });
+  });
+  updateFilterCounts();
+  restoreListState();
+</script>
+{% endblock %}

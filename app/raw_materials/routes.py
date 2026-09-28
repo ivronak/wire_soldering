@@ -1,5 +1,5 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash
-from app.models import RawMaterial, RmCategories, Unit
+from app.models import RawMaterial, RmCategories, Unit, TaxRate
 from app.extensions import db
 
 raw_materials_bp = Blueprint("raw_materials", __name__, template_folder='templates')
@@ -11,12 +11,15 @@ def raw_materials_list():
 
     units = Unit.query.filter(Unit.is_active == True, Unit.is_deleted == False).all()
     categories = RmCategories.query.filter(RmCategories.is_active == True, RmCategories.is_deleted == False).all()
+    tax_rates = TaxRate.query.filter(TaxRate.is_active == True, TaxRate.is_deleted == False).all()
+
 
     return render_template(
         "raw_materials.html",
         materials = materials,
         units = units,
         categories = categories,
+        tax_rates=tax_rates,
         active_nav = 'raw_materials',
         total_count = total_count,
         result_count = total_count,
@@ -36,6 +39,7 @@ def raw_materials_add():
     min_stock = int(request.form.get('min_stock')) if (request.form.get('min_stock') or "").strip() else None
     max_stock = int(request.form.get('max_stock')) if (request.form.get('max_stock') or "").strip() else None
     hsn_code = (request.form.get('hsn_code') or "").strip()
+    tax_rate_id = int(request.form.get('tax_rate_id')) if (request.form.get('tax_rate_id') or "").strip() else None
     valuation_method = (request.form.get('valuation_method') or "").strip()
 
     if not code or not name or category_id is None or base_unit_id is None:
@@ -55,6 +59,7 @@ def raw_materials_add():
             existing.min_stock = min_stock
             existing.max_stock = max_stock
             existing.hsn_code = hsn_code
+            existing.tax_rate_id=tax_rate_id
             existing.valuation_method = valuation_method
             existing.is_active = True
             db.session.commit()
@@ -77,6 +82,7 @@ def raw_materials_add():
         min_stock=min_stock,
         max_stock=max_stock,
         hsn_code=hsn_code,
+        tax_rate_id=tax_rate_id,
         valuation_method=valuation_method,
         is_active=True,
         is_deleted=False,
@@ -111,6 +117,7 @@ def raw_materials_edit(m_id):
     min_stock = int(request.form.get('min_stock')) if (request.form.get('min_stock') or "").strip() else None
     max_stock = int(request.form.get('max_stock')) if (request.form.get('max_stock') or "").strip() else None
     hsn_code = (request.form.get('hsn_code') or "").strip()
+    tax_rate_id = int(request.form.get('tax_rate_id')) if (request.form.get('tax_rate_id') or "").strip() else None
     valuation_method = (request.form.get('valuation_method') or "").strip()
 
     if not code or not name or category_id is None or base_unit_id is None:
@@ -132,6 +139,7 @@ def raw_materials_edit(m_id):
     m.min_stock = min_stock
     m.max_stock = max_stock
     m.hsn_code = hsn_code
+    m.tax_rate_id=tax_rate_id
     m.valuation_method = valuation_method
     m.is_deleted = False
 

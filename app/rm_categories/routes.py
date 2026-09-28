@@ -16,7 +16,7 @@ def rm_categories_list():
         ))
         db.session.commit()
 
-    categories = RmCategories.query.filter(RmCategories.is_deleted == False).all()
+    categories = RmCategories.query.filter(RmCategories.is_deleted == False).order_by(RmCategories.code).all()
     total_count = len(categories)
     return render_template(
         'rm_categories.html',
