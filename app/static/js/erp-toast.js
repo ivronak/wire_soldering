@@ -40,15 +40,28 @@
         '#erp-confirm-root.is-open{display:flex;}',
         '.erp-confirm__backdrop{position:absolute;inset:0;background:rgba(15,47,50,0.4);}',
         '.erp-confirm__panel{position:relative;width:100%;max-width:22rem;border-radius:10px;border:1px solid #FBD9A5;background:#FEF3E2;box-shadow:0 16px 40px rgba(15,47,50,0.18);padding:1rem 1.05rem;animation:erpToastIn 0.22s ease-out;}',
+        '.erp-confirm__panel--wide{max-width:26rem;}',
         '.erp-confirm__top{display:flex;align-items:flex-start;gap:0.65rem;}',
         '.erp-confirm__title{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:#B45309;margin-bottom:4px;}',
         '.erp-confirm__msg{font-size:13.5px;line-height:1.45;color:#1C2B2D;white-space:pre-line;}',
+        '.erp-confirm__msg p{margin:0 0 0.55rem;}',
+        '.erp-confirm__msg p:last-child{margin-bottom:0;}',
+        '.erp-confirm__card{background:#fff;border:1px solid #FBD9A5;border-radius:8px;padding:0.7rem 0.8rem;margin:0.55rem 0;}',
+        '.erp-confirm__card-title{font-weight:600;font-size:13.5px;color:#0F2F32;margin-bottom:0.45rem;}',
+        '.erp-confirm__card-code{font-weight:500;font-size:11.5px;color:#6B7F82;font-family:ui-monospace,monospace;}',
+        '.erp-confirm__row{display:flex;justify-content:space-between;gap:0.75rem;font-size:13px;padding:0.15rem 0;color:#3D5A5D;}',
+        '.erp-confirm__row strong{color:#0F2F32;font-variant-numeric:tabular-nums;}',
+        '.erp-confirm__row--warn{color:#B45309;font-weight:600;}',
+        '.erp-confirm__row--warn strong{color:#B45309;}',
+        '.erp-confirm__hint{font-size:12.5px;color:#6B7F82;line-height:1.4;margin-top:0.35rem;}',
         '.erp-confirm__actions{display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;}',
         '.erp-confirm__btn{font-size:13.5px;font-weight:600;padding:0.45rem 0.85rem;border-radius:6px;border:1px solid;cursor:pointer;font-family:inherit;}',
         '.erp-confirm__btn--cancel{background:#fff;border-color:#CBD5E1;color:#3D5A5D;}',
         '.erp-confirm__btn--cancel:hover{background:#F4F6F5;}',
         '.erp-confirm__btn--ok{background:#B42318;border-color:#912018;color:#fff;}',
-        '.erp-confirm__btn--ok:hover{background:#912018;}'
+        '.erp-confirm__btn--ok:hover{background:#912018;}',
+        '.erp-confirm__btn--ok.erp-confirm__btn--warning{background:#C46B2D;border-color:#A35522;}',
+        '.erp-confirm__btn--ok.erp-confirm__btn--warning:hover{background:#A35522;}'
       ].join('');
       document.head.appendChild(style);
     }
@@ -117,7 +130,8 @@
 
   /**
    * Toast-style confirm (browser confirm() ki jagah).
-   * options: { title, confirmText, cancelText }
+   * options: { title, confirmText, cancelText, variant: 'danger'|'warning', wide, html }
+   * html:true → message ko HTML maan lo (sirf trusted/app-built HTML)
    * Returns Promise<boolean>
    */
   window.showConfirm = function (message, options) {
@@ -135,10 +149,10 @@
       root.setAttribute('aria-modal', 'true');
       root.innerHTML =
         '<div class="erp-confirm__backdrop" data-erp-confirm="cancel"></div>' +
-        '<div class="erp-confirm__panel">' +
+        '<div class="erp-confirm__panel' + (options.wide ? ' erp-confirm__panel--wide' : '') + '">' +
           '<div class="erp-confirm__top">' +
             ICONS.warning +
-            '<div>' +
+            '<div style="min-width:0;flex:1">' +
               '<div class="erp-confirm__title"></div>' +
               '<div class="erp-confirm__msg"></div>' +
             '</div>' +
@@ -150,9 +164,19 @@
         '</div>';
 
       root.querySelector('.erp-confirm__title').textContent = options.title || 'Please confirm';
-      root.querySelector('.erp-confirm__msg').textContent = message == null ? '' : String(message);
+      var msgEl = root.querySelector('.erp-confirm__msg');
+      if (options.html) {
+        msgEl.style.whiteSpace = 'normal';
+        msgEl.innerHTML = message == null ? '' : String(message);
+      } else {
+        msgEl.textContent = message == null ? '' : String(message);
+      }
       root.querySelector('[data-erp-confirm="cancel"].erp-confirm__btn').textContent = options.cancelText || 'Cancel';
-      root.querySelector('[data-erp-confirm="ok"]').textContent = options.confirmText || 'Confirm';
+      var okBtn = root.querySelector('[data-erp-confirm="ok"]');
+      okBtn.textContent = options.confirmText || 'Confirm';
+      if (options.variant === 'warning') {
+        okBtn.classList.add('erp-confirm__btn--warning');
+      }
 
       function finish(ok) {
         document.removeEventListener('keydown', onKey);
@@ -173,7 +197,7 @@
 
       document.addEventListener('keydown', onKey);
       document.body.appendChild(root);
-      root.querySelector('[data-erp-confirm="ok"]').focus();
+      okBtn.focus();
     });
   };
 

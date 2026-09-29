@@ -1,0 +1,631 @@
+{% extends "base.html" %}
+{% block title %}Gate Inward / GRN{% endblock %}
+
+{% block page_css %}
+<style>
+  .grn-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .grn-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 8px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .grn-table thead th:first-child,
+  .grn-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .grn-table thead th:last-child { border-right: none; }
+  .grn-table tbody td {
+    padding: 11px 8px;
+    font-size: 13.5px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grn-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .grn-table tbody tr:hover { background: #FBF4EE; }
+  .search-wrap input { padding-left: 32px; }
+  #grn-modal.hidden, #view-modal.hidden { display: none; }
+  #grn-modal, #view-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8A4A1C;
+    margin-top: 4px;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid;
+  }
+  .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .status-pending-qc { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .status-partial-qc { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .status-closed { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th {
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 8px 6px;
+    border: 1px solid #D1D9D8;
+    text-align: center;
+  }
+  .lines-table td {
+    padding: 4px;
+    border: 1px solid #E2E8E7;
+    vertical-align: middle;
+  }
+  .lines-table input, .lines-table select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+  }
+  .lines-table input:focus, .lines-table select:focus {
+    outline: none;
+    border-color: #C46B2D;
+    box-shadow: 0 0 0 1px #C46B2D;
+  }
+  .lines-table input:read-only { background: #F4F6F5; color: #3D5A5D; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Gate inward &amp; GRN</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Gate inward / GRN</h1>
+        </div>
+        <button type="button" id="btn-new-grn"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          New GRN
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-grn" placeholder="Search GRN, PO, vendor, challan…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (0)</button>
+            <button type="button" data-filter="pending qc" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Pending QC (0)</button>
+            <button type="button" data-filter="partial qc" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial QC (0)</button>
+            <button type="button" data-filter="closed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Closed (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Record vendor delivery at gate (challan, transporter, vehicle, gross weight) · Post GRN to move stock to <strong>QC Hold Bay</strong> · Inward QC comes next
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="grn-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:11%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+              <col style="width:11%" />
+              <col style="width:9%" />
+              <col style="width:8%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>GRN no.</th>
+                <th>Date</th>
+                <th>PO no.</th>
+                <th>Vendor</th>
+                <th>Challan no.</th>
+                <th>Vehicle</th>
+                <th>Lines</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="grn-tbody">
+              {# Flask: grns list pass karega #}
+              {% for g in grns %}
+              <tr class="grn-row{% if g.status == 'Draft' %} opacity-80{% endif %}"
+                  data-search="{{ (g.grn_no ~ ' ' ~ g.po.po_no ~ ' ' ~ (g.po.vendor.name if g.po and g.po.vendor else '') ~ ' ' ~ (g.challan_no or ''))|lower }}"
+                  data-status="{{ g.status|lower }}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td class="font-mono font-semibold {% if g.status == 'Draft' %}text-ink-faint{% else %}text-ink{% endif %}">{{ g.grn_no }}</td>
+                <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}</td>
+                <td><span class="text-brand-teal font-medium">{{ g.po.po_no if g.po else "—" }}</span></td>
+                <td class="text-left {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.po.vendor.name if g.po and g.po.vendor else "—" }}</td>
+                <td class="font-mono text-[12.5px] {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.challan_no or "—" }}</td>
+                <td class="font-mono text-[12.5px] {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.vehicle_no or "—" }}</td>
+                <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.lines|length }}</td>
+                <td>
+                  {% set status_class = {'Draft': 'status-draft', 'Pending QC': 'status-pending-qc', 'Partial QC': 'status-partial-qc', 'Closed': 'status-closed'} %}
+                  <span class="status-pill {{ status_class.get(g.status, 'status-draft') }}">{{ g.status }}</span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button"
+                      class="btn-view-grn px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                      data-grn="{{ g.grn_no }}"
+                      data-po="{{ g.po.po_no if g.po else '' }}"
+                      data-vendor="{{ g.po.vendor.name if g.po and g.po.vendor else '' }}"
+                      data-status="{{ g.status }}"
+                      data-date="{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else 'Not posted' }}"
+                      data-challan="{{ g.challan_no or '—' }}"
+                      data-transporter="{{ g.transporter or '—' }}"
+                      data-vehicle="{{ g.vehicle_no or '—' }}"
+                      data-gross="{{ (g.gross_weight ~ ' kg') if g.gross_weight else '—' }}"
+                      data-remarks="{{ g.remarks or '' }}"
+                      data-lines='{{ (g.lines | map(attribute="po_line.raw_material.code") | list) | tojson }}'
+                      data-descs='{{ (g.lines | map(attribute="po_line.raw_material.name") | list) | tojson }}'
+                      data-qtys='{{ (g.lines | map(attribute="received_qty") | list) | tojson }}'
+                      data-units='{{ (g.lines | map(attribute="po_line.unit.code") | list) | tojson }}'
+                      data-batches='{{ (g.lines | map(attribute="batch_lot_no") | list) | tojson }}'>
+                      View
+                    </button>
+                    {% if g.status == "Draft" %}
+                    <form method="post" action="{{ url_for('grns.grns_post', grn_id=g.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Post GRN"
+                          data-confirm-ok="Post"
+                          data-confirm-message="Post {{ g.grn_no }}? Status will move to Pending QC.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post GRN</button>
+                    </form>
+                    {% endif %}
+                    {% if g.status in ("Pending QC", "Partial QC") %}
+                    {# Gate pe QC pending → Inward QC list pe le jao (lab inspection) #}
+                    <a href="{{ url_for('inward_qc.inward_qc_list') }}" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Inward QC</a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {# list khali — empty-state JS/HTML #}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No GRN records found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search or create a new GRN against an open PO.</p>
+            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">New GRN</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} GRN records</span>
+          <span>After post: stock sits in QC Hold Bay until inward lab QC passes</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="grn-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="grn-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="grn-modal-title" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="grn-modal-title" class="text-[16px] font-bold text-ink">New goods receipt (GRN)</h2>
+        <p class="text-[12.5px] text-ink-faint">Gate inward details + quantities received against PO</p>
+      </div>
+      <button type="button" id="btn-close-grn-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+
+    <form id="grn-form" method="post" action="{{ url_for('grns.grns_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <p class="form-section-title">GRN header</p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div>
+          <label for="grn-no" class="block text-[12.5px] font-semibold text-ink mb-1">GRN no.</label>
+          <input type="text" id="grn-no" value="Auto on save" readonly class="w-full px-2.5 py-2 text-[13px] font-mono bg-mist border border-slate-300 rounded text-ink-faint" />
+        </div>
+        <div>
+          <label for="grn-date" class="block text-[12.5px] font-semibold text-ink mb-1">GRN date *</label>
+          <input type="date" id="grn-date" name="grn_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div class="md:col-span-2">
+          <label for="grn-po" class="block text-[12.5px] font-semibold text-ink mb-1">Purchase order *</label>
+          <select id="grn-po" name="po_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select open PO…</option>
+            {% for po in open_pos %}
+            <option value="{{ po.id }}">{{ po.po_no }} · {{ po.vendor.name if po.vendor else '—' }} · {{ po.status }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div>
+          <label for="grn-vendor" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor</label>
+          <input type="text" id="grn-vendor" readonly placeholder="Auto from PO" class="w-full px-2.5 py-2 text-[14px] bg-mist border border-slate-300 rounded text-ink-muted" />
+        </div>
+        <div>
+          <label for="grn-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Stock location after post</label>
+          <input type="text" id="grn-warehouse" readonly value="QC Hold Bay — Under QC inspection" class="w-full px-2.5 py-2 text-[13px] bg-brand-soft border border-brand-border rounded text-brand-teal font-medium" />
+        </div>
+        <div>
+          <label for="grn-gross" class="block text-[12.5px] font-semibold text-ink mb-1">Gross weight (kg)</label>
+          <input type="number" id="grn-gross" name="gross_weight" min="0" step="0.01" placeholder="Weighbridge / estimate" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+        </div>
+      </div>
+
+      <p class="form-section-title">Gate inward (delivery challan)</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div>
+          <label for="grn-challan" class="block text-[12.5px] font-semibold text-ink mb-1">Delivery challan no.</label>
+          <input type="text" id="grn-challan" name="challan_no" placeholder="Vendor DC number" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper font-mono" />
+        </div>
+        <div>
+          <label for="grn-transporter" class="block text-[12.5px] font-semibold text-ink mb-1">Transporter</label>
+          <input type="text" id="grn-transporter" name="transporter" placeholder="Carrier name" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="grn-vehicle" class="block text-[12.5px] font-semibold text-ink mb-1">Vehicle no.</label>
+          <input type="text" id="grn-vehicle" name="vehicle_no" placeholder="e.g. GJ-01-XX-0000" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper font-mono uppercase" />
+        </div>
+      </div>
+
+      <hr class="border-slate-200" />
+      <p class="form-section-title !mt-0">Receipt lines (this delivery)</p>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="lines-table" id="receipt-lines">
+          <thead>
+            <tr>
+              <th style="width:14%">Material</th>
+              <th style="width:16%">Description</th>
+              <th style="width:9%">PO qty</th>
+              <th style="width:9%">Prev. recv.</th>
+              <th style="width:11%">This receipt *</th>
+              <th style="width:7%">Unit</th>
+              <th style="width:14%">Vendor batch / lot *</th>
+              <th style="width:12%">Mfg date</th>
+            </tr>
+          </thead>
+          <tbody id="receipt-tbody">
+            <tr>
+              <td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <label for="grn-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+        <textarea id="grn-remarks" name="remarks" rows="2" placeholder="Seal condition, short supply notes…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+      <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+        Purchase Invoice ke liye sirf <strong>QC-accepted qty</strong> use hogi (yeh receipt qty nahi) — QC agle step me hogi.
+      </p>
+    </form>
+
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="grn-form" name="grn_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+      <button type="button" id="btn-cancel-grn" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="grn-form" name="grn_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post GRN</button>
+    </div>
+  </div>
+</div>
+
+<div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="view-title" class="text-[16px] font-bold text-ink">GRN detail</h2>
+        <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var grnModal = document.getElementById('grn-modal');
+  var grnForm = document.getElementById('grn-form');
+  var viewModal = document.getElementById('view-modal');
+  var searchInput = document.getElementById('search-grn');
+  var receiptTbody = document.getElementById('receipt-tbody');
+  var rows = Array.from(document.querySelectorAll('.grn-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.grn-table');
+  var activeFilter = 'all';
+
+  function openGrnModal() {
+    grnModal.classList.remove('hidden');
+    grnModal.setAttribute('aria-hidden', 'false');
+    document.getElementById('grn-po').focus();
+  }
+  function closeGrnModal() {
+    grnModal.classList.add('hidden');
+    grnModal.setAttribute('aria-hidden', 'true');
+    grnForm.reset();
+    document.getElementById('grn-vendor').value = '';
+    receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td></tr>';
+  }
+
+  // ---- PO select hote hi uski lines real Flask se fetch() ----
+  function renderReceiptLines(poId) {
+    if (!poId) {
+      document.getElementById('grn-vendor').value = '';
+      receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td></tr>';
+      return;
+    }
+    receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Loading…</td></tr>';
+    fetch('/grns/po_lines/' + poId)
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        document.getElementById('grn-vendor').value = data.vendor || '';
+        if (!data.lines || !data.lines.length) {
+          receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">No lines found on this PO</td></tr>';
+          return;
+        }
+        receiptTbody.innerHTML = data.lines.map(function (line) {
+          return '<tr>' +
+            '<td><input type="hidden" name="po_line_id_" class="line-po-line-id" value="' + line.po_line_id + '" />' +
+            '<input type="text" readonly value="' + line.material_code + '" class="font-mono text-[12px]" /></td>' +
+            '<td><input type="text" readonly value="' + line.material_name + '" /></td>' +
+            '<td><input type="text" readonly class="tabular-nums text-center" value="' + line.po_qty + '" /></td>' +
+            '<td><input type="text" readonly class="tabular-nums text-center" value="' + line.prev_received + '" /></td>' +
+            '<td><input type="number" required class="line-recv tabular-nums" min="0" step="0.01" data-material="' + line.material_code + '" data-name="' + (line.material_name || '').replace(/"/g, '&quot;') + '" data-unit="' + (line.unit_code || '') + '" data-poqty="' + line.po_qty + '" data-prev="' + line.prev_received + '" /></td>' +
+            '<td><input type="text" readonly class="text-center" value="' + line.unit_code + '" /></td>' +
+            '<td><input type="text" required class="line-batch font-mono text-[12px]" placeholder="Batch/lot" /></td>' +
+            '<td><input type="date" class="line-mfg" /></td>' +
+            '</tr>';
+        }).join('');
+        renumberReceiptLines();
+      })
+      .catch(function () {
+        receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-stop text-[13px]">Could not load PO lines.</td></tr>';
+      });
+  }
+
+  // Har row ke inputs ko index ke hisaab se naam do (Flask ke liye)
+  function renumberReceiptLines() {
+    var lineRows = receiptTbody.querySelectorAll('tr');
+    lineRows.forEach(function (row, index) {
+      var poLineIdInput = row.querySelector('.line-po-line-id');
+      if (!poLineIdInput) return;
+      poLineIdInput.name = 'po_line_id_' + index;
+      row.querySelector('.line-recv').name = 'received_qty_' + index;
+      row.querySelector('.line-batch').name = 'batch_lot_no_' + index;
+      row.querySelector('.line-mfg').name = 'mfg_date_' + index;
+    });
+  }
+
+  function viewField(label, value) {
+    return '<div><dt class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</dt><dd class="mt-0.5 text-ink">' + (value || '—') + '</dd></div>';
+  }
+  function openView(btn) {
+    document.getElementById('view-subtitle').textContent = (btn.getAttribute('data-po') || '') + ' · ' + (btn.getAttribute('data-vendor') || '');
+    document.getElementById('view-title').textContent = (btn.getAttribute('data-grn') || '') + ' · ' + (btn.getAttribute('data-status') || '');
+
+    var codes = JSON.parse(btn.getAttribute('data-lines') || '[]');
+    var descs = JSON.parse(btn.getAttribute('data-descs') || '[]');
+    var qtys = JSON.parse(btn.getAttribute('data-qtys') || '[]');
+    var units = JSON.parse(btn.getAttribute('data-units') || '[]');
+    var batches = JSON.parse(btn.getAttribute('data-batches') || '[]');
+
+    var html = '<dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] mb-4">';
+    html += viewField('GRN date', btn.getAttribute('data-date'));
+    html += viewField('Challan no.', btn.getAttribute('data-challan'));
+    html += viewField('Transporter', btn.getAttribute('data-transporter'));
+    html += viewField('Vehicle', btn.getAttribute('data-vehicle'));
+    html += viewField('Gross weight', btn.getAttribute('data-gross'));
+    html += viewField('Remarks', btn.getAttribute('data-remarks'));
+    html += '</dl>';
+    html += '<table class="w-full text-[13px] border border-slate-200 rounded overflow-hidden"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">';
+    html += '<th class="p-2 text-left">Material</th><th class="p-2 text-left">Description</th><th class="p-2">Recv qty</th><th class="p-2">Unit</th><th class="p-2">Batch</th></tr></thead><tbody>';
+    codes.forEach(function (code, i) {
+      html += '<tr class="border-t border-slate-100"><td class="p-2 font-mono text-[12px]">' + code + '</td><td class="p-2">' + (descs[i] || '') +
+        '</td><td class="p-2 text-center tabular-nums">' + (qtys[i] || '') + '</td><td class="p-2 text-center">' + (units[i] || '') +
+        '</td><td class="p-2 text-center font-mono text-[12px]">' + (batches[i] || '') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('view-body').innerHTML = html;
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var blob = row.getAttribute('data-search') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || blob.indexOf(q) !== -1) && (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' GRN records';
+  }
+  function updateFilterCounts() {
+    var counts = {};
+    rows.forEach(function (row) {
+      var s = row.getAttribute('data-status');
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="draft"]').textContent = 'Draft (' + (counts['draft'] || 0) + ')';
+    document.querySelector('[data-filter="pending qc"]').textContent = 'Pending QC (' + (counts['pending qc'] || 0) + ')';
+    document.querySelector('[data-filter="partial qc"]').textContent = 'Partial QC (' + (counts['partial qc'] || 0) + ')';
+    document.querySelector('[data-filter="closed"]').textContent = 'Closed (' + (counts['closed'] || 0) + ')';
+  }
+
+  document.getElementById('btn-new-grn').addEventListener('click', openGrnModal);
+  var emptyNew = document.getElementById('btn-empty-new');
+  if (emptyNew) emptyNew.addEventListener('click', openGrnModal);
+  document.getElementById('btn-close-grn-modal').addEventListener('click', closeGrnModal);
+  document.getElementById('btn-cancel-grn').addEventListener('click', closeGrnModal);
+  document.getElementById('grn-modal-backdrop').addEventListener('click', closeGrnModal);
+  document.getElementById('btn-close-view').addEventListener('click', closeView);
+  document.getElementById('btn-close-view-2').addEventListener('click', closeView);
+  document.getElementById('view-backdrop').addEventListener('click', closeView);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!viewModal.classList.contains('hidden')) closeView();
+    else if (!grnModal.classList.contains('hidden')) closeGrnModal();
+  });
+
+  document.getElementById('grn-po').addEventListener('change', function (e) {
+    renderReceiptLines(e.target.value);
+  });
+
+  document.querySelectorAll('.btn-view-grn').forEach(function (btn) {
+    btn.addEventListener('click', function () { openView(btn); });
+  });
+
+  grnForm.addEventListener('submit', function (e) {
+    // Over-qty warning confirm ke baad dobara submit — flag pe ignore
+    if (grnForm.getAttribute('data-over-qty-ok') === '1') {
+      grnForm.removeAttribute('data-over-qty-ok');
+      return;
+    }
+
+    var po = document.getElementById('grn-po').value;
+    var date = document.getElementById('grn-date').value;
+    if (!po || !date) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Purchase order and GRN date are required.', 'error');
+      return;
+    }
+    var firstRecv = document.querySelector('.line-recv');
+    if (!firstRecv || firstRecv.value === '') {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Add at least one receipt line.', 'error');
+      return;
+    }
+
+    // PO qty se zyada receive? Hard-block nahi — sirf clear warning (non-technical language)
+    function escHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function fmtQty(n) {
+      var x = Number(n);
+      if (isNaN(x)) return '0';
+      return (Math.round(x * 100) / 100).toLocaleString('en-IN');
+    }
+
+    var overItems = [];
+    document.querySelectorAll('.line-recv').forEach(function (inp) {
+      var recv = parseFloat(inp.value) || 0;
+      if (recv <= 0) return;
+      var poQty = parseFloat(inp.getAttribute('data-poqty')) || 0;
+      var prev = parseFloat(inp.getAttribute('data-prev')) || 0;
+      var total = prev + recv;
+      if (total > poQty) {
+        overItems.push({
+          name: inp.getAttribute('data-name') || inp.getAttribute('data-material') || 'Item',
+          code: inp.getAttribute('data-material') || '',
+          unit: inp.getAttribute('data-unit') || '',
+          poQty: poQty,
+          prev: prev,
+          recv: recv,
+          total: total
+        });
+      }
+    });
+    if (overItems.length) {
+      e.preventDefault();
+      var cards = overItems.map(function (it) {
+        var u = it.unit ? ' ' + escHtml(it.unit) : '';
+        return '<div class="erp-confirm__card">' +
+          '<div class="erp-confirm__card-title">' + escHtml(it.name) +
+            (it.code ? ' <span class="erp-confirm__card-code">(' + escHtml(it.code) + ')</span>' : '') +
+          '</div>' +
+          '<div class="erp-confirm__row"><span>Ordered on purchase order</span><strong>' + fmtQty(it.poQty) + u + '</strong></div>' +
+          '<div class="erp-confirm__row"><span>Already received earlier</span><strong>' + fmtQty(it.prev) + u + '</strong></div>' +
+          '<div class="erp-confirm__row"><span>Entering on this GRN</span><strong>' + fmtQty(it.recv) + u + '</strong></div>' +
+          '<div class="erp-confirm__row erp-confirm__row--warn"><span>Total after save</span><strong>' + fmtQty(it.total) + u + '</strong></div>' +
+        '</div>';
+      }).join('');
+
+      var msgHtml =
+        '<p>You are receiving <strong>more than ordered</strong> on the purchase order.</p>' +
+        cards +
+        '<p class="erp-confirm__hint">This can be OK if the vendor sent a little extra (for example coil or pack size). If you typed a wrong number, go back and fix it.</p>';
+
+      if (typeof showConfirm === 'function') {
+        showConfirm(msgHtml, {
+          title: 'More than ordered',
+          confirmText: 'Yes, continue',
+          cancelText: 'Fix quantity',
+          variant: 'warning',
+          wide: true,
+          html: true
+        }).then(function (ok) {
+          if (!ok) return;
+          grnForm.setAttribute('data-over-qty-ok', '1');
+          if (typeof e.submitter !== 'undefined' && e.submitter) {
+            grnForm.requestSubmit(e.submitter);
+          } else {
+            grnForm.requestSubmit();
+          }
+        });
+      } else if (window.confirm('Receiving more than ordered. Continue?')) {
+        grnForm.setAttribute('data-over-qty-ok', '1');
+        grnForm.requestSubmit();
+      }
+    }
+  });
+
+  searchInput.addEventListener('input', applyFilters);
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-btn').forEach(function (b) {
+        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+      });
+      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+      applyFilters();
+    });
+  });
+
+  updateFilterCounts();
+  applyFilters();
+</script>
+{% endblock %}

@@ -43,11 +43,12 @@
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
   .form-section-title {
-    font-size: 11.5px;
+    font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #6B7F82;
+    letter-spacing: 0.06em;
+    color: #8A4A1C;
+    margin-top: 4px;
   }
   .status-pill {
     display: inline-flex; align-items: center; gap: 5px;
@@ -58,6 +59,46 @@
   .status-partial { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .status-closed { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .status-cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+
+  /* GRN add-form jaisa line table — fixed layout, no side-scroll */
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  .lines-table th {
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 8px 6px;
+    border: 1px solid #D1D9D8;
+    text-align: center;
+  }
+  .lines-table th:first-child { text-align: left; }
+  .lines-table td {
+    padding: 4px;
+    border: 1px solid #E2E8E7;
+    vertical-align: middle;
+  }
+  .lines-table input, .lines-table select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .lines-table input:focus, .lines-table select:focus {
+    outline: none;
+    border-color: #C46B2D;
+    box-shadow: 0 0 0 1px #C46B2D;
+  }
+  .lines-table .line-amount {
+    display: block;
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    padding: 6px 8px;
+    color: #0F2F32;
+  }
 </style>
 {% endblock %}
 
@@ -158,6 +199,14 @@
                       data-taxpcts='{{ (o.lines | map(attribute="tax_rate.rate_percent") | list) | tojson }}'>
                       View
                     </button>
+                    {% if o.status == "Draft" %}
+                    <form method="post" action="{{ url_for('purchase_orders.purchase_orders_confirm', po_id=o.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Confirm purchase order"
+                          data-confirm-ok="Confirm"
+                          data-confirm-message="Confirm {{ o.po_no }}? It will move to Open status and become available for GRN.">
+                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Confirm</button>
+                    </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -185,7 +234,8 @@
 {% block modals %}
 <div id="po-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+  {# GRN jaisa wide drawer — lines-table fixed layout, side-scroll nahi #}
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-5xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">New purchase order</h2>
@@ -193,15 +243,15 @@
       </div>
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
-    <form id="po-form" method="post" action="{{ url_for('purchase_orders.purchase_orders_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+    <form id="po-form" method="post" action="{{ url_for('purchase_orders.purchase_orders_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       <p class="form-section-title">Order info</p>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
           <label for="po-date" class="block text-[12.5px] font-semibold text-ink mb-1">PO date *</label>
           <input type="date" id="po-date" name="po_date" required
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
-        <div>
+        <div class="md:col-span-2">
           <label for="po-vendor" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor *</label>
           <select id="po-vendor" name="vendor_id" required
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
@@ -211,13 +261,13 @@
             {% endfor %}
           </select>
         </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="po-expected" class="block text-[12.5px] font-semibold text-ink mb-1">Expected delivery</label>
           <input type="date" id="po-expected" name="expected_delivery_date"
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
           <label for="po-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Deliver to warehouse *</label>
           <select id="po-warehouse" name="warehouse_id" required
@@ -228,8 +278,6 @@
             {% endfor %}
           </select>
         </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-[12.5px] font-semibold text-ink mb-1">Tax type *</label>
           <div id="po-tax-type" class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-mist text-ink-faint">
@@ -249,30 +297,29 @@
         </div>
       </div>
 
-      <hr class="border-slate-200 !my-4" />
+      <hr class="border-slate-200" />
       <div class="flex items-center justify-between">
-        <p class="form-section-title !mb-0">Line items</p>
-        <button type="button" id="btn-add-line" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add line</button>
+        <p class="form-section-title !mt-0 !mb-0">Line items</p>
+        <button type="button" id="btn-add-line" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add line</button>
       </div>
-
-      <div class="overflow-x-auto border border-slate-200 rounded-lg mt-2">
-        <table class="w-full text-[13px]" style="min-width:760px">
+      <div class="border border-slate-200 rounded">
+        <table class="lines-table">
           <thead>
-            <tr class="bg-mist text-[11px] uppercase tracking-wide text-ink-faint">
-              <th class="text-left px-2 py-2">Material</th>
-              <th class="px-2 py-2" style="width:80px">Qty</th>
-              <th class="px-2 py-2" style="width:90px">Unit</th>
-              <th class="px-2 py-2" style="width:90px">Rate (₹)</th>
-              <th class="px-2 py-2" style="width:70px">Disc %</th>
-              <th class="px-2 py-2" style="width:110px">Tax %</th>
-              <th class="px-2 py-2 text-right" style="width:100px">Amount (₹)</th>
-              <th style="width:30px"></th>
+            <tr>
+              <th style="width:28%">Material</th>
+              <th style="width:10%">Qty</th>
+              <th style="width:10%">Unit</th>
+              <th style="width:12%">Rate (₹)</th>
+              <th style="width:9%">Disc %</th>
+              <th style="width:14%">Tax %</th>
+              <th style="width:12%">Amount</th>
+              <th style="width:5%"></th>
             </tr>
           </thead>
           <tbody id="po-line-list">
-            <tr class="po-line-row border-t border-slate-200" data-index="0">
-              <td class="px-2 py-1.5">
-                <select name="material_id_0" class="line-material w-full px-1.5 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+            <tr class="po-line-row" data-index="0">
+              <td>
+                <select name="material_id_0" class="line-material">
                   <option value="">Select material…</option>
                   {% for m in raw_materials %}
                   <option value="{{ m.id }}"
@@ -282,28 +329,28 @@
                   {% endfor %}
                 </select>
               </td>
-              <td class="px-1 py-1.5"><input type="number" name="ordered_qty_0" min="0" step="0.01" placeholder="0" class="line-qty w-full px-1.5 py-1.5 text-[12.5px] text-center border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" /></td>
-              <td class="px-1 py-1.5">
-                <select name="unit_id_0" class="line-unit w-full px-1 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+              <td><input type="number" name="ordered_qty_0" min="0" step="0.01" placeholder="0" class="line-qty text-center tabular-nums" /></td>
+              <td>
+                <select name="unit_id_0" class="line-unit">
                   <option value="">—</option>
                   {% for u in units %}
                   <option value="{{ u.id }}">{{ u.code }}</option>
                   {% endfor %}
                 </select>
               </td>
-              <td class="px-1 py-1.5"><input type="number" name="rate_0" min="0" step="0.01" placeholder="0.00" class="line-rate w-full px-1.5 py-1.5 text-[12.5px] text-center border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" /></td>
-              <td class="px-1 py-1.5"><input type="number" name="discount_percent_0" min="0" max="100" step="0.01" value="0" class="line-disc w-full px-1.5 py-1.5 text-[12.5px] text-center border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" /></td>
-              <td class="px-1 py-1.5">
-                <select name="tax_rate_id_0" class="line-tax w-full px-1 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper">
+              <td><input type="number" name="rate_0" min="0" step="0.01" placeholder="0.00" class="line-rate text-right tabular-nums" /></td>
+              <td><input type="number" name="discount_percent_0" min="0" max="100" step="0.01" value="0" class="line-disc text-center tabular-nums" /></td>
+              <td>
+                <select name="tax_rate_id_0" class="line-tax">
                   <option value="">—</option>
                   {% for t in tax_rates %}
                   <option value="{{ t.id }}" data-pct="{{ t.rate_percent }}">{{ t.code }} ({{ t.rate_percent }}%)</option>
                   {% endfor %}
                 </select>
               </td>
-              <td class="px-2 py-1.5 text-right line-amount font-semibold text-ink tabular-nums">₹0.00</td>
-              <td class="px-1 py-1.5 text-center">
-                <button type="button" class="btn-remove-line text-ink-faint hover:text-stop hidden" aria-label="Remove line">&times;</button>
+              <td><span class="line-amount">₹0.00</span></td>
+              <td class="text-center">
+                <button type="button" class="btn-remove-line text-ink-faint hover:text-stop text-lg leading-none hidden" aria-label="Remove line">&times;</button>
               </td>
             </tr>
           </tbody>
@@ -311,12 +358,12 @@
       </div>
 
       <div>
-        <label for="po-remarks" class="block text-[12.5px] font-semibold text-ink mb-1 mt-3">Remarks</label>
+        <label for="po-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
         <textarea id="po-remarks" name="remarks" rows="2" placeholder="Delivery instructions, QC notes…"
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
       </div>
 
-      <div class="bg-mist border border-slate-200 rounded-lg p-3 space-y-1.5 text-[13px] mt-3">
+      <div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">
         <div class="flex items-center justify-between text-ink-muted">
           <span>Subtotal</span><span id="po-subtotal" class="tabular-nums">₹0.00</span>
         </div>
@@ -331,7 +378,7 @@
         </div>
       </div>
     </form>
-    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
       <button type="submit" form="po-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save purchase order</button>
     </div>

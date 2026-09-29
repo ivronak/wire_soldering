@@ -14,24 +14,11 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / Phase2 / PurchaseOrder` — **Purchase Order List + Add complete + verified 2026-09-28**, poora mockup-jaisa UI/UX (table-based line items, live calculation, tax-type auto-detect). DB se verify: `PO-2026-001` auto-generated, header (payment_terms/freight) + line item (unit/tax/discount) sab sahi save hue.
+**Abhi chal raha hai:** `Part2 / Phase2 / InwardQC / F5` — QC **Submit** ke baad parent GRN status update (`Pending QC` → `Partial QC` / `Closed`). Draft pe GRN mat chhedo.
 
-**Is module me kya-kya bana (poori tarah naya):**
-- `PurchaseOrder` (header) + `PurchaseOrderLine` (child, Product+Variant jaisa hi pattern) — 2 tables, FK chain
-- `po_no` **auto-generate** hota hai (`PO-<saal>-<seq>`) — pehli baar transaction-numbering pattern use hua (masters ke manual "code" se alag)
-- Line items: Material select karte hi Unit + Tax Rate **auto-fill** hote hain (Raw Material Master se), lekin **configurable/overridable** hain
-- **Tax type (Intra-state CGST+SGST vs Inter-state IGST) DB me store nahi hota** — Vendor.state vs Warehouse→Branch.state compare karke **live compute** hota hai (JS me bhi, aur List/View me bhi)
-- Live calculation: per-line Amount, Subtotal, CGST+SGST/IGST split, Freight, Grand total
+**Done:** F1–F4 + GRN→Inward QC link (2026-09-29).
 
-**Side-fix (isi kaam ke dauraan mila aur theek kiya):** Vendor.state poora naam store karta tha ("Gujarat"), Branch.state sirf 2-digit code ("24") — compare kabhi match nahi karta. Naya shared `app/constants.py` (`INDIAN_STATES`, 36 states+UTs) banaya, **Vendor + Customer + Branch teeno** ab isi se dropdown lete hain (poora naam, consistent format). Purane 2 branches ka data (`"02"`, `"24"`) `"Gujarat"` me fix kiya.
-
-**Baaki bugs jo mile is module banate waqt (user ne khud fix kiye):** list route ka missing `units`/`tax_rates` pass; Add route ka `rate__raw` (double underscore) typo jo `rate_raw` se match nahi karta tha; **sabse important** — `commit()`/`flash()`/`return` galti se `while` loop ke andar the (isliye sirf pehla line-item hi save hota, baaki silently chhoot jaate) — ab loop ke bahar, sab lines save hoti hain.
-
-Ab decide karna hai: **Purchase Order me Edit + status-transition (Draft→Open) add karein**, ya seedha **agla Phase 2 module — Gate Inward/GRN** shuru karein.
-
-⚠️ **Yaad rakhna (pending, koi bhi naya FK/master banate waqt):** `naming_convention` wala permanent fix (`app/extensions.py` me `db = SQLAlchemy()` ko `MetaData(naming_convention=...)` ke saath banana) abhi tak nahi kiya. Ab tak koi bhi FK migration is issue me nahi phansi (Vendor/Customer/Ledger/Group sab naye tables the) — Phase 2 me existing table pe naya FK aaya to yaad dilana.
-
-Done abhi: Tax Rate Master CRUD complete 2026-09-23. Flask-Migrate setup complete (`flask db migrate`/`upgrade` workflow ab standard hai, DB delete karne ki zaroorat nahi — `db.create_all()` bhi hata diya `app/__init__.py` se 2026-09-24, ab sirf Migrate schema manage karta hai). Product Master CRUD complete + verified 2026-09-23 (list/add-with-restore/edit/toggle/soft-delete, Category+Base Unit+Tax Rate saare FK dropdowns). `ProductVariant` model complete 2026-09-24 (id, product_id FK, sku, attributes JSON, min_selling_price, is_active, is_deleted) — spec Section 22/4.6 ke hisaab se dynamic JSONB attributes (fixed columns nahi, taaki naya attribute type add karne ke liye code-change na chahiye).
+Teaching style: direction + checklist; user types Flask; HTML/JS AI likhe jab user bole.
 
 
 ---
@@ -100,9 +87,32 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 
 ---
 
+## Phase 2 — Module-wise Detail Tracker
+
+**Module order (spec §5, dependency-wise):** Purchase Order → Gate Inward/GRN → Inward QC → Purchase Invoice → Purchase Return (+ Rejection Memo, QC ka side-branch).
+
+- [x] Module 1: Purchase Order — mockup `mockups/purchase_order.html` (approved pehle se) — **backend List+Add+Confirm complete 2026-09-29** (`PurchaseOrder` + `PurchaseOrderLine`, po_no auto-numbering, live tax calculation UI mockup-jaisa, Draft→Open transition verified DB se) — **GRN ke liye ready** (Open status wale POs ab available hain)
+  - [ ] Poora Edit (vendor/line-items badalna) — abhi scope me nahi, "jo zaroori tha wahi kiya" (sirf Confirm chahiye tha GRN unblock karne ke liye)
+- [x] Module 2: Gate Inward / GRN — **backend List + Add (draft/post) + po_lines JSON + Post-from-draft** (user-typed; tracker sync 2026-09-29) — stock→QC_HOLD baad me Inventory phase me wire hoga
+- [ ] Module 3: Inward QC — mockup ready — **backend next** (`Part2 / Phase2 / InwardQC / F1` = model)
+- [ ] Module 4: Purchase Invoice — mockup ready, backend **not started** (⚠️ business rule design pending: ek GRN line dobara bill na ho — "remaining un-invoiced qty" tracking chahiye)
+- [ ] Module 5: Purchase Return — mockup ready, backend **not started** (business rule: sirf posted Invoice ke against)
+
+**Spec ka schema-gap already pata hai** (2026-09-28 verification pass se): PO/GRN schema hints adhoore hain (line-items table hi spec me nahi), Inward QC ka `grn_id` line-level FK nahi deta (ek GRN ke multiple materials alag QC maangte hain), Purchase Invoice/Return/Rejection Memo — inka **koi schema hint spec me hai hi nahi**, poora design mockup + apna judgment se karna hoga (jaisa PO ke liye kiya).
+
+---
+
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-28/29 — Purchase Order (Phase 2, Module 1) List + Add complete + verified; Vendor/Customer/Branch state-format bug fix.** Phase 2 shuru karne se pehle poora procurement flow (PO→GRN→QC→Invoice→Return) verify kiya subagent se — mockup ke 5 files aapas me sahi connected mile, lekin unka demo data (vendor naam, RM code) real seeded DB se match nahi karta — decide hua yeh matter nahi karta (mockup data backend bante hi Jinja se replace ho jaayega, sirf FLOW/FIELDS/business-rules important hain, data-values nahi — pehle se established rule reconfirm hui). 2 real business-rules identify hui jo backend me chahiye: (1) Purchase Invoice me ek GRN line dobara bill na ho, (2) Purchase Return sirf posted Invoice ke against.
+
+  `PurchaseOrder`+`PurchaseOrderLine` models bane (header+child, Product+Variant jaisa pattern). User ne poora Add route khud likha — 3 bugs mile aur fix hue: (a) list route `units`/`tax_rates` pass nahi kar raha tha, (b) `rate__raw` (double underscore) typo jo undefined `rate_raw` se collide karta tha, (c) **sabse bada** — `commit()`/`flash()`/`return` galti se `while` loop ke andar the, isliye sirf pehla line-item hi kabhi save hota tha.
+
+  UI poori tarah mockup-match banaya (user ne screenshot diya): table-based line items (Material/Qty/Unit/Rate/Disc%/Tax%/Amount), live JS calculation, Tax type (Intra CGST+SGST vs Inter IGST) **DB me store nahi**, Vendor.state vs Warehouse→Branch.state compare karke live compute hota hai. Iske liye `PurchaseOrderLine` me `unit_id`+`tax_rate_id`+`discount_percent` aur `PurchaseOrder` me `freight`+`payment_terms` naye fields add hue (Raw Material se auto-fill, configurable).
+
+  **Side-bug pakड़ा gaya:** Vendor.state poora naam store karta ("Gujarat"), Branch.state sirf 2-digit code ("24") — kabhi match nahi hota. Naya `app/constants.py` (`INDIAN_STATES`, 36 states+UTs) banaya, Vendor + Customer + Branch teeno isi se dropdown lete hain ab (pehle Vendor/Customer ka bhi sirf 5 hardcoded options tha). `Branch.state` column `String(2)` se `String(50)` kiya, purane 2 branches ka data (`"02"`/`"24"`) `"Gujarat"` me fix kiya seedha migration se. Verify kiya: DB me `PO-2026-001` sahi bana, saare naye fields (unit/tax/discount/freight/terms) sahi save hue.
 
 - **2026-09-28 — Poore Phase 1 ka automated test + realistic data seed (Claude ne kiya, user ka explicit request).** User ne maanga: "sare masters ke sare action test karlo aur sabhi master me accurate data daldo age ke liye." Claude ne Python script se `app.test_client()` use kiya — **real Flask routes hit kiye** (raw SQL insert nahi), taaki Auto-Ledger, restore-on-duplicate, FK validations sab **asli logic se** chalein. 65 actions test kiye (har master ka Add, kuch ka Edit/Toggle/Delete) — **64 pass, 1 fail**. Bug: `app/vendors/routes.py` ka list route `@vendors_bp.route("/Vendors")` (capital V) tha, baaki 10 masters sab lowercase — `url_for()` ki wajah se app ke andar (sidebar, redirects) kabhi issue nahi dikha, lekin direct `/vendors` (lowercase) 404 deta. Fix kiya: lowercase `/vendors`. Saath me realistic wire-harness-manufacturing (Gujarat) data add hua — naye Work Stages (Stripping/Crimping/Soldering/Assembly/QC/Packing), Machines har stage pe, RM Categories (Insulation, Connectors, Solder, Packaging), Raw Materials (PVC sleeving, terminals, solder wire, box), Products+Variants (Connector Assembly, Cable Assembly), Warehouses (WIP/SCRAP/QC_HOLD add kiye, RM/FG pehle se the), 3 naye Vendors + 2 naye Customers (realistic GSTIN/PAN/bank details, Gujarat addresses). Purane test-junk rows (jaise "tt", "rere", "dsds") ko chheda nahi — wo pehle se soft-deleted hain, UI me kabhi dikhte nahi, soft-delete pattern ka hi fayda hai. Script `scratchpad/test_and_seed.py` me hai (project ka hissa nahi, sirf is session ka testing tool).
 

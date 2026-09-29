@@ -96,3 +96,14 @@ def purchase_orders_add():
     flash(f"Purchase Order {po_no} saved.", "success")
     return redirect(url_for('purchase_orders.purchase_orders_list'))
 
+@purchase_orders_bp.route('/purchase_orders/confirm/<int:po_id>', methods=['POST'])
+def purchase_orders_confirm(po_id):
+    po = PurchaseOrder.query.get_or_404(po_id)
+
+    if po.status != "Draft":
+        return redirect(url_for('purchase_orders.purchase_orders_list'))
+
+    po.status = "Open"
+    db.session.commit()
+    flash(f"Purchase Order {po.po_no} confirmed — now Open.", "success")
+    return redirect(url_for('purchase_orders.purchase_orders_list'))

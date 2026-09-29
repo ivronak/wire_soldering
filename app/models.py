@@ -285,3 +285,61 @@ class PurchaseOrderLine(db.Model):
     tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
 
     discount_percent = db.Column(db.Float, default=0, nullable=False)
+
+class GRN(db.Model):
+    __tablename__="grns"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grn_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    po_id = db.Column(db.Integer, db.ForeignKey("purchase_orders.id"), nullable=False)
+    po = db.relationship("PurchaseOrder", foreign_keys=[po_id], backref="grns")
+
+    grn_date = db.Column(db.Date, nullable=False)
+    challan_no = db.Column(db.String(50), nullable=True)
+    transporter = db.Column(db.String(100), nullable=True)
+    vehicle_no = db.Column(db.String(20), nullable=True)
+    gross_weight = db.Column(db.Float, nullable=True)
+    status = db.Column(db.String(20), default="Pending QC", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class GRNLine(db.Model):
+    __tablename__ = "grn_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grn_id = db.Column(db.Integer, db.ForeignKey("grns.id"), nullable=False)
+    grn = db.relationship("GRN", foreign_keys=[grn_id], backref="lines")
+
+    po_line_id = db.Column(db.Integer, db.ForeignKey("purchase_order_lines.id"), nullable=False)
+    po_line = db.relationship("PurchaseOrderLine", foreign_keys=[po_line_id])
+
+    received_qty = db.Column(db.Float, nullable=False)
+    batch_lot_no = db.Column(db.String(30), nullable=False)
+    mfg_date = db.Column(db.Date, nullable=True)
+
+class InwardQC(db.Model):
+    # Ek QC = ek GRN line (material + batch/lot) ki inspection
+    __tablename__ = "inward_qc"
+
+    id = db.Column(db.Integer, primary_key=True)
+    qc_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    # Poori GRN nahi — uski ek line
+    grn_line_id = db.Column(db.Integer, db.ForeignKey("grn_lines.id"), nullable=False)
+    grn_line = db.relationship("GRNLine", foreign_keys=[grn_line_id])
+
+    inspection_date = db.Column(db.Date, nullable=False)
+    # Auth/User master baad me — abhi naam text
+    inspector = db.Column(db.String(100), nullable=False)
+
+    sample_size = db.Column(db.Float, nullable=False)
+    passed_qty = db.Column(db.Float, nullable=False)
+    rejected_qty = db.Column(db.Float, nullable=False)
+
+    # Draft / Passed / Partial / Failed
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)

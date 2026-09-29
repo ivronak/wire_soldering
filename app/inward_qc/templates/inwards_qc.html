@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+{% block title %}Inward QC{% endblock %}
+
+{% block page_css %}
+<style>
+  .qc-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .qc-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 8px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .qc-table thead th:first-child,
+  .qc-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .qc-table thead th:last-child { border-right: none; }
+  .qc-table tbody td {
+    padding: 11px 8px;
+    font-size: 13.5px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .qc-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .qc-table tbody tr:hover { background: #FBF4EE; }
+  .search-wrap input { padding-left: 32px; }
+  #inspect-modal.hidden, #view-modal.hidden, #memo-modal.hidden { display: none; }
+  #inspect-modal, #view-modal, #memo-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8A4A1C;
+    margin-top: 4px;
+  }
+  .param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .param-table th {
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 8px 6px;
+    border: 1px solid #D1D9D8;
+    text-align: center;
+  }
+  .param-table td {
+    padding: 6px;
+    border: 1px solid #E2E8E7;
+    vertical-align: middle;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Inward lab QC</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Inward QC</h1>
+        </div>
+        <button type="button" id="btn-new-inspect"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          New inspection
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-qc" placeholder="Search QC no., GRN, material, lot…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (0)</button>
+            <button type="button" data-filter="passed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Passed (0)</button>
+            <button type="button" data-filter="partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (0)</button>
+            <button type="button" data-filter="failed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Failed (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              Inspect one GRN lot at a time · <strong>Passed qty</strong> can be invoiced later · <strong>Rejected qty</strong> needs a rejection memo (not billable)
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="qc-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:10%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+              <col style="width:11%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:8%" />
+              <col style="width:10%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>QC no.</th>
+                <th>Date</th>
+                <th>GRN no.</th>
+                <th>Material</th>
+                <th>Lot / batch</th>
+                <th>Sample</th>
+                <th>Pass qty</th>
+                <th>Reject qty</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="qc-tbody">
+              {% for q in inwards %}
+              {% set gl = q.grn_line %}
+              {% set po_line = gl.po_line if gl else none %}
+              {% set rm = po_line.raw_material if po_line else none %}
+              {% set grn = gl.grn if gl else none %}
+              {% set st = (q.status or 'draft')|lower %}
+              <tr class="qc-row"
+                  data-search="{{ q.qc_no|lower }} {{ grn.grn_no|lower if grn else '' }} {{ rm.code|lower if rm else '' }} {{ rm.name|lower if rm else '' }} {{ gl.batch_lot_no|lower if gl else '' }}"
+                  data-status="{{ st }}">
+                <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td class="font-mono font-semibold text-ink">{{ q.qc_no }}</td>
+                <td class="tabular-nums">{{ q.inspection_date.strftime('%d %b %Y') if q.inspection_date else '—' }}</td>
+                <td>
+                  {% if grn %}
+                  <a href="{{ url_for('grns.grns_list') }}" class="text-brand-teal font-medium hover:underline">{{ grn.grn_no }}</a>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="text-left pl-3 !text-left text-[13px]">
+                  {% if rm %}{{ rm.code }} {{ rm.name }}{% else %}—{% endif %}
+                </td>
+                <td class="font-mono text-[12.5px]">{{ gl.batch_lot_no if gl else '—' }}</td>
+                <td class="tabular-nums">{{ q.sample_size }}{% if po_line and po_line.unit %} {{ po_line.unit.code }}{% endif %}</td>
+                <td class="tabular-nums font-medium {% if q.passed_qty %}text-success{% endif %}">{{ q.passed_qty }}</td>
+                <td class="tabular-nums {% if q.rejected_qty %}font-medium text-stop{% endif %}">{{ q.rejected_qty }}</td>
+                <td>
+                  {% if st == 'passed' %}
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Passed
+                  </span>
+                  {% elif st == 'partial' %}
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-brand-soft text-brand-teal border-brand-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-brand-teal"></span> Partial
+                  </span>
+                  {% elif st == 'failed' %}
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Failed
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> {{ q.status or 'Draft' }}
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                      data-qc="{{ q.qc_no }}"
+                      data-date="{{ q.inspection_date.strftime('%Y-%m-%d') if q.inspection_date else '' }}"
+                      data-inspector="{{ q.inspector or '' }}"
+                      data-grn="{{ grn.grn_no if grn else '' }}"
+                      data-material="{% if rm %}{{ rm.code }} — {{ rm.name }}{% endif %}"
+                      data-lot="{{ gl.batch_lot_no if gl else '' }}"
+                      data-sample="{{ q.sample_size }}"
+                      data-pass="{{ q.passed_qty }}"
+                      data-reject="{{ q.rejected_qty }}"
+                      data-status="{{ q.status or '' }}"
+                      data-remarks="{{ q.remarks or '' }}">
+                      View
+                    </button>
+                    {% if q.rejected_qty and q.rejected_qty > 0 %}
+                    <button type="button" class="btn-memo px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white"
+                      title="Rejection memo (coming soon)"
+                      data-qc="{{ q.qc_no }}"
+                      data-material="{% if rm %}{{ rm.code }} — {{ rm.name }}{% endif %}"
+                      data-lot="{{ gl.batch_lot_no if gl else '' }}"
+                      data-reject="{{ q.rejected_qty }}">
+                      Memo
+                    </button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              {# empty — empty-state JS dikhayega #}
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No QC inspections found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Clear search or start inspection from a pending GRN.</p>
+            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">New inspection</button>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing {{ inwards|length }} of {{ inwards|length }} QC inspections</span>
+          <span>Accepted qty feeds Purchase invoice later · Rejected qty is not billable</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="inspect-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="inspect-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="inspect-modal-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="inspect-modal-title" class="text-[16px] font-bold text-ink">Inward QC inspection</h2>
+        <p class="text-[12.5px] text-ink-faint">One GRN lot · pass / reject quantities</p>
+      </div>
+      <button type="button" id="btn-close-inspect" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+
+    {# Add route → form yahan POST karega #}
+    <form id="inspect-form" method="post" action="{{ url_for('inward_qc.inward_qc_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <p class="form-section-title">Header</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div>
+          <label for="qc-no" class="block text-[12.5px] font-semibold text-ink mb-1">QC no.</label>
+          <input type="text" id="qc-no" value="Auto on save" readonly class="w-full px-2.5 py-2 text-[13px] font-mono bg-mist border border-slate-300 rounded text-ink-faint" />
+        </div>
+        <div>
+          <label for="qc-date" class="block text-[12.5px] font-semibold text-ink mb-1">Inspection date *</label>
+          <input type="date" id="qc-date" name="inspection_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="qc-inspector" class="block text-[12.5px] font-semibold text-ink mb-1">Inspector *</label>
+          {# Model me text field hai — User master baad me #}
+          <input type="text" id="qc-inspector" name="inspector" required placeholder="Lab inspector name" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label for="qc-grn" class="block text-[12.5px] font-semibold text-ink mb-1">GRN *</label>
+          <select id="qc-grn" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select pending GRN…</option>
+            {% for g in pending_grns %}
+            <option value="{{ g.id }}">{{ g.grn_no }} · {{ g.status }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="qc-line" class="block text-[12.5px] font-semibold text-ink mb-1">Material / lot *</label>
+          <select id="qc-line" name="grn_line_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">Select after GRN…</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div>
+          <label for="qc-recv" class="block text-[12.5px] font-semibold text-ink mb-1">Received qty</label>
+          <input type="text" id="qc-recv" readonly value="—" class="w-full px-2.5 py-2 text-[14px] bg-mist border border-slate-300 rounded tabular-nums" />
+        </div>
+        <div>
+          <label for="qc-sample" class="block text-[12.5px] font-semibold text-ink mb-1">Sample size *</label>
+          <input type="number" id="qc-sample" name="sample_size" required min="0" step="0.01" placeholder="0" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+        </div>
+        <div>
+          <label for="qc-pass" class="block text-[12.5px] font-semibold text-ink mb-1">Passed qty *</label>
+          <input type="number" id="qc-pass" name="passed_qty" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+        </div>
+        <div>
+          <label for="qc-reject" class="block text-[12.5px] font-semibold text-ink mb-1">Rejected qty *</label>
+          <input type="number" id="qc-reject" name="rejected_qty" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+        </div>
+      </div>
+
+      <hr class="border-slate-200" />
+      <div class="flex items-center justify-between gap-2">
+        <p class="form-section-title !mt-0">QC parameters (template)</p>
+        <span id="qc-template-label" class="text-[12px] text-ink-faint">Optional for now — RM templates later</span>
+      </div>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th style="width:28%">Parameter</th>
+              <th style="width:18%">Standard</th>
+              <th style="width:14%">Unit</th>
+              <th style="width:20%">Actual value</th>
+              <th style="width:20%">Result</th>
+            </tr>
+          </thead>
+          <tbody id="param-tbody">
+            <tr>
+              <td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">Parameter templates will load here in a later step</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <label for="qc-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+        <textarea id="qc-remarks" name="remarks" rows="2" placeholder="Visual notes, instrument ID…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+      <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+        After submit: <strong>passed qty</strong> can move to available stock later · <strong>rejected qty</strong> needs a rejection memo (blocks billing).
+      </p>
+    </form>
+
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="inspect-form" name="qc_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save draft</button>
+      <button type="button" id="btn-cancel-inspect" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="inspect-form" name="qc_action" value="submit" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Submit result</button>
+    </div>
+  </div>
+</div>
+
+<div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="view-title" class="text-[16px] font-bold text-ink">QC inspection</h2>
+        <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="memo-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="memo-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="memo-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-stop-bg flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="memo-title" class="text-[16px] font-bold text-ink">Material rejection memo</h2>
+        <p id="memo-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-memo" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="memo-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-memo-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var inspectModal = document.getElementById('inspect-modal');
+  var viewModal = document.getElementById('view-modal');
+  var memoModal = document.getElementById('memo-modal');
+  var searchInput = document.getElementById('search-qc');
+  var rows = Array.from(document.querySelectorAll('.qc-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.qc-table');
+  var activeFilter = 'all';
+
+  function openInspect() {
+    inspectModal.classList.remove('hidden');
+    inspectModal.setAttribute('aria-hidden', 'false');
+    document.getElementById('qc-date').focus();
+  }
+  function closeInspect() {
+    inspectModal.classList.add('hidden');
+    inspectModal.setAttribute('aria-hidden', 'true');
+    document.getElementById('inspect-form').reset();
+    resetQcLineSelect();
+    document.getElementById('qc-recv').value = '—';
+  }
+
+  // ---- GRN select → Flask se uski lines lao (Material / lot) ----
+  var qcGrn = document.getElementById('qc-grn');
+  var qcLine = document.getElementById('qc-line');
+  var qcRecv = document.getElementById('qc-recv');
+
+  function resetQcLineSelect() {
+    qcLine.innerHTML = '<option value="">Select after GRN…</option>';
+    qcRecv.value = '—';
+  }
+
+  function loadGrnLines(grnId) {
+    resetQcLineSelect();
+    if (!grnId) return;
+    qcLine.innerHTML = '<option value="">Loading…</option>';
+    fetch('/inward_qc/grn_lines/' + grnId)
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        resetQcLineSelect();
+        if (!data.lines || !data.lines.length) {
+          qcLine.innerHTML = '<option value="">No lines on this GRN</option>';
+          return;
+        }
+        data.lines.forEach(function (line) {
+          var opt = document.createElement('option');
+          opt.value = line.id;
+          opt.textContent =
+            (line.material_code || '') + ' · ' +
+            (line.material_name || '') + ' · ' +
+            (line.batch_lot_no || '');
+          opt.setAttribute('data-qty', line.received_qty);
+          qcLine.appendChild(opt);
+        });
+      })
+      .catch(function () {
+        qcLine.innerHTML = '<option value="">Could not load lines</option>';
+      });
+  }
+
+  qcGrn.addEventListener('change', function () {
+    loadGrnLines(qcGrn.value);
+  });
+  qcLine.addEventListener('change', function () {
+    var opt = qcLine.options[qcLine.selectedIndex];
+    var qty = opt ? opt.getAttribute('data-qty') : null;
+    qcRecv.value = (qty !== null && qty !== '') ? qty : '—';
+  });
+
+  function viewField(label, value) {
+    return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+  }
+  function openView(btn) {
+    document.getElementById('view-subtitle').textContent =
+      (btn.getAttribute('data-qc') || '') + ' · ' + (btn.getAttribute('data-status') || '');
+    document.getElementById('view-body').innerHTML =
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Date', btn.getAttribute('data-date')) +
+      viewField('Inspector', btn.getAttribute('data-inspector')) +
+      viewField('GRN', btn.getAttribute('data-grn')) +
+      viewField('Material', btn.getAttribute('data-material')) +
+      viewField('Lot / batch', btn.getAttribute('data-lot')) +
+      viewField('Sample size', btn.getAttribute('data-sample')) +
+      viewField('Passed qty', btn.getAttribute('data-pass')) +
+      viewField('Rejected qty', btn.getAttribute('data-reject')) +
+      '</div>' +
+      '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>';
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function openMemo(btn) {
+    document.getElementById('memo-subtitle').textContent =
+      (btn.getAttribute('data-qc') || '') + ' · rejected goods';
+    document.getElementById('memo-body').innerHTML =
+      '<p class="text-[13.5px] text-ink-muted leading-relaxed">Rejection memo will be a separate document later. For now this is a preview of what failed QC.</p>' +
+      '<div class="grid grid-cols-1 gap-3 mt-3">' +
+      viewField('Material', btn.getAttribute('data-material')) +
+      viewField('Lot / batch', btn.getAttribute('data-lot')) +
+      viewField('Rejected qty', btn.getAttribute('data-reject')) +
+      '</div>';
+    memoModal.classList.remove('hidden');
+    memoModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeMemo() {
+    memoModal.classList.add('hidden');
+    memoModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var blob = row.getAttribute('data-search') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || blob.indexOf(q) !== -1) && (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' QC inspections';
+  }
+  function updateFilterCounts() {
+    var counts = { draft: 0, passed: 0, partial: 0, failed: 0 };
+    rows.forEach(function (row) {
+      var s = row.getAttribute('data-status');
+      if (counts[s] !== undefined) counts[s] += 1;
+    });
+    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
+    document.querySelector('[data-filter="draft"]').textContent = 'Draft (' + counts.draft + ')';
+    document.querySelector('[data-filter="passed"]').textContent = 'Passed (' + counts.passed + ')';
+    document.querySelector('[data-filter="partial"]').textContent = 'Partial (' + counts.partial + ')';
+    document.querySelector('[data-filter="failed"]').textContent = 'Failed (' + counts.failed + ')';
+  }
+
+  document.getElementById('btn-new-inspect').addEventListener('click', openInspect);
+  var emptyNew = document.getElementById('btn-empty-new');
+  if (emptyNew) emptyNew.addEventListener('click', openInspect);
+  document.getElementById('btn-close-inspect').addEventListener('click', closeInspect);
+  document.getElementById('btn-cancel-inspect').addEventListener('click', closeInspect);
+  document.getElementById('inspect-modal-backdrop').addEventListener('click', closeInspect);
+  document.getElementById('btn-close-view').addEventListener('click', closeView);
+  document.getElementById('btn-close-view-2').addEventListener('click', closeView);
+  document.getElementById('view-backdrop').addEventListener('click', closeView);
+  document.getElementById('btn-close-memo').addEventListener('click', closeMemo);
+  document.getElementById('btn-close-memo-2').addEventListener('click', closeMemo);
+  document.getElementById('memo-backdrop').addEventListener('click', closeMemo);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!memoModal.classList.contains('hidden')) closeMemo();
+    else if (!viewModal.classList.contains('hidden')) closeView();
+    else if (!inspectModal.classList.contains('hidden')) closeInspect();
+  });
+
+  document.querySelectorAll('.btn-view').forEach(function (btn) {
+    btn.addEventListener('click', function () { openView(btn); });
+  });
+  document.querySelectorAll('.btn-memo').forEach(function (btn) {
+    btn.addEventListener('click', function () { openMemo(btn); });
+  });
+
+  searchInput.addEventListener('input', applyFilters);
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-btn').forEach(function (b) {
+        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+      });
+      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+      applyFilters();
+    });
+  });
+
+  updateFilterCounts();
+  applyFilters();
+</script>
+{% endblock %}
