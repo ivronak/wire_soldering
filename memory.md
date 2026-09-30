@@ -6,6 +6,14 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### Decision: Product Master = ek screen, teen tables (recipe variant pe)
+**Date:** 2026-09-30
+**Kya:** Add Product ek hi form, 3 sections. (1) Basic details → `Product` (code, name, category, unit, HSN, tax). (2) Specs → **ek default** `ProductVariant` (`attributes` JSON: alloy grade, thickness, flux %). Alag variant-list UI nahi. (3) Recipe → naya `VariantRecipeItem` (`variant_id`, `raw_material_id`, `line_type` jaise Base Metal / Core Flux, `ratio_percent`). Base metals ka total 100% hona chahiye; flux us 100% ke bahar apna % hai.
+**Kyun:** Client flow alloy product hai (Tin 60 / Lead 40 / Flux 2). Purana Product+Variant hataane ki zaroorat nahi — BOM/Sales baad me variant pe hi latke hain. Recipe alag table isliye, taaki percent lines query ho saken. Sales Order pe `qty × ratio%` se RM nikalna, phir Production Order / issue slip — woh Phase 4/6 ka kaam hai, is form ke saath nahi banega.
+**How to apply:** Naya product save = Product + 1 variant + recipe lines, ek transaction. Purane multi-variant rows DB me reh sakte hain; naya form unhe nahi banata. Recipe se pehle RM Master pe do optional flags: `is_base_metal`, `is_core_flux` (default False). Dono off chal sakta hai (normal RM). Ek waqt pe sirf ek on — base metal aur core flux saath nahi. Product recipe dropdown mein sirf ticked RM aayega.
+
+---
+
 ### ⚠️ SUPERSEDED (same din baad me) — Product pe GST slab abhi nahi
 **Date:** 2026-09-23 (superseded 2026-09-23, neeche naya decision dekho: "Tax Rate Master banega")
 **Kya tha:** Product form se hardcoded Tax dropdown hata diya tha, `tax_rate` column unused chhod diya tha, socha tha HSN/Tax master baad me (Sales/GST phase me) banega.

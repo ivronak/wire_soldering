@@ -1,5 +1,6 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash
-from app.models import Product, ProductCategories, Unit, TaxRate, ProductVariant
+from sqlalchemy import or_
+from app.models import Product, ProductCategories, Unit, TaxRate, ProductVariant, RawMaterial
 from app.extensions import db
 
 products_bp = Blueprint("products", __name__, template_folder="templates")
@@ -13,6 +14,12 @@ def products_list():
     units = Unit.query.filter(Unit.is_deleted == False, Unit.is_active == True).all()
     categories = ProductCategories.query.filter(ProductCategories.is_deleted == False,              ProductCategories.is_active == True).all()
     tax_rates = TaxRate.query.filter(TaxRate.is_active == True, TaxRate.is_deleted == False).order_by(TaxRate.code).all()
+    # Recipe dropdown: sirf jin RM pe Base metal ya Core flux tick hai
+    recipe_materials = RawMaterial.query.filter(
+        RawMaterial.is_deleted == False,
+        RawMaterial.is_active == True,
+        or_(RawMaterial.is_base_metal == True, RawMaterial.is_core_flux == True),
+    ).order_by(RawMaterial.code).all()
 
     return render_template(
         "products.html",
@@ -23,6 +30,7 @@ def products_list():
         categories=categories,
         units=units,
         tax_rates=tax_rates,
+        recipe_materials=recipe_materials,
     )
 
 @products_bp.route("/products/add", methods=['POST'])

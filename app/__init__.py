@@ -15,6 +15,7 @@ from app.customers.routes import customers_bp
 from app.purchase_orders.routes import purchase_orders_bp
 from app.grns.routes import grns_bp
 from app.inward_qc.routes import inward_qc_bp
+from app.charges.routes import charges_bp
 from app.extensions import db, migrate
 
 
@@ -50,6 +51,7 @@ def create_app():
     app.register_blueprint(purchase_orders_bp)
     app.register_blueprint(grns_bp)
     app.register_blueprint(inward_qc_bp)
+    app.register_blueprint(charges_bp)
 
     @app.route("/")
     def home():

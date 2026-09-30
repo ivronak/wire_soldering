@@ -466,16 +466,16 @@
 {% block modals %}
 <div id="product-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add product</h2>
-        <p class="text-[12.5px] text-ink-faint">Code, name, category, unit, tax rate &amp; HSN — plus variants when adding</p>
+        <p class="text-[12.5px] text-ink-faint">Basic details, attributes, and the raw-material recipe</p>
       </div>
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
     <form id="product-form" method="post" action="{{url_for('products.products_add')}}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-      <p class="form-section-title">Product info</p>
+      <p class="form-section-title">Basic details</p>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="product-code" class="block text-[12.5px] font-semibold text-ink mb-1">Product code *</label>
@@ -537,46 +537,67 @@
           {% endfor %}
         </select>
       </div>
-      <div id="variant-section">
-        <hr class="border-slate-200 !my-4" />
-        <p class="form-section-title">Variants</p>
-        <p class="text-[11.5px] text-ink-faint -mt-1 mb-2">
-          Each variant is what actually gets stocked and sold — give it its own SKU and its own attributes below. (Editing an existing product? Manage its variants from the expanded row in the list instead.)
-        </p>
-
-        <div id="variant-list" class="space-y-3">
-          <div class="variant-card border border-slate-200 rounded-lg p-3 bg-mist/40" data-index="0">
-            <div class="flex items-center justify-between mb-2">
-              <span class="variant-card-label text-[11.5px] font-semibold text-ink-faint uppercase tracking-wide">Variant 1</span>
-              <button type="button" class="btn-remove-variant text-[11.5px] text-stop hover:underline hidden">Remove</button>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label class="block text-[11px] font-semibold text-ink mb-1">Variant name *</label>
-                <input type="text" name="variant_name_0" placeholder="e.g. Small / 2MM" class="variant-name w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-ink mb-1">SKU *</label>
-                <input type="text" name="variant_sku_0" placeholder="e.g. WSH-SM-2MM" class="variant-sku w-full px-2 py-1.5 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-              </div>
-            </div>
-
-            <label class="block text-[11px] font-semibold text-ink mb-1">Attributes</label>
-            <div class="grid grid-cols-2 gap-1.5 mb-1 pr-6">
-              <span class="text-[10px] text-ink-faint uppercase tracking-wide">Attribute name</span>
-              <span class="text-[10px] text-ink-faint uppercase tracking-wide">Value</span>
-            </div>
-            <div class="attribute-list space-y-1.5 mb-2">
-              <div class="attribute-row flex gap-1.5">
-                <input type="text" name="attr_key_0[]" placeholder="e.g. Size" class="attr-key w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-                <input type="text" name="attr_value_0[]" placeholder="e.g. Small" class="attr-value w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-                <button type="button" class="btn-remove-attr text-ink-faint hover:text-stop px-1" aria-label="Remove attribute">&times;</button>
-              </div>
-            </div>
-            <button type="button" class="btn-add-attr text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
+      <div id="formulation-section" class="space-y-4">
+        <hr class="border-slate-200" />
+        <div>
+          <p class="form-section-title">Attributes</p>
+          <p class="text-[12px] text-ink-faint -mt-1 mb-2">Same as a variant’s attributes — any name and value. Example: Alloy grade = 60/40, Wire thickness = 1.6 mm.</p>
+          <div class="grid grid-cols-2 gap-1.5 mb-1 pr-8">
+            <span class="text-[10px] text-ink-faint uppercase tracking-wide">Attribute name</span>
+            <span class="text-[10px] text-ink-faint uppercase tracking-wide">Value</span>
           </div>
+          <div id="spec-attr-list" class="space-y-1.5 mb-2">
+            <div class="spec-attr-row flex gap-1.5">
+              <input type="text" name="attr_key_0[]" placeholder="e.g. Alloy grade" class="spec-attr-key w-1/2 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+              <input type="text" name="attr_value_0[]" placeholder="e.g. 60/40" class="spec-attr-value w-1/2 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+              <button type="button" class="spec-attr-remove text-ink-faint hover:text-stop px-1" aria-label="Remove attribute">&times;</button>
+            </div>
+          </div>
+          <button type="button" id="btn-add-spec-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
         </div>
-        <button type="button" id="btn-add-variant" class="mt-1 w-full px-3 py-2 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add another variant</button>
+
+        <hr class="border-slate-200" />
+        <div>
+          <p class="form-section-title">Raw material recipe</p>
+          <p class="text-[12px] text-ink-faint -mt-1 mb-2">Only materials marked Base metal or Core flux on the Raw Material master appear here. Base metals should total 100%. Flux stays outside that 100%.</p>
+          {% if not recipe_materials %}
+          <p class="text-[13px] text-ink bg-mist border border-slate-200 rounded px-3 py-2">No recipe materials yet. Open Raw Materials and set a role on Tin, Lead, or Flux first.</p>
+          {% endif %}
+          <div class="overflow-x-auto border border-slate-200 rounded">
+            <table class="w-full text-[13px]">
+              <thead class="bg-mist text-left text-[11.5px] uppercase tracking-wide text-ink-faint">
+                <tr>
+                  <th class="px-2 py-2 w-8">#</th>
+                  <th class="px-2 py-2">Raw material</th>
+                  <th class="px-2 py-2 w-28">Type</th>
+                  <th class="px-2 py-2 w-20">Unit</th>
+                  <th class="px-2 py-2 w-28">Ratio %</th>
+                  <th class="px-2 py-2 w-16"></th>
+                </tr>
+              </thead>
+              <tbody id="recipe-body"></tbody>
+            </table>
+          </div>
+          <button type="button" id="btn-add-recipe-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add material line</button>
+          <p id="recipe-balance" class="mt-2 text-[13px] text-ink-muted">Base metals total: 0% · Flux total: 0%</p>
+        </div>
+
+        <hr class="border-slate-200" />
+        <div class="rounded border border-brand-border bg-brand-soft px-3 py-3 space-y-2">
+          <p class="text-[12.5px] font-semibold text-ink">Flow check — sample customer order</p>
+          <p class="text-[12px] text-ink-muted">Not saved. Type a quantity to see how this recipe explodes into raw material.</p>
+          <div class="flex items-center gap-2 max-w-xs">
+            <label for="recipe-preview-qty" class="text-[12.5px] font-semibold text-ink shrink-0">Order qty</label>
+            <input type="number" id="recipe-preview-qty" min="0" step="0.01" value="500"
+              class="w-full px-2.5 py-2 text-[14px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <ul id="recipe-preview-lines" class="text-[13px] text-ink space-y-1"></ul>
+        </div>
+        <script type="application/json" id="recipe-materials-data">[
+          {%- for m in recipe_materials -%}
+          {"id": {{ m.id }}, "code": {{ m.code|tojson }}, "name": {{ m.name|tojson }}, "role": "{{ 'base' if m.is_base_metal else 'flux' }}", "unit": "{{m.base_unit.code if m.base_unit.code else "KG"}}" }{% if not loop.last %},{% endif %}
+          {%- endfor -%}
+        ]</script>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
@@ -698,12 +719,27 @@
     applyFilters();
   }
 
+  function resetSpecAttributes() {
+    var list = document.getElementById('spec-attr-list');
+    if (!list) return;
+    var rows = list.querySelectorAll('.spec-attr-row');
+    rows.forEach(function (row, i) { if (i > 0) row.remove(); });
+    var first = list.querySelector('.spec-attr-row');
+    if (!first) return;
+    first.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+  }
+
   function resetVariantSection() {
-    // Extra clone kiye hue variant-cards hatao, sirf pehla wala rakho
-    var list = document.getElementById('variant-list');
-    var cards = list.querySelectorAll('.variant-card');
-    cards.forEach(function (card, i) { if (i > 0) card.remove(); });
-    renumberVariants();
+    resetSpecAttributes();
+    var body = document.getElementById('recipe-body');
+    if (!body) return;
+    body.innerHTML = '';
+    addRecipeLine();
+    addRecipeLine();
+    addRecipeLine();
+    var qty = document.getElementById('recipe-preview-qty');
+    if (qty) qty.value = '500';
+    refreshRecipe();
   }
 
   function openModal() {
@@ -724,7 +760,8 @@
     modalTitle.textContent = 'Add product';
     form.reset();
     resetVariantSection();
-    document.getElementById('variant-section').classList.remove('hidden');
+    var formulation = document.getElementById('formulation-section');
+    if (formulation) formulation.classList.remove('hidden');
     openModal();
   }
   function openEditModal(btn) {
@@ -739,8 +776,8 @@
     document.getElementById('product-base-unit').value = btn.getAttribute('data-base-unit-id') || '';
     document.getElementById('product-hsn').value = btn.getAttribute('data-hsn') || '';
     document.getElementById('product-tax-rate').value = btn.getAttribute('data-tax-rate-id') || '';
-    // Variants ab is bade form se edit nahi hote — expanded row se alag manage hote hain
-    document.getElementById('variant-section').classList.add('hidden');
+    var formulation = document.getElementById('formulation-section');
+    if (formulation) formulation.classList.add('hidden');
     openModal();
   }
 
@@ -928,6 +965,12 @@
     var cat = document.getElementById('product-category').value;
     var unit = document.getElementById('product-base-unit').value;
     var taxRate = document.getElementById('product-tax-rate').value;
+    var formulation = document.getElementById('formulation-section');
+    if (formulation && !formulation.classList.contains('hidden')) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Preview only. Recipe save is the next step — nothing was stored.', 'success');
+      return;
+    }
     if (!code || !name || !cat || !unit || !taxRate) {
       e.preventDefault();
       if (typeof showToast === 'function') showToast('Code, Name, Category, Base unit and Tax rate are required.', 'error');
@@ -959,7 +1002,8 @@
   });
 
 
-  document.getElementById('variant-list').addEventListener('click', function (e) {
+  var variantListEl = document.getElementById('variant-list');
+  if (variantListEl) variantListEl.addEventListener('click', function (e) {
     var addAttrBtn = e.target.closest('.btn-add-attr');
     if (addAttrBtn) {
       var card = addAttrBtn.closest('.variant-card');
@@ -1006,7 +1050,8 @@
     });
   }
 
-  document.getElementById('btn-add-variant').addEventListener('click', function () {
+  var addVariantBtn = document.getElementById('btn-add-variant');
+  if (addVariantBtn) addVariantBtn.addEventListener('click', function () {
     var list = document.getElementById('variant-list');
     var newCard = list.querySelector('.variant-card').cloneNode(true);
     newCard.querySelectorAll('input').forEach(function (input) { input.value = ''; });
@@ -1015,6 +1060,127 @@
     list.appendChild(newCard);
     renumberVariants();
   });
+
+  var recipeMaterials = [];
+  try {
+    recipeMaterials = JSON.parse(document.getElementById('recipe-materials-data').textContent || '[]');
+  } catch (err) {
+    recipeMaterials = [];
+  }
+
+  function recipeSelectHtml() {
+    var base = recipeMaterials.filter(function (m) { return m.role === 'base'; });
+    var flux = recipeMaterials.filter(function (m) { return m.role === 'flux'; });
+    function opts(list) {
+      return list.map(function (m) {
+        return '<option value="' + m.id + '" data-role="' + m.role + '" data-unit="' + (m.unit || 'KG') + '">' + m.code + ' — ' + m.name + '</option>';
+      }).join('');
+    }
+    return '<option value="">Select material…</option>'
+      + '<optgroup label="Base metal">' + opts(base) + '</optgroup>'
+      + '<optgroup label="Core flux">' + opts(flux) + '</optgroup>';
+  }
+
+  function addRecipeLine() {
+    var body = document.getElementById('recipe-body');
+    if (!body) return;
+    var tr = document.createElement('tr');
+    tr.className = 'border-t border-slate-200';
+    tr.innerHTML =
+      '<td class="px-2 py-2 text-ink-faint tabular-nums recipe-no"></td>' +
+      '<td class="px-2 py-2"><select class="recipe-rm w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + recipeSelectHtml() + '</select></td>' +
+      '<td class="px-2 py-2 text-ink-muted recipe-type">—</td>' +
+      '<td class="px-2 py-2 font-mono text-[12px] text-ink-muted recipe-unit">—</td>' +
+      '<td class="px-2 py-2"><input type="number" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-2 text-right"><button type="button" class="recipe-remove text-[12px] text-stop hover:underline">Remove</button></td>';
+    body.appendChild(tr);
+    renumberRecipe();
+  }
+
+  function renumberRecipe() {
+    document.querySelectorAll('#recipe-body tr').forEach(function (row, i) {
+      row.querySelector('.recipe-no').textContent = String(i + 1);
+    });
+  }
+
+  function refreshRecipe() {
+    var baseTotal = 0;
+    var fluxTotal = 0;
+    var previewQty = parseFloat(document.getElementById('recipe-preview-qty').value) || 0;
+    var preview = [];
+    document.querySelectorAll('#recipe-body tr').forEach(function (row) {
+      var sel = row.querySelector('.recipe-rm');
+      var opt = sel.options[sel.selectedIndex];
+      var role = opt ? opt.getAttribute('data-role') : '';
+      var unit = opt ? opt.getAttribute('data-unit') : '—';
+      var ratio = parseFloat(row.querySelector('.recipe-ratio').value) || 0;
+      var typeCell = row.querySelector('.recipe-type');
+      var unitCell = row.querySelector('.recipe-unit');
+
+      if (unitCell) {
+        unitCell.textContent = (sel.value && unit) ? unit : '—';
+      }
+
+      if (role === 'base') {
+        typeCell.textContent = 'Base metal';
+        baseTotal += ratio;
+      } else if (role === 'flux') {
+        typeCell.textContent = 'Core flux';
+        fluxTotal += ratio;
+      } else {
+        typeCell.textContent = '—';
+      }
+
+      if (sel.value && ratio > 0) {
+        var need = previewQty * ratio / 100;
+        // Output me saaf-saaf Unit (KG, LTR) print hogi
+        preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums">' + need.toFixed(2) + ' ' + (unit !== '—' ? unit : '') + '</strong></li>');
+      }
+    });
+    var balance = document.getElementById('recipe-balance');
+    var metalsOk = Math.abs(baseTotal - 100) < 0.05;
+    balance.textContent = 'Base metals total: ' + baseTotal.toFixed(1) + '% ' + (metalsOk ? '(balanced)' : '(needs 100%)') + ' · Flux total: ' + fluxTotal.toFixed(1) + '%';
+    document.getElementById('recipe-preview-lines').innerHTML = preview.length
+      ? preview.join('')
+      : '<li class="text-ink-faint">Add materials and ratios to see the explosion.</li>';
+  }
+
+  var specAttrList = document.getElementById('spec-attr-list');
+  if (specAttrList) {
+    document.getElementById('btn-add-spec-attr').addEventListener('click', function () {
+      var first = specAttrList.querySelector('.spec-attr-row');
+      var row = first.cloneNode(true);
+      row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+      specAttrList.appendChild(row);
+    });
+    specAttrList.addEventListener('click', function (e) {
+      var btn = e.target.closest('.spec-attr-remove');
+      if (!btn) return;
+      if (specAttrList.querySelectorAll('.spec-attr-row').length <= 1) return;
+      btn.closest('.spec-attr-row').remove();
+    });
+  }
+
+  var recipeBody = document.getElementById('recipe-body');
+  if (recipeBody) {
+    document.getElementById('btn-add-recipe-line').addEventListener('click', function () {
+      addRecipeLine();
+      refreshRecipe();
+    });
+    recipeBody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.recipe-remove');
+      if (!btn) return;
+      var rows = recipeBody.querySelectorAll('tr');
+      if (rows.length <= 1) return;
+      btn.closest('tr').remove();
+      renumberRecipe();
+      refreshRecipe();
+    });
+    recipeBody.addEventListener('input', refreshRecipe);
+    recipeBody.addEventListener('change', refreshRecipe);
+    document.getElementById('recipe-preview-qty').addEventListener('input', refreshRecipe);
+    resetVariantSection();
+  }
 
   searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
   document.querySelectorAll('.filter-btn').forEach(function (btn) {

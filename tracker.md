@@ -14,9 +14,21 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **Part 1 (Mockups)** — masters + Phase 2/3/4 screens ready (verify/walkthrough chal sakta hai).
 
-**Abhi chal raha hai:** `Part2 / Phase2 / InwardQC / F5` — QC **Submit** ke baad parent GRN status update (`Pending QC` → `Partial QC` / `Closed`). Draft pe GRN mat chhedo.
+> **2026-09-30 — Client meeting hui, 12 naye architectural items add hue spec me (§10.1–§10.12).** Poora status + plan: `development.md` Section 12. Bade highlights: (a) naya **Charges Master**; (b) GRN over-receipt = `received_qty`/`remaining_qty` + PO status (§10.7); (c) **Product recipe LOCKED 2026-09-30** — Product + 1 default Variant (attributes) + `VariantRecipeItem`. Variant table mat hatao. Sales/Production explosion baad me. Detail: `memory.md`.
 
-**Done:** F1–F4 + GRN→Inward QC link (2026-09-29).
+**Abhi chal raha hai:** `Part2 / Product / recipe-form` — Add Product frontend preview ready (basic + specs + recipe + sample order explosion). Save abhi store nahi karta. Next: save = Product + 1 variant + recipe lines.
+
+**RM flags done:** `is_base_metal` / `is_core_flux`, ek waqt pe ek, form buttons.
+
+**Charges:** add/toggle/delete typed. List query ab `is_deleted == False` honi chahiye (Stopped row gayab na ho) + `active_nav='charges'`.
+
+**Exact next micro-step (Charges Master):**
+1. `app/charges/routes.py` me `charges_add` likho — pattern bilkul RM/Product Category jaisa hai (`app/product_categories/routes.py` dekho reference ke liye): `request.form.get('name')`, `generate_next_charge_code()` se code lo (form se code mat lo — template ka Code field disabled hai, isliye kabhi submit hi nahi hoga), duplicate-name check zaroori nahi (sirf code unique hona chahiye, aur wo khud generate hota hai isliye clash hi nahi hoga), `Charge(code=..., name=..., is_active=True, is_deleted=False)` add + commit + flash + redirect.
+2. Phir `charges_toggle` (is_active flip, Product Category jaisa) aur `charges_delete` (is_deleted=True) — dono chhote, 5-6 line ke routes.
+3. **Ek flag:** current `charges_list` query sirf `Charge.is_active == True` filter karta hai — matlab Stopped charges list me kabhi dikhenge hi nahi (baaki sab masters `is_deleted == False` filter karte hain, dono Active+Stopped dikhate hain, JS filter pills se switch hota hai). Isko fix karna hoga taaki "Stopped" filter pill kaam kare — jab `charges_add`/`toggle`/`delete` likho tab yeh bhi ek saath sahi kar lena (`Charge.is_deleted == False` filter, `is_active` filter hatao).
+4. `charges_list` route `active_nav='charges'` bhi pass nahi kar raha — ek line add karo taaki sidebar me "Charges" link highlight ho jab is page pe ho (baaki sab list routes yeh karte hain).
+
+**Baaki Phase 2 (Inward QC) actually zyada aage hai jitna pehle likha tha — neeche "Overall Phase Progress" aur Phase 2 tracker dono correct kiye gaye 2026-09-30.**
 
 Teaching style: direction + checklist; user types Flask; HTML/JS AI likhe jab user bole.
 
@@ -28,8 +40,8 @@ Teaching style: direction + checklist; user types Flask; HTML/JS AI likhe jab us
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Foundation, Auth & Multi-Tenancy | ⬜ Not Started |
-| 1 | Master Data Management & Dynamic Attributes | 🟡 In Progress (9 masters mocked: Unit/Machine/Vendor/Customer/Raw Material/Product/Warehouse/RM Category/Product Category) |
-| 2 | Procurement, GRN & Inward QC | 🟡 In Progress (mockups 5/5 built + verified; backend: Purchase Order List+Add done 2026-09-28) |
+| 1 | Master Data Management & Dynamic Attributes | 🟡 In Progress (11 masters backend-complete; **Charges Master** added 2026-09-30 per client meeting §10.2, in progress) |
+| 2 | Procurement, GRN & Inward QC | 🟡 In Progress (mockups 5/5 built + verified; backend: PO List+Add+Confirm done 2026-09-29, GRN List+Add(draft/post) done 2026-09-29, **Inward QC List+Add+GRN-status-sync done 2026-09-29/30** — corrected from "not started", see Phase 2 tracker below) |
 | 3 | Inventory, Warehouse & Stock Valuation | 🟡 In Progress (stock mockups 4/4 + Warehouse Master mock added) |
 | 4 | Manufacturing Engine, BOM, Routing & WIP | 🟡 In Progress (mockups 6/6 built) |
 | 5 | Lab/QC & Finished Goods Traceability | ⬜ Not Started |
@@ -77,6 +89,9 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 
 **Phase 1 backend masters — saare 11 complete:** Unit, Work Stage, Machine, RM Category, Raw Material, Product Category, Tax Rate, Product+Variant, Warehouse+Branch, Vendor, Customer.
 
+### Phase 1 — Client-Requested Addition (2026-09-30)
+- [ ] **Charges Master** (spec §10.2, simplified — Code auto/Name/Status only) — model + list route user ne khud shuru kiya, template + sidebar link Claude ne bana diya 2026-09-30. Baaki: `charges_add`/`charges_toggle`/`charges_delete` (user types next) + `charges_list` ka `is_active`-only filter bug fix + `active_nav` pass karna. Exact steps upar "Current Focus" me hain. `development.md` §12.2.
+
 ### Phase 1 Wrap-up
 - [x] Cross-module sidebar navigation check *(2026-09-17 — saare 21 mockups me same nav: Masters → Procurement → Inventory → Manufacturing)*
 - [x] Auto-Ledger verified (Vendor/Customer → ledger created) *(2026-09-28 — DB se confirm: alag-alag groups Sundry Creditors/Sundry Debtors, sahi ledger_id links, signed current_balance sahi)*
@@ -94,17 +109,26 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 - [x] Module 1: Purchase Order — mockup `mockups/purchase_order.html` (approved pehle se) — **backend List+Add+Confirm complete 2026-09-29** (`PurchaseOrder` + `PurchaseOrderLine`, po_no auto-numbering, live tax calculation UI mockup-jaisa, Draft→Open transition verified DB se) — **GRN ke liye ready** (Open status wale POs ab available hain)
   - [ ] Poora Edit (vendor/line-items badalna) — abhi scope me nahi, "jo zaroori tha wahi kiya" (sirf Confirm chahiye tha GRN unblock karne ke liye)
 - [x] Module 2: Gate Inward / GRN — **backend List + Add (draft/post) + po_lines JSON + Post-from-draft** (user-typed; tracker sync 2026-09-29) — stock→QC_HOLD baad me Inventory phase me wire hoga
-- [ ] Module 3: Inward QC — mockup ready — **backend next** (`Part2 / Phase2 / InwardQC / F1` = model)
-- [ ] Module 4: Purchase Invoice — mockup ready, backend **not started** (⚠️ business rule design pending: ek GRN line dobara bill na ho — "remaining un-invoiced qty" tracking chahiye)
+- [x] Module 3: Inward QC — mockup ready — **backend List + Add (draft/final) + GRN-line-level FK + GRN-status-sync complete** (2026-09-29/30, user-typed; tracker correction 2026-09-30 — pehle "not started" likha tha, galat tha). `InwardQC` model `grn_line_id` FK use karta hai (`GRNLine` ke against, line-level — spec ke schema-gap ka khud hi sahi solution nikal liya gaya), Draft/Passed/Failed/Partial status auto-decide hota hai passed/rejected qty se, aur QC save hote hi parent `GRN.status` bhi (`Pending QC`/`Partial QC`/`Closed`) auto-update hota hai saari lines ka result check karke. `inward_qc_grn_lines` JSON endpoint bhi hai (GRN pattern jaisa hi, dropdown-free line loading).
+  - [ ] Rejection Memo generation abhi wire nahi hai (QC "Failed"/"Partial" ka reject-qty part vendor ko wapas jaane ka record) — mockup me hai, backend nahi.
+- [ ] Module 4: Purchase Invoice — mockup ready, backend **not started** (⚠️ business rule design pending: ek GRN line dobara bill na ho — "remaining un-invoiced qty" tracking chahiye; ab §10.7 ka `billed_qty` field isi kaam aayega)
 - [ ] Module 5: Purchase Return — mockup ready, backend **not started** (business rule: sirf posted Invoice ke against)
 
-**Spec ka schema-gap already pata hai** (2026-09-28 verification pass se): PO/GRN schema hints adhoore hain (line-items table hi spec me nahi), Inward QC ka `grn_id` line-level FK nahi deta (ek GRN ke multiple materials alag QC maangte hain), Purchase Invoice/Return/Rejection Memo — inka **koi schema hint spec me hai hi nahi**, poora design mockup + apna judgment se karna hoga (jaisa PO ke liye kiya).
+**Spec ka schema-gap already pata hai** (2026-09-28 verification pass se): PO/GRN schema hints adhoore hain (line-items table hi spec me nahi) — **§10.7 (2026-09-30) is ab officially fix karta hai**, dekho neeche. Purchase Invoice/Return/Rejection Memo — inka **koi schema hint spec me hai hi nahi**, poora design mockup + apna judgment se karna hoga (jaisa PO ke liye kiya).
+
+### Phase 2 — Priority Fix (2026-09-30, spec §10.7): PO partial-delivery / over-receipt tracking
+- [ ] `PurchaseOrderLine` par `received_qty` (computed ya stored, GRN post hone par update) + `remaining_qty` add karna.
+- [ ] `PurchaseOrder.status` ko proper state machine banana: `Confirmed/Open` → `Partially Received` (0 < received < ordered) → `Completed` (received ≥ ordered) / `Short Closed` (manual, reason ke saath).
+- [ ] GRN ke "This receipt" input ko `remaining_qty` ke against warn/cap karna (PO ke poore `ordered_qty` ke against nahi — abhi tak koi bhi remaining-tracking nahi thi).
+- **Kyun urgent:** User ne khud ek real gap dikhaya (screenshot) — PO qty 100 tha, 2 GRN se already 140 receive ho chuka tha, 3rd GRN me 100 aur add ho raha tha, kuch rok nahi raha tha. `grns.html` me ek chhota JS-warning-popup approach shuru kiya gaya tha (`data-material`/`data-poqty`/`data-prev` attributes GRN Add form ke receipt-qty inputs par already add hain) — **ab superseded**, asli fix yehi upar wala hai. `development.md` §12.3.
 
 ---
 
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-09-30 — Client meeting (§10.1–§10.12) docs update + Charges Master template + tracker corrections.** User ne ek naya client-meeting requirements block diya (already `Manufacturing_ERP_Unified_Requirements_Specification.md` Section 10 me spec-level detail me mojood tha) — `development.md` me naya Section 12 likha jo har ek 12 items ko project ke **actual current state** ke against map karta hai (status/plan table + 2 follow-up notes), sirf spec text repeat nahi kiya. Sabse important 3 findings: (1) **Charges Master** (§10.2, simplified Code+Name+Status) — user ne khud `Charge` model + `charges_list` route + auto-code helper (`CHG-0001` scheme) pehle se shuru kar diya tha (session ke bahar) — Claude ne template (`app/charges/templates/charges.html`) + sidebar link (`base.html`) bana diye, baaki CRUD routes user type karega (exact steps "Current Focus" me). (2) **GRN over-receipt ka JS-warning plan superseded** — pichhle session me ek chhota confirm()-popup approach shuru hua tha (data-attributes GRN template me add hue the), lekin §10.7 ka asli fix (`received_qty`/`remaining_qty` per PO line + PO status state machine + Short Close) zyada sahi/permanent solution hai — flag kiya as next Phase 2 priority, popup-approach continue nahi karna. (3) **Product Master recipe-rework (§10.12) flag kiya as decision-pending, koi code touch nahi kiya** — existing Product+Variant (100% built+verified 2026-09-24) se directly conflict karta hai, user se explicit confirm chahiye pehle. Isi pass mein tracker ka ek purana galat fact bhi correct kiya: **Inward QC backend actually already List+Add+GRN-line-FK+GRN-status-sync complete hai** (user-typed, 2026-09-29/30) — tracker pehle "not started" bola raha tha, ab sahi kiya.
 
 - **2026-09-28/29 — Purchase Order (Phase 2, Module 1) List + Add complete + verified; Vendor/Customer/Branch state-format bug fix.** Phase 2 shuru karne se pehle poora procurement flow (PO→GRN→QC→Invoice→Return) verify kiya subagent se — mockup ke 5 files aapas me sahi connected mile, lekin unka demo data (vendor naam, RM code) real seeded DB se match nahi karta — decide hua yeh matter nahi karta (mockup data backend bante hi Jinja se replace ho jaayega, sirf FLOW/FIELDS/business-rules important hain, data-values nahi — pehle se established rule reconfirm hui). 2 real business-rules identify hui jo backend me chahiye: (1) Purchase Invoice me ek GRN line dobara bill na ho, (2) Purchase Return sirf posted Invoice ke against.
 

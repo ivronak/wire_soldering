@@ -464,3 +464,45 @@ Manufacturing:  BOM/Recipe → Production Order → Material Issue → Routing �
 ```
 
 — so every screen's fields and buttons are understood in terms of *why*, not just *what*, before any backend work starts. **Do not assume the direction — ask.**
+
+---
+
+## 12. Client Meeting Adjustments (2026-09-29/30) — New Requirements
+
+**Source:** `Manufacturing_ERP_Unified_Requirements_Specification.md` Section 10 (§10.1–§10.12) — a client feedback session added 12 architectural refinements to the spec. This section maps each one onto the project's *actual current state* (Phase 1 backend ~complete, Phase 2 Purchase Order/GRN/Inward QC backend in progress) rather than repeating the spec text — see the spec doc itself for full field-level detail.
+
+**Manual Learning Mode is unchanged for all of this** (`CLAUDE.md` §0A, `learning.md`): AI builds templates/HTML directly and teaches Flask one micro-step at a time; user types the Python. Same scoped exceptions as before (AI fixes small bugs when asked "fix karo").
+
+### 12.1 Status of each item (as of 2026-09-30)
+
+| # | Spec ref | Item | Status / plan |
+|---|---|---|---|
+| 1 | §10.1 | Zero hardcoded dropdowns everywhere | Already the project's standing rule (Unit/Category/Warehouse/Branch/Tax Rate are all real masters, not fixed lists) — no new work, just re-confirmed as a permanent check for every future dropdown. |
+| 2 | §10.2 | **Charges Master** — simplified: Code (auto) + Name + Status only, no ledger/tax fields | **In progress.** User started it themselves (`app/charges/routes.py`: `Charge` model + `charges_list` + a `generate_next_charge_code()` helper already typed, matching the `CHG-0001` scheme). Template built by Claude 2026-09-30 (`app/charges/templates/charges.html`) + sidebar link wired in `base.html`. Remaining: user types `charges_add` / `charges_toggle` / `charges_delete`. See §12.2. |
+| 3 | §10.3 | Universal auto-generated codes on **all** masters/transactions | PO/GRN/Inward QC already follow this (`PO-2026-NNN` style). Charges is being built this way from day one. **The other 9 already-built masters (Unit, Work Stage, Machine, RM Category, Raw Material, Product Category, Tax Rate, Vendor, Customer, Warehouse, Product) still take a manually-typed code** — retrofitting them is a real, cross-module task, **not started, timing not yet decided with the user.** |
+| 4 | §10.4 | Vendor/Customer real document upload (replace placeholder dropzone) | **Not started.** Needs a new `party_documents` table (or `vendor_documents`/`customer_documents`), an upload route, and `uploads/vendors/<id>/` / `uploads/customers/<id>/` storage folders. Natural next step after Phase 1 wrap-up, or whenever the user prioritizes it. |
+| 5 | §10.5 | PO "Confirm" → vendor invoice/bill upload modal before Draft→Open | **Not started.** This *extends* the existing simple Confirm button (currently a no-upload Draft→Open transition, built 2026-09-29) — it should not be thrown away, just wrapped with an upload step. |
+| 6 | §10.6 | Two-tier "Pending Action Queue" + "Completed Register" on every operational stage | **Not started.** A UI pattern to apply to GRN, Inward QC, Purchase Invoice, Material Issue, Dispatch, Sales Invoice screens. GRN and Inward QC already exist and are template-only changes to retrofit (their queries already have the data — e.g. GRN's list route already computes `pending_grns`-style filtering for Inward QC) — good candidates to try this pattern on first. |
+| 7 | §10.7 | Partial deliveries: `ordered_qty` / `received_qty` / `remaining_qty` / `billed_qty` per PO line, PO status state machine (`Confirmed/Open` → `Partially Received` → `Completed`/`Short Closed`) | **Directly relevant to an open gap the user already found** — a GRN screenshot showed a PO for 100 units with 140 already received (2 prior GRNs) and a 3rd GRN about to add 100 more, with nothing stopping it. The half-built fix (a JS "are you sure" warning on the GRN Add form) is **superseded by this** — the correct fix is real `received_qty`/`remaining_qty` tracking + a proper PO status machine + `[Short Close PO]`, not just a popup. **Not started — this is the next real Phase 2 priority**, see §12.3. |
+| 8 | §10.8 | Unified Procurement Document Docket (PO→GRN→QC→Invoice shared file bundle, tagged by document type) | **Not started** — naturally depends on #4/#5's upload infrastructure existing first (same underlying files table, different tag). |
+| 9 | §10.9 | RM lot code + unit-level serialized barcode/QR, generated **only** for QC-passed/accepted quantity | **Not started**, and correctly blocked on Inward QC being further along (Inward QC backend — list/add/GRN-status-sync — is already in progress, see tracker). Barcode/QR generation itself belongs to Phase 3/5. Handheld scanner-gun integration is **explicitly deferred** per the spec itself, no action needed. |
+| 10 | §10.10 | Printed document footer: "Created By" / "Approved By" attribution stamp | **Not started** — blocked on any document having a print/PDF view at all (none exist yet). Low priority until a print template is being built anyway. |
+| 11 | §10.11 | Visitor Gate Pass / factory security entry | **Deferred**, per the spec's own phasing note (Phase 0 / Auth & Security). No action now. |
+| 12 | §10.12 | **Recipe-Based Product Formulation** — replace Product+Variant hierarchy with a single product carrying an inline RM ratio/recipe (e.g. Tin 60% / Lead 40% / Flux 2%), auto-exploded into RM requirements on Sales Order | **⚠️ Conflicts with already-built, verified work.** `Product` + `ProductVariant` (dynamic JSON attributes, e.g. Size/Gauge/Color) is 100% complete and verified (2026-09-24) — Product Master's entire backend is built on this model. This spec change effectively asks for a different Product Master shape (no child variants, inline recipe %, auto-explosion logic that doesn't exist until Sales Order/Phase 6 anyway). **This needs an explicit decision with the user before any code changes** — e.g., replace Product+Variant entirely, or keep Variant for products that genuinely vary by size/attribute and add a separate recipe-mode for alloy-style products like solder wire. **Not started, decision-pending — do not silently start rewriting Product Master.** |
+
+### 12.2 Immediate next module: Charges Master (§10.2)
+
+Simplest possible master (3 fields, no FK relationships) — same "Add/Edit/Toggle/Soft-delete" shape as every other master the user has already built (Unit, RM Category, Product Category, Tax Rate), just with the code auto-generated instead of typed. Good re-entry point into Manual Learning Mode after this doc-update detour.
+
+**What already exists (user-typed):**
+- `Charge` model (`app/models.py`) — `code`, `name`, `is_active`, `is_deleted`.
+- `charges_bp` registered in `app/__init__.py`.
+- `charges_list` route + `generate_next_charge_code()` helper (`CHG-0001` style, based on `Charge.query.order_by(Charge.id.desc()).first()`).
+
+**What Claude just built:** `app/charges/templates/charges.html` (list table + Add/Edit slide-over, code shown read-only/disabled so it's *never submitted from the form* — the route generates it), and the sidebar link in `base.html`.
+
+**What's left (user types, next micro-step):** `charges_add`, `charges_toggle`, `charges_delete` routes — same restore-on-duplicate-code / soft-delete pattern as every prior master. See `tracker.md` Current Focus for the exact next step and a flagged bug in the existing `charges_list` query.
+
+### 12.3 Follow-up note: GRN over-receipt fix changes shape (§10.7)
+
+Before this update, the plan (mid-session, interrupted by this doc-update request) was a client-side JS `confirm()` warning on the GRN Add form when cumulative received qty would exceed the PO's ordered qty — the `data-material`/`data-poqty`/`data-prev` attributes already added to `grns.html`'s receipt-qty inputs are leftover scaffolding from that approach. §10.7 defines the *real* fix: `PurchaseOrderLine` needs actual `received_qty`/`remaining_qty` tracking (updated whenever a GRN posts) and `PurchaseOrder.status` needs to become a proper state machine (`Confirmed/Open` → `Partially Received` → `Completed` / `Short Closed`), with the GRN's "This receipt" input capped/warned against `remaining_qty` specifically, not the raw ordered qty. This is real backend work (new column + logic in the GRN post route), not just a template change — flagged in `tracker.md` as the next Phase 2 priority after Charges Master.

@@ -41,6 +41,8 @@ def raw_materials_add():
     hsn_code = (request.form.get('hsn_code') or "").strip()
     tax_rate_id = int(request.form.get('tax_rate_id')) if (request.form.get('tax_rate_id') or "").strip() else None
     valuation_method = (request.form.get('valuation_method') or "").strip()
+    is_base_metal = request.form.get('is_base_metal') == 'on'
+    is_core_flux = request.form.get('is_core_flux') == 'on'
 
     if not code or not name or category_id is None or base_unit_id is None:
         return redirect(url_for('raw_materials.raw_materials_list'))
@@ -61,6 +63,8 @@ def raw_materials_add():
             existing.hsn_code = hsn_code
             existing.tax_rate_id=tax_rate_id
             existing.valuation_method = valuation_method
+            existing.is_base_metal=is_base_metal
+            existing.is_core_flux=is_core_flux
             existing.is_active = True
             db.session.commit()
             flash("A Raw Material restored with this code.", "success")
@@ -84,6 +88,8 @@ def raw_materials_add():
         hsn_code=hsn_code,
         tax_rate_id=tax_rate_id,
         valuation_method=valuation_method,
+        is_base_metal=is_base_metal,
+        is_core_flux=is_core_flux,
         is_active=True,
         is_deleted=False,
     ))
@@ -119,6 +125,8 @@ def raw_materials_edit(m_id):
     hsn_code = (request.form.get('hsn_code') or "").strip()
     tax_rate_id = int(request.form.get('tax_rate_id')) if (request.form.get('tax_rate_id') or "").strip() else None
     valuation_method = (request.form.get('valuation_method') or "").strip()
+    is_base_metal = request.form.get('is_base_metal') == 'on'
+    is_core_flux = request.form.get('is_core_flux') == 'on'
 
     if not code or not name or category_id is None or base_unit_id is None:
         return redirect(url_for('raw_materials.raw_materials_list'))
@@ -141,6 +149,8 @@ def raw_materials_edit(m_id):
     m.hsn_code = hsn_code
     m.tax_rate_id=tax_rate_id
     m.valuation_method = valuation_method
+    m.is_base_metal = is_base_metal
+    m.is_core_flux=is_core_flux
     m.is_deleted = False
 
     db.session.commit()

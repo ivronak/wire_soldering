@@ -65,6 +65,10 @@ class RawMaterial(db.Model):
     alt_unit = db.relationship("Unit", foreign_keys=[alt_unit_id])
     tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
 
+    # Recipe form ke dropdown ke liye — dono optional, default off
+    is_base_metal = db.Column(db.Boolean, default=False, nullable=False)
+    is_core_flux = db.Column(db.Boolean, default=False, nullable=False)
+
     conversion_note = db.Column(db.String(100), nullable=True)
     reorder_level = db.Column(db.Integer, nullable=True)
     min_stock = db.Column(db.Integer, nullable=True)
@@ -343,3 +347,13 @@ class InwardQC(db.Model):
     remarks = db.Column(db.String(255), nullable=True)
 
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class Charge(db.Model):
+    __tablename__ = 'charges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    is_deleted = db.Column(db.Boolean, default=False)
+
