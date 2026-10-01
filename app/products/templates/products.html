@@ -131,6 +131,52 @@
     padding-bottom: 10px;
     border-bottom: 1px solid #D1D9D8;
   }
+  /* Recipe = variant ki child rows, alag table nahi. Doosri line SKU column ke andar. */
+  .variant-row.recipe-line td {
+    background: #F4F7F6;
+    font-size: 12.5px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .variant-row.recipe-line:hover td { background: #EEF3F1; }
+  .variant-row.recipe-line td:first-child::after { display: none; }
+  .variant-row.recipe-head td {
+    background: #EEF2F1;
+    color: #6B7F82;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .variant-row.recipe-head td:nth-child(2)::after { display: none; }
+  .variant-item[data-recipe-id] { cursor: pointer; }
+  .variant-row.recipe-line td:nth-child(2),
+  .variant-row.recipe-head td:nth-child(2) { position: relative; padding-left: 22px; }
+  .variant-row.recipe-line td:nth-child(2)::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid #D5DDDB;
+  }
+  .variant-row.recipe-line td:nth-child(2)::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    width: 10px;
+    height: 2px;
+    margin-top: -1px;
+    background: #D5DDDB;
+  }
+  .variant-row.recipe-line.recipe-last td:nth-child(2)::before {
+    bottom: 50%;
+    border-bottom: 2px solid #D5DDDB;
+    border-bottom-left-radius: 6px;
+  }
   /* Attribute = label | value segmented chip — naam aur value alag dikhein */
   .attr-chip {
     display: inline-flex;
@@ -354,12 +400,23 @@
               </tr>
               {% endif %}
               {% for v in p.active_variants %}
-              <tr class="variant-row variant-item hidden" data-parent="variants-{{ p.id }}">
+              <tr class="variant-row variant-item hidden" data-parent="variants-{{ p.id }}"{% if v.recipe_items %} data-recipe-id="{{ v.id }}"{% endif %}>
                 <td></td>
                 <td class="cell-left">
                   <span class="inline-block max-w-full font-mono text-[12px] font-semibold text-copper-text bg-copper-soft border border-copper-border rounded px-2 py-1 truncate align-middle">{{ v.sku }}</span>
                 </td>
-                <td class="cell-left text-[13.5px] text-ink font-medium truncate">{{ v.name }}</td>
+                <td class="cell-left">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[13.5px] text-ink font-medium truncate">{{ v.name }}</span>
+                    {% if v.recipe_items %}
+                    {% set rcount = v.recipe_items|length %}
+                    <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/></svg>
+                      {{ rcount }} material{{ 's' if rcount != 1 else '' }}
+                    </span>
+                    {% endif %}
+                  </div>
+                </td>
                 <td class="cell-left" colspan="3">
                   {% set attrs = v.attributes or {} %}
                   {% if attrs %}
@@ -391,7 +448,9 @@
                       data-id="{{ v.id }}"
                       data-name="{{ v.name }}"
                       data-sku="{{ v.sku }}"
-                      data-attributes='{{ (v.attributes or {}) | tojson }}'>
+                      data-attributes='{{ (v.attributes or {}) | tojson }}'
+                      data-recipe='[{% for r in v.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }}}{% if not loop.last %},{% endif %}{% endfor %}]'
+                      data-unit="{{ p.base_unit.code if p.base_unit else 'KG' }}">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                     </button>
                     <form method="post" action="/products/variants/delete/{{ v.id }}" class="inline-flex js-confirm-submit"
@@ -405,6 +464,38 @@
                   </div>
                 </td>
               </tr>
+              {% if v.recipe_items %}
+              <tr class="variant-row recipe-head variant-recipe-row hidden" data-recipe-of="{{ v.id }}" data-recipe-for="variants-{{ p.id }}">
+                <td></td>
+                <td class="cell-left">Material</td>
+                <td class="cell-left">Name</td>
+                <td class="cell-left">Type</td>
+                <td>Unit</td>
+                <td>Ratio</td>
+                <td></td>
+                <td></td>
+              </tr>
+              {% for r in v.recipe_items %}
+              <tr class="variant-row recipe-line variant-recipe-row hidden{% if loop.last %} recipe-last{% endif %}" data-recipe-of="{{ v.id }}" data-recipe-for="variants-{{ p.id }}">
+                <td></td>
+                <td class="cell-left">
+                  <span class="inline-block font-mono text-[11.5px] font-semibold text-ink bg-white border border-slate-200 rounded px-1.5 py-0.5">{{ r.raw_material.code if r.raw_material else '—' }}</span>
+                </td>
+                <td class="cell-left text-[13px] text-ink">{{ r.raw_material.name if r.raw_material else '—' }}</td>
+                <td class="cell-left">
+                  {% if r.is_flux %}
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-copper-soft text-copper-text border border-copper-border">Core flux</span>
+                  {% else %}
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-brand-soft text-brand-teal border border-brand-border">Base metal</span>
+                  {% endif %}
+                </td>
+                <td class="text-center font-mono text-[12px] text-ink-muted">{{ r.raw_material.base_unit.code if r.raw_material and r.raw_material.base_unit else '—' }}</td>
+                <td class="text-center font-mono text-[12.5px] font-semibold text-ink tabular-nums">{{ "%.1f"|format(r.ratio_percent) }}%</td>
+                <td></td>
+                <td></td>
+              </tr>
+              {% endfor %}
+              {% endif %}
               {% endfor %}
               <tr class="variant-row variant-add hidden" data-parent="variants-{{ p.id }}">
                 <td></td>
@@ -412,7 +503,9 @@
                   <div class="flex items-center gap-3">
                     <button type="button"
                       class="btn-add-variant-to-product inline-flex items-center gap-1 px-2.5 py-1 text-[12px] font-semibold text-copper-text bg-white border border-dashed border-copper-border rounded hover:bg-copper-soft"
-                      data-product-id="{{ p.id }}">
+                      data-product-id="{{ p.id }}"
+                      data-unit="{{ p.base_unit.code if p.base_unit else 'KG' }}"
+                      data-next-sku="{{ p.code }}-{{ '%02d'|format(p.variants|length + 1) }}">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                       Add variant
                     </button>
@@ -478,9 +571,10 @@
       <p class="form-section-title">Basic details</p>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label for="product-code" class="block text-[12.5px] font-semibold text-ink mb-1">Product code *</label>
-          <input type="text" id="product-code" name="code" required placeholder="FG-WS-01" maxlength="20" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <label for="product-code" class="block text-[12.5px] font-semibold text-ink mb-1">Product code</label>
+          <input type="text" id="product-code" value="{{ next_code or '' }}" disabled placeholder="FG-0001" maxlength="20" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
+          <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated. Disabled so it is not sent with the form — the route creates the code.</p>
         </div>
         <div>
           <label for="product-name" class="block text-[12.5px] font-semibold text-ink mb-1">Product name *</label>
@@ -583,15 +677,32 @@
         </div>
 
         <hr class="border-slate-200" />
+        <!-- IS PURANE BLOCK KO REPLACE KAREIN -->
         <div class="rounded border border-brand-border bg-brand-soft px-3 py-3 space-y-2">
-          <p class="text-[12.5px] font-semibold text-ink">Flow check — sample customer order</p>
-          <p class="text-[12px] text-ink-muted">Not saved. Type a quantity to see how this recipe explodes into raw material.</p>
-          <div class="flex items-center gap-2 max-w-xs">
-            <label for="recipe-preview-qty" class="text-[12.5px] font-semibold text-ink shrink-0">Order qty</label>
-            <input type="number" id="recipe-preview-qty" min="0" step="0.01" value="500"
-              class="w-full px-2.5 py-2 text-[14px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          <div class="flex items-center justify-between">
+            <p class="text-[12.5px] font-semibold text-ink">Flow check — sample customer order</p>
+            <span id="recipe-preview-calc-summary" class="text-[11.5px] font-mono text-ink-muted"></span>
           </div>
-          <ul id="recipe-preview-lines" class="text-[13px] text-ink space-y-1"></ul>
+          <p class="text-[12px] text-ink-muted">Type an order quantity to see how this recipe explodes into raw material.</p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+            <div>
+              <label class="block text-[12px] font-semibold text-ink mb-1">
+                Order qty (<span id="recipe-preview-unit-label" class="font-mono text-copper">KG</span>)
+              </label>
+              <input type="number" id="recipe-preview-qty" min="0" step="1" value="500"
+                class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+
+            <!-- Agar product Roll/Pcs me hai, toh per-unit weight yahan dikhega -->
+            <div id="recipe-unit-weight-box" class="hidden">
+              <label class="block text-[12px] font-semibold text-ink mb-1">Weight per unit (KG)</label>
+              <input type="number" id="recipe-unit-weight" min="0.001" step="0.001" value="0.5"
+                class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            </div>
+          </div>
+
+          <ul id="recipe-preview-lines" class="text-[13px] text-ink space-y-1 pt-1"></ul>
         </div>
         <script type="application/json" id="recipe-materials-data">[
           {%- for m in recipe_materials -%}
@@ -626,11 +737,11 @@
 
 <div id="variant-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="variant-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" aria-labelledby="variant-modal-title" class="relative ml-auto h-full w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-xl">
+  <div role="dialog" aria-labelledby="variant-modal-title" class="relative ml-auto h-full w-full max-w-xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="variant-modal-title" class="text-[16px] font-bold text-ink">Add variant</h2>
-        <p class="text-[12.5px] text-ink-faint">Name, SKU &amp; attributes</p>
+        <p class="text-[12.5px] text-ink-faint">Name, SKU, attributes, and recipe</p>
       </div>
       <button type="button" id="btn-close-variant-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -641,9 +752,10 @@
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
       </div>
       <div>
-        <label for="variant-modal-sku" class="block text-[12.5px] font-semibold text-ink mb-1">SKU *</label>
-        <input type="text" id="variant-modal-sku" name="sku" required placeholder="e.g. WSH-SM-2MM"
-          class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <label for="variant-modal-sku" class="block text-[12.5px] font-semibold text-ink mb-1">SKU</label>
+        <input type="text" id="variant-modal-sku" disabled placeholder="FG-0001-02"
+          class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated from the product code. Disabled so it is not sent — the route keeps or creates the SKU.</p>
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-ink mb-1">Attributes</label>
@@ -659,6 +771,48 @@
           </div>
         </div>
         <button type="button" id="btn-add-variant-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
+      </div>
+      <hr class="border-slate-200" />
+      <div>
+        <p class="form-section-title">Raw material recipe</p>
+        <p class="text-[12px] text-ink-faint -mt-1 mb-2">Same fields as Add product. Save replaces this variant’s recipe lines.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded">
+          <table class="w-full text-[13px]">
+            <thead class="bg-mist text-left text-[11px] uppercase tracking-wide text-ink-faint">
+              <tr>
+                <th class="px-2 py-2 w-8">#</th>
+                <th class="px-2 py-2">Raw material</th>
+                <th class="px-2 py-2 w-24">Type</th>
+                <th class="px-2 py-2 w-14">Unit</th>
+                <th class="px-2 py-2 w-20">Ratio %</th>
+                <th class="px-2 py-2 w-14"></th>
+              </tr>
+            </thead>
+            <tbody id="variant-recipe-body"></tbody>
+          </table>
+        </div>
+        <button type="button" id="btn-add-variant-recipe" class="mt-2 text-[12px] font-semibold text-copper-text hover:underline">+ Add material line</button>
+        <p id="variant-recipe-balance" class="mt-2 text-[13px] text-ink-muted">Base metals total: 0% · Flux total: 0%</p>
+      </div>
+      <div class="rounded border border-brand-border bg-brand-soft px-3 py-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[12.5px] font-semibold text-ink">Flow check — sample customer order</p>
+          <span id="variant-preview-calc-summary" class="text-[11.5px] font-mono text-ink-muted"></span>
+        </div>
+        <p class="text-[12px] text-ink-muted">Type an order quantity to see how this recipe explodes into raw material.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[12px] font-semibold text-ink mb-1">Order qty (<span id="variant-preview-unit-label" class="font-mono text-copper">KG</span>)</label>
+            <input type="number" id="variant-preview-qty" min="0" step="1" value="500"
+              class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div id="variant-unit-weight-box" class="hidden">
+            <label class="block text-[12px] font-semibold text-ink mb-1">Weight per unit (KG)</label>
+            <input type="number" id="variant-unit-weight" min="0.001" step="0.001" value="0.5"
+              class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <ul id="variant-preview-lines" class="text-[13px] text-ink space-y-1 pt-1"></ul>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
@@ -686,6 +840,7 @@
   var SEARCH_KEY = 'erp.products.searchQ';
   // Flask Add route ready hone pe url_for yahan / form pe
   var addAction = "{{url_for('products.products_add')}}";
+  var nextProductCode = "{{ next_code or '' }}";
 
   function saveActiveFilter() {
     try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
@@ -745,7 +900,7 @@
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('product-code').focus();
+    document.getElementById('product-name').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -759,6 +914,7 @@
     if (addAction) form.action = addAction;
     modalTitle.textContent = 'Add product';
     form.reset();
+    document.getElementById('product-code').value = nextProductCode;
     resetVariantSection();
     var formulation = document.getElementById('formulation-section');
     if (formulation) formulation.classList.remove('hidden');
@@ -835,12 +991,16 @@
     variantModal.setAttribute('aria-hidden', 'true');
     variantForm.reset();
     resetVariantModalAttrs();
+    fillVariantRecipe([]);
   }
-  function openAddVariantModal(productId) {
+  function openAddVariantModal(productId, unitCode, nextSku) {
     variantForm.action = '/products/' + productId + '/variants/add';
     variantModalTitle.textContent = 'Add variant';
     variantForm.reset();
+    document.getElementById('variant-modal-sku').value = nextSku || '';
     resetVariantModalAttrs();
+    fillVariantRecipe([]);
+    setVariantOrderUnit(unitCode);
     openVariantModal();
   }
   function openEditVariantModal(btn) {
@@ -861,6 +1021,10 @@
       row.querySelector('.attr-value').value = attrs[key];
       if (i > 0) list.appendChild(row);
     });
+    var recipe = [];
+    try { recipe = JSON.parse(btn.getAttribute('data-recipe') || '[]'); } catch (err) { recipe = []; }
+    fillVariantRecipe(recipe);
+    setVariantOrderUnit(btn.getAttribute('data-unit'));
     openVariantModal();
   }
 
@@ -873,7 +1037,7 @@
 
   document.querySelectorAll('.btn-add-variant-to-product').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      openAddVariantModal(btn.getAttribute('data-product-id'));
+      openAddVariantModal(btn.getAttribute('data-product-id'), btn.getAttribute('data-unit'), btn.getAttribute('data-next-sku'));
     });
   });
   document.querySelectorAll('.btn-edit-variant').forEach(function (btn) {
@@ -890,6 +1054,20 @@
       list.appendChild(newRow);
       return;
     }
+    var addRecipeBtn = e.target.closest('#btn-add-variant-recipe');
+    if (addRecipeBtn) {
+      addVariantRecipeLine();
+      return;
+    }
+    var removeRecipeBtn = e.target.closest('.v-recipe-remove');
+    if (removeRecipeBtn) {
+      var body = document.getElementById('variant-recipe-body');
+      if (body.querySelectorAll('tr').length <= 1) return;
+      removeRecipeBtn.closest('tr').remove();
+      renumberVariantRecipe();
+      refreshVariantFlow();
+      return;
+    }
     var removeBtn = e.target.closest('.btn-remove-attr');
     if (removeBtn) {
       var row = removeBtn.closest('.attribute-row');
@@ -903,10 +1081,9 @@
 
   variantForm.addEventListener('submit', function (e) {
     var vname = document.getElementById('variant-modal-name').value.trim();
-    var vsku = document.getElementById('variant-modal-sku').value.trim();
-    if (!vname || !vsku) {
+    if (!vname) {
       e.preventDefault();
-      if (typeof showToast === 'function') showToast('Variant name and SKU are required.', 'error');
+      if (typeof showToast === 'function') showToast('Variant name is required.', 'error');
     }
   });
 
@@ -960,20 +1137,13 @@
   });
 
   form.addEventListener('submit', function (e) {
-    var code = document.getElementById('product-code').value.trim();
     var name = document.getElementById('product-name').value.trim();
     var cat = document.getElementById('product-category').value;
     var unit = document.getElementById('product-base-unit').value;
     var taxRate = document.getElementById('product-tax-rate').value;
-    var formulation = document.getElementById('formulation-section');
-    if (formulation && !formulation.classList.contains('hidden')) {
+    if (!name || !cat || !unit || !taxRate) {
       e.preventDefault();
-      if (typeof showToast === 'function') showToast('Preview only. Recipe save is the next step — nothing was stored.', 'success');
-      return;
-    }
-    if (!code || !name || !cat || !unit || !taxRate) {
-      e.preventDefault();
-      if (typeof showToast === 'function') showToast('Code, Name, Category, Base unit and Tax rate are required.', 'error');
+      if (typeof showToast === 'function') showToast('Name, Category, Base unit and Tax rate are required.', 'error');
       return;
     }
     if (!form.action || form.action.indexOf('TODO') !== -1) {
@@ -988,6 +1158,26 @@
       var variantRows = document.querySelectorAll('[data-parent="' + targetId + '"]');
       var isOpening = btn.classList.toggle('is-open');
       variantRows.forEach(function (row) { row.classList.toggle('hidden', !isOpening); });
+      // Recipe alag se khulti hai — product band karo to recipe bhi band
+      if (!isOpening) {
+        document.querySelectorAll('.variant-recipe-row[data-recipe-for="' + targetId + '"]').forEach(function (row) {
+          row.classList.add('hidden');
+        });
+      }
+    });
+  });
+
+  function toggleRecipe(variantId) {
+    var recipeRows = document.querySelectorAll('.variant-recipe-row[data-recipe-of="' + variantId + '"]');
+    if (!recipeRows.length) return;
+    var show = recipeRows[0].classList.contains('hidden');
+    recipeRows.forEach(function (row) { row.classList.toggle('hidden', !show); });
+  }
+
+  document.querySelectorAll('.variant-item[data-recipe-id]').forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('button, a, input, label, form, select, textarea')) return;
+      toggleRecipe(row.getAttribute('data-recipe-id'));
     });
   });
 
@@ -1081,6 +1271,122 @@
       + '<optgroup label="Core flux">' + opts(flux) + '</optgroup>';
   }
 
+  function paintVariantRecipeRow(row) {
+    var sel = row.querySelector('.recipe-rm');
+    var opt = sel.options[sel.selectedIndex];
+    var role = opt ? opt.getAttribute('data-role') : '';
+    var typeCell = row.querySelector('.recipe-type');
+    var unitCell = row.querySelector('.recipe-unit');
+    if (role === 'base') typeCell.textContent = 'Base metal';
+    else if (role === 'flux') typeCell.textContent = 'Core flux';
+    else typeCell.textContent = '—';
+    unitCell.textContent = (opt && opt.getAttribute('data-unit')) || '—';
+  }
+
+  function renumberVariantRecipe() {
+    document.querySelectorAll('#variant-recipe-body tr').forEach(function (row, i) {
+      row.querySelector('.recipe-no').textContent = String(i + 1);
+    });
+  }
+
+  function addVariantRecipeLine(rmId, ratio) {
+    var body = document.getElementById('variant-recipe-body');
+    if (!body) return;
+    var tr = document.createElement('tr');
+    tr.className = 'border-t border-slate-200';
+    tr.innerHTML =
+      '<td class="px-2 py-2 text-ink-faint tabular-nums recipe-no"></td>' +
+      '<td class="px-2 py-2"><select name="recipe_rm_id[]" class="recipe-rm w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + recipeSelectHtml() + '</select></td>' +
+      '<td class="px-2 py-2 text-ink-muted recipe-type">—</td>' +
+      '<td class="px-2 py-2 font-mono text-[12px] text-ink-muted recipe-unit">—</td>' +
+      '<td class="px-2 py-2"><input type="number" name="recipe_ratio[]" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-2 text-right"><button type="button" class="v-recipe-remove text-[12px] text-stop hover:underline">Remove</button></td>';
+    body.appendChild(tr);
+    var sel = tr.querySelector('.recipe-rm');
+    if (rmId) sel.value = String(rmId);
+    if (ratio !== undefined && ratio !== null && ratio !== '') tr.querySelector('.recipe-ratio').value = ratio;
+    sel.addEventListener('change', function () { paintVariantRecipeRow(tr); });
+    sel.addEventListener('change', refreshVariantFlow);
+    tr.querySelector('.recipe-ratio').addEventListener('input', refreshVariantFlow);
+    paintVariantRecipeRow(tr);
+    renumberVariantRecipe();
+    refreshVariantFlow();
+  }
+
+  function fillVariantRecipe(items) {
+    var body = document.getElementById('variant-recipe-body');
+    if (!body) return;
+    body.innerHTML = '';
+    if (!items || !items.length) {
+      addVariantRecipeLine();
+      return;
+    }
+    items.forEach(function (item) { addVariantRecipeLine(item.id, item.ratio); });
+    refreshVariantFlow();
+  }
+
+  var variantOrderUnit = 'KG';
+
+  function setVariantOrderUnit(code) {
+    variantOrderUnit = (code || 'KG').trim() || 'KG';
+    var qty = document.getElementById('variant-preview-qty');
+    var weight = document.getElementById('variant-unit-weight');
+    if (qty) qty.value = '500';
+    if (weight) weight.value = '0.5';
+    refreshVariantFlow();
+  }
+
+  function refreshVariantFlow() {
+    var qtyEl = document.getElementById('variant-preview-qty');
+    var linesEl = document.getElementById('variant-preview-lines');
+    if (!qtyEl || !linesEl) return;
+    var unitCode = (variantOrderUnit || 'KG').toUpperCase();
+    var isWeight = unitCode === 'KG' || unitCode === 'KGS';
+    var label = document.getElementById('variant-preview-unit-label');
+    if (label) label.textContent = variantOrderUnit || 'KG';
+    var weightBox = document.getElementById('variant-unit-weight-box');
+    if (weightBox) weightBox.classList.toggle('hidden', isWeight);
+    var orderQty = parseFloat(qtyEl.value) || 0;
+    var unitWeight = isWeight ? 1 : (parseFloat(document.getElementById('variant-unit-weight').value) || 1);
+    var totalBatchKg = orderQty * unitWeight;
+    var summary = document.getElementById('variant-preview-calc-summary');
+    if (summary) {
+      summary.textContent = isWeight
+        ? 'Total batch: ' + totalBatchKg.toFixed(2) + ' KG'
+        : orderQty + ' ' + (variantOrderUnit || 'KG') + ' × ' + unitWeight + ' KG = ' + totalBatchKg.toFixed(2) + ' KG';
+    }
+    var baseTotal = 0;
+    var fluxTotal = 0;
+    var preview = [];
+    document.querySelectorAll('#variant-recipe-body tr').forEach(function (row) {
+      var sel = row.querySelector('.recipe-rm');
+      var opt = sel.options[sel.selectedIndex];
+      var role = opt ? opt.getAttribute('data-role') : '';
+      var unit = opt ? (opt.getAttribute('data-unit') || 'KG') : 'KG';
+      var ratio = parseFloat(row.querySelector('.recipe-ratio').value) || 0;
+      paintVariantRecipeRow(row);
+      if (role === 'base') baseTotal += ratio;
+      else if (role === 'flux') fluxTotal += ratio;
+      if (sel.value && ratio > 0) {
+        var need = totalBatchKg * ratio / 100;
+        preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums">' + need.toFixed(2) + ' ' + unit + '</strong></li>');
+      }
+    });
+    var balance = document.getElementById('variant-recipe-balance');
+    if (balance) {
+      var metalsOk = Math.abs(baseTotal - 100) < 0.05;
+      balance.textContent = 'Base metals total: ' + baseTotal.toFixed(1) + '% ' + (metalsOk ? '(balanced)' : '(needs 100%)') + ' · Flux total: ' + fluxTotal.toFixed(1) + '%';
+    }
+    linesEl.innerHTML = preview.length
+      ? preview.join('')
+      : '<li class="text-ink-faint">Add materials and ratios to see the explosion.</li>';
+  }
+
+  var variantPreviewQty = document.getElementById('variant-preview-qty');
+  var variantUnitWeight = document.getElementById('variant-unit-weight');
+  if (variantPreviewQty) variantPreviewQty.addEventListener('input', refreshVariantFlow);
+  if (variantUnitWeight) variantUnitWeight.addEventListener('input', refreshVariantFlow);
+
   function addRecipeLine() {
     var body = document.getElementById('recipe-body');
     if (!body) return;
@@ -1088,10 +1394,10 @@
     tr.className = 'border-t border-slate-200';
     tr.innerHTML =
       '<td class="px-2 py-2 text-ink-faint tabular-nums recipe-no"></td>' +
-      '<td class="px-2 py-2"><select class="recipe-rm w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + recipeSelectHtml() + '</select></td>' +
+      '<td class="px-2 py-2"><select name="recipe_rm_id[]" class="recipe-rm w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + recipeSelectHtml() + '</select></td>' +
       '<td class="px-2 py-2 text-ink-muted recipe-type">—</td>' +
       '<td class="px-2 py-2 font-mono text-[12px] text-ink-muted recipe-unit">—</td>' +
-      '<td class="px-2 py-2"><input type="number" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-2"><input type="number" name="recipe_ratio[]" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
       '<td class="px-2 py-2 text-right"><button type="button" class="recipe-remove text-[12px] text-stop hover:underline">Remove</button></td>';
     body.appendChild(tr);
     renumberRecipe();
@@ -1106,13 +1412,49 @@
   function refreshRecipe() {
     var baseTotal = 0;
     var fluxTotal = 0;
-    var previewQty = parseFloat(document.getElementById('recipe-preview-qty').value) || 0;
+    
+    // 1. Check karna ki Product ki Base Unit kya hai
+    var baseUnitSelect = document.getElementById('product-base-unit');
+    var selectedUnitText = baseUnitSelect && baseUnitSelect.selectedIndex > 0 
+      ? baseUnitSelect.options[baseUnitSelect.selectedIndex].text.split('—')[0].trim() 
+      : 'KG';
+    
+    // Unit label update karna
+    var unitLabel = document.getElementById('recipe-preview-unit-label');
+    if (unitLabel) unitLabel.textContent = selectedUnitText;
+
+    // 2. Agar unit KG nahi hai (jaise ROLL ya PCS hai), toh Weight per unit box show karna
+    var weightBox = document.getElementById('recipe-unit-weight-box');
+    var isWeightBased = (selectedUnitText.toUpperCase() === 'KG' || selectedUnitText.toUpperCase() === 'KGS');
+    
+    if (weightBox) {
+      if (!isWeightBased && selectedUnitText !== '') {
+        weightBox.classList.remove('hidden');
+      } else {
+        weightBox.classList.add('hidden');
+      }
+    }
+
+    var orderQty = parseFloat(document.getElementById('recipe-preview-qty').value) || 0;
+    var unitWeight = isWeightBased ? 1.0 : (parseFloat(document.getElementById('recipe-unit-weight').value) || 1.0);
+    
+    // Total manufacturing weight (in KG)
+    var totalBatchKg = orderQty * unitWeight;
+
+    // Calculation summary badge
+    var summaryBadge = document.getElementById('recipe-preview-calc-summary');
+    if (summaryBadge) {
+      summaryBadge.textContent = isWeightBased 
+        ? 'Total Batch: ' + totalBatchKg.toFixed(2) + ' KG' 
+        : orderQty + ' ' + selectedUnitText + ' × ' + unitWeight + ' KG = ' + totalBatchKg.toFixed(2) + ' KG';
+    }
+
     var preview = [];
     document.querySelectorAll('#recipe-body tr').forEach(function (row) {
       var sel = row.querySelector('.recipe-rm');
       var opt = sel.options[sel.selectedIndex];
       var role = opt ? opt.getAttribute('data-role') : '';
-      var unit = opt ? opt.getAttribute('data-unit') : '—';
+      var unit = opt ? opt.getAttribute('data-unit') : 'KG';
       var ratio = parseFloat(row.querySelector('.recipe-ratio').value) || 0;
       var typeCell = row.querySelector('.recipe-type');
       var unitCell = row.querySelector('.recipe-unit');
@@ -1132,11 +1474,12 @@
       }
 
       if (sel.value && ratio > 0) {
-        var need = previewQty * ratio / 100;
-        // Output me saaf-saaf Unit (KG, LTR) print hogi
-        preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums">' + need.toFixed(2) + ' ' + (unit !== '—' ? unit : '') + '</strong></li>');
+        // Asli formula: Total Batch KG * Ratio %
+        var need = totalBatchKg * ratio / 100;
+        preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums text-ink">' + need.toFixed(2) + ' ' + (unit !== '—' ? unit : 'KG') + '</strong></li>');
       }
     });
+
     var balance = document.getElementById('recipe-balance');
     var metalsOk = Math.abs(baseTotal - 100) < 0.05;
     balance.textContent = 'Base metals total: ' + baseTotal.toFixed(1) + '% ' + (metalsOk ? '(balanced)' : '(needs 100%)') + ' · Flux total: ' + fluxTotal.toFixed(1) + '%';
@@ -1179,6 +1522,13 @@
     recipeBody.addEventListener('input', refreshRecipe);
     recipeBody.addEventListener('change', refreshRecipe);
     document.getElementById('recipe-preview-qty').addEventListener('input', refreshRecipe);
+    // Unit change hone par live update
+    var baseUnitEl = document.getElementById('product-base-unit');
+    if (baseUnitEl) baseUnitEl.addEventListener('change', refreshRecipe);
+
+    // Weight per roll change hone par live update
+    var unitWeightEl = document.getElementById('recipe-unit-weight');
+    if (unitWeightEl) unitWeightEl.addEventListener('input', refreshRecipe);
     resetVariantSection();
   }
 

@@ -16,17 +16,18 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **2026-09-30 — Client meeting hui, 12 naye architectural items add hue spec me (§10.1–§10.12).** Poora status + plan: `development.md` Section 12. Bade highlights: (a) naya **Charges Master**; (b) GRN over-receipt = `received_qty`/`remaining_qty` + PO status (§10.7); (c) **Product recipe LOCKED 2026-09-30** — Product + 1 default Variant (attributes) + `VariantRecipeItem`. Variant table mat hatao. Sales/Production explosion baad me. Detail: `memory.md`.
 
-**Abhi chal raha hai:** `Part2 / Product / recipe-form` — Add Product frontend preview ready (basic + specs + recipe + sample order explosion). Save abhi store nahi karta. Next: save = Product + 1 variant + recipe lines.
+**Abhi chal raha hai:** `Part2 / Product / auto-code` — recipe routes done. Next: Product code `FG-0001` auto (Charges jaisa). Default variant SKU `{code}-STD`. Extra variant `{code}-02`. Edit pe code/SKU regenerate nahi. Unit aur Tax Rate manual. Detail: `memory.md` 2026-10-01 auto code.
 
 **RM flags done:** `is_base_metal` / `is_core_flux`, ek waqt pe ek, form buttons.
 
 **Charges:** add/toggle/delete typed. List query ab `is_deleted == False` honi chahiye (Stopped row gayab na ho) + `active_nav='charges'`.
 
-**Exact next micro-step (Charges Master):**
-1. `app/charges/routes.py` me `charges_add` likho — pattern bilkul RM/Product Category jaisa hai (`app/product_categories/routes.py` dekho reference ke liye): `request.form.get('name')`, `generate_next_charge_code()` se code lo (form se code mat lo — template ka Code field disabled hai, isliye kabhi submit hi nahi hoga), duplicate-name check zaroori nahi (sirf code unique hona chahiye, aur wo khud generate hota hai isliye clash hi nahi hoga), `Charge(code=..., name=..., is_active=True, is_deleted=False)` add + commit + flash + redirect.
-2. Phir `charges_toggle` (is_active flip, Product Category jaisa) aur `charges_delete` (is_deleted=True) — dono chhote, 5-6 line ke routes.
-3. **Ek flag:** current `charges_list` query sirf `Charge.is_active == True` filter karta hai — matlab Stopped charges list me kabhi dikhenge hi nahi (baaki sab masters `is_deleted == False` filter karte hain, dono Active+Stopped dikhate hain, JS filter pills se switch hota hai). Isko fix karna hoga taaki "Stopped" filter pill kaam kare — jab `charges_add`/`toggle`/`delete` likho tab yeh bhi ek saath sahi kar lena (`Charge.is_deleted == False` filter, `is_active` filter hatao).
-4. `charges_list` route `active_nav='charges'` bhi pass nahi kar raha — ek line add karo taaki sidebar me "Charges" link highlight ho jab is page pe ho (baaki sab list routes yeh karte hain).
+**Exact next micro-step (product auto code):**
+1. `products_list` mein `next_code = generate_next_product_code()` bhejo. Helper Charges jaisa: last `Product.id + 1`, warna `FG-0001`.
+2. Add form ka Code field disabled. `products_add` form se code na le — helper se lo. Default variant SKU `f"{code}-STD"` already hai, wahi rehne do.
+3. Product edit: code input disabled, route `p.code` mat badle.
+4. Variant add: form se SKU na lo. `count = ProductVariant.query.filter_by(product_id=p_id).count()` phir `f"{p.code}-{count+1:02d}"`. Variant edit: `pv.sku` mat badlo, field disabled.
+5. Baaki masters baad mein, ek-ek. Unit aur Tax Rate skip.
 
 **Baaki Phase 2 (Inward QC) actually zyada aage hai jitna pehle likha tha — neeche "Overall Phase Progress" aur Phase 2 tracker dono correct kiye gaye 2026-09-30.**
 
@@ -82,7 +83,8 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 - [x] **Raw Material Master** (Unit FK + RM Category FK) — CRUD complete 2026-09-22
 - [x] **Product Category Master** — CRUD complete 2026-09-23
 - [x] **Tax Rate Master (naya, 2026-09-23 decide hua)** — CRUD complete 2026-09-23 (list/add/edit/toggle/soft-delete, user ne khud type kiya)
-- [x] **Product Master** (+ Category FK, Base Unit FK, Tax Rate FK + **ProductVariant** dynamic JSON attributes) — 100% complete + verified 2026-09-24 (parent CRUD + variant Add/Edit/Delete, list UI polish)
+- [x] **Product Master** (+ Category FK, Base Unit FK, Tax Rate FK + **ProductVariant** dynamic JSON attributes) — parent CRUD + variant Add/Edit/Delete verified 2026-09-24
+- [x] **Product recipe** (`VariantRecipeItem`, 2026-10-01) — add product, variant add (restore included), variant edit. Flow preview save nahi hota. Product edit sirf header — recipe variant Edit se. Detail: `memory.md` 2026-10-01.
 - [x] **Warehouse Master** (+ chhota `Branch` table) — CRUD complete 2026-09-25 (list/add-with-restore/edit/toggle; Branch inline-add via `fetch()`/JSON) — **order badla, Vendor se pehle bana** (user decision)
 - [x] **Vendor Master** (rich form + Auto-Ledger under Sundry Creditors) — complete 2026-09-25 (list/add/edit/toggle; opening balance edit = delta current me)
 - [x] **Customer Master** (Vendor pattern + Auto-Ledger under Sundry Debtors) — complete + verified 2026-09-28 (list/add/edit/toggle; `credit_limit`, opening default Dr)
@@ -90,7 +92,7 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 **Phase 1 backend masters — saare 11 complete:** Unit, Work Stage, Machine, RM Category, Raw Material, Product Category, Tax Rate, Product+Variant, Warehouse+Branch, Vendor, Customer.
 
 ### Phase 1 — Client-Requested Addition (2026-09-30)
-- [ ] **Charges Master** (spec §10.2, simplified — Code auto/Name/Status only) — model + list route user ne khud shuru kiya, template + sidebar link Claude ne bana diya 2026-09-30. Baaki: `charges_add`/`charges_toggle`/`charges_delete` (user types next) + `charges_list` ka `is_active`-only filter bug fix + `active_nav` pass karna. Exact steps upar "Current Focus" me hain. `development.md` §12.2.
+- [ ] **Charges Master** (spec §10.2, simplified — Code auto/Name/Status only) — model + list + add/toggle/delete typed. Baaki: `charges_list` sirf `is_deleted == False` (Stopped row gayab na ho) + `active_nav='charges'`. Abhi paused — Current Focus product recipe hai. `development.md` §12.2.
 
 ### Phase 1 Wrap-up
 - [x] Cross-module sidebar navigation check *(2026-09-17 — saare 21 mockups me same nav: Masters → Procurement → Inventory → Manufacturing)*
@@ -127,6 +129,8 @@ Legend: ⬜ Not Started · 🟡 In Progress · ✅ Done
 ## Work Log
 
 *(Har entry: date, kya hua, kaun sa file/decision touch hua. Naya entry hamesha sabse upar add karo.)*
+
+- **2026-10-01 — Product recipe: add + variant edit save, variant flow preview.** RM pe `is_base_metal` / `is_core_flux` (ek waqt pe ek, dono off = normal RM). Recipe table `variant_recipe_items` (`ratio_percent`, `is_flux` — `line_type` nahi). Add Product ek default variant + recipe lines save karta hai. User ne `products_variants_edit` likha: attributes update, purani recipe lines delete, nayi insert. List pe recipe child rows; poori variant row click se khulti hai. Edit/Add variant modal pe wahi order-qty explosion jo Add Product pe hai (KG pe weight box chhupta hai). **Next micro-step:** `products_variants_add` mein wahi recipe loop (`flush` ke baad, taaki `pv.id` mile) + restore-SKU branch pe bhi recipe replace. Phir product edit. Decisions: `memory.md` 2026-09-30 + 2026-10-01.
 
 - **2026-09-30 — Client meeting (§10.1–§10.12) docs update + Charges Master template + tracker corrections.** User ne ek naya client-meeting requirements block diya (already `Manufacturing_ERP_Unified_Requirements_Specification.md` Section 10 me spec-level detail me mojood tha) — `development.md` me naya Section 12 likha jo har ek 12 items ko project ke **actual current state** ke against map karta hai (status/plan table + 2 follow-up notes), sirf spec text repeat nahi kiya. Sabse important 3 findings: (1) **Charges Master** (§10.2, simplified Code+Name+Status) — user ne khud `Charge` model + `charges_list` route + auto-code helper (`CHG-0001` scheme) pehle se shuru kar diya tha (session ke bahar) — Claude ne template (`app/charges/templates/charges.html`) + sidebar link (`base.html`) bana diye, baaki CRUD routes user type karega (exact steps "Current Focus" me). (2) **GRN over-receipt ka JS-warning plan superseded** — pichhle session me ek chhota confirm()-popup approach shuru hua tha (data-attributes GRN template me add hue the), lekin §10.7 ka asli fix (`received_qty`/`remaining_qty` per PO line + PO status state machine + Short Close) zyada sahi/permanent solution hai — flag kiya as next Phase 2 priority, popup-approach continue nahi karna. (3) **Product Master recipe-rework (§10.12) flag kiya as decision-pending, koi code touch nahi kiya** — existing Product+Variant (100% built+verified 2026-09-24) se directly conflict karta hai, user se explicit confirm chahiye pehle. Isi pass mein tracker ka ek purana galat fact bhi correct kiya: **Inward QC backend actually already List+Add+GRN-line-FK+GRN-status-sync complete hai** (user-typed, 2026-09-29/30) — tracker pehle "not started" bola raha tha, ab sahi kiya.
 

@@ -10,7 +10,30 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 **Date:** 2026-09-30
 **Kya:** Add Product ek hi form, 3 sections. (1) Basic details → `Product` (code, name, category, unit, HSN, tax). (2) Specs → **ek default** `ProductVariant` (`attributes` JSON: alloy grade, thickness, flux %). Alag variant-list UI nahi. (3) Recipe → naya `VariantRecipeItem` (`variant_id`, `raw_material_id`, `line_type` jaise Base Metal / Core Flux, `ratio_percent`). Base metals ka total 100% hona chahiye; flux us 100% ke bahar apna % hai.
 **Kyun:** Client flow alloy product hai (Tin 60 / Lead 40 / Flux 2). Purana Product+Variant hataane ki zaroorat nahi — BOM/Sales baad me variant pe hi latke hain. Recipe alag table isliye, taaki percent lines query ho saken. Sales Order pe `qty × ratio%` se RM nikalna, phir Production Order / issue slip — woh Phase 4/6 ka kaam hai, is form ke saath nahi banega.
-**How to apply:** Naya product save = Product + 1 variant + recipe lines, ek transaction. Purane multi-variant rows DB me reh sakte hain; naya form unhe nahi banata. Recipe se pehle RM Master pe do optional flags: `is_base_metal`, `is_core_flux` (default False). Dono off chal sakta hai (normal RM). Ek waqt pe sirf ek on — base metal aur core flux saath nahi. Product recipe dropdown mein sirf ticked RM aayega.
+**How to apply:** Naya product save = Product + 1 variant + recipe lines, ek transaction. Purane multi-variant rows DB me reh sakte hain; naya form unhe nahi banata. Recipe se pehle RM Master pe do optional flags: `is_base_metal`, `is_core_flux` (default False). Dono off chal sakta hai (normal RM). Ek waqt pe sirf ek on — base metal aur core flux saath nahi. Product recipe dropdown mein sirf ticked RM aayenge. `line_type` aur "alag variant-list UI nahi" neeche 2026-10-01 decision se update ho gaye — wahi follow karo.
+
+### Decision: Recipe lines ka exact shape + edit rule (2026-10-01)
+**Date:** 2026-10-01 (upar wale 2026-09-30 decision ka implementation detail)
+**Kya:**
+- Column `line_type` nahi bana. `VariantRecipeItem` pe `ratio_percent` + `is_flux` (Boolean). `is_flux` RM ke `is_core_flux` se copy hota hai save ke waqt.
+- Base metals ka total 100%. Flux us 100% ke bahar apna ratio hai.
+- Specs fixed Alloy/Thickness fields nahi — wahi dynamic attributes (`attr_key_0[]` / `attr_value_0[]` add product pe; variant modal pe `attr_key[]` / `attr_value[]`).
+- Product list pe variant rows rehte hain (expand). Recipe usi table ki child rows hain, alag card nahi. Add Product ek default variant banata hai (`{name}-Standard`, sku `{code}-STD`). Extra variant Add/Edit ab bhi hai.
+- Flow check (order qty → kitna material) sirf screen pe hai, save nahi. Unit KG/KGS ho to weight = 1. Warna order qty × weight-per-unit (KG) × ratio/100.
+- Recipe edit = us variant ki purani `VariantRecipeItem` rows **hard-delete** karke nayi insert. Variant khud soft-delete rehta hai. Safe hai kyunki koi document abhi in rows ko FK se point nahi karta.
+- Aage Sales/Production order pe ratios **copy** honge document pe. Recipe line ki id FK mat banana — master formula badlegi to purana order nahi badlega.
+
+**Kyun:** Client alloy formula (Tin/Lead/Flux) master pe rakhta hai, lekin shipped order ki recipe us din ki honi chahiye. Child rows hard-delete isliye theek hai; business document soft-delete rehta hai.
+
+**How to apply:** `products_add`, `products_variants_add` (naya + deleted-SKU restore), aur `products_variants_edit` recipe save karte hain. **Product edit mein recipe / attributes mat daalo** — list pe standard variant ka Edit button wahi kaam karta hai. Product edit sirf header: code, name, category, description, unit, HSN, tax. Toggle/delete routes recipe mat chhedo.
+
+### Decision: Master code auto, edit pe regenerate nahi (2026-10-01)
+**Date:** 2026-10-01
+**Kya:** Charges jaisa serial code baaki masters pe bhi, ek-ek karke. Pattern: last row `id + 1`, prefix + 4 digits (`CHG-0001`). Form se code mat lo — route khud generate kare. Edit pe purana code rehna chahiye, naya number mat banao.
+**Product:** code auto `FG-0001`. Default variant SKU auto `{code}-STD` (user SKU type nahi karega). Extra variant SKU `{code}-02`, `{code}-03` — us product ki variant rows count karke, deleted rows bhi count, taaki SKU dubara na bane.
+**Mat auto karo:** Unit (`KG`, `ROLL`) aur Tax Rate (`GST18`) — wahan code ka matlab hai, serial nahi. HSN bhi user ka hai, government code hai.
+**Kyun:** User ne Charges pe auto code dekh ke sab masters pe wahi maanga. Product code aur variant SKU alag counters nahi — SKU product code se judi rehti hai, warna `FG-0007` ka variant `VAR-0012` ho kar link toot jaati hai.
+**How to apply:** Pehle Product (code + dono SKU rules). Phir RM, category, machine, warehouse, vendor, customer. Unit aur Tax Rate chhod do.
 
 ---
 
@@ -234,6 +257,11 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 ## Session Log
 
 *(Chhote updates jo Key Decisions jitne bade nahi hain, lekin future context ke liye useful hain. Naya entry sabse upar.)*
+
+### 2026-10-01
+- Product recipe UI + save aage badha. RM flags (`is_base_metal` / `is_core_flux`) mutually exclusive buttons. Migration `631aec3a18e5` ko `server_default=sa.false()` chahiye tha (SQLite NOT NULL without default fail).
+- `products_add` = Product + default variant + recipe lines. `products_variants_edit` user ne type kiya: attributes update + recipe replace. Variant modal pe product jaisa flow preview (order qty / weight / material qty).
+- Abhi baaki: `products_variants_add` recipe save, phir `products_edit` (default variant attributes + recipe). Product add ka soft-deleted restore abhi variant/recipe nahi banata.
 
 ### 2026-09-17
 - **Inline list Add + Manage:** Raw Material / Product Category aur Warehouse Branch pe form me hi `+ Add` + `Manage` (rename / soft-remove). Shared helper: `mockups/assets/erp-list-picker.js`. Hard-delete nahi.

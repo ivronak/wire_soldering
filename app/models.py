@@ -142,6 +142,20 @@ class ProductVariant(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+class VariantRecipeItem(db.Model):
+    __tablename__ = "variant_recipe_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    variant_id = db.Column(db.Integer, db.ForeignKey("product_variants.id"), nullable=False)
+    variant = db.relationship("ProductVariant", foreign_keys=[variant_id], backref="recipe_items")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+
+    ratio_percent = db.Column(db.Float, nullable=False)
+    is_flux = db.Column(db.Boolean, default=False, nullable=False)
+    
+
 class Branch(db.Model):
     __tablename__ = "branches"
 
