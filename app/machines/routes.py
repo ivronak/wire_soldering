@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from app.models import Machines, WorkStage
 from app.extensions import db
-from datetime import date, datetime
+from datetime import datetime
 
 
 machines_bp = Blueprint("machines",__name__, template_folder="templates")
@@ -16,10 +16,9 @@ def generate_next_machine_code():
 
 @machines_bp.route("/machines")
 def machines_list():
-    if Machines.query.count() == 0:
-        db.session.add(Machines(code = "MC-0001", name = "Cutting Bench", work_stage_id = 1, capacity = "500 units/hr", installed_date = date(2026, 9, 19), status = "active",))
-        db.session.commit()
-
+    # Pehle yahan khaali table pe ek demo machine (work_stage_id=1 fixed) apne aap ban jaati thi —
+    # hata diya: master data hamesha user UI se daale, code me hardcode nahi (CLAUDE.md §5 rule 1),
+    # aur id=1 wali work stage exist na kare to machine galat stage se jud jaati.
     machines = (
         Machines.query.filter(Machines.is_deleted == False).order_by(Machines.code).all()
     )
@@ -42,13 +41,15 @@ def machines_list():
 def machines_add():
     code = generate_next_machine_code()
     name = (request.form.get('name') or "").strip()
-    work_stage_id = int(request.form.get('work_stage_id')) or None
+    # type=int: value khaali/galat ho to None milta hai — int("") ki tarah crash nahi karta
+    work_stage_id = request.form.get('work_stage_id', type=int)
     capacity = (request.form.get('capacity') or "").strip() or None
     status = (request.form.get('status') or "active").strip().lower()
     raw_date = (request.form.get('installed_date') or "").strip()
     installed_date = datetime.strptime(raw_date, "%Y-%m-%d").date() if raw_date else None
 
     if not name or not work_stage_id:
+        flash("Machine name and work stage are required.", "error")
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
@@ -97,7 +98,8 @@ def machines_edit(machine_id):
     m = Machines.query.get_or_404(machine_id)
 
     name = (request.form.get('name') or "").strip()
-    work_stage_id = int(request.form.get('work_stage_id')) or None
+    # type=int: khaali/galat value pe None — crash nahi
+    work_stage_id = request.form.get('work_stage_id', type=int)
     capacity = (request.form.get('capacity') or "").strip() or None
     status = (request.form.get('status') or "active").strip().lower()
     raw_date = (request.form.get('installed_date') or "").strip()
@@ -105,6 +107,7 @@ def machines_edit(machine_id):
 
     # Code ab auto-generated — edit pe immutable (form se code nahi aata)
     if not name or not work_stage_id:
+        flash("Machine name and work stage are required.", "error")
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)

@@ -334,7 +334,9 @@ User ne decide: parties (Vendor) se pehle materials/products + unki categories, 
 
 ## 7. Phase 1 Status — ✅ COMPLETE (Part 1: Mockups)
 
-All 6 modules built and approved (2026-09-16): Unit, Machine, Vendor, Customer, Raw Material, Product Master. Phase 1's Part 2 (backend) has not started yet — see Section 4 for the template to use when it does.
+All 6 modules built and approved (2026-09-16): Unit, Machine, Vendor, Customer, Raw Material, Product Master.
+
+> **Stale note (2026-10-06):** this section was written before Part 2 began. Phase 1 backend is now done (17 masters) and Phase 2 backend is in progress — see `tracker.md` Current Focus for the live status.
 
 ---
 
@@ -453,6 +455,8 @@ All 4 built files cross-link back into Production Order by real `<a href>` (Rout
 ---
 
 ## 11. Immediate Next Action
+
+> **Stale note (2026-10-06):** this was the plan as of 2026-09-17 (mockup walkthrough). Backend work has moved far past it — the live "next step" is always `tracker.md` → Current Focus.
 
 Phase 1 (now 7 masters, including the gap-fill Warehouse Master) + Phase 2, 3, and 4 mockups (16 screens: 5+4+6) are all built and verified (2026-09-17). Walkthrough / next phase with user —
 

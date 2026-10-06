@@ -14,14 +14,8 @@ def generate_next_work_stage_code():
 
 @work_stages_bp.route("/work_stages")
 def work_stages_list():
-    if WorkStage.query.count() == 0:
-        db.session.add(WorkStage(
-            code="WS-0001",
-            name="Cutting",
-            sort_order=10,
-        ))
-        db.session.commit()
-
+    # Pehle khaali table pe "Cutting" stage apne aap ban jaati thi — hata diya:
+    # master data user UI se daale, code me hardcode nahi (CLAUDE.md §5 rule 1)
     stages = WorkStage.query.filter(WorkStage.is_deleted == False).all()
     total_count = len(stages)
     next_code = generate_next_work_stage_code()

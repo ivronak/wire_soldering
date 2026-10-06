@@ -11,13 +11,9 @@ units_bp = Blueprint("units", __name__, template_folder="templates")
 
 @units_bp.route("/units")
 def units_list():
-    # Agar table khaali hai to pehli baar 3 demo units daal do
-    if Unit.query.count() == 0:
-        db.session.add(Unit(code="KG", name="Kilogram", is_base_unit=True))
-        db.session.add(Unit(code="GM", name="Gram", is_base_unit=True))
-        db.session.add(Unit(code="PCS", name="Piece", is_base_unit=False))
-        db.session.commit()  # bina commit ke DB me save nahi hota
-    
+    # Pehle khaali table pe 3 demo units (KG/GM/PCS) apne aap ban jaate the — hata diya:
+    # "No hardcoded units" rule (CLAUDE.md §5 rule 1) — units hamesha Add button se aayenge.
+    # (Seekhne ka point: GET request (sirf page dekhna) se DB me kuch likhna achhi practice nahi hai.)
     q = (request.args.get("q") or "").strip()
     status = (request.args.get("status") or "all").strip().lower()
 

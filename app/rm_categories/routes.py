@@ -16,16 +16,8 @@ def generate_next_rm_category_code():
 
 @rm_categories_bp.route('/rm_categories')
 def rm_categories_list():
-    if RmCategories.query.count() == 0:
-        db.session.add(RmCategories(
-            code="RMC-0001",
-            name="Metal",
-            description="the metal materials used as raw materials in production.",
-            is_active=True,
-            is_deleted=False,
-        ))
-        db.session.commit()
-
+    # Pehle khaali table pe "Metal" category apne aap ban jaati thi — hata diya:
+    # master data user UI se daale, code me hardcode nahi (CLAUDE.md §5 rule 1)
     categories = RmCategories.query.filter(RmCategories.is_deleted == False).order_by(RmCategories.code).all()
     total_count = len(categories)
     next_code = generate_next_rm_category_code()
@@ -95,7 +87,8 @@ def rm_categories_edit(c_id):
 
     c.name = name
     c.description = description
-    c.is_active = True
+    # is_active yahan mat chhedo — pehle "= True" tha, jisse Stopped category edit karte hi chupke se
+    # Active ho jaati thi. Active/Stopped sirf Toggle button se badalna chahiye.
     c.is_deleted = False
 
     db.session.commit()

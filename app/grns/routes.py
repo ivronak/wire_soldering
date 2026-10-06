@@ -71,6 +71,16 @@ def grns_add():
     if not po_id or not grn_date_raw:
         return redirect(url_for('grns.grns_list'))
 
+    # PO pehle hi check karo — galat id pe pehle refresh_po_status(None) crash karta tha.
+    # Sirf Open/Partial PO pe GRN ban sakti hai (dropdown bhi yahi dikhata hai, lekin backend pe bhi rokna zaroori)
+    po = PurchaseOrder.query.get(po_id)
+    if not po or po.is_deleted or po.status not in ("Open", "Partial"):
+        flash("This purchase order is not open for receiving.", "error")
+        return redirect(url_for('grns.grns_list'))
+
+    # Is PO ki apni lines ke id — form me kisi aur PO ki line aaye to reject
+    valid_line_ids = {line.id for line in po.lines}
+
     grn_date = datetime.strptime(grn_date_raw, "%Y-%m-%d").date()
 
     year = grn_date.year
@@ -95,6 +105,7 @@ def grns_add():
     db.session.flush()
 
     i=0
+    lines_added = 0
     while True:
         po_line_id_raw = (request.form.get(f'po_line_id_{i}') or "").strip()
         received_qty_raw = (request.form.get(f'received_qty_{i}') or "").strip()
@@ -105,17 +116,34 @@ def grns_add():
             break
 
         if received_qty_raw and batch_raw:
+            po_line_id = int(po_line_id_raw)
+            received_qty = float(received_qty_raw)
+
+            # Line isi PO ki honi chahiye, aur qty 0 se zyada.
+            # Note: ordered qty se zyada aana (over-receipt) jaan-boojhkar allowed hai —
+            # form pe sirf warning popup aata hai, PO View me "X over the ordered qty" dikhta hai (§10.7 decision)
+            if po_line_id not in valid_line_ids or received_qty <= 0:
+                db.session.rollback()
+                flash("Each received qty must be more than 0 and belong to this purchase order.", "error")
+                return redirect(url_for('grns.grns_list'))
+
             db.session.add(GRNLine(
                 grn_id=grn.id,
-                po_line_id=int(po_line_id_raw),
-                received_qty=float(received_qty_raw),
+                po_line_id=po_line_id,
+                received_qty=received_qty,
                 batch_lot_no=batch_raw,
                 mfg_date=datetime.strptime(mfg_raw, "%Y-%m-%d").date() if mfg_raw else None,
 
-            ))    
+            ))
+            lines_added += 1
         i += 1
 
-    po = PurchaseOrder.query.get(po_id)
+    # Bina kisi line ke khaali GRN save mat karo
+    if lines_added == 0:
+        db.session.rollback()
+        flash("Enter received qty and batch / lot no. for at least one line.", "error")
+        return redirect(url_for('grns.grns_list'))
+
     refresh_po_status(po)
 
     db.session.commit()

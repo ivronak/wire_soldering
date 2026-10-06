@@ -805,3 +805,24 @@ Core architecture:
 > **Masters → Transactions → Stock → Production → QC → Sales → Accounting → Reports → Traceability**
 
 All modules stay data-connected so no transaction is ever manually re-entered across modules.
+
+---
+
+## 27. Addendum — Client Meeting Adjustments (2026-09-29/30)
+
+> **Numbering note (added 2026-10-06):** `tracker.md`, `memory.md` and `development.md` refer to these items as **"§10.1–§10.12"**. That label clashes with this document's own Section 10 (Sales, Dispatch & Statutory Compliance), and the items were never actually written into this file. This addendum is the canonical index so those references resolve somewhere. The original, field-level client-meeting text is **not in the repository** — the summaries below come from `development.md` §12.1, which also tracks each item's build status.
+
+| Ref used in other docs | Requirement (summary) |
+|---|---|
+| §10.1 | Zero hardcoded dropdowns anywhere — every option list comes from a master table |
+| §10.2 | Charges Master (simplified: auto Code, Name, Status) — used for PO-level charges such as freight |
+| §10.3 | Universal auto-generated codes on all masters and transactions |
+| §10.4 | Real document upload on Vendor and Customer masters |
+| §10.5 | PO "Confirm" requires the vendor invoice/bill upload before Draft → Open |
+| §10.6 | Two-tier "Pending Action Queue" + "Completed Register" on every operational stage |
+| §10.7 | Partial deliveries: received / remaining / billed qty per PO line, PO status state machine, manual Short Close with reason |
+| §10.8 | Unified Procurement Document Docket (all documents of one purchase in one place) |
+| §10.9 | RM lot code + unit-level serialized barcode/QR |
+| §10.10 | Printed document footer with "Created By" / "Approved By" attribution |
+| §10.11 | Visitor Gate Pass |
+| §10.12 | Recipe-based product formulation (alloy ratio per product; drives production material requirement) |

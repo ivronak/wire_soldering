@@ -36,7 +36,8 @@ def tax_rates_add():
             existing.rate_percent = rate_percent
             existing.label = label
             existing.is_active = True
-            db.commit.session()
+            # Pehle yahan db.commit.session() likha tha (ulta) — "db" ke paas "commit" naam ki cheez hi nahi, AttributeError aata
+            db.session.commit()
             flash("A Tax Rate restored with this code.", "success")
             return redirect(url_for('tax_rates.tax_rates_list'))
 

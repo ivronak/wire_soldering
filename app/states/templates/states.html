@@ -206,7 +206,7 @@
         <label for="st-code" class="block text-[12.5px] font-semibold text-ink mb-1">State code</label>
         <input type="text" id="st-code" name="code" value="{{ next_code }}" disabled
           class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
-        <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated, read-only — disabled field form ke saath jaata hi nahi; route khud code banata hai. Edit pe bhi code nahi badalta.</p>
+        <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated and read-only. The code does not change on edit.</p>
       </div>
       <div>
         <label for="st-name" class="block text-[12.5px] font-semibold text-ink mb-1">State name *</label>
@@ -218,7 +218,7 @@
         <input type="text" id="st-gst" name="gst_state_code" required maxlength="2" inputmode="numeric" pattern="[0-9]{2}"
           placeholder="24" autocomplete="off"
           class="w-full px-2.5 py-2.5 text-[14.5px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-        <p class="text-[11.5px] text-ink-faint mt-1">2-digit government code (Gujarat 24, Maharashtra 27, Karnataka 29). Ye apne aap nahi banta — tum type karoge.</p>
+        <p class="text-[11.5px] text-ink-faint mt-1">2-digit government code (Gujarat 24, Maharashtra 27, Karnataka 29). Enter it manually — it is not auto-generated.</p>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">

@@ -6,6 +6,20 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### Decision: Bug-fix pass ke rules — QC/GRN backend validation, no list-route seeds, scratchpad guard, env-based secrets
+**Date:** 2026-10-06
+**Kya:**
+1. **Inward QC (backend pe enforce):** passed + rejected ≤ GRN line ka received qty; final (non-Draft) result me 0+0 allowed nahi; **ek GRN line ka final QC sirf ek baar** (Draft kitne bhi). Pending-GRN dropdown sirf `Pending QC`/`Partial QC` dikhata hai.
+2. **GRN (backend pe enforce):** PO exist kare aur `Open`/`Partial` ho; har line isi PO ki ho; qty > 0; kam se kam ek line. **Over-receipt (ordered se zyada) jaan-boojhkar allowed hai** — form pe sirf warning popup, PO View me "X over the ordered qty" (§10.7). Isko backend pe block mat karna jab tak user na bole.
+3. **List routes me auto-seed nahi** (Units KG/GM/PCS, Machine, Work Stage, RM Category hataye) — master data sirf UI se; GET request DB me kuch na likhe.
+4. **Edit route `is_active` nahi chhedta** — Active/Stopped sirf Toggle se (RM Category me `is_active = True` force ho raha tha, hataya).
+5. **Secrets/config env se:** `ERP_SECRET_KEY` (fallback = purana dev key), `ERP_DEBUG` (`run.py`, default 1 local pe), `MAX_CONTENT_LENGTH` = 10 MB + 413 handler (`/party_documents` → JSON, baaki → flash + redirect). `requirements.txt` ab repo me hai.
+6. **`scratchpad/` scripts pe `_guard.py`** — har DB-likhne wali script pehli line pe `import _guard` karti hai; bina `ERP_ALLOW_DB_SCRIPTS=1` ke ruk jaati hai, chalne pe `instance/erp.db.before-script-<time>` backup banta hai. Nayi verify script likho to yehi line sabse upar daalo.
+**Kyun:** Analysis me mila ki Inward QC ka har final submit 500 de raha tha (unsaved object pe relationship `None` — **seekhne ka point:** `db.session.add()` ke baad bhi relationship tab tak load nahi hota jab tak flush/commit na ho; isliye related row ko id se khud `Model.query.get(id)` karo). Validation sirf HTML (`min`, `required`) pe thi — CLAUDE.md §5 rule 4 backend pe maangta hai. Scratchpad scripts (`Charge.query.delete()` jaisi) galti se dobara chalti to real master data udd jaata. 5 din ka kaam (19 migrations samet) git me untracked tha — checkpoint commit `f123ede` me save kiya.
+**How to apply:** Naye transaction module (Purchase Invoice, Return, Material Issue) me shuru se hi: related row id se load + exist check, qty limits backend pe, status-guard (sirf sahi status wale parent pe child document). Har bade kaam ke baad git commit — "test" ki jagah chhota descriptive message.
+
+---
+
 ### Decision: File upload paths hamesha `/` se banao (store karte waqt), `os.path.join` sirf real disk operations ke liye
 **Date:** 2026-10-03
 **Kya:** Jab bhi koi uploaded file ka **relative path DB mein store** karna ho (taaki baad mein `send_from_directory` se wapas serve ho sake), us path ko seedha `/` se jodo (jaise `'purchase_orders/' + str(po_id) + '/' + safe_name`) — `os.path.join()` **mat** use karo us jagah. `os.path.join()` sirf tabhi use karo jab seedha disk pe real file read/write/save ho raha ho (jaise `folder = os.path.join(UPLOAD_FOLDER, ...)` aur `invoice_file.save(...)`).
