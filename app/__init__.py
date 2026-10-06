@@ -1,5 +1,5 @@
 # Yeh file Flask app banati hai - poore project ka main object.
-
+import os
 from flask import Flask
 from app.units.routes import units_bp
 from app.machines.routes import machines_bp
@@ -16,6 +16,11 @@ from app.purchase_orders.routes import purchase_orders_bp
 from app.grns.routes import grns_bp
 from app.inward_qc.routes import inward_qc_bp
 from app.charges.routes import charges_bp
+from app.states.routes import states_bp
+from app.vendor_types.routes import vendor_types_bp
+from app.production_orders.routes import production_orders_bp
+from app.payment_terms.routes import payment_terms_bp
+from app.party_documents.routes import party_documents_bp
 from app.extensions import db, migrate
 
 
@@ -28,7 +33,9 @@ def create_app():
     #SQLite file: instance/erp.db (Flask khud instance/ folder sambhalta hai )
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
+    app.config["UPLOAD_FOLDER"] = os.path.join(app.instance_path, "uploads")
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    
     db.init_app(app)
     migrate.init_app(app, db)
 
@@ -52,6 +59,11 @@ def create_app():
     app.register_blueprint(grns_bp)
     app.register_blueprint(inward_qc_bp)
     app.register_blueprint(charges_bp)
+    app.register_blueprint(states_bp)
+    app.register_blueprint(vendor_types_bp)
+    app.register_blueprint(production_orders_bp)
+    app.register_blueprint(payment_terms_bp)
+    app.register_blueprint(party_documents_bp)
 
     @app.route("/")
     def home():

@@ -257,7 +257,7 @@
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Category from Product Category master · Base unit from Unit master · Expand a row (▸) to view/add/edit variants
+              Category from Product Category master · Base unit from Unit master · Expand a row (▸) to view its recipe
             </p>
           </details>
         </div>
@@ -297,7 +297,7 @@
                   <div class="flex items-center gap-1.5">
                     <button type="button"
                       class="expand-btn inline-flex items-center justify-center w-6 h-6 shrink-0 rounded-md border border-slate-200 bg-white text-ink-faint hover:border-copper-border hover:text-copper-text focus:outline-none focus-visible:ring-1 focus-visible:ring-copper"
-                      data-target="variants-{{ p.id }}" aria-label="Show variants" title="Show / hide variants">
+                      data-target="recipe-{{ p.id }}" aria-label="Show recipe" title="Show / hide recipe">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                     </button>
                     <span>{{ loop.index }}</span>
@@ -309,14 +309,14 @@
                     <div class="min-w-0">
                       <div class="flex items-center gap-2 min-w-0">
                         <span class="font-semibold text-ink truncate">{{ p.name }}</span>
-                        {% set vcount = p.active_variants|length %}
-                        {% if vcount %}
+                        {% set rcount = p.recipe_items|length %}
+                        {% if rcount %}
                         <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border">
                           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/></svg>
-                          {{ vcount }} variant{{ 's' if vcount != 1 else '' }}
+                          {{ rcount }} material{{ 's' if rcount != 1 else '' }}
                         </span>
                         {% else %}
-                        <span class="shrink-0 inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-neutral-bg text-neutral border border-neutral-border">No variants</span>
+                        <span class="shrink-0 inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-neutral-bg text-neutral border border-neutral-border">No recipe</span>
                         {% endif %}
                       </div>
                       <div class="text-[12px] text-ink-faint truncate mt-0.5">{{ p.description or "No description" }}</div>
@@ -366,7 +366,9 @@
                       data-description="{{ p.description or '' }}"
                       data-base-unit-id="{{ p.base_unit_id or '' }}"
                       data-hsn="{{ p.hsn_code or '' }}"
-                      data-tax-rate-id="{{ p.tax_rate_id or '' }}">
+                      data-tax-rate-id="{{ p.tax_rate_id or '' }}"
+                      data-attributes='{{ (p.attributes or {}) | tojson }}'
+                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
                     <form method="post" action="{{ url_for('products.products_delete', p_id=p.id) }}" class="inline-flex js-confirm-submit"
@@ -389,83 +391,21 @@
                   </div>
                 </td>
               </tr>
-              {% if p.active_variants %}
-              <tr class="variant-row variant-head hidden" data-parent="variants-{{ p.id }}">
+              {% set attrs = p.attributes or {} %}
+              {% if attrs %}
+              <tr class="variant-row variant-head hidden" data-parent="recipe-{{ p.id }}">
                 <td></td>
-                <td class="cell-left">SKU</td>
-                <td class="cell-left">Variant</td>
-                <td class="cell-left" colspan="3">Attributes</td>
-                <td>Status</td>
-                <td>Actions</td>
-              </tr>
-              {% endif %}
-              {% for v in p.active_variants %}
-              <tr class="variant-row variant-item hidden" data-parent="variants-{{ p.id }}"{% if v.recipe_items %} data-recipe-id="{{ v.id }}"{% endif %}>
-                <td></td>
-                <td class="cell-left">
-                  <span class="inline-block max-w-full font-mono text-[12px] font-semibold text-copper-text bg-copper-soft border border-copper-border rounded px-2 py-1 truncate align-middle">{{ v.sku }}</span>
-                </td>
-                <td class="cell-left">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[13.5px] text-ink font-medium truncate">{{ v.name }}</span>
-                    {% if v.recipe_items %}
-                    {% set rcount = v.recipe_items|length %}
-                    <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/></svg>
-                      {{ rcount }} material{{ 's' if rcount != 1 else '' }}
-                    </span>
-                    {% endif %}
-                  </div>
-                </td>
-                <td class="cell-left" colspan="3">
-                  {% set attrs = v.attributes or {} %}
-                  {% if attrs %}
+                <td class="cell-left" colspan="7">
                   <div class="flex flex-wrap items-center">
                     {% for k, val in attrs.items() %}
                     <span class="attr-chip"><span class="attr-k">{{ k }}</span><span class="attr-v">{{ val }}</span></span>
                     {% endfor %}
                   </div>
-                  {% else %}
-                  <span class="text-[12px] text-ink-faint">—</span>
-                  {% endif %}
-                </td>
-                <td class="text-center">
-                  {% if v.is_active %}
-                  <span class="inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-1.5 py-0.5 rounded border bg-success-bg text-success border-success-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
-                  </span>
-                  {% else %}
-                  <span class="inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-1.5 py-0.5 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
-                  </span>
-                  {% endif %}
-                </td>
-                <td>
-                  <div class="flex items-center justify-center gap-1.5">
-                    <button type="button"
-                      class="btn-edit-variant act-btn act-edit act-sm"
-                      title="Edit variant" aria-label="Edit variant"
-                      data-id="{{ v.id }}"
-                      data-name="{{ v.name }}"
-                      data-sku="{{ v.sku }}"
-                      data-attributes='{{ (v.attributes or {}) | tojson }}'
-                      data-recipe='[{% for r in v.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }}}{% if not loop.last %},{% endif %}{% endfor %}]'
-                      data-unit="{{ p.base_unit.code if p.base_unit else 'KG' }}">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                    </button>
-                    <form method="post" action="/products/variants/delete/{{ v.id }}" class="inline-flex js-confirm-submit"
-                          data-confirm-title="Remove variant"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this variant? It will be kept in the database but hidden.">
-                      <button type="submit" class="act-btn act-delete act-sm" title="Delete variant" aria-label="Delete variant">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-                      </button>
-                    </form>
-                  </div>
                 </td>
               </tr>
-              {% if v.recipe_items %}
-              <tr class="variant-row recipe-head variant-recipe-row hidden" data-recipe-of="{{ v.id }}" data-recipe-for="variants-{{ p.id }}">
+              {% endif %}
+              {% if p.recipe_items %}
+              <tr class="variant-row recipe-head hidden" data-parent="recipe-{{ p.id }}">
                 <td></td>
                 <td class="cell-left">Material</td>
                 <td class="cell-left">Name</td>
@@ -475,8 +415,8 @@
                 <td></td>
                 <td></td>
               </tr>
-              {% for r in v.recipe_items %}
-              <tr class="variant-row recipe-line variant-recipe-row hidden{% if loop.last %} recipe-last{% endif %}" data-recipe-of="{{ v.id }}" data-recipe-for="variants-{{ p.id }}">
+              {% for r in p.recipe_items %}
+              <tr class="variant-row recipe-line hidden{% if loop.last %} recipe-last{% endif %}" data-parent="recipe-{{ p.id }}">
                 <td></td>
                 <td class="cell-left">
                   <span class="inline-block font-mono text-[11.5px] font-semibold text-ink bg-white border border-slate-200 rounded px-1.5 py-0.5">{{ r.raw_material.code if r.raw_material else '—' }}</span>
@@ -496,25 +436,6 @@
               </tr>
               {% endfor %}
               {% endif %}
-              {% endfor %}
-              <tr class="variant-row variant-add hidden" data-parent="variants-{{ p.id }}">
-                <td></td>
-                <td class="cell-left" colspan="7">
-                  <div class="flex items-center gap-3">
-                    <button type="button"
-                      class="btn-add-variant-to-product inline-flex items-center gap-1 px-2.5 py-1 text-[12px] font-semibold text-copper-text bg-white border border-dashed border-copper-border rounded hover:bg-copper-soft"
-                      data-product-id="{{ p.id }}"
-                      data-unit="{{ p.base_unit.code if p.base_unit else 'KG' }}"
-                      data-next-sku="{{ p.code }}-{{ '%02d'|format(p.variants|length + 1) }}">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                      Add variant
-                    </button>
-                    {% if not p.active_variants %}
-                    <span class="text-[12px] text-ink-faint">No variants yet — each variant gets its own SKU and attributes.</span>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
               {% else %}
               {% endfor %}
             </tbody>
@@ -522,21 +443,16 @@
 
           {% for p in products %}
           <div id="variant-summary-{{ p.id }}" class="hidden">
-            {% for v in p.active_variants %}
-            <div class="border border-slate-200 rounded-lg p-2.5 mb-2 bg-mist/40">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-[13px] font-semibold text-ink">{{ v.name }}</span>
-                <span class="font-mono text-[11.5px] font-semibold text-copper-text bg-copper-soft border border-copper-border rounded px-1.5 py-0.5">{{ v.sku }}</span>
-              </div>
-              {% set attrs = v.attributes or {} %}
-              {% if attrs %}
-              <div class="flex flex-wrap mt-1.5">
-                {% for k, val in attrs.items() %}
-                <span class="attr-chip"><span class="attr-k">{{ k }}</span><span class="attr-v">{{ val }}</span></span>
-                {% endfor %}
-              </div>
-              {% endif %}
+            {% set attrs = p.attributes or {} %}
+            {% if attrs %}
+            <div class="flex flex-wrap mb-2">
+              {% for k, val in attrs.items() %}
+              <span class="attr-chip"><span class="attr-k">{{ k }}</span><span class="attr-v">{{ val }}</span></span>
+              {% endfor %}
             </div>
+            {% endif %}
+            {% for r in p.recipe_items %}
+            <div class="text-[13px] text-ink mb-1">{{ r.raw_material.code if r.raw_material else '—' }} — {{ r.raw_material.name if r.raw_material else '—' }} · {{ "%.1f"|format(r.ratio_percent) }}%</div>
             {% endfor %}
           </div>
           {% endfor %}
@@ -550,7 +466,7 @@
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} products</span>
-          <span>Expand a row (▸) to view, add or edit its variants</span>
+          <span>Expand a row (▸) to view its recipe</span>
           <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
@@ -577,9 +493,10 @@
           <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated. Disabled so it is not sent with the form — the route creates the code.</p>
         </div>
         <div>
-          <label for="product-name" class="block text-[12.5px] font-semibold text-ink mb-1">Product name *</label>
-          <input type="text" id="product-name" name="name" required placeholder="Soldered Wire Assembly" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <label for="product-name" class="block text-[12.5px] font-semibold text-ink mb-1">Product name</label>
+          <input type="text" id="product-name" name="name" readonly placeholder="Select a category" maxlength="100" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-200 bg-mist text-ink rounded" />
+          <p class="text-[11.5px] text-ink-faint mt-1">Built from the category name and attribute values.</p>
         </div>
       </div>
       <div>
@@ -591,7 +508,7 @@
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
           <option value="">Select category</option>
           {% for cat in categories %}
-          <option value="{{ cat.id }}">{{ cat.code }} — {{ cat.name }}</option>
+          <option value="{{ cat.id }}" data-name="{{ cat.name }}" data-fields='{{ (cat.attribute_fields or []) | tojson }}'>{{ cat.code }} — {{ cat.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -635,19 +552,10 @@
         <hr class="border-slate-200" />
         <div>
           <p class="form-section-title">Attributes</p>
-          <p class="text-[12px] text-ink-faint -mt-1 mb-2">Same as a variant’s attributes — any name and value. Example: Alloy grade = 60/40, Wire thickness = 1.6 mm.</p>
-          <div class="grid grid-cols-2 gap-1.5 mb-1 pr-8">
-            <span class="text-[10px] text-ink-faint uppercase tracking-wide">Attribute name</span>
-            <span class="text-[10px] text-ink-faint uppercase tracking-wide">Value</span>
-          </div>
-          <div id="spec-attr-list" class="space-y-1.5 mb-2">
-            <div class="spec-attr-row flex gap-1.5">
-              <input type="text" name="attr_key_0[]" placeholder="e.g. Alloy grade" class="spec-attr-key w-1/2 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-              <input type="text" name="attr_value_0[]" placeholder="e.g. 60/40" class="spec-attr-value w-1/2 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-              <button type="button" class="spec-attr-remove text-ink-faint hover:text-stop px-1" aria-label="Remove attribute">&times;</button>
-            </div>
-          </div>
-          <button type="button" id="btn-add-spec-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
+          <p class="text-[12px] text-ink-faint -mt-1 mb-2">These fields come from the category. The product name updates as you type values.</p>
+          <p id="spec-attr-empty" class="text-[13px] text-ink-muted mb-2">Select a category to see its attribute fields.</p>
+          <div id="spec-attr-list" class="space-y-1.5 mb-2"></div>
+          <button type="button" id="btn-add-spec-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute field</button>
         </div>
 
         <hr class="border-slate-200" />
@@ -874,14 +782,100 @@
     applyFilters();
   }
 
-  function resetSpecAttributes() {
+  function isProductEdit() {
+    return (form.action || '').indexOf('/products/edit/') !== -1;
+  }
+  function refreshProductName() {
+    var sel = document.getElementById('product-category');
+    var opt = sel.options[sel.selectedIndex];
+    var parts = [];
+    var catName = opt ? (opt.getAttribute('data-name') || '').trim() : '';
+    if (catName) parts.push(catName);
+    document.querySelectorAll('#spec-attr-list .spec-attr-value').forEach(function (input) {
+      var value = input.value.trim();
+      if (value) parts.push(value);
+    });
+    document.getElementById('product-name').value = parts.join(' ');
+  }
+  function specValueInput() {
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.name = 'attr_value_0[]';
+    input.setAttribute('autocomplete', 'off');
+    input.className = 'spec-attr-value flex-1 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper';
+    input.addEventListener('input', refreshProductName);
+    return input;
+  }
+  function addExtraSpecField(keyText, valueText, focusKey) {
     var list = document.getElementById('spec-attr-list');
+    var empty = document.getElementById('spec-attr-empty');
+    if (empty) empty.classList.add('hidden');
+    var row = document.createElement('div');
+    row.className = 'spec-attr-row spec-attr-extra flex gap-1.5 items-center';
+    var key = document.createElement('input');
+    key.type = 'text';
+    key.name = 'attr_key_0[]';
+    key.placeholder = 'New field name';
+    key.value = keyText || '';
+    key.setAttribute('autocomplete', 'off');
+    key.className = 'spec-attr-key w-2/5 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper';
+    var value = specValueInput();
+    value.placeholder = 'Value';
+    value.value = valueText || '';
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'spec-attr-remove text-ink-faint hover:text-stop px-1';
+    remove.setAttribute('aria-label', 'Remove attribute');
+    remove.textContent = '×';
+    row.appendChild(key);
+    row.appendChild(value);
+    row.appendChild(remove);
+    list.appendChild(row);
+    if (focusKey) key.focus();
+  }
+  function renderCategoryFields(savedAttrs) {
+    savedAttrs = savedAttrs || {};
+    var list = document.getElementById('spec-attr-list');
+    var empty = document.getElementById('spec-attr-empty');
     if (!list) return;
-    var rows = list.querySelectorAll('.spec-attr-row');
-    rows.forEach(function (row, i) { if (i > 0) row.remove(); });
-    var first = list.querySelector('.spec-attr-row');
-    if (!first) return;
-    first.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+    list.innerHTML = '';
+    var sel = document.getElementById('product-category');
+    var opt = sel.options[sel.selectedIndex];
+    var fields = [];
+    if (opt && opt.value) {
+      try { fields = JSON.parse(opt.getAttribute('data-fields') || '[]'); } catch (err) { fields = []; }
+    }
+    var shown = {};
+    fields.forEach(function (name) {
+      if (!name) return;
+      var row = document.createElement('div');
+      row.className = 'spec-attr-row flex gap-1.5 items-center';
+      var key = document.createElement('input');
+      key.type = 'hidden';
+      key.name = 'attr_key_0[]';
+      key.value = name;
+      var label = document.createElement('div');
+      label.className = 'w-2/5 text-[13px] font-semibold text-ink';
+      label.textContent = name;
+      var value = specValueInput();
+      value.placeholder = name;
+      if (Object.prototype.hasOwnProperty.call(savedAttrs, name)) value.value = savedAttrs[name];
+      shown[name.toLowerCase()] = true;
+      row.appendChild(key);
+      row.appendChild(label);
+      row.appendChild(value);
+      list.appendChild(row);
+    });
+    Object.keys(savedAttrs).forEach(function (key) {
+      if (shown[key.toLowerCase()]) return;
+      addExtraSpecField(key, savedAttrs[key], false);
+      shown[key.toLowerCase()] = true;
+    });
+    if (empty) empty.classList.toggle('hidden', list.children.length > 0);
+    refreshProductName();
+  }
+  function resetSpecAttributes() {
+    renderCategoryFields();
   }
 
   function resetVariantSection() {
@@ -900,7 +894,7 @@
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('product-name').focus();
+    document.getElementById('product-category').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -932,9 +926,30 @@
     document.getElementById('product-base-unit').value = btn.getAttribute('data-base-unit-id') || '';
     document.getElementById('product-hsn').value = btn.getAttribute('data-hsn') || '';
     document.getElementById('product-tax-rate').value = btn.getAttribute('data-tax-rate-id') || '';
+    var attrs = {};
+    var recipe = [];
+    try { attrs = JSON.parse(btn.getAttribute('data-attributes') || '{}'); } catch (err) { attrs = {}; }
+    try { recipe = JSON.parse(btn.getAttribute('data-recipe') || '[]'); } catch (err) { recipe = []; }
+    renderCategoryFields(attrs);
+    fillProductRecipe(recipe);
     var formulation = document.getElementById('formulation-section');
-    if (formulation) formulation.classList.add('hidden');
+    if (formulation) formulation.classList.remove('hidden');
+    var qty = document.getElementById('recipe-preview-qty');
+    if (qty) qty.value = '500';
+    refreshRecipe();
     openModal();
+  }
+  function fillProductRecipe(lines) {
+    var body = document.getElementById('recipe-body');
+    if (!body) return;
+    body.innerHTML = '';
+    if (!lines || !lines.length) {
+      addRecipeLine();
+      return;
+    }
+    lines.forEach(function (line) {
+      addRecipeLine(line.id, line.ratio);
+    });
   }
 
   function viewField(label, value) {
@@ -957,8 +972,8 @@
       viewField('Tax rate', btn.getAttribute('data-tax-rate')) +
       '</div>' +
       '<div class="pt-2">' + viewField('Description', btn.getAttribute('data-description')) + '</div>'+
-      '<div class="pt-3"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1">Variants</div>' +
-      (variantsHtml || '<div class="text-ink-faint text-[13px]">No variants</div>') +
+      '<div class="pt-3"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1">Attributes and recipe</div>' +
+      (variantsHtml || '<div class="text-ink-faint text-[13px]">No attributes or recipe</div>') +
       '</div>';
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
@@ -1387,7 +1402,7 @@
   if (variantPreviewQty) variantPreviewQty.addEventListener('input', refreshVariantFlow);
   if (variantUnitWeight) variantUnitWeight.addEventListener('input', refreshVariantFlow);
 
-  function addRecipeLine() {
+  function addRecipeLine(rmId, ratio) {
     var body = document.getElementById('recipe-body');
     if (!body) return;
     var tr = document.createElement('tr');
@@ -1400,6 +1415,8 @@
       '<td class="px-2 py-2"><input type="number" name="recipe_ratio[]" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
       '<td class="px-2 py-2 text-right"><button type="button" class="recipe-remove text-[12px] text-stop hover:underline">Remove</button></td>';
     body.appendChild(tr);
+    if (rmId) tr.querySelector('.recipe-rm').value = String(rmId);
+    if (ratio !== undefined && ratio !== null && ratio !== '') tr.querySelector('.recipe-ratio').value = ratio;
     renumberRecipe();
   }
 
@@ -1489,18 +1506,23 @@
   }
 
   var specAttrList = document.getElementById('spec-attr-list');
+  var productCategory = document.getElementById('product-category');
+  if (productCategory) {
+    productCategory.addEventListener('change', function () {
+      renderCategoryFields();
+    });
+  }
   if (specAttrList) {
     document.getElementById('btn-add-spec-attr').addEventListener('click', function () {
-      var first = specAttrList.querySelector('.spec-attr-row');
-      var row = first.cloneNode(true);
-      row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
-      specAttrList.appendChild(row);
+      addExtraSpecField('', '', true);
     });
     specAttrList.addEventListener('click', function (e) {
       var btn = e.target.closest('.spec-attr-remove');
       if (!btn) return;
-      if (specAttrList.querySelectorAll('.spec-attr-row').length <= 1) return;
-      btn.closest('.spec-attr-row').remove();
+      var row = btn.closest('.spec-attr-extra');
+      if (!row) return;
+      row.remove();
+      refreshProductName();
     });
   }
 

@@ -5,6 +5,20 @@ from datetime import datetime
 
 grns_bp = Blueprint("grns", __name__, template_folder="templates")
 
+def refresh_po_status(po):
+    if po.status in ("Draft", "Cancelled"):
+        return
+
+    total_ordered = sum(line.ordered_qty for line in po.lines)
+    total_received = sum(line.received_qty for line in po.lines)
+
+    if total_received <=0:
+        po.status = "Open"
+    elif total_received < total_ordered:
+        po.status = "Partial"
+    else:
+        po.status = "Closed"            
+
 @grns_bp.route('/grns')
 def grns_list():
     grns = GRN.query.filter(GRN.is_deleted == False).order_by(GRN.id.desc()).all()
@@ -30,18 +44,14 @@ def grns_po_lines(po_id):
 
     lines=[]
     for line in po.lines:
-        prev_received =0
-        for grn_line in GRNLine.query.filter_by(po_line_id=line.id).all():
-            if grn_line.grn.status != "Draft":
-                prev_received  += grn_line.received_qty
-
         lines.append(
             {
                 "po_line_id": line.id,
                 "material_code": line.raw_material.code if line.raw_material else "",
                 "material_name": line.raw_material.name if line.raw_material else "",
                 "po_qty": line.ordered_qty,
-                "prev_received": prev_received,
+                "prev_received": line.received_qty,
+                "remaining": line.remaining_qty,
                 "unit_code": line.unit.code if line.unit else "",
             }
         )    
@@ -105,6 +115,9 @@ def grns_add():
             ))    
         i += 1
 
+    po = PurchaseOrder.query.get(po_id)
+    refresh_po_status(po)
+
     db.session.commit()
     flash(f"GRN {grn_no} saved as {status}.", "success")
     return redirect(url_for('grns.grns_list'))        
@@ -117,6 +130,7 @@ def grns_post(grn_id):
         return redirect(url_for('grns.grns_list'))
 
     grn.status = "Pending QC"
+    refresh_po_status(grn.po)
     db.session.commit()
     flash(f"GRN {grn.grn_no} posted — now Pending QC.", "success")
     return redirect(url_for('grns.grns_list'))

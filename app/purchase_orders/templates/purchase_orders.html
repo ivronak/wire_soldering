@@ -38,8 +38,8 @@
   .po-table tbody tr:nth-child(even) { background: #F8FAF9; }
   .po-table tbody tr:hover { background: #FBF4EE; }
   .search-wrap input { padding-left: 32px; }
-  #po-modal.hidden, #view-modal.hidden { display: none; }
-  #po-modal, #view-modal { display: flex; }
+  #po-modal.hidden, #view-modal.hidden, #confirm-po-modal.hidden, #short-close-po-modal.hidden { display: none; }
+  #po-modal, #view-modal, #confirm-po-modal, #short-close-po-modal { display: flex; }
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
   .form-section-title {
@@ -128,6 +128,7 @@
             <button type="button" data-filter="open" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Open (0)</button>
             <button type="button" data-filter="partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (0)</button>
             <button type="button" data-filter="closed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Closed (0)</button>
+            <button type="button" data-filter="cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Short closed (0)</button>
           </div>
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
@@ -175,10 +176,12 @@
                 <td class="text-[13px] text-ink-muted">{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else "—" }}</td>
                 <td class="text-[13px] text-ink-muted">{{ o.warehouse.name if o.warehouse else "—" }}</td>
                 <td class="text-center">
-                  <span class="status-pill status-{{ o.status|lower }}">{{ o.status }}</span>
+                  <span class="status-pill status-{{ o.status|lower }}">{{ 'Short closed' if o.status == 'Cancelled' else o.status }}</span>
                 </td>
                 <td>
                   <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <a href="/purchase_orders/{{ o.id }}/print" target="_blank"
+                      class="px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">Print</a>
                     <button type="button"
                       class="btn-view-po px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
                       data-po="{{ o.po_no }}"
@@ -188,24 +191,35 @@
                       data-expected="{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else '' }}"
                       data-status="{{ o.status }}"
                       data-remarks="{{ o.remarks or '' }}"
-                      data-terms="{{ o.payment_terms or '' }}"
+                      data-terms="{{ o.payment_terms.name if o.payment_terms else '' }}"
                       data-freight="{{ o.freight }}"
-                      data-tax-type="{{ 'intra' if (o.vendor and o.warehouse and o.warehouse.branch and o.vendor.state == o.warehouse.branch.state) else 'inter' }}"
+                      data-charge-names='{{ o.charge_lines | map(attribute="charge") | map(attribute="name") | list | tojson }}'
+                      data-charge-amounts='{{ o.charge_lines | map(attribute="amount") | list | tojson }}'
+                      data-charge-effects='{{ o.charge_lines | map(attribute="effect") | list | tojson }}'
+                      data-tax-type="{{ 'intra' if (o.vendor and o.vendor.state and o.warehouse and o.warehouse.branch and o.warehouse.branch.state and o.vendor.state.name == o.warehouse.branch.state.name) else 'inter' }}"
                       data-lines='{{ (o.lines | map(attribute="raw_material.name") | list) | tojson }}'
                       data-qtys='{{ (o.lines | map(attribute="ordered_qty") | list) | tojson }}'
+                      data-received='{{ (o.lines | map(attribute="received_qty") | list) | tojson }}'
                       data-rates='{{ (o.lines | map(attribute="rate") | list) | tojson }}'
                       data-units='{{ (o.lines | map(attribute="unit.code") | list) | tojson }}'
-                      data-discs='{{ (o.lines | map(attribute="discount_percent") | list) | tojson }}'
-                      data-taxpcts='{{ (o.lines | map(attribute="tax_rate.rate_percent") | list) | tojson }}'>
+                      data-taxpcts='{{ (o.lines | map(attribute="tax_rate.rate_percent") | list) | tojson }}'
+                      data-invoice-no="{{ o.vendor_invoice_no or '' }}"
+                      data-invoice-date="{{ o.vendor_invoice_date.strftime('%d-%b-%Y') if o.vendor_invoice_date else '' }}"
+                      data-invoice-url="{{ url_for('purchase_orders.purchase_orders_invoice', po_id=o.id) if o.vendor_invoice_file else '' }}"
+                      data-short-close-reason="{{ o.short_close_reason or '' }}">
                       View
                     </button>
                     {% if o.status == "Draft" %}
-                    <form method="post" action="{{ url_for('purchase_orders.purchase_orders_confirm', po_id=o.id) }}" class="inline js-confirm-submit"
-                          data-confirm-title="Confirm purchase order"
-                          data-confirm-ok="Confirm"
-                          data-confirm-message="Confirm {{ o.po_no }}? It will move to Open status and become available for GRN.">
-                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Confirm</button>
-                    </form>
+                    <button type="button" class="btn-confirm-po px-2.5 py-1 text-[12.5px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
+                      data-id="{{ o.id }}" data-po="{{ o.po_no }}">
+                      Confirm
+                    </button>
+                    {% endif %}
+                    {% if o.status in ("Open", "Partial") %}
+                    <button type="button" class="btn-short-close-po px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90"
+                      data-id="{{ o.id }}" data-po="{{ o.po_no }}">
+                      Short close
+                    </button>
                     {% endif %}
                   </div>
                 </td>
@@ -257,7 +271,7 @@
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
             <option value="">Select vendor…</option>
             {% for v in vendors %}
-            <option value="{{ v.id }}" data-state="{{ v.state or '' }}" data-terms="{{ v.payment_terms or '' }}">{{ v.code }} — {{ v.name }}</option>
+            <option value="{{ v.id }}" data-state="{{ v.state.name if v.state else '' }}" data-terms="{{ v.payment_terms_id or '' }}">{{ v.code }} — {{ v.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -274,7 +288,7 @@
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
             <option value="">Select warehouse…</option>
             {% for w in warehouses %}
-            <option value="{{ w.id }}" data-state="{{ w.branch.state if w.branch else '' }}">{{ w.code }} — {{ w.name }}</option>
+            <option value="{{ w.id }}" data-state="{{ w.branch.state.name if (w.branch and w.branch.state) else '' }}">{{ w.code }} — {{ w.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -286,13 +300,13 @@
         </div>
         <div>
           <label for="po-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
-          <select id="po-terms" name="payment_terms"
+          <select id="po-terms" name="payment_terms_id"
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
-            <option value="Advance">Advance</option>
-            <option value="Net 15">Net 15</option>
-            <option value="Net 30" selected>Net 30</option>
-            <option value="Net 45">Net 45</option>
-            <option value="Net 60">Net 60</option>
+            <option value="">Select terms… (optional)</option>
+            {# Options ab Payment Terms Master se — vendor select karne pe auto-fill hota hai #}
+            {% for pt in payment_terms %}
+            <option value="{{ pt.id }}">{{ pt.name }}</option>
+            {% endfor %}
           </select>
         </div>
       </div>
@@ -306,14 +320,13 @@
         <table class="lines-table">
           <thead>
             <tr>
-              <th style="width:28%">Material</th>
-              <th style="width:10%">Qty</th>
-              <th style="width:10%">Unit</th>
-              <th style="width:12%">Rate (₹)</th>
-              <th style="width:9%">Disc %</th>
-              <th style="width:14%">Tax %</th>
-              <th style="width:12%">Amount</th>
-              <th style="width:5%"></th>
+              <th style="width:30%">Material</th>
+              <th style="width:12%">Qty</th>
+              <th style="width:11%">Unit</th>
+              <th style="width:14%">Rate (₹)</th>
+              <th style="width:16%">Tax %</th>
+              <th style="width:13%">Amount</th>
+              <th style="width:4%"></th>
             </tr>
           </thead>
           <tbody id="po-line-list">
@@ -339,7 +352,6 @@
                 </select>
               </td>
               <td><input type="number" name="rate_0" min="0" step="0.01" placeholder="0.00" class="line-rate text-right tabular-nums" /></td>
-              <td><input type="number" name="discount_percent_0" min="0" max="100" step="0.01" value="0" class="line-disc text-center tabular-nums" /></td>
               <td>
                 <select name="tax_rate_id_0" class="line-tax">
                   <option value="">—</option>
@@ -363,16 +375,35 @@
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
       </div>
 
+      <div class="flex items-center justify-between">
+        <p class="form-section-title !mt-0 !mb-0">Charges</p>
+        <button type="button" id="btn-add-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
+      </div>
+      <p class="text-[12.5px] text-ink-faint">Optional. Pick a charge from the master. Add increases the total. Minus reduces it.</p>
+      <div class="border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th style="width:46%">Charge</th>
+              <th style="width:22%">Effect</th>
+              <th style="width:24%">Amount (₹)</th>
+              <th style="width:8%"></th>
+            </tr>
+          </thead>
+          <tbody id="po-charge-list">
+            <tr id="po-charge-empty">
+              <td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">
         <div class="flex items-center justify-between text-ink-muted">
           <span>Subtotal</span><span id="po-subtotal" class="tabular-nums">₹0.00</span>
         </div>
         <div id="po-tax-rows" class="text-ink-muted"></div>
-        <div class="flex items-center justify-between text-ink-muted">
-          <span>Freight (₹)</span>
-          <input type="number" id="po-freight" name="freight" min="0" step="0.01" value="0"
-            class="w-28 px-2 py-1 text-[13px] text-right border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-        </div>
+        <div id="po-charge-rows" class="text-ink-muted"></div>
         <div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">
           <span>Grand total</span><span id="po-grand-total" class="tabular-nums">₹0.00</span>
         </div>
@@ -401,6 +432,67 @@
     </div>
   </div>
 </div>
+
+<div id="confirm-po-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="confirm-po-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="confirm-po-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="confirm-po-title" class="text-[16px] font-bold text-ink">Confirm purchase order</h2>
+        <p id="confirm-po-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-confirm-po" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="confirm-po-form" method="post" enctype="multipart/form-data" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <p class="text-[13px] text-ink-muted">Attach the vendor's invoice / bill copy to confirm this purchase order. It will move to <strong>Open</strong> status and become available for GRN.</p>
+      <div>
+        <label for="confirm-po-file" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor invoice / bill copy *</label>
+        <input type="file" id="confirm-po-file" name="invoice_file" required accept=".pdf,.png,.jpg,.jpeg"
+          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="text-[11.5px] text-ink-faint mt-1">PDF, PNG or JPG — required to confirm.</p>
+      </div>
+      <div>
+        <label for="confirm-po-inv-no" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor bill / invoice no. (optional)</label>
+        <input type="text" id="confirm-po-inv-no" name="vendor_invoice_no" autocomplete="off"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="confirm-po-inv-date" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor invoice date (optional)</label>
+        <input type="date" id="confirm-po-inv-date" name="vendor_invoice_date"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-confirm-po" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="confirm-po-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Confirm — move to Open</button>
+    </div>
+  </div>
+</div>
+
+<div id="short-close-po-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="short-close-po-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="short-close-po-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-stop-bg flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="short-close-po-title" class="text-[16px] font-bold text-ink">Short close purchase order</h2>
+        <p id="short-close-po-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-short-close-po" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="short-close-po-form" method="post" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <p class="text-[13px] text-ink-muted">Use this when the vendor cannot supply the remaining quantity. The order will move to <strong>Short closed</strong> and stop appearing in the GRN pending list — the balance is not cancelled, it is written off.</p>
+      <div>
+        <label for="short-close-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason *</label>
+        <textarea id="short-close-reason" name="short_close_reason" required rows="3" placeholder="e.g. Vendor out of stock, balance quantity will not be supplied"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-short-close-po" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="short-close-po-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-stop border border-stop-border rounded hover:opacity-90">Short close this PO</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block page_js %}
@@ -418,6 +510,7 @@
   var FILTER_KEY = 'erp.po.statusFilter';
   var SEARCH_KEY = 'erp.po.searchQ';
   var addAction = "{{ url_for('purchase_orders.purchase_orders_add') }}";
+  var chargeOptions = [{% for c in charges|default([]) %}{id: {{ c.id }}, label: {{ (c.code ~ ' — ' ~ c.name)|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
 
   function saveActiveFilter() {
     try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (e) {}
@@ -458,6 +551,7 @@
     renumberLines();
     var firstAmount = list.querySelector('.line-amount');
     if (firstAmount) firstAmount.textContent = '₹0.00';
+    clearCharges();
     var taxBox = document.getElementById('po-tax-type');
     taxBox.textContent = 'Select vendor & warehouse first';
     taxBox.className = 'w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-mist text-ink-faint';
@@ -481,12 +575,11 @@
     openModal();
   }
 
-  // ---- Line calculation (qty x rate x (1-disc%) per line, tax on top) ----
+  // Line amount = qty x rate. Discount column hata diya. Tax is amount ke upar.
   function calcLineAmount(row) {
     var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
     var rate = parseFloat(row.querySelector('.line-rate').value) || 0;
-    var disc = parseFloat(row.querySelector('.line-disc').value) || 0;
-    var amount = qty * rate * (1 - disc / 100);
+    var amount = qty * rate;
     row.querySelector('.line-amount').textContent = '₹' + amount.toFixed(2);
     return amount;
   }
@@ -528,7 +621,19 @@
       var pct = taxOpt ? (parseFloat(taxOpt.getAttribute('data-pct')) || 0) : 0;
       totalTax += amount * pct / 100;
     });
-    var freight = parseFloat(document.getElementById('po-freight').value) || 0;
+    var chargeNet = 0;
+    var chargeHtml = '';
+    document.querySelectorAll('.po-charge-row').forEach(function (row) {
+      var amt = parseFloat(row.querySelector('.charge-amount').value) || 0;
+      var effect = row.querySelector('.charge-effect').value;
+      var label = row.querySelector('.charge-id').selectedOptions[0];
+      var name = label && label.value ? label.textContent : 'Charge';
+      var signed = effect === 'minus' ? -amt : amt;
+      chargeNet += signed;
+      var sign = effect === 'minus' ? '−' : '+';
+      chargeHtml += '<div class="flex items-center justify-between"><span>' + esc(name) + '</span><span class="tabular-nums">' + sign + ' ₹' + amt.toFixed(2) + '</span></div>';
+    });
+    document.getElementById('po-charge-rows').innerHTML = chargeHtml;
     var type = getTaxType();
     var taxRowsEl = document.getElementById('po-tax-rows');
     if (type === 'inter') {
@@ -540,7 +645,7 @@
         '<div class="flex items-center justify-between"><span>SGST</span><span class="tabular-nums">₹' + half.toFixed(2) + '</span></div>';
     }
     document.getElementById('po-subtotal').textContent = '₹' + subtotal.toFixed(2);
-    document.getElementById('po-grand-total').textContent = '₹' + (subtotal + totalTax + freight).toFixed(2);
+    document.getElementById('po-grand-total').textContent = '₹' + (subtotal + totalTax + chargeNet).toFixed(2);
   }
 
   // ---- Material select hote hi uski Unit + Tax Rate auto-fill (Raw Material Master se) ----
@@ -558,17 +663,29 @@
     return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
       '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
   }
+  function invoiceFieldHtml(btn) {
+    var url = btn.getAttribute('data-invoice-url') || '';
+    var no = btn.getAttribute('data-invoice-no') || '';
+    var date = btn.getAttribute('data-invoice-date') || '';
+    if (!url) return '<span class="text-ink-faint">Not uploaded yet</span>';
+    var extra = [no, date].filter(Boolean).map(esc).join(' · ');
+    return '<a href="' + url + '" target="_blank" class="text-copper-text font-semibold hover:underline">View uploaded copy</a>' +
+      (extra ? ' <span class="text-ink-faint">· ' + extra + '</span>' : '');
+  }
   function openViewModal(btn) {
     document.getElementById('view-modal-subtitle').textContent =
       (btn.getAttribute('data-po') || '') + ' — ' + (btn.getAttribute('data-vendor') || '');
 
     var materials = JSON.parse(btn.getAttribute('data-lines') || '[]');
     var qtys = JSON.parse(btn.getAttribute('data-qtys') || '[]');
+    var receiveds = JSON.parse(btn.getAttribute('data-received') || '[]');
     var rates = JSON.parse(btn.getAttribute('data-rates') || '[]');
     var units = JSON.parse(btn.getAttribute('data-units') || '[]');
-    var discs = JSON.parse(btn.getAttribute('data-discs') || '[]');
     var taxPcts = JSON.parse(btn.getAttribute('data-taxpcts') || '[]');
     var freight = parseFloat(btn.getAttribute('data-freight')) || 0;
+    var chargeNames = JSON.parse(btn.getAttribute('data-charge-names') || '[]');
+    var chargeAmounts = JSON.parse(btn.getAttribute('data-charge-amounts') || '[]');
+    var chargeEffects = JSON.parse(btn.getAttribute('data-charge-effects') || '[]');
     var taxType = btn.getAttribute('data-tax-type');
 
     var linesHtml = '';
@@ -577,18 +694,45 @@
     materials.forEach(function (name, i) {
       var qty = qtys[i] || 0;
       var rate = rates[i] || 0;
-      var disc = discs[i] || 0;
       var pct = taxPcts[i] || 0;
-      var amount = qty * rate * (1 - disc / 100);
+      var amount = qty * rate;
       subtotal += amount;
       totalTax += amount * pct / 100;
-      linesHtml += '<div class="flex items-center justify-between border-b border-slate-100 py-1.5 text-[13px]">' +
+      var received = receiveds[i] || 0;
+      var remaining = qty - received;
+      var receivedNote;
+      if (remaining < 0) {
+        receivedNote = '<span class="text-stop font-semibold">Received ' + received + ' ' + (units[i] || '') + ' — ' + Math.abs(remaining) + ' over the ordered qty</span>';
+      } else if (received <= 0) {
+        receivedNote = '<span class="text-ink-faint">Not received yet</span>';
+      } else if (remaining === 0) {
+        receivedNote = '<span class="text-success font-semibold">Fully received (' + received + ' ' + (units[i] || '') + ')</span>';
+      } else {
+        receivedNote = '<span class="text-ink-faint">Received ' + received + ' · Remaining ' + remaining + ' ' + (units[i] || '') + '</span>';
+      }
+      linesHtml += '<div class="flex items-center justify-between pt-1.5 text-[13px]">' +
         '<span class="text-ink">' + name + '</span>' +
-        '<span class="text-ink-faint">' + qty + ' ' + (units[i] || '') + ' × ₹' + rate + (disc ? ' (−' + disc + '%)' : '') + ' · ' + pct + '% tax</span>' +
+        '<span class="text-ink-faint">' + qty + ' ' + (units[i] || '') + ' × ₹' + rate + ' · ' + pct + '% tax</span>' +
         '<span class="font-semibold text-ink">₹' + amount.toFixed(2) + '</span>' +
-        '</div>';
+        '</div>' +
+        '<div class="flex items-center justify-end text-[12px] pb-1.5 border-b border-slate-100">' + receivedNote + '</div>';
     });
     if (!linesHtml) linesHtml = '<div class="text-ink-faint text-[13px]">No line items</div>';
+
+    var chargeNet = 0;
+    var chargeHtml = '';
+    if (chargeNames.length) {
+      chargeNames.forEach(function (name, i) {
+        var amt = chargeAmounts[i] || 0;
+        var effect = chargeEffects[i] || 'add';
+        var signed = effect === 'minus' ? -amt : amt;
+        chargeNet += signed;
+        chargeHtml += '<div class="flex items-center justify-between"><span>' + esc(name || 'Charge') + '</span><span>' + (effect === 'minus' ? '−' : '+') + ' ₹' + Number(amt).toFixed(2) + '</span></div>';
+      });
+    } else if (freight) {
+      chargeNet = freight;
+      chargeHtml = '<div class="flex items-center justify-between"><span>Freight</span><span>₹' + freight.toFixed(2) + '</span></div>';
+    }
 
     var taxHtml = taxType === 'inter'
       ? '<div class="flex items-center justify-between"><span>IGST</span><span>₹' + totalTax.toFixed(2) + '</span></div>'
@@ -604,6 +748,8 @@
       viewField('Payment terms', btn.getAttribute('data-terms')) +
       viewField('Tax type', taxType === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)') +
       '</div>' +
+      '<div class="pt-2">' + viewField('Vendor invoice', invoiceFieldHtml(btn)) + '</div>' +
+      (btn.getAttribute('data-short-close-reason') ? '<div class="pt-2">' + viewField('Short close reason', btn.getAttribute('data-short-close-reason')) + '</div>' : '') +
       '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>' +
       '<div class="pt-3 border-t border-slate-200 mt-2">' +
       '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Line items</div>' +
@@ -612,9 +758,9 @@
       '<div class="bg-mist border border-slate-200 rounded-lg p-3 mt-2 space-y-1 text-[13px] text-ink-muted">' +
       '<div class="flex items-center justify-between"><span>Subtotal</span><span>₹' + subtotal.toFixed(2) + '</span></div>' +
       taxHtml +
-      '<div class="flex items-center justify-between"><span>Freight</span><span>₹' + freight.toFixed(2) + '</span></div>' +
+      chargeHtml +
       '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">' +
-      '<span>Grand total</span><span>₹' + (subtotal + totalTax + freight).toFixed(2) + '</span></div>' +
+      '<span>Grand total</span><span>₹' + (subtotal + totalTax + chargeNet).toFixed(2) + '</span></div>' +
       '</div>';
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
@@ -623,6 +769,52 @@
     viewModal.classList.add('hidden');
     viewModal.setAttribute('aria-hidden', 'true');
   }
+
+  // ---- Confirm PO modal (vendor invoice upload) ----
+  var confirmPoModal = document.getElementById('confirm-po-modal');
+  var confirmPoForm = document.getElementById('confirm-po-form');
+  function openConfirmPoModal(btn) {
+    var id = btn.getAttribute('data-id');
+    var poNo = btn.getAttribute('data-po') || '';
+    confirmPoForm.reset();
+    confirmPoForm.action = '/purchase_orders/confirm/' + id;
+    document.getElementById('confirm-po-subtitle').textContent = poNo;
+    confirmPoModal.classList.remove('hidden');
+    confirmPoModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeConfirmPoModal() {
+    confirmPoModal.classList.add('hidden');
+    confirmPoModal.setAttribute('aria-hidden', 'true');
+  }
+  document.querySelectorAll('.btn-confirm-po').forEach(function (btn) {
+    btn.addEventListener('click', function () { openConfirmPoModal(btn); });
+  });
+  document.getElementById('btn-close-confirm-po').addEventListener('click', closeConfirmPoModal);
+  document.getElementById('btn-cancel-confirm-po').addEventListener('click', closeConfirmPoModal);
+  document.getElementById('confirm-po-backdrop').addEventListener('click', closeConfirmPoModal);
+
+  // ---- Short Close PO modal ----
+  var shortClosePoModal = document.getElementById('short-close-po-modal');
+  var shortClosePoForm = document.getElementById('short-close-po-form');
+  function openShortClosePoModal(btn) {
+    var id = btn.getAttribute('data-id');
+    var poNo = btn.getAttribute('data-po') || '';
+    shortClosePoForm.reset();
+    shortClosePoForm.action = '/purchase_orders/short_close/' + id;
+    document.getElementById('short-close-po-subtitle').textContent = poNo;
+    shortClosePoModal.classList.remove('hidden');
+    shortClosePoModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeShortClosePoModal() {
+    shortClosePoModal.classList.add('hidden');
+    shortClosePoModal.setAttribute('aria-hidden', 'true');
+  }
+  document.querySelectorAll('.btn-short-close-po').forEach(function (btn) {
+    btn.addEventListener('click', function () { openShortClosePoModal(btn); });
+  });
+  document.getElementById('btn-close-short-close-po').addEventListener('click', closeShortClosePoModal);
+  document.getElementById('btn-cancel-short-close-po').addEventListener('click', closeShortClosePoModal);
+  document.getElementById('short-close-po-backdrop').addEventListener('click', closeShortClosePoModal);
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -642,7 +834,7 @@
     resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' purchase orders';
   }
   function updateFilterCounts() {
-    var counts = { draft: 0, open: 0, partial: 0, closed: 0 };
+    var counts = { draft: 0, open: 0, partial: 0, closed: 0, cancelled: 0 };
     rows.forEach(function (row) {
       var s = row.getAttribute('data-status');
       if (counts[s] !== undefined) counts[s] += 1;
@@ -652,6 +844,7 @@
     document.querySelector('[data-filter="open"]').textContent = 'Open (' + counts.open + ')';
     document.querySelector('[data-filter="partial"]').textContent = 'Partial (' + counts.partial + ')';
     document.querySelector('[data-filter="closed"]').textContent = 'Closed (' + counts.closed + ')';
+    document.querySelector('[data-filter="cancelled"]').textContent = 'Short closed (' + counts.cancelled + ')';
   }
 
   document.getElementById('btn-add-po').addEventListener('click', openAddModal);
@@ -665,7 +858,9 @@
   document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (!viewModal.classList.contains('hidden')) closeViewModal();
+    if (!shortClosePoModal.classList.contains('hidden')) closeShortClosePoModal();
+    else if (!confirmPoModal.classList.contains('hidden')) closeConfirmPoModal();
+    else if (!viewModal.classList.contains('hidden')) closeViewModal();
     else if (!modal.classList.contains('hidden')) closeModal();
   });
   document.querySelectorAll('.btn-view-po').forEach(function (btn) {
@@ -696,7 +891,6 @@
       row.querySelector('.line-qty').name = 'ordered_qty_' + index;
       row.querySelector('.line-unit').name = 'unit_id_' + index;
       row.querySelector('.line-rate').name = 'rate_' + index;
-      row.querySelector('.line-disc').name = 'discount_percent_' + index;
       row.querySelector('.line-tax').name = 'tax_rate_id_' + index;
       row.querySelector('.btn-remove-line').classList.toggle('hidden', index === 0);
     });
@@ -706,7 +900,7 @@
     var list = document.getElementById('po-line-list');
     var newRow = list.querySelector('.po-line-row').cloneNode(true);
     newRow.querySelectorAll('input, select').forEach(function (el) {
-      el.value = el.classList.contains('line-disc') ? '0' : '';
+      el.value = '';
     });
     newRow.querySelector('.line-amount').textContent = '₹0.00';
     list.appendChild(newRow);
@@ -725,7 +919,7 @@
     }
   });
   document.getElementById('po-line-list').addEventListener('input', function (e) {
-    if (e.target.classList.contains('line-qty') || e.target.classList.contains('line-rate') || e.target.classList.contains('line-disc')) {
+    if (e.target.classList.contains('line-qty') || e.target.classList.contains('line-rate')) {
       calcTotals();
     }
   });
@@ -744,7 +938,60 @@
     updateTaxType();
   });
   document.getElementById('po-warehouse').addEventListener('change', updateTaxType);
-  document.getElementById('po-freight').addEventListener('input', calcTotals);
+
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function chargeSelectHtml() {
+    var html = '<option value="">Select charge…</option>';
+    chargeOptions.forEach(function (c) {
+      html += '<option value="' + c.id + '">' + esc(c.label) + '</option>';
+    });
+    return html;
+  }
+  function syncChargeEmpty() {
+    var empty = document.getElementById('po-charge-empty');
+    var has = document.querySelectorAll('.po-charge-row').length > 0;
+    if (has && empty) empty.remove();
+    if (!has && !document.getElementById('po-charge-empty')) {
+      document.getElementById('po-charge-list').innerHTML = '<tr id="po-charge-empty"><td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges yet.</td></tr>';
+    }
+  }
+  function renumberCharges() {
+    document.querySelectorAll('.po-charge-row').forEach(function (row, index) {
+      row.querySelector('.charge-id').name = 'charge_id_' + index;
+      row.querySelector('.charge-amount').name = 'charge_amount_' + index;
+      row.querySelector('.charge-effect').name = 'charge_effect_' + index;
+    });
+  }
+  function clearCharges() {
+    document.getElementById('po-charge-list').innerHTML = '<tr id="po-charge-empty"><td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges yet.</td></tr>';
+  }
+  function addChargeRow() {
+    var empty = document.getElementById('po-charge-empty');
+    if (empty) empty.remove();
+    var tr = document.createElement('tr');
+    tr.className = 'po-charge-row';
+    tr.innerHTML =
+      '<td><select class="charge-id">' + chargeSelectHtml() + '</select></td>' +
+      '<td><select class="charge-effect"><option value="add">Add</option><option value="minus">Minus</option></select></td>' +
+      '<td><input type="number" class="charge-amount text-right tabular-nums" min="0" step="0.01" placeholder="0.00" /></td>' +
+      '<td class="text-center"><button type="button" class="btn-remove-charge text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove charge">&times;</button></td>';
+    document.getElementById('po-charge-list').appendChild(tr);
+    renumberCharges();
+    calcTotals();
+  }
+  document.getElementById('btn-add-charge').addEventListener('click', addChargeRow);
+  document.getElementById('po-charge-list').addEventListener('click', function (e) {
+    var btn = e.target.closest('.btn-remove-charge');
+    if (!btn) return;
+    btn.closest('.po-charge-row').remove();
+    syncChargeEmpty();
+    renumberCharges();
+    calcTotals();
+  });
+  document.getElementById('po-charge-list').addEventListener('input', calcTotals);
+  document.getElementById('po-charge-list').addEventListener('change', calcTotals);
 
   searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
   document.querySelectorAll('.filter-btn').forEach(function (btn) {

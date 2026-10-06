@@ -1,43 +1,8 @@
-# Bharat ke saare states + union territories — ek hi jagah define kiya hai
-# taaki Vendor aur Branch (Warehouse) dono isi list se state select karein.
-# Isse dono jagah state ka format (poora naam) same rehta hai, compare karne
-# me (Vendor state == Branch state, intra/inter-state tax ke liye) mismatch
-# nahi hota.
-INDIAN_STATES = [
-    "Andaman and Nicobar Islands",
-    "Andhra Pradesh",
-    "Arunachal Pradesh",
-    "Assam",
-    "Bihar",
-    "Chandigarh",
-    "Chhattisgarh",
-    "Dadra and Nagar Haveli and Daman and Diu",
-    "Delhi",
-    "Goa",
-    "Gujarat",
-    "Haryana",
-    "Himachal Pradesh",
-    "Jammu and Kashmir",
-    "Jharkhand",
-    "Karnataka",
-    "Kerala",
-    "Ladakh",
-    "Lakshadweep",
-    "Madhya Pradesh",
-    "Maharashtra",
-    "Manipur",
-    "Meghalaya",
-    "Mizoram",
-    "Nagaland",
-    "Odisha",
-    "Puducherry",
-    "Punjab",
-    "Rajasthan",
-    "Sikkim",
-    "Tamil Nadu",
-    "Telangana",
-    "Tripura",
-    "Uttar Pradesh",
-    "Uttarakhand",
-    "West Bengal",
-]
+# NOTE (2026-10-02): Pehle yahan `INDIAN_STATES` (36 states/UT ki hardcoded list)
+# thi, jo Vendor / Customer / Branch ke dropdowns use karte the. Woh list ab
+# hata di gayi hai — States ka single source of truth **State Master** hai
+# (`State` model / `states` table). Dropdowns ab `State.query` se aate hain aur
+# Vendor / Customer / Branch me `state_id` FK store hota hai.
+#
+# (Seed migration `fd2c563b95f7` ne `states` table me 36 states/UT + GST codes
+#  isi purani list ke order me bhar diye the, taaki purana text data match ho jaaye.)

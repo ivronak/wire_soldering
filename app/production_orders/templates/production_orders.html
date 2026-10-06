@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Production orders{% endblock %}
+
+{% block page_css %}
+<style>
+  .po-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .po-table thead th {
+    position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D;
+    font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 12px 14px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9;
+  }
+  .po-table thead th:first-child, .po-table tbody td:first-child { text-align: left; padding-left: 18px; }
+  .po-table thead th:last-child { border-right: none; }
+  .po-table tbody td {
+    padding: 11px 14px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle;
+  }
+  .po-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .po-table tbody tr:hover { background: #FBF4EE; }
+  #mo-modal.hidden { display: none; }
+  #mo-modal { display: flex; }
+  .form-section-title {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8A4A1C;
+  }
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th {
+    background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left;
+  }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
+  .status-pill {
+    display: inline-flex; align-items: center; font-size: 12px; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid #E2E8F0; background: #F1F5F9; color: #475569;
+  }
+  .attr-chip {
+    display: inline-flex; align-items: stretch; margin: 3px 6px 3px 0;
+    border: 1px solid #D1D9D8; border-radius: 6px; overflow: hidden; background: #fff; line-height: 1;
+  }
+  .attr-chip .attr-k {
+    padding: 5px 7px; background: #EEF2F1; border-right: 1px solid #D1D9D8;
+    color: #3D5A5D; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .attr-chip .attr-v { padding: 5px 9px; color: #0F2F32; font-size: 12.5px; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Production orders</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Production orders</h1>
+  </div>
+  <button type="button" id="btn-add-mo"
+    class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+    New production order
+  </button>
+</div>
+
+<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+    Showing {{ result_count }} of {{ total_count }} orders · Material lines are copied from the product recipe when you save
+  </div>
+  <div class="flex-1 overflow-auto min-h-0">
+    <table class="po-table">
+      <colgroup>
+        <col style="width:16%" /><col style="width:14%" /><col style="width:34%" />
+        <col style="width:12%" /><col style="width:12%" /><col style="width:12%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Order no.</th><th>Date</th><th>Product</th><th>Qty</th><th>Materials</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td class="font-mono font-semibold">{{ o.prod_no }}</td>
+          <td>{{ o.order_date.strftime('%d %b %Y') }}</td>
+          <td style="text-align:left">{{ o.product.code if o.product else '—' }} — {{ o.product.name if o.product else '—' }}</td>
+          <td class="font-mono">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}</td>
+          <td>{{ o.lines|length }}</td>
+          <td><span class="status-pill">{{ o.status }}</span></td>
+        </tr>
+        {% if o.lines %}
+        <tr>
+          <td colspan="6" style="text-align:left; background:#F8FAF9; font-size:13px; color:#3D5A5D;">
+            {% for line in o.lines %}
+              {{ line.raw_material.code if line.raw_material else '—' }}
+              {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}
+              {% if line.is_extra %}(added){% else %}({{ '%.1f'|format(line.ratio_percent) }}%){% endif %}{% if not loop.last %} · {% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:36px; color:#6B7F82;">No production orders yet. Create one from a product recipe.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div id="mo-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="mo-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="mo-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="mo-title" class="text-[16px] font-bold text-ink">New production order</h2>
+        <p class="text-[12.5px] text-ink-faint">Pick a category, then a product. Specs and materials show below.</p>
+      </div>
+      <button type="button" id="btn-close-mo" class="w-8 h-8 text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="mo-form" method="post" action="{{ url_for('production_orders.production_orders_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <p class="form-section-title">Order</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="mo-date" class="block text-[12.5px] font-semibold text-ink mb-1">Order date *</label>
+          <input type="date" id="mo-date" name="order_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        </div>
+        <div>
+          <label for="mo-category" class="block text-[12.5px] font-semibold text-ink mb-1">Product category *</label>
+          <select id="mo-category" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="">Select category</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="mo-product" class="block text-[12.5px] font-semibold text-ink mb-1">Product *</label>
+        <select id="mo-product" name="product_id" required disabled class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white disabled:bg-mist">
+          <option value="">Select a category first</option>
+        </select>
+      </div>
+      <div>
+        <label id="mo-qty-label" for="mo-qty" class="block text-[12.5px] font-semibold text-ink mb-1">Quantity to make *</label>
+        <input type="number" id="mo-qty" name="planned_qty" min="0" step="0.01" value="500" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      </div>
+      <div id="mo-weight-box" class="hidden rounded border border-copper-border bg-copper-soft px-3 py-2.5">
+        <p id="mo-weight-note" class="text-[13px] text-ink mb-2"></p>
+        <label id="mo-weight-label" for="mo-weight" class="block text-[12.5px] font-semibold text-ink mb-1">Kilograms in one unit *</label>
+        <input type="number" id="mo-weight" name="unit_weight" min="0" step="0.01" value="0.5" class="w-full max-w-xs px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white" />
+      </div>
+      <div>
+        <label for="mo-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+        <input type="text" id="mo-remarks" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      </div>
+      <p class="form-section-title">Attributes</p>
+      <div id="mo-attrs" class="text-[13px] text-ink-faint">Select a product to see its attributes.</div>
+      <p class="form-section-title">Materials from the product recipe</p>
+      <p id="mo-summary" class="text-[12.5px] font-mono text-ink-muted"></p>
+      <table class="lines-table">
+        <thead>
+          <tr>
+            <th>Material</th><th>Name</th><th>Type</th><th>Ratio</th><th>Required</th>
+          </tr>
+        </thead>
+        <tbody id="mo-lines">
+          <tr><td colspan="5" class="text-ink-faint">Select a product.</td></tr>
+        </tbody>
+      </table>
+      <div class="flex items-center justify-between gap-2">
+        <p class="form-section-title mb-0">Other materials</p>
+        <button type="button" id="btn-add-extra" class="text-[13px] font-semibold text-copper hover:underline">+ Add material</button>
+      </div>
+      <p class="text-[12.5px] text-ink-faint">Add packaging or any other raw material that is not in the recipe. Type the quantity yourself.</p>
+      <table class="lines-table">
+        <thead>
+          <tr>
+            <th>Material</th><th>Unit</th><th>Quantity</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="mo-extra-lines">
+          <tr id="mo-extra-empty"><td colspan="4" class="text-ink-faint">No extra materials yet.</td></tr>
+        </tbody>
+      </table>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-mo" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="mo-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save order</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var planner = {{ planner | tojson }};
+  var materialOptions = {{ material_options | tojson }};
+  var byId = {};
+  planner.forEach(function (p) { byId[String(p.id)] = p; });
+
+  var modal = document.getElementById('mo-modal');
+  var categorySel = document.getElementById('mo-category');
+  var productSel = document.getElementById('mo-product');
+  var qtyInput = document.getElementById('mo-qty');
+  var qtyLabel = document.getElementById('mo-qty-label');
+  var weightInput = document.getElementById('mo-weight');
+  var weightBox = document.getElementById('mo-weight-box');
+  var weightNote = document.getElementById('mo-weight-note');
+  var weightLabel = document.getElementById('mo-weight-label');
+  var summary = document.getElementById('mo-summary');
+  var attrsBox = document.getElementById('mo-attrs');
+  var linesBody = document.getElementById('mo-lines');
+  var extraBody = document.getElementById('mo-extra-lines');
+
+  function materialSelectHtml() {
+    var html = '<option value="">Select material</option>';
+    materialOptions.forEach(function (rm) {
+      html += '<option value="' + rm.id + '">' + esc(rm.code) + ' — ' + esc(rm.name) + '</option>';
+    });
+    return html;
+  }
+  function syncExtraEmpty() {
+    var empty = document.getElementById('mo-extra-empty');
+    var hasRows = extraBody.querySelectorAll('tr.extra-row').length > 0;
+    if (hasRows && empty) empty.remove();
+    if (!hasRows && !empty) {
+      extraBody.innerHTML = '<tr id="mo-extra-empty"><td colspan="4" class="text-ink-faint">No extra materials yet.</td></tr>';
+    }
+  }
+  function addExtraLine() {
+    var empty = document.getElementById('mo-extra-empty');
+    if (empty) empty.remove();
+    var tr = document.createElement('tr');
+    tr.className = 'extra-row';
+    tr.innerHTML =
+      '<td><select name="extra_rm_id[]" class="extra-rm w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + materialSelectHtml() + '</select></td>' +
+      '<td class="extra-unit font-mono text-ink-muted">—</td>' +
+      '<td><input type="number" name="extra_qty[]" min="0" step="0.01" placeholder="0" class="w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded" /></td>' +
+      '<td><button type="button" class="extra-remove text-[12px] text-stop hover:underline">Remove</button></td>';
+    extraBody.appendChild(tr);
+    tr.querySelector('.extra-rm').addEventListener('change', function () {
+      var picked = materialOptions.filter(function (rm) { return String(rm.id) === tr.querySelector('.extra-rm').value; })[0];
+      tr.querySelector('.extra-unit').textContent = picked ? (picked.unit || '—') : '—';
+    });
+    tr.querySelector('.extra-remove').addEventListener('click', function () {
+      tr.remove();
+      syncExtraEmpty();
+    });
+  }
+  function clearExtraLines() {
+    extraBody.innerHTML = '<tr id="mo-extra-empty"><td colspan="4" class="text-ink-faint">No extra materials yet.</td></tr>';
+  }
+
+  function esc(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+  function fillProducts() {
+    var categoryId = categorySel.value;
+    var matches = planner.filter(function (p) { return String(p.category_id) === String(categoryId); });
+    productSel.innerHTML = '';
+    var blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = categoryId ? (matches.length ? 'Select product' : 'No products in this category') : 'Select a category first';
+    productSel.appendChild(blank);
+    matches.forEach(function (p) {
+      var opt = document.createElement('option');
+      opt.value = String(p.id);
+      opt.textContent = p.code + ' — ' + p.name;
+      productSel.appendChild(opt);
+    });
+    productSel.disabled = !categoryId || !matches.length;
+  }
+  function renderAttrs(product) {
+    var attrs = (product && product.attributes) || {};
+    var keys = Object.keys(attrs);
+    if (!product) {
+      attrsBox.className = 'text-[13px] text-ink-faint';
+      attrsBox.textContent = 'Select a product to see its attributes.';
+      return;
+    }
+    if (!keys.length) {
+      attrsBox.className = 'text-[13px] text-ink-faint';
+      attrsBox.textContent = 'This product has no attributes.';
+      return;
+    }
+    attrsBox.className = 'flex flex-wrap';
+    attrsBox.innerHTML = keys.map(function (key) {
+      return '<span class="attr-chip"><span class="attr-k">' + esc(key) + '</span><span class="attr-v">' + esc(attrs[key]) + '</span></span>';
+    }).join('');
+  }
+
+  function todayIso() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+  function openModal() {
+    document.getElementById('mo-date').value = todayIso();
+    categorySel.value = '';
+    fillProducts();
+    clearExtraLines();
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    refreshPlan();
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  function refreshPlan() {
+    var product = byId[productSel.value];
+    renderAttrs(product);
+    if (!product) {
+      qtyLabel.textContent = 'Quantity to make *';
+      weightBox.classList.add('hidden');
+      summary.textContent = '';
+      linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">Select a product.</td></tr>';
+      return;
+    }
+    var unitName = product.unit || 'KG';
+    var unit = unitName.toUpperCase();
+    var isKg = unit === 'KG' || unit === 'KGS';
+    weightBox.classList.toggle('hidden', isKg);
+    qtyLabel.textContent = isKg ? 'How many KG to make *' : ('How many ' + unitName + ' to make *');
+    if (!isKg) {
+      weightNote.textContent = 'This product is in ' + unitName + ', not kilograms. The recipe is calculated in KG, so enter how many kilograms are in one ' + unitName + '.';
+      weightLabel.textContent = 'Kilograms in one ' + unitName + ' *';
+    }
+    var qty = parseFloat(qtyInput.value) || 0;
+    var weight = isKg ? 1 : (parseFloat(weightInput.value) || 0);
+    var batchKg = qty * weight;
+    summary.textContent = isKg
+      ? 'Making ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.'
+      : (qty + ' ' + unitName + ' × ' + weight + ' KG each = ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.');
+    if (!product.recipe.length) {
+      linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">This product has no recipe.</td></tr>';
+      return;
+    }
+    linesBody.innerHTML = product.recipe.map(function (line) {
+      var need = batchKg * (line.ratio || 0) / 100;
+      var type = line.is_flux ? 'Core flux' : 'Base metal';
+      return '<tr>' +
+        '<td class="font-mono font-semibold">' + line.code + '</td>' +
+        '<td>' + line.name + '</td>' +
+        '<td>' + type + '</td>' +
+        '<td class="font-mono">' + Number(line.ratio).toFixed(1) + '%</td>' +
+        '<td class="font-mono font-semibold">' + need.toFixed(2) + ' ' + (line.unit || '') + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  document.getElementById('btn-add-mo').addEventListener('click', openModal);
+  document.getElementById('btn-close-mo').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel-mo').addEventListener('click', closeModal);
+  document.getElementById('mo-backdrop').addEventListener('click', closeModal);
+  categorySel.addEventListener('change', function () {
+    fillProducts();
+    refreshPlan();
+  });
+  productSel.addEventListener('change', refreshPlan);
+  document.getElementById('btn-add-extra').addEventListener('click', addExtraLine);
+  qtyInput.addEventListener('input', refreshPlan);
+  weightInput.addEventListener('input', refreshPlan);
+</script>
+{% endblock %}

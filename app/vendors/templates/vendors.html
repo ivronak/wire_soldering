@@ -58,6 +58,7 @@
         <div>
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Vendors</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Vendors</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">Code is auto-generated · just fill the rest</p>
         </div>
         <button type="button" id="btn-add-vendor"
           class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
@@ -122,9 +123,9 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td><span class="inline-block font-mono text-[13px] font-bold {% if v.is_active %}text-ink{% else %}text-ink-faint{% endif %} bg-mist border border-slate-200 rounded px-2 py-1">{{ v.code }}</span></td>
                 <td><span class="font-medium {% if v.is_active %}text-ink{% else %}text-ink-faint{% endif %}">{{ v.name }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ v.state or "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ v.state.name if v.state else "—" }}</td>
                 <td class="text-[12.5px] text-ink-faint font-mono">{{ v.gstin or "—" }}</td>
-                <td class="text-[13px] text-ink-muted">{{ v.payment_terms or "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ v.payment_terms.name if v.payment_terms else "—" }}</td>
                 <td class="text-[13px] text-ink-muted font-mono tabular-nums">
                   {% if v.ledger %}₹{{ "%.0f"|format(v.ledger.opening_balance) }} {{ v.ledger.opening_balance_type }}{% else %}—{% endif %}
                 </td>
@@ -143,22 +144,23 @@
                   <div class="flex items-center justify-center gap-2 flex-wrap">
                     <button type="button"
                       class="btn-view-vendor px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                      data-id="{{ v.id }}"
                       data-code="{{ v.code }}"
                       data-name="{{ v.name }}"
                       data-contact="{{ v.contact_person or '' }}"
                       data-mobile="{{ v.mobile or '' }}"
                       data-email="{{ v.email or '' }}"
                       data-address="{{ v.address or '' }}"
-                      data-state="{{ v.state or '' }}"
+                      data-state="{{ v.state.name if v.state else '' }}"
                       data-gstin="{{ v.gstin or '' }}"
                       data-pan="{{ v.pan or '' }}"
-                      data-terms="{{ v.payment_terms or '' }}"
+                      data-terms="{{ v.payment_terms.name if v.payment_terms else '' }}"
                       data-opening="{% if v.ledger %}₹{{ '%.2f'|format(v.ledger.opening_balance) }} {{ v.ledger.opening_balance_type }}{% endif %}"
                       data-current-balance="{% if v.ledger %}₹{{ '%.2f'|format(v.ledger.current_balance|abs) }} {{ 'Cr' if v.ledger.current_balance >= 0 else 'Dr' }}{% endif %}"
                       data-bank-name="{{ v.bank_name or '' }}"
                       data-bank-ifsc="{{ v.bank_ifsc or '' }}"
                       data-bank-account="{{ v.bank_account or '' }}"
-                      data-vendor-type="{{ v.vendor_type or '' }}"
+                      data-vendor-type="{{ v.vendor_type.name if v.vendor_type else '' }}"
                       data-ledger-name="{{ v.ledger.name if v.ledger else '' }}">
                       View
                     </button>
@@ -171,16 +173,16 @@
                       data-mobile="{{ v.mobile or '' }}"
                       data-email="{{ v.email or '' }}"
                       data-address="{{ v.address or '' }}"
-                      data-state="{{ v.state or '' }}"
+                      data-state="{{ v.state_id or '' }}"
                       data-gstin="{{ v.gstin or '' }}"
                       data-pan="{{ v.pan or '' }}"
-                      data-terms="{{ v.payment_terms or '' }}"
+                      data-terms="{{ v.payment_terms_id or '' }}"
                       data-opening-amount="{{ v.ledger.opening_balance if v.ledger else '' }}"
                       data-opening-type="{{ v.ledger.opening_balance_type if v.ledger else 'Cr' }}"
                       data-bank-name="{{ v.bank_name or '' }}"
                       data-bank-ifsc="{{ v.bank_ifsc or '' }}"
                       data-bank-account="{{ v.bank_account or '' }}"
-                      data-vendor-type="{{ v.vendor_type or '' }}">
+                      data-vendor-type="{{ v.vendor_type_id or '' }}">
                       Edit
                     </button>
                     <form method="post" action="{{ url_for('vendors.vendors_toggle', v_id=v.id) }}" class="inline">
@@ -226,13 +228,15 @@
       </div>
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
-    <form id="vendor-form" method="post" action="{{ url_for('vendors.vendors_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+    <div class="flex-1 overflow-y-auto">
+    <form id="vendor-form" method="post" action="{{ url_for('vendors.vendors_add') }}" class="px-4 py-4 space-y-3">
       <p class="form-section-title">Basic info</p>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label for="vendor-code" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor code *</label>
-          <input type="text" id="vendor-code" name="code" required placeholder="V-006" maxlength="20" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <label for="vendor-code" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor code</label>
+          <input type="text" id="vendor-code" name="code" value="{{ next_code }}" disabled
+            class="w-full px-2.5 py-2 text-[14px] font-mono border border-slate-200 bg-mist text-ink-faint rounded" />
+          <p class="text-[11px] text-ink-faint mt-1">Auto-generated</p>
         </div>
         <div>
           <label for="vendor-name" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor name *</label>
@@ -264,11 +268,12 @@
       </div>
       <div>
         <label for="vendor-state" class="block text-[12.5px] font-semibold text-ink mb-1">State *</label>
-        <select id="vendor-state" name="state" required
+        <select id="vendor-state" name="state_id" required
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
           <option value="">Select state…</option>
+          {# States ab State Master table se aate hain — option value = State.id #}
           {% for s in states %}
-          <option value="{{ s }}"{% if s == "Gujarat" %} selected{% endif %}>{{ s }}</option>
+          <option value="{{ s.id }}"{% if s.name == "Gujarat" %} selected{% endif %}>{{ s.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -293,13 +298,13 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="vendor-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
-          <select id="vendor-terms" name="payment_terms"
+          <select id="vendor-terms" name="payment_terms_id"
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
-            <option value="Advance">Advance</option>
-            <option value="Net 15">Net 15</option>
-            <option value="Net 30" selected>Net 30</option>
-            <option value="Net 45">Net 45</option>
-            <option value="Net 60">Net 60</option>
+            <option value="">Select terms… (optional)</option>
+            {# Options ab Payment Terms Master se — blank chhoda to koi terms nahi #}
+            {% for pt in payment_terms %}
+            <option value="{{ pt.id }}">{{ pt.name }}</option>
+            {% endfor %}
           </select>
         </div>
         <div>
@@ -337,18 +342,35 @@
       <p class="form-section-title">Type</p>
       <div>
         <label for="vendor-type" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor type</label>
-        <select id="vendor-type" name="vendor_type"
+        <select id="vendor-type" name="vendor_type_id"
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
-          <option value="Raw Material Supplier" selected>Raw Material Supplier</option>
-          <option value="Job Worker / Sub-contractor">Job Worker / Sub-contractor</option>
-          <option value="Transporter">Transporter</option>
-          <option value="Service Provider">Service Provider</option>
-          <option value="Other">Other</option>
+          <option value="">Select type… (optional)</option>
+          {# Vendor types ab Vendor Type Master table se aate hain — option value = VendorType.id #}
+          {% for vt in vendor_types %}
+          <option value="{{ vt.id }}">{{ vt.name }}</option>
+          {% endfor %}
         </select>
       </div>
 
       <p class="text-[11.5px] text-ink-faint pt-1">Saving this vendor will auto-create a ledger under <strong>Sundry Creditors</strong>.</p>
     </form>
+
+    <div id="vendor-docs-section" class="px-4 pb-4 pt-2 border-t border-slate-200 mt-1" data-party-id="">
+      <p class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Documents</p>
+      <p id="vendor-docs-hint" class="text-[12.5px] text-ink-muted">Save the vendor first — documents can be attached once it exists.</p>
+      <div id="vendor-docs-upload-wrap" class="hidden">
+        <form id="doc-upload-form-modal" class="flex flex-wrap items-end gap-2 mb-2">
+          <div class="flex-1 min-w-[140px]"><label class="block text-[11px] text-ink-faint mb-0.5">Title (optional)</label>
+            <input type="text" id="doc-title-modal" class="w-full px-2 py-1.5 text-[12.5px] border border-slate-300 rounded" placeholder="e.g. GST certificate" /></div>
+          <div><label class="block text-[11px] text-ink-faint mb-0.5">File</label>
+            <input type="file" id="doc-file-modal" accept=".pdf,.png,.jpg,.jpeg" class="text-[12px]" /></div>
+          <button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Upload</button>
+        </form>
+        <p class="text-[11px] text-ink-faint -mt-1 mb-2">PDF, PNG or JPG, up to 5 MB.</p>
+        <div id="doc-list-modal" class="space-y-1.5 text-[13px]"></div>
+      </div>
+    </div>
+    </div>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
       <button type="submit" form="vendor-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save vendor</button>
@@ -425,7 +447,7 @@
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('vendor-code').focus();
+    document.getElementById('vendor-name').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -438,10 +460,15 @@
     if (addAction) form.action = addAction;
     modalTitle.textContent = 'Add vendor';
     form.reset();
+    document.getElementById('vendor-docs-hint').classList.remove('hidden');
+    document.getElementById('vendor-docs-upload-wrap').classList.add('hidden');
     openModal();
   }
   function openEditModal(btn) {
     var id = btn.getAttribute('data-id');
+    document.getElementById('vendor-docs-hint').classList.add('hidden');
+    document.getElementById('vendor-docs-upload-wrap').classList.remove('hidden');
+    wireDocumentsSection('vendor', id, '-modal');
     // Flask Edit route ready hone pe yahan action set karo
     form.action = '/vendors/edit/' + id;
     modalTitle.textContent = 'Edit vendor';
@@ -451,16 +478,16 @@
     document.getElementById('vendor-mobile').value = btn.getAttribute('data-mobile') || '';
     document.getElementById('vendor-email').value = btn.getAttribute('data-email') || '';
     document.getElementById('vendor-address').value = btn.getAttribute('data-address') || '';
-    document.getElementById('vendor-state').value = btn.getAttribute('data-state') || 'Gujarat';
+    document.getElementById('vendor-state').value = btn.getAttribute('data-state') || '';
     document.getElementById('vendor-gstin').value = btn.getAttribute('data-gstin') || '';
     document.getElementById('vendor-pan').value = btn.getAttribute('data-pan') || '';
-    document.getElementById('vendor-terms').value = btn.getAttribute('data-terms') || 'Net 30';
+    document.getElementById('vendor-terms').value = btn.getAttribute('data-terms') || '';
     document.getElementById('vendor-opening-balance').value = btn.getAttribute('data-opening-amount') || '';
     document.getElementById('vendor-opening-balance-type').value = btn.getAttribute('data-opening-type') || 'Cr';
     document.getElementById('vendor-bank-name').value = btn.getAttribute('data-bank-name') || '';
     document.getElementById('vendor-bank-ifsc').value = btn.getAttribute('data-bank-ifsc') || '';
     document.getElementById('vendor-bank-account').value = btn.getAttribute('data-bank-account') || '';
-    document.getElementById('vendor-type').value = btn.getAttribute('data-vendor-type') || 'Raw Material Supplier';
+    document.getElementById('vendor-type').value = btn.getAttribute('data-vendor-type') || '';
     openModal();
   }
 
@@ -494,9 +521,96 @@
       viewField('Ledger name', btn.getAttribute('data-ledger-name')) +
       viewField('Opening balance', btn.getAttribute('data-opening')) +
       viewField('Current balance', btn.getAttribute('data-current-balance')) +
-      '</div></div>';
+      '</div></div>' +
+      '<div class="pt-3 border-t border-slate-200 mt-2">' +
+      '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Documents</div>' +
+      '<form id="doc-upload-form" class="flex flex-wrap items-end gap-2 mb-2">' +
+      '<div class="flex-1 min-w-[140px]"><label class="block text-[11px] text-ink-faint mb-0.5">Title (optional)</label>' +
+      '<input type="text" id="doc-title" class="w-full px-2 py-1.5 text-[12.5px] border border-slate-300 rounded" placeholder="e.g. GST certificate" /></div>' +
+      '<div><label class="block text-[11px] text-ink-faint mb-0.5">File</label>' +
+      '<input type="file" id="doc-file" accept=".pdf,.png,.jpg,.jpeg" class="text-[12px]" /></div>' +
+      '<button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Upload</button>' +
+      '</form>' +
+      '<p class="text-[11px] text-ink-faint -mt-1 mb-2">PDF, PNG or JPG, up to 5 MB.</p>' +
+      '<div id="doc-list" class="space-y-1.5 text-[13px]"><span class="text-ink-faint">Loading…</span></div>' +
+      '</div>';
+    wireDocumentsSection('vendor', btn.getAttribute('data-id'), '');
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
+  }
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  // idSuffix se ek hi function View panel (ids: doc-list, doc-upload-form...) aur
+  // Add/Edit modal (ids: doc-list-modal, doc-upload-form-modal...) dono ke liye kaam karta hai.
+  function loadPartyDocuments(partyType, partyId, idSuffix) {
+    idSuffix = idSuffix || '';
+    var list = document.getElementById('doc-list' + idSuffix);
+    if (!list) return;
+    fetch('/party_documents/' + partyType + '/' + partyId)
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var docs = data.documents || [];
+        if (!docs.length) {
+          list.innerHTML = '<span class="text-ink-faint">No documents uploaded yet.</span>';
+          return;
+        }
+        list.innerHTML = docs.map(function (d) {
+          return '<div class="flex items-center justify-between border border-slate-200 rounded px-2.5 py-1.5 gap-2">' +
+            '<a href="' + d.url + '" target="_blank" class="text-copper-text font-medium hover:underline truncate">' + escHtml(d.title) + '</a>' +
+            '<span class="text-ink-faint text-[11.5px] shrink-0">' + d.size_kb + ' KB · ' + escHtml(d.uploaded_at) + '</span>' +
+            '<button type="button" class="btn-delete-doc text-stop text-[12px] font-medium hover:underline shrink-0" data-doc-id="' + d.id + '">Delete</button>' +
+            '</div>';
+        }).join('');
+        list.querySelectorAll('.btn-delete-doc').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            fetch('/party_documents/' + btn.getAttribute('data-doc-id') + '/delete', { method: 'POST' })
+              .then(function (res) { return res.json(); })
+              .then(function () {
+                if (typeof showToast === 'function') showToast('Document removed.', 'success');
+                loadPartyDocuments(partyType, partyId, idSuffix);
+              });
+          });
+        });
+      })
+      .catch(function () {
+        list.innerHTML = '<span class="text-stop">Could not load documents.</span>';
+      });
+  }
+  function wireDocumentsSection(partyType, partyId, idSuffix) {
+    idSuffix = idSuffix || '';
+    loadPartyDocuments(partyType, partyId, idSuffix);
+    var docForm = document.getElementById('doc-upload-form' + idSuffix);
+    if (!docForm) return;
+    // "onsubmit =" (assignment, addEventListener nahi) — kyunki modal ke elements static hain
+    // (Edit baar-baar khulega), isse purana handler khud replace ho jata hai, duplicate upload nahi hota
+    docForm.onsubmit = function (e) {
+      e.preventDefault();
+      var fileInput = document.getElementById('doc-file' + idSuffix);
+      if (!fileInput.files.length) {
+        if (typeof showToast === 'function') showToast('Choose a file first.', 'error');
+        return;
+      }
+      var fd = new FormData();
+      fd.append('document_file', fileInput.files[0]);
+      fd.append('document_title', document.getElementById('doc-title' + idSuffix).value);
+      fetch('/party_documents/' + partyType + '/' + partyId + '/add', { method: 'POST', body: fd })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.success) {
+            if (typeof showToast === 'function') showToast('Document uploaded.', 'success');
+            docForm.reset();
+            loadPartyDocuments(partyType, partyId, idSuffix);
+          } else {
+            if (typeof showToast === 'function') showToast(data.error || 'Upload failed.', 'error');
+          }
+        })
+        .catch(function () {
+          if (typeof showToast === 'function') showToast('Upload failed.', 'error');
+        });
+    };
   }
   function closeViewModal() {
     viewModal.classList.add('hidden');
@@ -553,12 +667,11 @@
   });
 
   form.addEventListener('submit', function (e) {
-    var code = document.getElementById('vendor-code').value.trim();
     var name = document.getElementById('vendor-name').value.trim();
     var state = document.getElementById('vendor-state').value;
-    if (!code || !name || !state) {
+    if (!name || !state) {
       e.preventDefault();
-      if (typeof showToast === 'function') showToast('Code, Name and State are required.', 'error');
+      if (typeof showToast === 'function') showToast('Name and State are required.', 'error');
     }
   });
 

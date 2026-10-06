@@ -4,11 +4,21 @@ from app.extensions import db
 
 rm_categories_bp = Blueprint("rm_categories", __name__, template_folder='templates')
 
+
+def generate_next_rm_category_code():
+    # Auto-serial (RMC-0001, RMC-0002 ...) — form se code nahi aata
+    last_row = RmCategories.query.order_by(RmCategories.id.desc()).first()
+    if not last_row:
+        return "RMC-0001"
+    next_row = last_row.id + 1
+    return f"RMC-{next_row:04d}"
+
+
 @rm_categories_bp.route('/rm_categories')
 def rm_categories_list():
     if RmCategories.query.count() == 0:
         db.session.add(RmCategories(
-            code="RM-CAT-01",
+            code="RMC-0001",
             name="Metal",
             description="the metal materials used as raw materials in production.",
             is_active=True,
@@ -18,20 +28,22 @@ def rm_categories_list():
 
     categories = RmCategories.query.filter(RmCategories.is_deleted == False).order_by(RmCategories.code).all()
     total_count = len(categories)
+    next_code = generate_next_rm_category_code()
     return render_template(
         'rm_categories.html',
         categories=categories,
         active_nav='rm_categories',
         total_count=total_count,
         result_count=total_count,
+        next_code=next_code,
     )
 @rm_categories_bp.route('/rm_categories/add', methods=['POST'])
 def rm_categories_add():
-    code = (request.form.get('code') or "").strip().upper()
+    code = generate_next_rm_category_code()
     name = (request.form.get('name') or "").strip()
     description = (request.form.get('description') or "").strip()
 
-    if not code or not name:
+    if not name:
         return redirect(url_for('rm_categories.rm_categories_list'))
 
     existing = RmCategories.query.filter_by(code=code).first()
@@ -74,19 +86,13 @@ def rm_categories_toggle(c_id):
 def rm_categories_edit(c_id):
     c = RmCategories.query.get_or_404(c_id)
 
-    code = (request.form.get('code') or "").strip().upper()
+    # Code ab auto-generated — edit pe immutable (form se code nahi aata)
     name = (request.form.get('name') or "").strip()
     description = (request.form.get('description') or "").strip()
 
-    if not code or not name:
+    if not name:
         return redirect(url_for('rm_categories.rm_categories_list'))
 
-    dup = RmCategories.query.filter(RmCategories.code == code, RmCategories.id != c_id).first()
-    if dup:
-        flash("A RM Category with this code already exists.", "error")
-        return redirect(url_for('rm_categories.rm_categories_list'))
-
-    c.code = code
     c.name = name
     c.description = description
     c.is_active = True

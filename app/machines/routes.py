@@ -6,24 +6,31 @@ from datetime import date, datetime
 
 machines_bp = Blueprint("machines",__name__, template_folder="templates")
 
+def generate_next_machine_code():
+    # Auto-serial (MC-0001, MC-0002 ...) — form se code nahi aata
+    last_row = Machines.query.order_by(Machines.id.desc()).first()
+    if not last_row:
+        return "MC-0001"
+    next_row = last_row.id + 1
+    return f"MC-{next_row:04d}"
+
 @machines_bp.route("/machines")
 def machines_list():
     if Machines.query.count() == 0:
-        db.session.add(Machines(code = "MC-CUT-01", name = "Cutting Bench", work_stage_id = 1, capacity = "500 units/hr", installed_date = date(2026, 9, 19), status = "active",))
+        db.session.add(Machines(code = "MC-0001", name = "Cutting Bench", work_stage_id = 1, capacity = "500 units/hr", installed_date = date(2026, 9, 19), status = "active",))
         db.session.commit()
 
     machines = (
         Machines.query.filter(Machines.is_deleted == False).order_by(Machines.code).all()
     )
-
     total_count = len(machines)
-
     stages = WorkStage.query.filter(WorkStage.is_active == True, WorkStage.is_deleted == False).order_by(WorkStage.sort_order).all()
-
+    next_code = generate_next_machine_code()
 
     return render_template(
         "machines.html",
         machines=machines,
+        next_code=next_code,
         total_count=total_count,
         active_nav="machines",
         result_count=total_count,
@@ -33,7 +40,7 @@ def machines_list():
 
 @machines_bp.route("/machines/add", methods=['POST'])
 def machines_add():
-    code = (request.form.get('code') or "").strip().upper()
+    code = generate_next_machine_code()
     name = (request.form.get('name') or "").strip()
     work_stage_id = int(request.form.get('work_stage_id')) or None
     capacity = (request.form.get('capacity') or "").strip() or None
@@ -41,7 +48,7 @@ def machines_add():
     raw_date = (request.form.get('installed_date') or "").strip()
     installed_date = datetime.strptime(raw_date, "%Y-%m-%d").date() if raw_date else None
 
-    if not code or not name or not work_stage_id:
+    if not name or not work_stage_id:
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
@@ -89,7 +96,6 @@ def machines_status(machine_id):
 def machines_edit(machine_id):
     m = Machines.query.get_or_404(machine_id)
 
-    code = (request.form.get('code') or "").strip().upper()
     name = (request.form.get('name') or "").strip()
     work_stage_id = int(request.form.get('work_stage_id')) or None
     capacity = (request.form.get('capacity') or "").strip() or None
@@ -97,17 +103,12 @@ def machines_edit(machine_id):
     raw_date = (request.form.get('installed_date') or "").strip()
     installed_date = datetime.strptime(raw_date, "%Y-%m-%d").date() if raw_date else None
 
-    if not code or not name or not work_stage_id:
-        return redirect(url_for('machines.machines_list'))
-
-    dup = Machines.query.filter(Machines.code == code, Machines.id != machine_id).first()
-    if dup:
-        flash("A machine with this code already exists.", "error")
+    # Code ab auto-generated — edit pe immutable (form se code nahi aata)
+    if not name or not work_stage_id:
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
 
-    m.code = code
     m.name = name
     m.work_stage_id = work_stage_id
     m.capacity = capacity

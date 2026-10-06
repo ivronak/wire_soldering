@@ -4,10 +4,21 @@ from app.extensions import db
 
 raw_materials_bp = Blueprint("raw_materials", __name__, template_folder='templates')
 
+
+def generate_next_raw_material_code():
+    # Auto-serial (RM-0001, RM-0002 ...) — form se code nahi aata
+    last_row = RawMaterial.query.order_by(RawMaterial.id.desc()).first()
+    if not last_row:
+        return "RM-0001"
+    next_row = last_row.id + 1
+    return f"RM-{next_row:04d}"
+
+
 @raw_materials_bp.route("/raw_materials")
 def raw_materials_list():
     materials = RawMaterial.query.filter(RawMaterial.is_deleted == False).order_by(RawMaterial.code).all()
     total_count = len(materials)
+    next_code = generate_next_raw_material_code()
 
     units = Unit.query.filter(Unit.is_active == True, Unit.is_deleted == False).all()
     categories = RmCategories.query.filter(RmCategories.is_active == True, RmCategories.is_deleted == False).all()
@@ -23,12 +34,14 @@ def raw_materials_list():
         active_nav = 'raw_materials',
         total_count = total_count,
         result_count = total_count,
+        next_code = next_code,
     )
 
 @raw_materials_bp.route("/raw_materials/add", methods=['POST'])
 def raw_materials_add():
 
-    code = (request.form.get('code') or "").strip().upper()
+    # Code ab auto-generated — form se code nahi aata
+    code = generate_next_raw_material_code()
     name = (request.form.get('name') or "").strip()
     description = (request.form.get('description') or "").strip()
     category_id = int(request.form.get('category_id')) if (request.form.get('category_id') or "").strip() else None
@@ -44,7 +57,7 @@ def raw_materials_add():
     is_base_metal = request.form.get('is_base_metal') == 'on'
     is_core_flux = request.form.get('is_core_flux') == 'on'
 
-    if not code or not name or category_id is None or base_unit_id is None:
+    if not name or category_id is None or base_unit_id is None:
         return redirect(url_for('raw_materials.raw_materials_list'))
 
     existing = RawMaterial.query.filter_by(code=code).first()
@@ -112,7 +125,7 @@ def raw_materials_toggle(m_id):
 def raw_materials_edit(m_id):
     m = RawMaterial.query.get_or_404(m_id)
 
-    code = (request.form.get('code') or "").strip().upper()
+    # Code ab auto-generated — edit pe immutable (form se code nahi aata)
     name = (request.form.get('name') or "").strip()
     description = (request.form.get('description') or "").strip()
     category_id = int(request.form.get('category_id')) if (request.form.get('category_id') or "").strip() else None
@@ -128,15 +141,9 @@ def raw_materials_edit(m_id):
     is_base_metal = request.form.get('is_base_metal') == 'on'
     is_core_flux = request.form.get('is_core_flux') == 'on'
 
-    if not code or not name or category_id is None or base_unit_id is None:
+    if not name or category_id is None or base_unit_id is None:
         return redirect(url_for('raw_materials.raw_materials_list'))
 
-    dup = RawMaterial.query.filter(RawMaterial.code == code, RawMaterial.id != m_id).first()
-    if dup:
-        flash("A Raw Material with this code already exists.", "error")   
-        return redirect(url_for('raw_materials.raw_materials_list'))
-
-    m.code = code
     m.name = name
     m.description = description
     m.category_id = category_id

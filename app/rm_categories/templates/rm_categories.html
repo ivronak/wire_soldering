@@ -194,16 +194,17 @@
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add category</h2>
-        <p class="text-[12.5px] text-ink-faint">Code, Name, Description</p>
+        <p class="text-[12.5px] text-ink-faint">Code is auto-generated · just name it</p>
       </div>
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
     {# method/action tum Flask Add route se lagaoge #}
     <form id="cat-form" method='post' action="{{ url_for('rm_categories.rm_categories_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       <div>
-        <label for="cat-code" class="block text-[12.5px] font-semibold text-ink mb-1">Short code *</label>
-        <input type="text" id="cat-code" name="code" required placeholder="METALS" maxlength="16" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <label for="cat-code" class="block text-[12.5px] font-semibold text-ink mb-1">Category code</label>
+        <input type="text" id="cat-code" name="code" value="{{ next_code }}" disabled
+          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated, read-only — disabled so it is never sent with the form; the route generates the real code itself.</p>
       </div>
       <div>
         <label for="cat-name" class="block text-[12.5px] font-semibold text-ink mb-1">Category name *</label>
@@ -283,7 +284,7 @@
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('cat-code').focus();
+    document.getElementById('cat-name').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -352,20 +353,17 @@
     btn.addEventListener('click', function () { openEditModal(btn); });
   });
 
-  // Abhi mock: empty pe toast; Flask POST baad me (method/action lagaoge)
+  // Required fields: khali → toast, Flask mat bhejo
+  // Code ab auto-generated (disabled) — isliye validation me nahi
   form.addEventListener('submit', function (e) {
-    var code = document.getElementById('cat-code').value.trim();
     var name = document.getElementById('cat-name').value.trim();
-    if (!code || !name) {
+    if (!name) {
       e.preventDefault();
-      if (typeof showToast === 'function') showToast('Code and Name are required.', 'error');
+      if (typeof showToast === 'function') showToast('Name is required.', 'error');
+      document.getElementById('cat-name').focus();
       return;
     }
-    // e.preventDefault();
-    // if (typeof showToast === 'function') {
-    //   showToast('Saved (UI only — wire Flask next)\n' + code.toUpperCase() + ' — ' + name, 'success');
-    // }
-    // closeModal();
+    // valid → browser form POST karega
   });
 
   document.querySelectorAll('td form').forEach(function (f) {

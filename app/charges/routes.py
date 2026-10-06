@@ -26,6 +26,7 @@ def charges_list():
         next_code=next_code,
         total_count=total_count,
         result_count=total_count,
+        active_nav='charges',
     )
 
 @charges_bp.route('/charges/add', methods=['POST'])
@@ -46,7 +47,7 @@ def charges_add():
             existing.code = code
             existing.name = name
             existing.is_active = True
-            db.commit.session()
+            db.session.commit()
             flash("A Charge restored with this code.", "success")
             return redirect(url_for('charges.charges_list'))
 
@@ -85,7 +86,8 @@ def charges_toggle(c_id):
 @charges_bp.route('/charges/edit/<int:c_id>', methods=['POST'])
 def charges_edit(c_id):
     c = Charge.query.get_or_404(c_id)
-    name = (request.form.get('name')).strip()
+    # .get() ke bina, name field missing ho to None.strip() crash karta tha
+    name = (request.form.get('name') or "").strip()
 
     if not name:
        return redirect(url_for('charges.charges_list'))

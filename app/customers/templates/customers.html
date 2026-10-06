@@ -58,6 +58,7 @@
         <div>
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Customers</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Customers</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">Code is auto-generated · just fill the rest</p>
         </div>
         <button type="button" id="btn-add-customer"
           class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
@@ -122,7 +123,7 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td><span class="inline-block font-mono text-[13px] font-bold {% if c.is_active %}text-ink{% else %}text-ink-faint{% endif %} bg-mist border border-slate-200 rounded px-2 py-1">{{ c.code }}</span></td>
                 <td><span class="font-medium {% if c.is_active %}text-ink{% else %}text-ink-faint{% endif %}">{{ c.name }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ c.state or "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ c.state.name if c.state else "—" }}</td>
                 <td class="text-[12.5px] text-ink-faint font-mono">{{ c.gstin or "—" }}</td>
                 {# credit_limit None ho sakta hai (blank = koi limit nahi) — isliye "is not none" check, warna 0 bhi "—" dikh jaata #}
                 <td class="text-[13px] text-ink-muted font-mono tabular-nums">
@@ -146,16 +147,17 @@
                   <div class="flex items-center justify-center gap-2 flex-wrap">
                     <button type="button"
                       class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                      data-id="{{ c.id }}"
                       data-code="{{ c.code }}"
                       data-name="{{ c.name }}"
                       data-contact="{{ c.contact_person or '' }}"
                       data-mobile="{{ c.mobile or '' }}"
                       data-email="{{ c.email or '' }}"
                       data-address="{{ c.address or '' }}"
-                      data-state="{{ c.state or '' }}"
+                      data-state="{{ c.state.name if c.state else '' }}"
                       data-gstin="{{ c.gstin or '' }}"
                       data-pan="{{ c.pan or '' }}"
-                      data-terms="{{ c.payment_terms or '' }}"
+                      data-terms="{{ c.payment_terms.name if c.payment_terms else '' }}"
                       data-credit-limit="{% if c.credit_limit is not none %}₹{{ '%.2f'|format(c.credit_limit) }}{% endif %}"
                       data-opening="{% if c.ledger %}₹{{ '%.2f'|format(c.ledger.opening_balance) }} {{ c.ledger.opening_balance_type }}{% endif %}"
                       data-current-balance="{% if c.ledger %}₹{{ '%.2f'|format(c.ledger.current_balance|abs) }} {{ 'Cr' if c.ledger.current_balance >= 0 else 'Dr' }}{% endif %}"
@@ -174,10 +176,10 @@
                       data-mobile="{{ c.mobile or '' }}"
                       data-email="{{ c.email or '' }}"
                       data-address="{{ c.address or '' }}"
-                      data-state="{{ c.state or '' }}"
+                      data-state="{{ c.state_id or '' }}"
                       data-gstin="{{ c.gstin or '' }}"
                       data-pan="{{ c.pan or '' }}"
-                      data-terms="{{ c.payment_terms or '' }}"
+                      data-terms="{{ c.payment_terms_id or '' }}"
                       data-credit-limit="{{ c.credit_limit if c.credit_limit is not none else '' }}"
                       data-opening-amount="{{ c.ledger.opening_balance if c.ledger else '' }}"
                       data-opening-type="{{ c.ledger.opening_balance_type if c.ledger else 'Dr' }}"
@@ -231,13 +233,15 @@
       <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
     {# TODO: Add route banne ke baad action me url_for lagao #}
-    <form id="customer-form" method="post" action="{{url_for('customers.customers_add')}}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+    <div class="flex-1 overflow-y-auto">
+    <form id="customer-form" method="post" action="{{url_for('customers.customers_add')}}" class="px-4 py-4 space-y-3">
       <p class="form-section-title">Basic info</p>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label for="customer-code" class="block text-[12.5px] font-semibold text-ink mb-1">Customer code *</label>
-          <input type="text" id="customer-code" name="code" required placeholder="C-006" maxlength="20" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <label for="customer-code" class="block text-[12.5px] font-semibold text-ink mb-1">Customer code</label>
+          <input type="text" id="customer-code" name="code" value="{{ next_code }}" disabled maxlength="20" autocomplete="off"
+            class="w-full px-2.5 py-2 text-[14px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
+          <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated</p>
         </div>
         <div>
           <label for="customer-name" class="block text-[12.5px] font-semibold text-ink mb-1">Customer name *</label>
@@ -269,11 +273,12 @@
       </div>
       <div>
         <label for="customer-state" class="block text-[12.5px] font-semibold text-ink mb-1">State *</label>
-        <select id="customer-state" name="state" required
+        <select id="customer-state" name="state_id" required
           class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
           <option value="">Select state…</option>
+          {# States ab State Master table se aate hain — option value = State.id #}
           {% for s in states %}
-          <option value="{{ s }}"{% if s == "Gujarat" %} selected{% endif %}>{{ s }}</option>
+          <option value="{{ s.id }}"{% if s.name == "Gujarat" %} selected{% endif %}>{{ s.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -298,13 +303,13 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="customer-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
-          <select id="customer-terms" name="payment_terms"
+          <select id="customer-terms" name="payment_terms_id"
             class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
-            <option value="Advance">Advance</option>
-            <option value="Net 15">Net 15</option>
-            <option value="Net 30" selected>Net 30</option>
-            <option value="Net 45">Net 45</option>
-            <option value="Net 60">Net 60</option>
+            <option value="">Select terms… (optional)</option>
+            {# Options ab Payment Terms Master se — blank chhoda to koi terms nahi #}
+            {% for pt in payment_terms %}
+            <option value="{{ pt.id }}">{{ pt.name }}</option>
+            {% endfor %}
           </select>
         </div>
         <div>
@@ -347,6 +352,23 @@
 
       <p class="text-[11.5px] text-ink-faint pt-1">Saving this customer will auto-create a ledger under <strong>Sundry Debtors</strong>.</p>
     </form>
+
+    <div id="customer-docs-section" class="px-4 pb-4 pt-2 border-t border-slate-200 mt-1">
+      <p class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Documents</p>
+      <p id="customer-docs-hint" class="text-[12.5px] text-ink-muted">Save the customer first — documents can be attached once it exists.</p>
+      <div id="customer-docs-upload-wrap" class="hidden">
+        <form id="doc-upload-form-modal" class="flex flex-wrap items-end gap-2 mb-2">
+          <div class="flex-1 min-w-[140px]"><label class="block text-[11px] text-ink-faint mb-0.5">Title (optional)</label>
+            <input type="text" id="doc-title-modal" class="w-full px-2 py-1.5 text-[12.5px] border border-slate-300 rounded" placeholder="e.g. GST certificate" /></div>
+          <div><label class="block text-[11px] text-ink-faint mb-0.5">File</label>
+            <input type="file" id="doc-file-modal" accept=".pdf,.png,.jpg,.jpeg" class="text-[12px]" /></div>
+          <button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Upload</button>
+        </form>
+        <p class="text-[11px] text-ink-faint -mt-1 mb-2">PDF, PNG or JPG, up to 5 MB.</p>
+        <div id="doc-list-modal" class="space-y-1.5 text-[13px]"></div>
+      </div>
+    </div>
+    </div>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
       <button type="submit" form="customer-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save customer</button>
@@ -424,7 +446,7 @@
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('customer-code').focus();
+    document.getElementById('customer-name').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -437,10 +459,15 @@
     if (addAction) form.action = addAction;
     modalTitle.textContent = 'Add customer';
     form.reset();
+    document.getElementById('customer-docs-hint').classList.remove('hidden');
+    document.getElementById('customer-docs-upload-wrap').classList.add('hidden');
     openModal();
   }
   function openEditModal(btn) {
     var id = btn.getAttribute('data-id');
+    document.getElementById('customer-docs-hint').classList.add('hidden');
+    document.getElementById('customer-docs-upload-wrap').classList.remove('hidden');
+    wireDocumentsSection('customer', id, '-modal');
     // TODO: Edit route banne ke baad yahan form.action = '/customers/edit/' + id jaisa set karo
     form.action = '/customers/edit/'+id
     modalTitle.textContent = 'Edit customer';
@@ -450,10 +477,10 @@
     document.getElementById('customer-mobile').value = btn.getAttribute('data-mobile') || '';
     document.getElementById('customer-email').value = btn.getAttribute('data-email') || '';
     document.getElementById('customer-address').value = btn.getAttribute('data-address') || '';
-    document.getElementById('customer-state').value = btn.getAttribute('data-state') || 'Gujarat';
+    document.getElementById('customer-state').value = btn.getAttribute('data-state') || '';
     document.getElementById('customer-gstin').value = btn.getAttribute('data-gstin') || '';
     document.getElementById('customer-pan').value = btn.getAttribute('data-pan') || '';
-    document.getElementById('customer-terms').value = btn.getAttribute('data-terms') || 'Net 30';
+    document.getElementById('customer-terms').value = btn.getAttribute('data-terms') || '';
     document.getElementById('customer-credit-limit').value = btn.getAttribute('data-credit-limit') || '';
     document.getElementById('customer-opening-balance').value = btn.getAttribute('data-opening-amount') || '';
     document.getElementById('customer-opening-balance-type').value = btn.getAttribute('data-opening-type') || 'Dr';
@@ -493,9 +520,96 @@
       viewField('Ledger name', btn.getAttribute('data-ledger-name')) +
       viewField('Opening balance', btn.getAttribute('data-opening')) +
       viewField('Current balance', btn.getAttribute('data-current-balance')) +
-      '</div></div>';
+      '</div></div>' +
+      '<div class="pt-3 border-t border-slate-200 mt-2">' +
+      '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Documents</div>' +
+      '<form id="doc-upload-form" class="flex flex-wrap items-end gap-2 mb-2">' +
+      '<div class="flex-1 min-w-[140px]"><label class="block text-[11px] text-ink-faint mb-0.5">Title (optional)</label>' +
+      '<input type="text" id="doc-title" class="w-full px-2 py-1.5 text-[12.5px] border border-slate-300 rounded" placeholder="e.g. GST certificate" /></div>' +
+      '<div><label class="block text-[11px] text-ink-faint mb-0.5">File</label>' +
+      '<input type="file" id="doc-file" accept=".pdf,.png,.jpg,.jpeg" class="text-[12px]" /></div>' +
+      '<button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Upload</button>' +
+      '</form>' +
+      '<p class="text-[11px] text-ink-faint -mt-1 mb-2">PDF, PNG or JPG, up to 5 MB.</p>' +
+      '<div id="doc-list" class="space-y-1.5 text-[13px]"><span class="text-ink-faint">Loading…</span></div>' +
+      '</div>';
+    wireDocumentsSection('customer', btn.getAttribute('data-id'), '');
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
+  }
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  // idSuffix se ek hi function View panel (ids: doc-list, doc-upload-form...) aur
+  // Add/Edit modal (ids: doc-list-modal, doc-upload-form-modal...) dono ke liye kaam karta hai.
+  function loadPartyDocuments(partyType, partyId, idSuffix) {
+    idSuffix = idSuffix || '';
+    var list = document.getElementById('doc-list' + idSuffix);
+    if (!list) return;
+    fetch('/party_documents/' + partyType + '/' + partyId)
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var docs = data.documents || [];
+        if (!docs.length) {
+          list.innerHTML = '<span class="text-ink-faint">No documents uploaded yet.</span>';
+          return;
+        }
+        list.innerHTML = docs.map(function (d) {
+          return '<div class="flex items-center justify-between border border-slate-200 rounded px-2.5 py-1.5 gap-2">' +
+            '<a href="' + d.url + '" target="_blank" class="text-copper-text font-medium hover:underline truncate">' + escHtml(d.title) + '</a>' +
+            '<span class="text-ink-faint text-[11.5px] shrink-0">' + d.size_kb + ' KB · ' + escHtml(d.uploaded_at) + '</span>' +
+            '<button type="button" class="btn-delete-doc text-stop text-[12px] font-medium hover:underline shrink-0" data-doc-id="' + d.id + '">Delete</button>' +
+            '</div>';
+        }).join('');
+        list.querySelectorAll('.btn-delete-doc').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            fetch('/party_documents/' + btn.getAttribute('data-doc-id') + '/delete', { method: 'POST' })
+              .then(function (res) { return res.json(); })
+              .then(function () {
+                if (typeof showToast === 'function') showToast('Document removed.', 'success');
+                loadPartyDocuments(partyType, partyId, idSuffix);
+              });
+          });
+        });
+      })
+      .catch(function () {
+        list.innerHTML = '<span class="text-stop">Could not load documents.</span>';
+      });
+  }
+  function wireDocumentsSection(partyType, partyId, idSuffix) {
+    idSuffix = idSuffix || '';
+    loadPartyDocuments(partyType, partyId, idSuffix);
+    var docForm = document.getElementById('doc-upload-form' + idSuffix);
+    if (!docForm) return;
+    // "onsubmit =" (assignment, addEventListener nahi) — kyunki modal ke elements static hain
+    // (Edit baar-baar khulega), isse purana handler khud replace ho jata hai, duplicate upload nahi hota
+    docForm.onsubmit = function (e) {
+      e.preventDefault();
+      var fileInput = document.getElementById('doc-file' + idSuffix);
+      if (!fileInput.files.length) {
+        if (typeof showToast === 'function') showToast('Choose a file first.', 'error');
+        return;
+      }
+      var fd = new FormData();
+      fd.append('document_file', fileInput.files[0]);
+      fd.append('document_title', document.getElementById('doc-title' + idSuffix).value);
+      fetch('/party_documents/' + partyType + '/' + partyId + '/add', { method: 'POST', body: fd })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.success) {
+            if (typeof showToast === 'function') showToast('Document uploaded.', 'success');
+            docForm.reset();
+            loadPartyDocuments(partyType, partyId, idSuffix);
+          } else {
+            if (typeof showToast === 'function') showToast(data.error || 'Upload failed.', 'error');
+          }
+        })
+        .catch(function () {
+          if (typeof showToast === 'function') showToast('Upload failed.', 'error');
+        });
+    };
   }
   function closeViewModal() {
     viewModal.classList.add('hidden');
@@ -552,12 +666,11 @@
   });
 
   form.addEventListener('submit', function (e) {
-    var code = document.getElementById('customer-code').value.trim();
     var name = document.getElementById('customer-name').value.trim();
     var state = document.getElementById('customer-state').value;
-    if (!code || !name || !state) {
+    if (!name || !state) {
       e.preventDefault();
-      if (typeof showToast === 'function') showToast('Code, Name and State are required.', 'error');
+      if (typeof showToast === 'function') showToast('Name and State are required.', 'error');
     }
   });
 

@@ -4,11 +4,19 @@ from app.extensions import db
 
 work_stages_bp = Blueprint("work_stages", __name__, template_folder="templates")
 
+def generate_next_work_stage_code():
+    # Auto-serial (WS-0001, WS-0002 ...) — form se code nahi aata
+    last_row = WorkStage.query.order_by(WorkStage.id.desc()).first()
+    if not last_row:
+        return "WS-0001"
+    next_row = last_row.id + 1
+    return f"WS-{next_row:04d}"
+
 @work_stages_bp.route("/work_stages")
 def work_stages_list():
-    if WorkStage.query.count() == 0: 
+    if WorkStage.query.count() == 0:
         db.session.add(WorkStage(
-            code="WS-CUT",
+            code="WS-0001",
             name="Cutting",
             sort_order=10,
         ))
@@ -16,22 +24,25 @@ def work_stages_list():
 
     stages = WorkStage.query.filter(WorkStage.is_deleted == False).all()
     total_count = len(stages)
+    next_code = generate_next_work_stage_code()
 
     return render_template(
         "work_stages.html",
         active_nav="work_stages",
         stages=stages,
+        next_code=next_code,
         total_count=total_count,
         result_count=total_count,
     )
 
 @work_stages_bp.route('/work_stages/add', methods=['POST'])
 def work_stages_add():
-    code = (request.form.get('code') or "").strip().upper()
+    # Code ab auto-generated hai — form se nahi aata
+    code = generate_next_work_stage_code()
     name = (request.form.get('name') or "").strip()
     sort_order = request.form.get('sort_order') or 0
 
-    if not code or not name:
+    if not name:
         return redirect(url_for('work_stages.work_stages_list'))
 
     existing = WorkStage.query.filter_by(code=code).first()
@@ -43,12 +54,12 @@ def work_stages_add():
             existing.sort_order = sort_order
             existing.is_active = True
             db.session.commit()
-            flash("Work Stage restored with this code.","success")    
+            flash("Work Stage restored with this code.","success")
             return redirect(url_for('work_stages.work_stages_list'))
 
-        flash("A Work Stage with this code already exists.","error")     
+        flash("A Work Stage with this code already exists.","error")
         return redirect(url_for('work_stages.work_stages_list'))
-    
+
     db.session.add(WorkStage(
         code=code,
         name=name,
@@ -64,19 +75,13 @@ def work_stages_add():
 def work_stages_edit(stage_id):
     s = WorkStage.query.get_or_404(stage_id)
 
-    code = (request.form.get('code') or "").strip().upper()
     name = (request.form.get('name') or "").strip()
     sort_order = request.form.get('sort_order') or 0
 
-    if not code or not name:
+    if not name:
         return redirect(url_for('work_stages.work_stages_list'))
 
-    dup = WorkStage.query.filter(WorkStage.code == code, WorkStage.id != stage_id).first()
-    if dup:
-        flash("A work stage with this code already exists.", "error")    
-        return redirect(url_for('work_stages.work_stages_list'))
-
-    s.code = code
+    # Code ab auto-generated — edit pe immutable
     s.name = name
     s.sort_order = sort_order
     db.session.commit()

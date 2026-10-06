@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Purchase order {{ po.po_no }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@1&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    @page { size: A4; margin: 11mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #e8eef3; color: #142033;
+      font-family: "Source Sans 3", "Segoe UI", Arial, sans-serif;
+    }
+    .toolbar { max-width: 210mm; margin: 16px auto 0; display: flex; justify-content: flex-end; gap: 8px; }
+    .toolbar a, .toolbar button {
+      font: 600 13px "Source Sans 3", sans-serif;
+      padding: 8px 16px; border-radius: 6px; cursor: pointer; text-decoration: none;
+    }
+    .toolbar a { color: #3d5166; background: #fff; border: 1px solid #d5dee6; }
+    .toolbar button { color: #fff; background: #0e3a8a; border: 1px solid #0e3a8a; }
+    .sheet {
+      width: 210mm; margin: 14px auto 28px; background: #fff;
+      padding: 14mm 15mm 12mm;
+      box-shadow: 0 12px 32px rgba(20, 32, 51, 0.08);
+    }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+    .brand img { height: 48px; width: auto; display: block; }
+    .tagline { margin-top: 7px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; color: #8b9aab; }
+    .company { text-align: right; font-size: 11.5px; line-height: 1.4; color: #526273; max-width: 250px; }
+    .company strong { display: block; font-size: 14px; color: #142033; margin-bottom: 3px; }
+    .ids { margin-top: 5px; font-size: 10.5px; font-weight: 600; color: #142033; letter-spacing: 0.01em; }
+    .doc {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      margin-top: 16px; padding-top: 12px; border-top: 2px solid #0e3a8a;
+    }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #0e3a8a; }
+    .pono { margin-top: 2px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+    .status {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      border-radius: 999px; padding: 4px 10px; border: 1px solid #d5dee6; color: #3d5166; background: #f4f7fa;
+    }
+    .status-open { color: #0f6b4c; background: #e7f6ef; border-color: #b7e4cc; }
+    .status-draft { color: #5c6b7a; background: #f4f6f8; border-color: #e1e6eb; }
+    .status-partial { color: #8a5a12; background: #fbf6ea; border-color: #ead7b0; }
+    .meta {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      margin: 14px 0 16px; border: 1px solid #e6edf2; border-radius: 8px; overflow: hidden;
+    }
+    .meta div { padding: 8px 12px; background: #f7f9fb; }
+    .meta div + div { border-left: 1px solid #e6edf2; }
+    .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8b9aab; }
+    .val { display: block; margin-top: 2px; font-size: 13px; font-weight: 600; }
+    .supplier { margin-bottom: 16px; }
+    .supplier .lbl { margin-bottom: 4px; }
+    .supplier strong { font-size: 15px; }
+    .supplier p { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: #526273; }
+    table.lines { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    table.lines th {
+      text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: #5c6e80; background: #f7f9fb; padding: 8px; border-bottom: 1px solid #d5dee6;
+    }
+    table.lines td { padding: 8px; border-bottom: 1px solid #eef2f6; vertical-align: top; }
+    table.lines tbody tr:last-child td { border-bottom: 1px solid #d5dee6; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mat-name { font-weight: 600; }
+    .mat-sub { display: block; margin-top: 1px; font-size: 11px; color: #8b9aab; }
+    .amt { font-weight: 700; }
+    .close { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; margin-top: 14px; }
+    .side { flex: 1; min-width: 0; }
+    .remarks p { margin: 4px 0 0; font-size: 13px; color: #526273; }
+    .sign { margin-top: 28px; width: 190px; font-size: 12.5px; color: #526273; }
+    .sign .line { margin-top: 36px; border-top: 1px solid #142033; padding-top: 5px; color: #142033; font-weight: 600; font-size: 12px; }
+    .totals { width: 268px; border: 1px solid #e6edf2; border-radius: 8px; overflow: hidden; font-size: 13px; }
+    .totals .row { display: flex; justify-content: space-between; padding: 6px 14px; color: #526273; }
+    .totals .grand {
+      display: flex; justify-content: space-between;
+      background: #0e3a8a; color: #fff; padding: 10px 14px; font-weight: 700; font-size: 15px;
+    }
+    footer.foot {
+      margin-top: 26px; padding-top: 8px; border-top: 2px solid #0e3a8a;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .script { font-family: "Libre Baskerville", Georgia, serif; font-style: italic; font-size: 16px; color: #0e3a8a; }
+    .tomorrow { font-size: 9.5px; letter-spacing: 0.16em; font-weight: 700; color: #8b9aab; }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .sheet { margin: 0; width: auto; box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  {# Company master abhi nahi hai, isliye letterhead ka naam/address yahin likha hai #}
+  {% set ns = namespace(subtotal=0, tax=0, charges=0) %}
+  {% set intra = po.vendor and po.vendor.state and po.warehouse and po.warehouse.branch and po.warehouse.branch.state and po.vendor.state.name == po.warehouse.branch.state.name %}
+  <div class="toolbar">
+    <a href="{{ url_for('purchase_orders.purchase_orders_list') }}">Back</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+  <article class="sheet">
+    <header class="head">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='img/nrupex_logo.png') }}" alt="Nrupex" />
+        <div class="tagline">INNOVATION &nbsp;|&nbsp; QUALITY &nbsp;|&nbsp; TRUST</div>
+      </div>
+      <div class="company">
+        <strong>Nrupex Solder LLP</strong>
+        Plot No: 3, Opp. Kamla Amrut Pharma, At &amp; Post: Irana, Ta: Kadi, Dist: Mehsana - 384440, Gujarat, India.<br />
+        +91 99250 24330 &nbsp;·&nbsp; nrupexsolder@gmail.com
+        <div class="ids">GSTIN 24ABAFN4751E1ZL &nbsp;·&nbsp; PAN ABAFN4751E</div>
+      </div>
+    </header>
+    <div class="doc">
+      <div>
+        <div class="eyebrow">Purchase order</div>
+        <div class="pono">{{ po.po_no }}</div>
+      </div>
+      <span class="status status-{{ po.status|lower }}">{{ po.status }}</span>
+    </div>
+    <div class="meta">
+      <div><span class="lbl">Date</span><span class="val">{{ po.po_date.strftime('%d %b %Y') if po.po_date else '—' }}</span></div>
+      <div><span class="lbl">Expected</span><span class="val">{{ po.expected_delivery_date.strftime('%d %b %Y') if po.expected_delivery_date else '—' }}</span></div>
+      <div><span class="lbl">Terms</span><span class="val">{{ po.payment_terms.name if po.payment_terms else '—' }}</span></div>
+      <div><span class="lbl">Deliver to</span><span class="val">{{ po.warehouse.name if po.warehouse else '—' }}</span></div>
+    </div>
+    <div class="supplier">
+      <span class="lbl">Supplier</span>
+      <strong>{{ po.vendor.name if po.vendor else '—' }}</strong>
+      {% if po.vendor and po.vendor.address %}<p>{{ po.vendor.address }}</p>{% endif %}
+      <p>
+        {{ po.vendor.state.name if po.vendor and po.vendor.state else '' }}
+        {% if po.vendor and po.vendor.gstin %} · GSTIN {{ po.vendor.gstin }}{% endif %}
+        {% if po.vendor and po.vendor.mobile %} · {{ po.vendor.mobile }}{% endif %}
+      </p>
+    </div>
+    <table class="lines">
+      <thead>
+        <tr>
+          <th>Material</th>
+          <th class="num">Qty</th>
+          <th class="num">Rate</th>
+          <th class="num">Tax</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in po.lines %}
+        {% set amount = (line.ordered_qty or 0) * (line.rate or 0) %}
+        {% set pct = line.tax_rate.rate_percent if line.tax_rate else 0 %}
+        {% set ns.subtotal = ns.subtotal + amount %}
+        {% set ns.tax = ns.tax + amount * pct / 100 %}
+        <tr>
+          <td>
+            <span class="mat-name">{{ line.raw_material.name if line.raw_material else '—' }}</span>
+            <span class="mat-sub">{{ line.raw_material.code if line.raw_material else '—' }}{% if line.raw_material and line.raw_material.hsn_code %} · HSN {{ line.raw_material.hsn_code }}{% endif %}</span>
+          </td>
+          <td class="num">{{ '{:,.2f}'.format(line.ordered_qty or 0) }} {{ line.unit.code if line.unit else '' }}</td>
+          <td class="num">₹{{ '{:,.2f}'.format(line.rate or 0) }}</td>
+          <td class="num">{{ '%.0f'|format(pct) }}%</td>
+          <td class="num amt">₹{{ '{:,.2f}'.format(amount) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No line items</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="close">
+      <div class="side">
+        {% if po.remarks %}
+        <div class="remarks">
+          <span class="lbl">Remarks</span>
+          <p>{{ po.remarks }}</p>
+        </div>
+        {% endif %}
+        <div class="sign">
+          For Nrupex Solder LLP
+          <div class="line">Authorised signatory</div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Subtotal</span><span>₹{{ '{:,.2f}'.format(ns.subtotal) }}</span></div>
+        {% if intra %}
+        <div class="row"><span>CGST</span><span>₹{{ '{:,.2f}'.format(ns.tax / 2) }}</span></div>
+        <div class="row"><span>SGST</span><span>₹{{ '{:,.2f}'.format(ns.tax / 2) }}</span></div>
+        {% else %}
+        <div class="row"><span>IGST</span><span>₹{{ '{:,.2f}'.format(ns.tax) }}</span></div>
+        {% endif %}
+        {% for cl in po.charge_lines %}
+        {% set signed = (cl.amount or 0) if cl.effect != 'minus' else -(cl.amount or 0) %}
+        {% set ns.charges = ns.charges + signed %}
+        <div class="row"><span>{{ cl.charge.name if cl.charge else 'Charge' }}</span><span>{{ '−' if cl.effect == 'minus' else '+' }} ₹{{ '{:,.2f}'.format(cl.amount or 0) }}</span></div>
+        {% endfor %}
+        {% if not po.charge_lines and po.freight %}
+        {% set ns.charges = ns.charges + po.freight %}
+        <div class="row"><span>Freight</span><span>₹{{ '{:,.2f}'.format(po.freight) }}</span></div>
+        {% endif %}
+        <div class="grand"><span>Grand total</span><span>₹{{ '{:,.2f}'.format(ns.subtotal + ns.tax + ns.charges) }}</span></div>
+      </div>
+    </div>
+    <footer class="foot">
+      <div class="script">Stronger Together</div>
+      <div class="tomorrow">FOR A BETTER TOMORROW</div>
+    </footer>
+  </article>
+</body>
+</html>

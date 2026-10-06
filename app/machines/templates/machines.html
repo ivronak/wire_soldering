@@ -335,16 +335,17 @@
       <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
         <div>
           <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add machine</h2>
-          <p class="text-[12.5px] text-ink-faint">Code, Name, Work Stage, Capacity, Installed date, Status</p>
+          <p class="text-[12.5px] text-ink-faint">Code is auto-generated · just fill the rest</p>
         </div>
         <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
       </div>
       <!-- method/action tum khud add karoge (Flask POST) — abhi sirf UI -->
       <form id="machine-form" method="post" action="{{ url_for('machines.machines_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <div>
-          <label for="machine-code" class="block text-[12.5px] font-semibold text-ink mb-1">Machine code *</label>
-          <input type="text" id="machine-code" name="code" required placeholder="MC-CUT-03" maxlength="20" autocomplete="off"
-            class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <label for="machine-code" class="block text-[12.5px] font-semibold text-ink mb-1">Machine code</label>
+          <input type="text" id="machine-code" name="code" value="{{ next_code }}" disabled
+            class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
+          <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated, read-only — disabled so it is never sent with the form; the route generates the real code itself.</p>
         </div>
         <div>
           <label for="machine-name" class="block text-[12.5px] font-semibold text-ink mb-1">Machine name *</label>
@@ -461,7 +462,7 @@
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('machine-code').focus();
+    document.getElementById('machine-name').focus();
   }
   function closeModal() {
     modal.classList.add('hidden');
@@ -511,18 +512,17 @@
   }
 
   // Required fields: khali / sirf spaces → toast, Flask mat bhejo
+  // Code ab auto-generated (disabled) — isliye validation me nahi
   form.addEventListener('submit', function (e) {
-    var code = document.getElementById('machine-code').value.trim();
     var name = document.getElementById('machine-name').value.trim();
     var stageId = document.getElementById('machine-stage').value;
 
-    if (!code || !name || !stageId) {
+    if (!name || !stageId) {
       e.preventDefault();  // sirf galat pe rokna — sahi pe Flask POST chale
       if (typeof showToast === 'function') {
-        showToast('Code, Name and Work stage are required.', 'error');
+        showToast('Name and Work stage are required.', 'error');
       }
-      if (!code) document.getElementById('machine-code').focus();
-      else if (!name) document.getElementById('machine-name').focus();
+      if (!name) document.getElementById('machine-name').focus();
       else document.getElementById('machine-stage').focus();
       return;
     }

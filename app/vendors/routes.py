@@ -1,14 +1,24 @@
 from flask import render_template, redirect, url_for, Blueprint, request, flash
-from app.models import ChartOfAccountsGroup, Ledger, Vendor
+from app.models import ChartOfAccountsGroup, Ledger, Vendor, State, VendorType, PaymentTerm
 from app.extensions import db
-from app.constants import INDIAN_STATES
 
 vendors_bp = Blueprint("vendors", __name__, template_folder="templates")
+
+
+def generate_next_vendor_code():
+    # Auto-serial (V-0001, V-0002 ...) — form se code nahi aata
+    last_row = Vendor.query.order_by(Vendor.id.desc()).first()
+    if not last_row:
+        return "V-0001"
+    next_row = last_row.id + 1
+    return f"V-{next_row:04d}"
+
 
 @vendors_bp.route("/vendors")
 def vendors_list():
     vendors = Vendor.query.filter(Vendor.is_deleted == False).order_by(Vendor.code).all()
     total_count = len(vendors)
+    next_code = generate_next_vendor_code()
 
     return render_template(
         "vendors.html",
@@ -16,35 +26,54 @@ def vendors_list():
         total_count=total_count,
         result_count=total_count,
         active_nav="vendors",
-        states=INDIAN_STATES,
+        next_code=next_code,
+        # Dropdown ab State Master se — sirf live (deleted nahi, active) states
+        states=State.query.filter(State.is_deleted == False, State.is_active == True).order_by(State.name).all(),
+        # Vendor Type dropdown ab Vendor Type Master se — sirf live (deleted nahi, active) types
+        vendor_types=VendorType.query.filter(VendorType.is_deleted == False, VendorType.is_active == True).order_by(VendorType.name).all(),
+        # Payment terms dropdown ab Payment Terms Master se — sirf live (deleted nahi, active)
+        payment_terms=PaymentTerm.query.filter(PaymentTerm.is_deleted == False, PaymentTerm.is_active == True).order_by(PaymentTerm.name).all(),
     )
 
 @vendors_bp.route('/vendors/add', methods=['POST'])
 def vendors_add():
-    code = (request.form.get('code') or "").strip().upper()
+    # Code ab auto-generated — form se code nahi aata
+    code = generate_next_vendor_code()
     name = (request.form.get('name') or "").strip()
     contact_person = (request.form.get('contact_person') or "").strip()
     mobile = (request.form.get('mobile') or "").strip()
     email = (request.form.get('email') or "").strip()
     address = (request.form.get('address') or "").strip()
-    state = (request.form.get('state') or "").strip()
+    state_id = request.form.get('state_id', type=int)
     gstin = (request.form.get('gstin') or "").strip().upper()
     pan = (request.form.get('pan') or "").strip().upper()
-    payment_terms = (request.form.get('payment_terms') or "").strip()
+    # Payment terms ab master se aata hai (OPTIONAL) — form se id
+    payment_terms_id = request.form.get('payment_terms_id', type=int)
     opening_balance = float(request.form.get('opening_balance')) if (request.form.get('opening_balance') or "").strip() else 0
     opening_balance_type = (request.form.get('opening_balance_type') or "Cr").strip()
     bank_name = (request.form.get('bank_name') or "").strip()
     bank_ifsc = (request.form.get('bank_ifsc') or "").strip().upper()
     bank_account = (request.form.get('bank_account') or "").strip()
-    vendor_type = (request.form.get('vendor_type') or "").strip()    
+    # Vendor type ab master se aata hai (OPTIONAL) — form se id
+    vendor_type_id = request.form.get('vendor_type_id', type=int)
 
-    if not code or not name or not state:
+    if not name or not state_id:
         return redirect(url_for('vendors.vendors_list'))
 
-    existing = Vendor.query.filter_by(code=code).first()
-    if existing:
-        flash("A Vendor with this code already exists.", "error")
-        return redirect(url_for('vendors.vendors_list'))    
+    # Dropdown se aaya state_id sach me valid State hona chahiye
+    if not State.query.filter(State.id == state_id, State.is_deleted == False).first():
+        flash("Please select a valid state.", "error")
+        return redirect(url_for('vendors.vendors_list'))
+
+    # Vendor type optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
+    if vendor_type_id and not VendorType.query.filter(VendorType.id == vendor_type_id, VendorType.is_deleted == False).first():
+        flash("Please select a valid vendor type.", "error")
+        return redirect(url_for('vendors.vendors_list'))
+
+    # Payment terms optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
+    if payment_terms_id and not PaymentTerm.query.filter(PaymentTerm.id == payment_terms_id, PaymentTerm.is_deleted == False).first():
+        flash("Please select valid payment terms.", "error")
+        return redirect(url_for('vendors.vendors_list'))
 
     # Step 1: "Sundry Creditors" group dhoondo — na mile to pehli baar bana do
     group = ChartOfAccountsGroup.query.filter(ChartOfAccountsGroup.name == "Sundry Creditors").first()
@@ -55,7 +84,7 @@ def vendors_add():
 
     signed_opening = opening_balance if opening_balance_type == "Cr" else -opening_balance
 
-    # Step 2: is Vendor ka apna Ledger banao (Vendor se PEHLE, kyunki Vendor isko point karega) 
+    # Step 2: is Vendor ka apna Ledger banao (Vendor se PEHLE, kyunki Vendor isko point karega)
     ledger = Ledger(
         name=name,
         group_id=group.id,
@@ -75,11 +104,11 @@ def vendors_add():
         mobile=mobile,
         email=email,
         address=address,
-        state=state,
+        state_id=state_id,
         gstin=gstin or None,
         pan=pan or None,
-        payment_terms=payment_terms,
-        vendor_type=vendor_type,
+        payment_terms_id=payment_terms_id,
+        vendor_type_id=vendor_type_id,
         bank_name=bank_name,
         bank_ifsc=bank_ifsc,
         bank_account=bank_account,
@@ -98,35 +127,46 @@ def vendors_toggle(v_id):
 
     v.is_active =  not v.is_active
     db.session.commit()
-    return redirect(url_for('vendors.vendors_list'))    
+    return redirect(url_for('vendors.vendors_list'))
 
-@vendors_bp.route('/vendors/edit/<int:v_id>', methods=['POST']) 
+@vendors_bp.route('/vendors/edit/<int:v_id>', methods=['POST'])
 def vendors_edit(v_id):
     v = Vendor.query.get_or_404(v_id)
 
-    code = (request.form.get('code') or "").strip().upper()
+    # Code ab auto-generated — edit pe immutable (form se code nahi aata)
     name = (request.form.get('name') or "").strip()
     contact_person = (request.form.get('contact_person') or "").strip()
     mobile = (request.form.get('mobile') or "").strip()
     email = (request.form.get('email') or "").strip()
     address = (request.form.get('address') or "").strip()
-    state = (request.form.get('state') or "").strip()
+    state_id = request.form.get('state_id', type=int)
     gstin = (request.form.get('gstin') or "").strip().upper()
     pan = (request.form.get('pan') or "").strip().upper()
-    payment_terms = (request.form.get('payment_terms') or "").strip()
+    # Payment terms ab master se aata hai (OPTIONAL) — form se id
+    payment_terms_id = request.form.get('payment_terms_id', type=int)
     opening_balance = float(request.form.get('opening_balance')) if (request.form.get('opening_balance') or "").strip() else 0
     opening_balance_type = (request.form.get('opening_balance_type') or "Cr").strip()
     bank_name = (request.form.get('bank_name') or "").strip()
     bank_ifsc = (request.form.get('bank_ifsc') or "").strip().upper()
     bank_account = (request.form.get('bank_account') or "").strip()
-    vendor_type = (request.form.get('vendor_type') or "").strip()
+    # Vendor type ab master se aata hai (OPTIONAL) — form se id
+    vendor_type_id = request.form.get('vendor_type_id', type=int)
 
-    if not code or not name or not state:
+    if not name or not state_id:
         return redirect(url_for('vendors.vendors_list'))
 
-    dup = Vendor.query.filter(Vendor.code == code, Vendor.id != v.id).first()
-    if dup:
-        flash("A Vendor with this code already exists.", "error")
+    if not State.query.filter(State.id == state_id, State.is_deleted == False).first():
+        flash("Please select a valid state.", "error")
+        return redirect(url_for('vendors.vendors_list'))
+
+    # Vendor type optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
+    if vendor_type_id and not VendorType.query.filter(VendorType.id == vendor_type_id, VendorType.is_deleted == False).first():
+        flash("Please select a valid vendor type.", "error")
+        return redirect(url_for('vendors.vendors_list'))
+
+    # Payment terms optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
+    if payment_terms_id and not PaymentTerm.query.filter(PaymentTerm.id == payment_terms_id, PaymentTerm.is_deleted == False).first():
+        flash("Please select valid payment terms.", "error")
         return redirect(url_for('vendors.vendors_list'))
 
     ledger = v.ledger
@@ -134,9 +174,9 @@ def vendors_edit(v_id):
     def signed_ammount(bal, bal_type):
         return bal if bal_type == "Cr" else -bal
 
-    old_op_bal = signed_ammount(ledger.opening_balance, ledger.opening_balance_type)   
-    new_op_bal = signed_ammount(opening_balance, opening_balance_type) 
-        
+    old_op_bal = signed_ammount(ledger.opening_balance, ledger.opening_balance_type)
+    new_op_bal = signed_ammount(opening_balance, opening_balance_type)
+
     ledger.name = name
     ledger.opening_balance = opening_balance
     ledger.opening_balance_type = opening_balance_type
@@ -144,17 +184,16 @@ def vendors_edit(v_id):
     ledger.gstin = gstin or None
     db.session.flush()
 
-    v.code = code
     v.name = name
     v.contact_person=contact_person
     v.mobile=mobile
     v.email=email
     v.address=address
-    v.state=state
+    v.state_id=state_id
     v.gstin=gstin or None
     v.pan=pan or None
-    v.payment_terms=payment_terms
-    v.vendor_type=vendor_type
+    v.payment_terms_id=payment_terms_id
+    v.vendor_type_id=vendor_type_id
     v.bank_name=bank_name
     v.bank_ifsc=bank_ifsc
     v.bank_account=bank_account
@@ -162,9 +201,3 @@ def vendors_edit(v_id):
     db.session.commit()
     flash("Vendor Updated — ledger Updated under Sundry Creditors.", "success")
     return redirect(url_for('vendors.vendors_list'))
-
-
-
-
-
-       
