@@ -1,5 +1,5 @@
-from flask import render_template, Blueprint, redirect, url_for, request, flash
-from app.models import RawMaterial, RmCategories, Unit, TaxRate
+from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
+from app.models import RawMaterial, RmCategories, Unit, TaxRate, RMQCParameter
 from app.extensions import db
 
 raw_materials_bp = Blueprint("raw_materials", __name__, template_folder='templates')
@@ -172,3 +172,131 @@ def raw_materials_delete(m_id):
     db.session.commit()
     flash("Raw Material removed from the list (kept in database).", "success")
     return redirect(url_for('raw_materials.raw_materials_list'))
+
+# ---- RM QC parameters (Inward QC template) ----
+# Raw Material screen ke panel se fetch() se chalte hain, isliye redirect nahi, JSON dete hain.
+
+def qc_parameter_to_dict(p):
+    return {
+        "id": p.id,
+        "name": p.name,
+        "unit_label": p.unit_label or "",
+        "check_type": p.check_type,
+        "min_value": p.min_value,
+        "max_value": p.max_value,
+        "sort_order": p.sort_order,
+    }
+
+def read_qc_parameter_form(m, exclude_id=None):
+    # Add aur Edit dono ka form padhna + validation yahin hai, do jagah copy-paste nahi.
+    # Wapas deta hai: (values, None) agar sab theek, ya (None, "error message") agar galti.
+    name = (request.form.get("name") or "").strip()
+    unit_label = (request.form.get("unit_label") or "").strip() or None
+    check_type = (request.form.get("check_type") or "range").strip()
+    min_value = request.form.get("min_value", type=float)   # khaali / galat => None
+    max_value = request.form.get("max_value", type=float)
+    sort_order = request.form.get("sort_order", type=int) or 0
+
+    if not name:
+        return None, "Parameter name is required."
+    if len(name) > 100:
+        return None, "Parameter name is too long (maximum 100 characters)."
+    if check_type not in ("range", "pass_fail"):
+        return None, "Invalid check type."
+
+    if check_type == "range":
+        # 0 bhi sahi limit hai, isliye "is None" check
+        if min_value is None and max_value is None:
+            return None, "Enter a minimum, a maximum or both."
+        if min_value is not None and max_value is not None and min_value > max_value:
+            return None, "Minimum cannot be more than maximum."
+    else:
+        # pass/fail me limits ka matlab nahi, saaf kar do
+        min_value = max_value = None
+
+    # Duplicate naam: remove kiye hue ko chhod kar; edit me apni hi row ko bhi chhod kar (exclude_id)
+    query = RMQCParameter.query.filter(
+        RMQCParameter.raw_material_id == m.id,
+        RMQCParameter.is_deleted == False,
+        db.func.lower(RMQCParameter.name) == name.lower(),
+    )
+    if exclude_id:
+        query = query.filter(RMQCParameter.id != exclude_id)
+    if query.first():
+        return None, "This material already has a parameter with that name."
+
+    values = {
+        "name": name,
+        "unit_label": unit_label,
+        "check_type": check_type,
+        "min_value": min_value,
+        "max_value": max_value,
+        "sort_order": sort_order,
+    }
+    return values, None
+
+@raw_materials_bp.route('/raw_materials/<int:m_id>/qc_parameters' )
+def raw_materials_qc_parameters(m_id):
+    m = RawMaterial.query.filter_by(id=m_id, is_deleted=False).first_or_404()
+
+    params = (
+        RMQCParameter.query.filter_by(raw_material_id = m_id, is_deleted=False).order_by(RMQCParameter.sort_order, RMQCParameter.id).all()
+    )
+
+    return jsonify(material=m.name, parameters=[qc_parameter_to_dict(p) for p in params])
+
+@raw_materials_bp.route('/raw_materials/<int:m_id>/qc_parameters/add', methods=["POST"])
+def raw_materials_qc_parameters_add(m_id):
+    m = RawMaterial.query.filter_by(id=m_id, is_deleted=False).first_or_404()
+
+    values, error = read_qc_parameter_form(m)
+
+    if error:
+        return jsonify(success=False, error=error)
+
+    # Display order khaali chhoda ho (0) to naya parameter list ke AAKHIR me jode.
+    # Warna 0 sabse chhota number hai aur naya parameter purano ke upar aa jata hai.
+    if not values["sort_order"]:
+        last_order = db.session.query(db.func.max(RMQCParameter.sort_order)).filter(
+            RMQCParameter.raw_material_id == m.id,
+            RMQCParameter.is_deleted == False,
+        ).scalar()
+        values["sort_order"] = (last_order or 0) + 1
+
+    p = RMQCParameter(
+        raw_material_id=m.id,
+        **values
+    )
+    db.session.add(p)
+    db.session.commit()
+    return jsonify(success=True, parameter=qc_parameter_to_dict(p))                    
+
+@raw_materials_bp.route('/raw_materials/<int:m_id>/qc_parameters/<int:p_id>/edit', methods=['POST'])
+def raw_materials_qc_parameters_edit(m_id, p_id):
+
+    m = RawMaterial.query.filter_by(id=m_id, is_deleted=False).first_or_404()
+    p = RMQCParameter.query.filter_by(id=p_id, raw_material_id=m_id, is_deleted=False).first_or_404()
+
+    values, error = read_qc_parameter_form(m, exclude_id=p.id)
+
+    if error:
+        return jsonify(success=False, error=error)
+
+    p.name = values["name"]
+    p.unit_label = values["unit_label"]
+    p.check_type = values["check_type"]
+    p.min_value = values["min_value"]
+    p.max_value = values["max_value"]
+    p.sort_order = values["sort_order"]
+    db.session.commit()
+    return jsonify(success=True, parameter=qc_parameter_to_dict(p))    
+
+@raw_materials_bp.route("/raw_materials/<int:m_id>/qc_parameters/<int:p_id>/delete", methods=["POST"])
+def raw_materials_qc_parameters_delete(m_id, p_id):
+    m = RawMaterial.query.filter_by(id=m_id, is_deleted=False).first_or_404()
+    p = RMQCParameter.query.filter_by(id=p_id, raw_material_id=m.id, is_deleted=False).first_or_404()
+
+    # Soft delete: row DB me rehti hai (aage inspection results ka snapshot safe rahega)
+    p.is_deleted = True
+    db.session.commit()
+    return jsonify(success=True)

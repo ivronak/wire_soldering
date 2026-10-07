@@ -279,7 +279,10 @@
                       data-pass="{{ q.passed_qty }}"
                       data-reject="{{ q.rejected_qty }}"
                       data-status="{{ q.status or '' }}"
-                      data-remarks="{{ q.remarks or '' }}">
+                      data-remarks="{{ q.remarks or '' }}"
+                      {# Parameter-wise results: model ki @property "summary" (dictionary) se, JSON bana kar. Attribute single quote me
+                         kyunki JSON me double quotes aate hain (tojson andar ke ' ko khud safe kar deta hai) #}
+                      data-results='{{ q.results | map(attribute="summary") | list | tojson }}'>
                       View
                     </button>
                     {# Memo tabhi dikhao jab ban chuka ho. q.memo = model ka backref (RejectionMemo ya None) #}
@@ -400,7 +403,8 @@
       <hr class="border-slate-200" />
       <div class="flex items-center justify-between gap-2">
         <p class="form-section-title !mt-0">QC parameters (template)</p>
-        <span id="qc-template-label" class="text-[12px] text-ink-faint">Optional for now — RM templates later</span>
+        {# Label JS badalta hai: kitne parameters hain / is material ka template nahi hai #}
+        <span id="qc-template-label" class="text-[12px] text-ink-faint">Select a lot to load its tests</span>
       </div>
       <div class="overflow-x-auto border border-slate-200 rounded">
         <table class="param-table">
@@ -413,9 +417,11 @@
               <th style="width:20%">Result</th>
             </tr>
           </thead>
+          {# Rows JS banata hai (renderParamRows): lot chunte hi us material ke parameters aate hain.
+             Har row ke form fields: param_id_N (hidden), actual_N (number) ya result_N (pass / fail) — N = 0, 1, 2 ... #}
           <tbody id="param-tbody">
             <tr>
-              <td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">Parameter templates will load here in a later step</td>
+              <td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">Select a lot to load its QC parameters</td>
             </tr>
           </tbody>
         </table>
@@ -508,6 +514,7 @@
   function resetQcLineSelect() {
     qcLine.innerHTML = '<option value="">Select after GRN…</option>';
     qcRecv.value = '—';
+    renderParamRows(null);   // lot badli / form band hua to purane parameter rows hata do
   }
 
   // selectLineId (optional) — Pending tab ke "Inspect" se aaye to lines load hone ke baad wahi line select karo
@@ -531,6 +538,8 @@
             (line.material_name || '') + ' · ' +
             (line.batch_lot_no || '');
           opt.setAttribute('data-qty', line.received_qty);
+          // Is lot ke material ke QC parameters (Flask JSON se) — lot select hone par table me dikhenge
+          opt.setAttribute('data-params', JSON.stringify(line.parameters || []));
           qcLine.appendChild(opt);
         });
         if (selectLineId) {
@@ -551,6 +560,114 @@
     var opt = qcLine.options[qcLine.selectedIndex];
     var qty = opt ? opt.getAttribute('data-qty') : null;
     qcRecv.value = (qty !== null && qty !== '') ? qty : '—';
+    // Lot ke parameters table me dikhao (option par JSON string ke roop me rakhe hain)
+    var params = null;
+    if (opt && opt.getAttribute('data-params') !== null) {
+      try { params = JSON.parse(opt.getAttribute('data-params')); } catch (err) { params = []; }
+    }
+    renderParamRows(params);
+  });
+
+  // ---- QC parameters table (Raw Material ke "QC tests" template se) ----
+  // Har parameter ek row. Form fields ke naam index se: param_id_0, actual_0 (ya result_0), param_id_1 ...
+  // Server (Flask) parameter ki limits DB se khud padhta hai — browser se aayi limits par bharosa nahi karta.
+  var qcParamDefs = [];   // abhi dikhne wale parameters (verdict nikalne ke liye)
+
+  function paramStandardText(p) {
+    if (p.check_type === 'pass_fail') return 'Pass / Fail';
+    if (p.min_value !== null && p.max_value !== null) return p.min_value + ' to ' + p.max_value;
+    if (p.min_value !== null) return 'Min ' + p.min_value;
+    if (p.max_value !== null) return 'Max ' + p.max_value;
+    return '—';
+  }
+  // Ek parameter ka verdict: 'pass' / 'fail' / '' (abhi kuch bhara nahi)
+  function paramVerdict(p, rawValue) {
+    if (p.check_type === 'pass_fail') return rawValue === 'pass' || rawValue === 'fail' ? rawValue : '';
+    if (rawValue === '' || rawValue === null) return '';
+    var v = parseFloat(rawValue);
+    if (isNaN(v)) return '';
+    if (p.min_value !== null && v < p.min_value) return 'fail';
+    if (p.max_value !== null && v > p.max_value) return 'fail';
+    return 'pass';
+  }
+  function verdictBadge(verdict) {
+    if (verdict === 'pass') return '<span class="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded border bg-success-bg text-success border-success-border">Pass</span>';
+    if (verdict === 'fail') return '<span class="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded border bg-stop-bg text-stop border-stop-border">Fail</span>';
+    return '<span class="text-ink-faint">—</span>';
+  }
+  function currentParamValue(i) {
+    var el = document.querySelector('#param-tbody [name="actual_' + i + '"], #param-tbody [name="result_' + i + '"]');
+    return el ? el.value : '';
+  }
+  function updateParamVerdict(i) {
+    var cell = document.getElementById('param-verdict-' + i);
+    if (cell) cell.innerHTML = verdictBadge(paramVerdict(qcParamDefs[i], currentParamValue(i)));
+  }
+  function renderParamRows(params) {
+    var tbody = document.getElementById('param-tbody');
+    var label = document.getElementById('qc-template-label');
+    qcParamDefs = params || [];
+    if (params === null) {
+      label.textContent = 'Select a lot to load its tests';
+      tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">Select a lot to load its QC parameters</td></tr>';
+      return;
+    }
+    if (!params.length) {
+      label.textContent = 'No tests set for this material';
+      tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-ink-faint text-[13px]">No QC parameters are set for this material, so only quantities are recorded. Tests can be added on the Raw materials page (QC tests).</td></tr>';
+      return;
+    }
+    label.textContent = params.length + (params.length === 1 ? ' test' : ' tests') + ' from the material template';
+    tbody.innerHTML = params.map(function (p, i) {
+      var entry = p.check_type === 'pass_fail'
+        ? '<select name="result_' + i + '" class="qc-param-input w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white" data-i="' + i + '">' +
+            '<option value="">Select…</option><option value="pass">Pass</option><option value="fail">Fail</option></select>'
+        : '<input type="number" step="any" name="actual_' + i + '" class="qc-param-input w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded tabular-nums text-right" data-i="' + i + '" placeholder="0" />';
+      return '<tr>' +
+        '<td class="font-medium text-ink"><input type="hidden" name="param_id_' + i + '" value="' + p.id + '" />' + esc(p.name) + '</td>' +
+        '<td class="text-center text-[12.5px] tabular-nums text-ink-muted">' + esc(paramStandardText(p)) + '</td>' +
+        '<td class="text-center text-[12.5px] text-ink-muted">' + (p.unit_label ? esc(p.unit_label) : '—') + '</td>' +
+        '<td>' + entry + '</td>' +
+        '<td class="text-center" id="param-verdict-' + i + '">' + verdictBadge('') + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+  // Value badalte hi Pass / Fail turant dikhao (ek listener tbody pe — event delegation, rows dynamic hain)
+  document.getElementById('param-tbody').addEventListener('input', function (e) {
+    if (e.target.classList.contains('qc-param-input')) updateParamVerdict(parseInt(e.target.getAttribute('data-i'), 10));
+  });
+
+  // Final "Submit result" par: (1) har parameter ka result bharna zaroori, (2) koi parameter fail ho aur rejected qty 0 ho to
+  // sirf WARNING (confirm) — lab ka faisla passed / rejected qty se hi rehta hai. "Save draft" par koi check nahi.
+  document.getElementById('inspect-form').addEventListener('submit', function (e) {
+    var form = e.target;
+    var submitter = e.submitter;
+    if (!submitter || submitter.value !== 'submit') return;
+    if (form.getAttribute('data-erp-confirmed') === '1') return;   // confirm ke baad doosri baar yahin se nikal jao
+
+    var missing = [], failed = [];
+    qcParamDefs.forEach(function (p, i) {
+      var verdict = paramVerdict(p, currentParamValue(i));
+      if (verdict === '') missing.push(p.name);
+      if (verdict === 'fail') failed.push(p.name);
+    });
+    if (missing.length) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Enter a result for every QC parameter (or save as draft): ' + missing.join(', ') + '.', 'error');
+      return;
+    }
+    var rejected = parseFloat(document.getElementById('qc-reject').value) || 0;
+    if (failed.length && rejected === 0) {
+      e.preventDefault();
+      window.showConfirm(
+        'Outside the limits: ' + failed.join(', ') + '. But the rejected quantity is 0, so the whole lot will be accepted. Submit anyway?',
+        { title: 'A QC parameter failed', confirmText: 'Submit anyway', variant: 'warning' }
+      ).then(function (ok) {
+        if (!ok) return;
+        form.setAttribute('data-erp-confirmed', '1');
+        form.requestSubmit(submitter);   // wahi button (qc_action=submit) ke saath dobara bhejo
+      });
+    }
   });
 
   // Text ko HTML ke liye safe banao: < > & ko &lt; &gt; &amp; me badal do, taaki user ka text HTML ban ke chale nahi
@@ -561,9 +678,44 @@
     return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
       '</div><div class="mt-0.5 text-ink">' + (value ? esc(value) : '—') + '</div></div>';
   }
+  // QC test results ki table (View panel ke liye). results = Flask se aayi list: [{name, unit, standard, actual, passed}, ...]
+  // Sab text esc() se safe — parameter ka naam user ne type kiya tha.
+  function resultsTableHtml(results) {
+    if (!results.length) {
+      return '<div class="pt-2"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1">QC test results</div>' +
+        '<p class="text-[13px] text-ink-faint">No test results were recorded for this inspection (quantities only).</p></div>';
+    }
+    var failedCount = results.filter(function (r) { return !r.passed; }).length;
+    var rowsHtml = results.map(function (r) {
+      var isPassFail = r.standard === 'Pass / Fail';
+      var unit = r.unit && !isPassFail ? ' ' + r.unit : '';   // pass/fail parameter me unit nahi lagta
+      var actual = r.actual === null ? '—' : esc(r.actual + unit);
+      var standard = esc(r.standard + unit);
+      var badge = r.passed
+        ? '<span class="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded border bg-success-bg text-success border-success-border">Pass</span>'
+        : '<span class="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded border bg-stop-bg text-stop border-stop-border">Fail</span>';
+      return '<tr>' +
+        '<td class="font-medium text-ink">' + esc(r.name) + '</td>' +
+        '<td class="text-center text-[12.5px] tabular-nums text-ink-muted">' + standard + '</td>' +
+        '<td class="text-center tabular-nums">' + actual + '</td>' +
+        '<td class="text-center">' + badge + '</td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="pt-2">' +
+      '<div class="flex items-center justify-between mb-1">' +
+        '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">QC test results</div>' +
+        '<div class="text-[12px] ' + (failedCount ? 'text-stop font-semibold' : 'text-ink-faint') + '">' +
+          (failedCount ? failedCount + ' of ' + results.length + ' failed' : 'All ' + results.length + ' passed') + '</div>' +
+      '</div>' +
+      '<div class="overflow-x-auto border border-slate-200 rounded"><table class="param-table">' +
+        '<thead><tr><th style="width:32%">Parameter</th><th style="width:26%">Standard</th><th style="width:22%">Actual</th><th style="width:20%">Result</th></tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody></table></div></div>';
+  }
   function openView(btn) {
     document.getElementById('view-subtitle').textContent =
       (btn.getAttribute('data-qc') || '') + ' · ' + (btn.getAttribute('data-status') || '');
+    var results = [];
+    try { results = JSON.parse(btn.getAttribute('data-results') || '[]'); } catch (err) { results = []; }
     document.getElementById('view-body').innerHTML =
       '<div class="grid grid-cols-2 gap-3">' +
       viewField('Date', btn.getAttribute('data-date')) +
@@ -575,6 +727,7 @@
       viewField('Passed qty', btn.getAttribute('data-pass')) +
       viewField('Rejected qty', btn.getAttribute('data-reject')) +
       '</div>' +
+      resultsTableHtml(results) +
       '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>';
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');

@@ -544,3 +544,88 @@ class RejectionMemo(db.Model):
     status = db.Column(db.String(20), default="Issued", nullable=False)
 
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+class RMQCParameter(db.Model):
+    __tablename__ = "rm_qc_parameters"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id], backref="qc_parameters")
+
+    name = db.Column(db.String(100), nullable=False)
+    unit_label = db.Column(db.String(20), nullable=True)
+    
+    # "range" = number type hota hai, min/max se pass-fail; "pass_fail" = lab seedha Pass/Fail chune (visual jaisa)
+    check_type = db.Column(db.String(20), default="range", nullable=False)
+    # Dono optional: purity me sirf min, impurity me sirf max, gauge me dono
+    min_value = db.Column(db.Float, nullable=True)
+    max_value = db.Column(db.Float, nullable=True)
+
+    # Chhota number pehle dikhega
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+
+class InwardQCResult(db.Model):
+    # Ek inspection (InwardQC) ke ek parameter ka result: "Purity 99.7 -> Pass".
+    # Parameter ka naam / unit / limits yahan COPY (snapshot) hote hain. Baad me template badle
+    # ya parameter remove ho jaye to bhi purana result waisa hi rahe (production order me recipe copy jaisa).
+    __tablename__ = "inward_qc_results"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    inward_qc_id = db.Column(db.Integer, db.ForeignKey("inward_qc.id"), nullable=False)
+    # backref: inspection.results = us inspection ke saare parameter results
+    inward_qc = db.relationship("InwardQC", foreign_keys=[inward_qc_id], backref="results")
+
+    # Sirf reference ke liye. Asli data neeche ki copy me hai (parameter badle/hate to bhi result safe)
+    parameter_id = db.Column(db.Integer, db.ForeignKey("rm_qc_parameters.id"), nullable=True)
+
+    # ---- Snapshot: result save karte waqt parameter ki copy ----
+    parameter_name = db.Column(db.String(100), nullable=False)
+    unit_label = db.Column(db.String(20), nullable=True)
+    check_type = db.Column(db.String(20), nullable=False)
+    min_value = db.Column(db.Float, nullable=True)
+    max_value = db.Column(db.Float, nullable=True)
+
+    # ---- Lab ka result ----
+    # Range parameter me naapi hui value; pass/fail parameter me koi number nahi hota (isliye nullable)
+    actual_value = db.Column(db.Float, nullable=True)
+    # True = pass, False = fail. Server nikalta hai (range: limits se; pass/fail: lab ka chuna hua jawab)
+    passed = db.Column(db.Boolean, nullable=False)
+
+    @property
+    def standard_text(self):
+        # Parameter ki limit padhne layak text me: "Min 90" / "2 to 3.05" / "Max 0.1" / "Pass / Fail"
+        if self.check_type == "pass_fail":
+            return "Pass / Fail"
+        if self.min_value is not None and self.max_value is not None:
+            return f"{self.min_value:g} to {self.max_value:g}"
+        if self.min_value is not None:
+            return f"Min {self.min_value:g}"
+        if self.max_value is not None:
+            return f"Max {self.max_value:g}"
+        return "—"
+
+    @property
+    def fail_text(self):
+        # Memo ke reason ke liye: fail hue parameter ka ek line ka text
+        if self.check_type == "pass_fail":
+            return f"{self.parameter_name} failed"
+        unit = f" {self.unit_label}" if self.unit_label else ""
+        return f"{self.parameter_name} {self.actual_value:g}{unit} (standard: {self.standard_text}{unit})"
+
+    @property
+    def summary(self):
+        # View panel (JS) ke liye ek dictionary: template me data-attribute me JSON ban kar jayegi
+        return {
+            "name": self.parameter_name,
+            "unit": self.unit_label or "",
+            "standard": self.standard_text,
+            "actual": None if self.actual_value is None else f"{self.actual_value:g}",
+            "passed": self.passed,
+        }

@@ -1,5 +1,6 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
-from app.models import InwardQC, GRN, GRNLine, RejectionMemo
+from app.models import InwardQC, GRN, GRNLine, RejectionMemo, RMQCParameter, InwardQCResult
+from app.raw_materials.routes import qc_parameter_to_dict
 from app.extensions import db
 from datetime import datetime
 
@@ -9,6 +10,65 @@ def final_qc_line_ids():
     # Jin GRN lines ka final (non-Draft) QC ho chuka — unka kaam khatam, dobara inspect nahi hongi
     rows = InwardQC.query.filter(InwardQC.is_deleted == False, InwardQC.status != "Draft").all()
     return {q.grn_line_id for q in rows}
+
+def read_qc_results(grn_line, is_final):
+    # Form se parameter-wise results padho aur check karo. Wapas: (rows, None) ya (None, "error message").
+    # rows = [{"parameter": RMQCParameter, "actual_value": float ya None, "passed": True/False}, ...]
+    rm = grn_line.po_line.raw_material if grn_line.po_line else None
+    if not rm:
+        return [], None
+
+    # Is material ke abhi ke active parameters. Browser ki list par bharosa nahi, DB se khud lete hain.
+    allowed = {
+        p.id : p for p in RMQCParameter.query.filter_by(raw_material_id=rm.id, is_deleted=False, is_active=True).all()
+    }
+
+    rows =[]
+    seen=set()
+    i=0
+    while True:
+
+        param_id = request.form.get(f'param_id_{i}', type=int)
+        if param_id is None:
+            break
+
+        p = allowed.get(param_id)    
+        if p is None or param_id in seen:
+            return None, "Invalid QC parameter in the form. Please reopen the inspection."
+        seen.add(param_id)
+
+        if p.check_type == "pass_fail":
+            answer = request.form.get(f"result_{i}")
+            actual_value = None
+            if answer == "pass":
+                passed = True
+            elif answer == "fail":
+                passed = False
+            else:
+                passed = None   # abhi kuch chuna nahi  
+
+        else:
+            actual_value = request.form.get(f'actual_{i}', type=float)
+            if actual_value is None:
+                passed = None
+            else:
+                passed = (
+                    (p.min_value is None or actual_value >= p.min_value)
+                    and(p.max_value is None or actual_value <= p.max_value )
+                ) 
+
+        if passed is not None:
+            rows.append({"parameter":p, "actual_value":actual_value, "passed":passed})
+        i+=1
+
+    if is_final:
+        done_ids = {r["parameter"].id for r in rows}
+        missing = [p.name for pid, p in allowed.items() if pid not in done_ids]
+        if missing:
+            return None, "Enter a result for every QC parameter: " + ", ".join(missing) + "."
+
+    return rows, None        
+                   
 
 @inward_qc_bp.route('/inward_qc')
 def inward_qc_list():
@@ -65,12 +125,16 @@ def inward_qc_grn_lines(grn_id):
         if line.id in done_ids:
             continue
         rm = line.po_line.raw_material if line.po_line else None
+        params = []
+        if rm:
+            params=RMQCParameter.query.filter_by(raw_material_id=rm.id, is_deleted=False, is_active=True).order_by(RMQCParameter.sort_order, RMQCParameter.id).all()
         lines.append({
             "id":line.id,
             "material_code":rm.code if rm else "",
             "material_name":rm.name if rm else "",
             "batch_lot_no":line.batch_lot_no or "",
             "received_qty":line.received_qty,
+            "parameters": [qc_parameter_to_dict(p) for p in params],
         })
     return jsonify(lines=lines)    
 
@@ -122,6 +186,11 @@ def inward_qc_add():
             flash(f"This material / lot already has a final QC result ({already_final.qc_no}).", "error")
             return redirect(url_for('inward_qc.inward_qc_list'))
 
+    result_rows, error = read_qc_results(grn_line, is_final=(qc_action != 'draft'))
+    if error:
+        flash(error,"error")
+        return redirect(url_for('inward_qc.inward_qc_list')) 
+
     inspection_date = datetime.strptime(inspection_date_raw, "%Y-%m-%d").date()
 
     year=inspection_date.year
@@ -151,12 +220,38 @@ def inward_qc_add():
     )            
 
     db.session.add(inward_qc)
+    saved_results=[]
+    for row in result_rows:
+        p = row["parameter"]
+        result=InwardQCResult(
+            inward_qc=inward_qc,
+            parameter_id=p.id,
+            parameter_name=p.name,
+            unit_label=p.unit_label,
+            check_type=p.check_type,
+            min_value=p.min_value,
+            max_value=p.max_value,
+            actual_value=row['actual_value'],
+            passed=row['passed'],
+        )
+        db.session.add(result)
+        saved_results.append(result)
 
     # §6.5 Rejection memo: final result me rejected qty ho (Failed / Partial) to memo apne aap bane.
     # Draft me nahi — draft abhi pakka result nahi hai. Alag "New memo" button bhi nahi (auto-flow rule).
     memo_no = None
     if status != "Draft" and rejected_qty > 0:
         db.session.flush()
+
+        reason_parts =[]
+        failed_texts = [r.fail_text for r in saved_results if not r.passed]
+        if failed_texts:
+            reason_parts.append("Failed tests: "+"; ".join(failed_texts))
+        if remarks:
+            reason_parts.append(remarks)
+        reason = " | ".join(reason_parts)[:255] or None
+    
+
 
         memo_count = RejectionMemo.query.filter(RejectionMemo.memo_no.like(f"MEMO-{year}-%")).count()
         memo_no = f"MEMO-{year}-{memo_count + 1:03d}"
@@ -165,7 +260,7 @@ def inward_qc_add():
             inward_qc_id = inward_qc.id,
             memo_date = inspection_date,
             rejected_qty = rejected_qty,
-            reason = remarks or None,
+            reason = reason,
         ))    
 
 

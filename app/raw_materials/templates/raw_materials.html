@@ -39,8 +39,8 @@
   .rm-table tbody tr:hover { background: #FBF4EE; }
   .rm-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
-  #rm-modal.hidden, #view-modal.hidden { display: none; }
-  #rm-modal, #view-modal { display: flex; }
+  #rm-modal.hidden, #view-modal.hidden, #qc-modal.hidden { display: none; }
+  #rm-modal, #view-modal, #qc-modal { display: flex; }
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
   .form-section-title {
@@ -90,15 +90,16 @@
         <div class="flex-1 overflow-auto min-h-0">
           <table class="rm-table">
             <colgroup>
+              {# Actions column me ek aur button (QC tests) aaya, isliye Material name aur Valuation se 4% le kar Actions ko diya (total 100) #}
               <col style="width:4%" />
               <col style="width:9%" />
-              <col style="width:16%" />
+              <col style="width:14%" />
               <col style="width:11%" />
               <col style="width:9%" />
               <col style="width:11%" />
-              <col style="width:12%" />
+              <col style="width:10%" />
               <col style="width:11%" />
-              <col style="width:17%" />
+              <col style="width:21%" />
             </colgroup>
             <thead>
               <tr>
@@ -177,6 +178,16 @@
                       data-base-metal="{% if m.is_base_metal %}1{% else %}0{% endif %}"
                       data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}">
                       Edit
+                    </button>
+                    {# QC tests: inward QC ke test parameters (purity, gauge...) ka panel kholta hai. Count = remove kiye hue parameters ko chhod kar #}
+                    {% set qc_count = m.qc_parameters | rejectattr('is_deleted') | list | length %}
+                    <button type="button"
+                      class="btn-qc-params px-2.5 py-1 text-[12.5px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                      title="Manage QC test parameters for inward inspection"
+                      data-id="{{ m.id }}"
+                      data-code="{{ m.code }}"
+                      data-name="{{ m.name }}">
+                      QC tests ({{ qc_count }})
                     </button>
                     <form method="post" action="{{ url_for('raw_materials.raw_materials_delete', m_id=m.id) }}" class="inline js-confirm-submit"
                           data-confirm-title="Remove material"
@@ -391,6 +402,80 @@
     </div>
   </div>
 </div>
+
+{# ——— QC test parameters panel ———
+   Ek material ke inward QC test parameters (Purity, Gauge, Visual...). Page reload nahi hota:
+   JS fetch() se Flask ke JSON routes (/raw_materials/<id>/qc_parameters ...) se baat karta hai.
+   Upar list, neeche add / edit form. #}
+<div id="qc-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="qc-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="qc-modal-title" class="relative ml-auto h-full w-full max-w-xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="qc-modal-title" class="text-[16px] font-bold text-ink">QC test parameters</h2>
+        <p id="qc-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-qc" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]">
+      <p class="text-[12.5px] text-ink-muted leading-relaxed">
+        These tests are listed for the lab whenever a lot of this material is inspected. Use a number range for measured values, or Pass / Fail for visual checks.
+      </p>
+
+      <div id="qc-list" class="space-y-2"></div>
+
+      <form id="qc-form" class="border border-slate-200 rounded-lg p-3 space-y-3 bg-mist" autocomplete="off">
+        <p id="qc-form-title" class="form-section-title">Add a parameter</p>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label for="qc-name" class="block text-[12.5px] font-semibold text-ink mb-1">Parameter name *</label>
+            <input type="text" id="qc-name" name="name" maxlength="100" placeholder="e.g. Purity, Gauge, Visual finish"
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="qc-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Unit label</label>
+            <input type="text" id="qc-unit" name="unit_label" maxlength="20" placeholder="mm, %"
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <div>
+          <label for="qc-type" class="block text-[12.5px] font-semibold text-ink mb-1">How is it checked?</label>
+          <select id="qc-type" name="check_type" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="range">Number range (minimum / maximum)</option>
+            <option value="pass_fail">Pass / Fail (visual or yes-no check)</option>
+          </select>
+        </div>
+        <div id="qc-limits" class="grid grid-cols-3 gap-3">
+          <div>
+            <label for="qc-min" class="block text-[12.5px] font-semibold text-ink mb-1">Minimum</label>
+            <input type="number" step="any" id="qc-min" name="min_value" placeholder="optional"
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="qc-max" class="block text-[12.5px] font-semibold text-ink mb-1">Maximum</label>
+            <input type="number" step="any" id="qc-max" name="max_value" placeholder="optional"
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div>
+            <label for="qc-order" class="block text-[12.5px] font-semibold text-ink mb-1">Display order</label>
+            <input type="number" step="1" id="qc-order" name="sort_order" placeholder="optional"
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+        <p id="qc-limits-help" class="text-[12px] text-ink-faint">Enter a minimum, a maximum, or both. A smaller display order is listed first.</p>
+        <div class="flex items-center justify-end gap-2">
+          <button type="button" id="btn-qc-cancel-edit" class="hidden px-3 py-2 text-[13.5px] text-ink-faint hover:bg-white rounded">Cancel edit</button>
+          <button type="submit" id="btn-qc-save" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Add parameter</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-qc-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block page_js %}
@@ -488,9 +573,13 @@
     openModal();
   }
 
+  // User ka likha text innerHTML me daalne se pehle safe banao: < > & ko badal do, taaki <script> jaisa kuch HTML ban ke na chale
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
   function viewField(label, value) {
     return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
-      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+      '</div><div class="mt-0.5 text-ink">' + (value ? esc(value) : '—') + '</div></div>';
   }
   function openViewModal(btn) {
     document.getElementById('view-modal-subtitle').textContent =
@@ -559,7 +648,10 @@
   document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (!viewModal.classList.contains('hidden')) closeViewModal();
+    // Remove-confirm dialog khula ho to Esc sirf usko band kare (erp-toast.js), neeche ka panel nahi
+    if (document.getElementById('erp-confirm-root')) return;
+    if (!qcModal.classList.contains('hidden')) closeQcPanel();
+    else if (!viewModal.classList.contains('hidden')) closeViewModal();
     else if (!modal.classList.contains('hidden')) closeModal();
   });
   document.querySelectorAll('.btn-edit-rm').forEach(function (btn) {
@@ -614,6 +706,176 @@
       if (typeof showToast === 'function') showToast('Wire Flask Add route first (form action).', 'error');
     }
   });
+
+  // ================= QC test parameters panel =================
+  // Panel kholne par list server se aati hai (fetch), add / edit / remove bhi fetch se hote hain,
+  // isliye page reload nahi hota. Server JSON deta hai: {success: true/false, error: "..."}.
+  var qcModal = document.getElementById('qc-modal');
+  var qcList = document.getElementById('qc-list');
+  var qcForm = document.getElementById('qc-form');
+  var qcMaterialId = null;   // abhi kis material ka panel khula hai
+  var qcRowBtn = null;       // table ka wahi "QC tests (n)" button, taaki count turant badal sake
+  var qcEditingId = null;    // null = naya parameter add, number = us parameter ko edit kar rahe hain
+  var qcParams = [];         // server se aayi list ki local copy (edit ke liye)
+
+  function qcToast(message, type) {
+    if (typeof showToast === 'function') showToast(message, type);
+  }
+  // Parameter ki "standard" ek line me: 1.95 to 2.05 mm / Min 99.5 % / Max 0.1 % / Pass / Fail
+  function qcStandardText(p) {
+    if (p.check_type === 'pass_fail') return 'Pass / Fail';
+    var unit = p.unit_label ? ' ' + p.unit_label : '';
+    if (p.min_value !== null && p.max_value !== null) return p.min_value + ' to ' + p.max_value + unit;
+    if (p.min_value !== null) return 'Min ' + p.min_value + unit;
+    if (p.max_value !== null) return 'Max ' + p.max_value + unit;
+    return '—';
+  }
+  function renderQcList() {
+    if (!qcParams.length) {
+      qcList.innerHTML = '<div class="border border-dashed border-slate-300 rounded-lg p-4 text-center text-[13px] text-ink-faint">No QC parameters yet. Add the first one below.</div>';
+    } else {
+      qcList.innerHTML = qcParams.map(function (p) {
+        return '<div class="flex items-center justify-between gap-3 border border-slate-200 rounded-lg px-3 py-2 bg-white">' +
+          '<div class="min-w-0">' +
+            '<div class="font-semibold text-ink truncate">' + esc(p.name) + '</div>' +
+            '<div class="text-[12.5px] text-ink-muted tabular-nums">' + esc(qcStandardText(p)) + '</div>' +
+          '</div>' +
+          '<div class="flex items-center gap-1.5 shrink-0">' +
+            '<button type="button" class="qc-edit px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="' + p.id + '">Edit</button>' +
+            '<button type="button" class="qc-remove px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90" data-id="' + p.id + '">Remove</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+    if (qcRowBtn) qcRowBtn.textContent = 'QC tests (' + qcParams.length + ')';
+  }
+  function loadQcParams() {
+    qcList.innerHTML = '<p class="text-[13px] text-ink-faint">Loading…</p>';
+    fetch('/raw_materials/' + qcMaterialId + '/qc_parameters')
+      .then(function (res) {
+        if (!res.ok) throw new Error('bad status');
+        return res.json();
+      })
+      .then(function (data) {
+        qcParams = data.parameters || [];
+        renderQcList();
+      })
+      .catch(function () {
+        qcList.innerHTML = '<p class="text-[13px] text-stop">Could not load the QC parameters. Close the panel and try again.</p>';
+      });
+  }
+
+  // Pass/Fail me minimum / maximum ka matlab nahi, isliye un boxes ko band kar do.
+  // (Disabled box form ke saath jaata hi nahi; server bhi pass_fail me limits saaf kar deta hai.)
+  function syncQcCheckType() {
+    var isRange = document.getElementById('qc-type').value === 'range';
+    var minBox = document.getElementById('qc-min');
+    var maxBox = document.getElementById('qc-max');
+    minBox.disabled = !isRange;
+    maxBox.disabled = !isRange;
+    if (!isRange) { minBox.value = ''; maxBox.value = ''; }
+    document.getElementById('qc-limits-help').textContent = isRange
+      ? 'Enter a minimum, a maximum, or both. A smaller display order is listed first.'
+      : 'Pass / Fail checks have no limits. The lab marks each lot as Pass or Fail.';
+  }
+  function resetQcForm() {
+    qcForm.reset();
+    qcEditingId = null;
+    document.getElementById('qc-form-title').textContent = 'Add a parameter';
+    document.getElementById('btn-qc-save').textContent = 'Add parameter';
+    document.getElementById('btn-qc-cancel-edit').classList.add('hidden');
+    syncQcCheckType();
+  }
+  function startQcEdit(p) {
+    qcEditingId = p.id;
+    document.getElementById('qc-name').value = p.name;
+    document.getElementById('qc-unit').value = p.unit_label || '';
+    document.getElementById('qc-type').value = p.check_type;
+    syncQcCheckType();   // pehle type set karo, tab min/max boxes ka enable/disable sahi hota hai
+    document.getElementById('qc-min').value = p.min_value === null ? '' : p.min_value;
+    document.getElementById('qc-max').value = p.max_value === null ? '' : p.max_value;
+    document.getElementById('qc-order').value = p.sort_order ? p.sort_order : '';
+    document.getElementById('qc-form-title').textContent = 'Edit parameter';
+    document.getElementById('btn-qc-save').textContent = 'Save changes';
+    document.getElementById('btn-qc-cancel-edit').classList.remove('hidden');
+    document.getElementById('qc-name').focus();
+  }
+
+  function openQcPanel(btn) {
+    qcMaterialId = btn.getAttribute('data-id');
+    qcRowBtn = btn;
+    document.getElementById('qc-modal-subtitle').textContent =
+      (btn.getAttribute('data-code') || '') + ' — ' + (btn.getAttribute('data-name') || '');
+    qcParams = [];
+    resetQcForm();
+    qcModal.classList.remove('hidden');
+    qcModal.setAttribute('aria-hidden', 'false');
+    loadQcParams();
+  }
+  function closeQcPanel() {
+    qcModal.classList.add('hidden');
+    qcModal.setAttribute('aria-hidden', 'true');
+  }
+
+  qcForm.addEventListener('submit', function (e) {
+    e.preventDefault();   // normal form submit nahi, fetch se bhejenge
+    var url = '/raw_materials/' + qcMaterialId + '/qc_parameters/' + (qcEditingId ? qcEditingId + '/edit' : 'add');
+    var wasEditing = !!qcEditingId;
+    var saveBtn = document.getElementById('btn-qc-save');
+    saveBtn.disabled = true;   // double click se do baar save na ho
+    fetch(url, { method: 'POST', body: new FormData(qcForm) })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.success) {
+          qcToast(wasEditing ? 'Parameter updated.' : 'Parameter added.', 'success');
+          resetQcForm();
+          loadQcParams();
+        } else {
+          qcToast(data.error || 'Could not save the parameter.', 'error');
+        }
+      })
+      .catch(function () { qcToast('Could not save the parameter.', 'error'); })
+      .then(function () { saveBtn.disabled = false; });   // chahe success ho ya error, button wapas chalu
+  });
+
+  // List ke andar ke Edit / Remove buttons dynamic hain (JS ne banaye), isliye ek hi listener list pe (event delegation)
+  qcList.addEventListener('click', function (e) {
+    var editBtn = e.target.closest('.qc-edit');
+    var removeBtn = e.target.closest('.qc-remove');
+    if (editBtn) {
+      var p = qcParams.find(function (x) { return String(x.id) === editBtn.getAttribute('data-id'); });
+      if (p) startQcEdit(p);
+    }
+    if (removeBtn) {
+      var id = removeBtn.getAttribute('data-id');
+      window.showConfirm('Remove this parameter from the QC list? Earlier inspection results are not affected.', {
+        title: 'Remove parameter', confirmText: 'Remove', variant: 'warning'
+      }).then(function (ok) {
+        if (!ok) return;
+        fetch('/raw_materials/' + qcMaterialId + '/qc_parameters/' + id + '/delete', { method: 'POST' })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.success) {
+              qcToast('Parameter removed.', 'success');
+              if (String(qcEditingId) === id) resetQcForm();   // jis ko edit kar rahe the wahi hata diya
+              loadQcParams();
+            } else {
+              qcToast(data.error || 'Could not remove the parameter.', 'error');
+            }
+          })
+          .catch(function () { qcToast('Could not remove the parameter.', 'error'); });
+      });
+    }
+  });
+
+  document.querySelectorAll('.btn-qc-params').forEach(function (btn) {
+    btn.addEventListener('click', function () { openQcPanel(btn); });
+  });
+  document.getElementById('qc-type').addEventListener('change', syncQcCheckType);
+  document.getElementById('btn-qc-cancel-edit').addEventListener('click', resetQcForm);
+  document.getElementById('btn-close-qc').addEventListener('click', closeQcPanel);
+  document.getElementById('btn-close-qc-2').addEventListener('click', closeQcPanel);
+  document.getElementById('qc-modal-backdrop').addEventListener('click', closeQcPanel);
 
   searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
   document.querySelectorAll('.filter-btn').forEach(function (btn) {
