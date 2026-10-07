@@ -70,7 +70,9 @@
     .close { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; margin-top: 14px; }
     .side { flex: 1; min-width: 0; }
     .remarks p { margin: 4px 0 0; font-size: 13px; color: #526273; }
-    .sign { margin-top: 28px; width: 190px; font-size: 12.5px; color: #526273; }
+    .sign-head { margin-top: 28px; font-size: 12.5px; color: #526273; }
+    .signs { display: flex; gap: 28px; }
+    .sign { width: 190px; font-size: 12.5px; color: #526273; }
     .sign .line { margin-top: 36px; border-top: 1px solid #142033; padding-top: 5px; color: #142033; font-weight: 600; font-size: 12px; }
     .totals { width: 268px; border: 1px solid #e6edf2; border-radius: 8px; overflow: hidden; font-size: 13px; }
     .totals .row { display: flex; justify-content: space-between; padding: 6px 14px; color: #526273; }
@@ -174,9 +176,12 @@
           <p>{{ po.remarks }}</p>
         </div>
         {% endif %}
-        <div class="sign">
-          For Nrupex Solder LLP
-          <div class="line">Authorised signatory</div>
+        {# §10.10: login abhi nahi hai, isliye naam print nahi hote — haath se sign ke liye do khaali lines.
+           Login aane par "Prepared by" me banane wale ka naam khud aa sakta hai. #}
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs">
+          <div class="sign"><div class="line">Prepared by</div></div>
+          <div class="sign"><div class="line">Approved by</div></div>
         </div>
       </div>
       <div class="totals">

@@ -156,6 +156,8 @@ def production_orders_add():
     extra_ids = request.form.getlist("extra_rm_id[]")
     extra_qtys = request.form.getlist("extra_qty[]")
     seen_extra = set()
+    # Jo material recipe me pehle se hai wo extra me dobara nahi aa sakta — warna aage "total material required" me double ginega
+    recipe_rm_ids = {r.raw_material_id for r in product.recipe_items}
     for rm_raw, qty_raw in zip(extra_ids, extra_qtys):
         rm_raw = (rm_raw or "").strip()
         qty_raw = (qty_raw or "").strip()
@@ -184,6 +186,10 @@ def production_orders_add():
         if not rm or rm.is_deleted or not rm.is_active:
             db.session.rollback()
             flash("Choose an active raw material for the added line.", "error")
+            return redirect(url_for("production_orders.production_orders_list"))
+        if rm_id in recipe_rm_ids:
+            db.session.rollback()
+            flash(f"{rm.name} is already part of this product's recipe. Its quantity is worked out from the recipe, so do not add it again as extra material.", "error")
             return redirect(url_for("production_orders.production_orders_list"))
         seen_extra.add(rm_id)
         db.session.add(ProductionOrderLine(

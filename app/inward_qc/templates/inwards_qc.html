@@ -345,6 +345,8 @@
 
     {# Add route → form yahan POST karega #}
     <form id="inspect-form" method="post" action="{{ url_for('inward_qc.inward_qc_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {# Is lot ka adhoora draft ho to JS yahan batata hai aur values wapas bhar deta hai (applyDraft) #}
+      <p id="qc-draft-note" class="hidden text-[12.5px] text-warning bg-warning-bg border border-warning-border rounded px-2.5 py-2"></p>
       <p class="form-section-title">Header</p>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
@@ -515,6 +517,7 @@
     qcLine.innerHTML = '<option value="">Select after GRN…</option>';
     qcRecv.value = '—';
     renderParamRows(null);   // lot badli / form band hua to purane parameter rows hata do
+    document.getElementById('qc-draft-note').classList.add('hidden');
   }
 
   // selectLineId (optional) — Pending tab ke "Inspect" se aaye to lines load hone ke baad wahi line select karo
@@ -540,6 +543,8 @@
           opt.setAttribute('data-qty', line.received_qty);
           // Is lot ke material ke QC parameters (Flask JSON se) — lot select hone par table me dikhenge
           opt.setAttribute('data-params', JSON.stringify(line.parameters || []));
+          // Is lot ka adhoora draft (ya null) — lot select hone par values wapas bharne ke liye
+          opt.setAttribute('data-draft', JSON.stringify(line.draft || null));
           qcLine.appendChild(opt);
         });
         if (selectLineId) {
@@ -566,7 +571,35 @@
       try { params = JSON.parse(opt.getAttribute('data-params')); } catch (err) { params = []; }
     }
     renderParamRows(params);
+    // Adhoora draft ho to uski values wapas form me bharo
+    var draft = null;
+    if (opt && opt.getAttribute('data-draft')) {
+      try { draft = JSON.parse(opt.getAttribute('data-draft')); } catch (err) { draft = null; }
+    }
+    applyDraft(draft);
   });
+
+  // Draft ki values wapas form me. Naya save purane draft ko replace karta hai (server), isliye yahan sirf bharna hai.
+  function applyDraft(draft) {
+    var note = document.getElementById('qc-draft-note');
+    if (!draft) { note.classList.add('hidden'); return; }
+    function put(id, value) { document.getElementById(id).value = (value === null || value === undefined) ? '' : value; }
+    put('qc-date', draft.inspection_date);
+    put('qc-inspector', draft.inspector);
+    put('qc-sample', draft.sample_size);
+    put('qc-pass', draft.passed_qty);
+    put('qc-reject', draft.rejected_qty);
+    put('qc-remarks', draft.remarks);
+    // Parameter values: param rows pehle ban chuki hain (renderParamRows upar chala), ab har ek me jawab daalo
+    qcParamDefs.forEach(function (p, i) {
+      var answer = draft.answers ? draft.answers[String(p.id)] : undefined;
+      if (answer === undefined || answer === null) return;
+      var el = document.querySelector('#param-tbody [name="actual_' + i + '"], #param-tbody [name="result_' + i + '"]');
+      if (el) { el.value = answer; updateParamVerdict(i); }
+    });
+    note.textContent = 'Continuing the saved draft ' + draft.qc_no + '. Saving again replaces that draft.';
+    note.classList.remove('hidden');
+  }
 
   // ---- QC parameters table (Raw Material ke "QC tests" template se) ----
   // Har parameter ek row. Form fields ke naam index se: param_id_0, actual_0 (ya result_0), param_id_1 ...

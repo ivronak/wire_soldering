@@ -75,7 +75,8 @@ def purchase_orders_add():
     remarks = (request.form.get('remarks') or "").strip()
     # Payment terms ab master se aata hai (OPTIONAL) — form se id
     payment_terms_id = request.form.get('payment_terms_id', type=int)
-    freight = float(request.form.get('freight')) if (request.form.get('freight') or "").strip() else 0
+    # Freight ab alag field nahi: Charges Master ki line se aata hai (neeche charge_id_N). PurchaseOrder.freight column
+    # sirf purani POs ke display ke liye bacha hai; nayi PO me wo column ka default 0 hi rehta hai.
 
 
     if not vendor_id or not warehouse_id or not po_date_raw:
@@ -103,9 +104,8 @@ def purchase_orders_add():
         status="Draft",
         remarks=remarks,
         payment_terms_id=payment_terms_id,
-        freight=freight,
         is_deleted=False,
-    )   
+    )
     db.session.add(po)
     db.session.flush()
 

@@ -11,6 +11,31 @@ def final_qc_line_ids():
     rows = InwardQC.query.filter(InwardQC.is_deleted == False, InwardQC.status != "Draft").all()
     return {q.grn_line_id for q in rows}
 
+def latest_draft_payload(line_id):
+    # Is lot ka sabse naya Draft QC (agar hai) — Inspect form me values wapas bharne ke liye JSON dictionary.
+    # "answers" = {parameter id (text): number ya "pass"/"fail"} — form ke actual_N / result_N me wapas jaane ke liye.
+    d = InwardQC.query.filter_by(grn_line_id=line_id, status="Draft", is_deleted=False).order_by(InwardQC.id.desc()).first()
+    if not d:
+        return None
+    answers = {}
+    for r in d.results:
+        if r.parameter_id is None:
+            continue
+        if r.check_type == "pass_fail":
+            answers[str(r.parameter_id)] = "pass" if r.passed else "fail"
+        else:
+            answers[str(r.parameter_id)] = r.actual_value
+    return {
+        "qc_no": d.qc_no,
+        "inspection_date": d.inspection_date.strftime("%Y-%m-%d") if d.inspection_date else "",
+        "inspector": d.inspector or "",
+        "sample_size": d.sample_size,
+        "passed_qty": d.passed_qty,
+        "rejected_qty": d.rejected_qty,
+        "remarks": d.remarks or "",
+        "answers": answers,
+    }
+
 def read_qc_results(grn_line, is_final):
     # Form se parameter-wise results padho aur check karo. Wapas: (rows, None) ya (None, "error message").
     # rows = [{"parameter": RMQCParameter, "actual_value": float ya None, "passed": True/False}, ...]
@@ -135,8 +160,10 @@ def inward_qc_grn_lines(grn_id):
             "batch_lot_no":line.batch_lot_no or "",
             "received_qty":line.received_qty,
             "parameters": [qc_parameter_to_dict(p) for p in params],
+            # Is lot ka adhoora draft (agar hai) — form me wapas bharne ke liye, warna None
+            "draft": latest_draft_payload(line.id),
         })
-    return jsonify(lines=lines)    
+    return jsonify(lines=lines)
 
 @inward_qc_bp.route('/inward_qc/add', methods=['POST'])
 def inward_qc_add():
@@ -189,7 +216,13 @@ def inward_qc_add():
     result_rows, error = read_qc_results(grn_line, is_final=(qc_action != 'draft'))
     if error:
         flash(error,"error")
-        return redirect(url_for('inward_qc.inward_qc_list')) 
+        return redirect(url_for('inward_qc.inward_qc_list'))
+
+    # Sab checks pass ho gaye. Draft = "kaam chalu hai", isliye naya save (draft ya final) is lot ke purane draft ko
+    # replace karta hai (purana hide ho jata hai) — warna har draft save par ek aur draft jama hota jata.
+    # Ye checks ke BAAD isliye ki galti hone par purana draft na ud jaye.
+    for old_draft in InwardQC.query.filter_by(grn_line_id=grn_line_id, status="Draft", is_deleted=False).all():
+        old_draft.is_deleted = True
 
     inspection_date = datetime.strptime(inspection_date_raw, "%Y-%m-%d").date()
 

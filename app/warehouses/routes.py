@@ -64,21 +64,10 @@ def warehouses_add():
     if not name or not warehouse_type or not location or branch_id is None:
         return redirect(url_for('warehouses.warehouses_list'))
 
-    existing = Warehouse.query.filter_by(code=code).first()
-    if existing:
-        if existing.is_deleted:
-            existing.is_deleted = False
-            existing.code = code
-            existing.name = name
-            existing.warehouse_type = warehouse_type
-            existing.branch_id = branch_id
-            existing.location = location
-            existing.is_active = True
-            db.session.commit()
-            flash("A Warehouse restored with this code.", "success")
-            return redirect(url_for('warehouses.warehouses_list'))
-
-        flash("A Warehouse with this code already exists.", "error")
+    # Code hamesha naya (max id + 1) banta hai, isliye normally yahan koi row nahi milti. Purana "deleted code restore"
+    # wala branch kabhi chalta hi nahi tha, isliye hata diya. Sirf bachav: do log ek saath add karein to unique-code error na aaye.
+    if Warehouse.query.filter_by(code=code).first():
+        flash("Could not save: another warehouse was added at the same moment. Please try again.", "error")
         return redirect(url_for('warehouses.warehouses_list'))
 
     db.session.add(Warehouse(
