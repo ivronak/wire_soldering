@@ -6,6 +6,32 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### Lessons: Rejection Memo build (user ne type kiya, 2026-10-07)
+**Date:** 2026-10-07
+**Kya:** Memo auto-create QC ke final submit pe (`rejected_qty > 0`, Draft pe nahi), same transaction me, `db.session.flush()` se QC ka id lekar. Memo me `rejected_qty` snapshot (QC badle to bhi memo ka qty nahi badlega). Memo number `MEMO-year-number` (client confirm karega — PRD Section 15 q14). Memo button sirf `{% if q.memo %}` pe (model backref `memo`, `uselist=False`).
+**Do galtiyan jo pakdi gayi (aage dhyan rakhna):** (1) **Ek hi string do jagah alag spelling** — `memo_no` me `Memo-` aur count query me `like("MEMO-...")`. SQLite me LIKE case-insensitive hai isliye chal gaya; PostgreSQL (aage ka plan) me count 0 aata, duplicate number, crash. Prefix ek hi jagah (constant/helper) se lo, ya dono jagah same likho. (2) **User ka free text `innerHTML` me bina escape ke** — reason/remarks me `<img onerror=…>` chal sakta tha. Ab `esc()` + `viewField` me. Naye JS panel me user-text dikhao to hamesha `esc()`.
+**Data fix ka tareeka:** purane rows ke liye migration nahi, one-off script (`scratchpad/memo_fix.py`) — `app.app_context()`, sirf galat rows ko chhoona (idempotent), `import _guard` se backup + `ERP_ALLOW_DB_SCRIPTS=1`.
+**How to apply:** Purchase Invoice/Return jaise auto-created documents me bhi: same transaction + flush, snapshot qty, status-guard, aur purane rows ka backfill plan.
+
+---
+
+### Decision: Auto-flow — PO ke baad kisi step me "Add/New" button nahi; har page ka tab = us step ka kaam
+**Date:** 2026-10-06
+**Kya:** Sirf **PO** naya banta hai ("New purchase order"). Uske baad har step ka kaam pichle step se khud aata hai: PO confirm → GRN page Pending me ("Receive goods") → GRN post → QC page Pending me har lot ("Inspect") → (aage) QC-passed qty → Purchase Invoice Pending me. "New GRN" / "New inspection" buttons hata diye; form sirf row ke button se khulta hai, PO/GRN/line pehle se bhare aur lock. Tabs: har page ka **Pending = us step ka baaki kaam, Completed = us step ka kaam ho gaya** (PO: Draft | confirmed; GRN: POs awaiting goods + Draft GRN | posted GRNs; QC: lots awaiting | results). Ek record agle step pe chala jaata hai, dono pages pe pending nahi rehta.
+**Kyun:** User ne kaha: *"jab me naya po banau aur confirm karu to mujhe GRN add na karna pade, wo po grn me pending me ajaye... kisi me add ka option nahi, pichle step se automatic agle step me ajaye"*, aur tabs ke liye *"perticular page stage ke status pe depend"*. GRN record khud (auto) nahi banta — challan/vehicle/received qty/batch maal aane pe hi pata chalta hai, aur ek PO ki kai GRN (partial delivery) ho sakti hain — isliye PO sirf "pending queue" me aata hai, GRN user Receive se banata hai.
+**How to apply:** Purchase Invoice / Return banate waqt bhi yahi: koi "New" button nahi, Pending queue pichle step se (Invoice pending = QC-accepted qty jo abhi bill nahi hui). **Khula sawaal (user se poochna jab Purchase Invoice banega):** spec §5 "direct Purchase Invoice without PO" allow karta hai — yeh "no add" rule se takrata hai; exception chahiye ya nahi. Purchase Return bhi kisi pichle step (posted invoice / QC reject) se hi trigger hoga.
+
+---
+
+### Decision: §10.6 = har list pe Pending/Completed tabs; §10.10 = sirf print sign lines
+**Date:** 2026-10-06
+**Kya:** (1) §10.6 "Pending Action Queue + Completed Register" ka matlab — PO / GRN / Inward QC teeno list pages pe upar 2 tabs: **Pending action** (jin documents pe agla kaam baaki hai) aur **Completed** (kaam khatam). Alag "Pending work" dashboard page nahi. Tab server-side `?tab=pending|completed` se (default `pending`), purane status pills tab ke andar kaam karte rahenge. (2) §10.10 "Created By / Approved By" — login system abhi nahi hai, isliye sirf print template ke neeche khaali **"Prepared by ____ / Approved by ____"** signature lines (haath se sign); DB me koi field nahi. Login (Phase 0) aane par dobara socho. (3) Yeh kaam **Manual Learning Mode** me — user type karega (user ne explicitly chuna, "main likh doon" option mana kiya).
+**Kyun:** User ne AskUserQuestion me khud yeh options chune. Client meeting ka detailed text repo me nahi hai, isliye one-line summary ko is design me tod ke confirm karaya. Server-side tab isliye ki memory 2026-09-19 decision kehta hai list filters pehle Flask (`request.args`) se, aur URL bookmark ho sakta hai.
+**How to apply:** Tracker Current Focus ke micro-steps `Part2 / PendingTabs / T1..T8`. Status groups tracker me likhe hain — naya status aaye (jaise Purchase Invoice ka) to dono lists me sochna kis tab me jaayega.
+**Update (same din, build ke waqt):** (a) QC ka "Pending" = **GRN lines jinka final QC baaki hai**, sirf Draft QC records nahi — warna jab koi draft na ho tab pending tab khaali dikhta jabki lab ka kaam pada hai. Har row pe Inspect button (modal pre-fill). (b) Pills ka JS count ab generic hai (har pill ka `data-label`) — naye list page pe bhi yahi pattern lo. (c) Mode: user ne T1 ke baad bola "tum edit kardo code me test karta hu" → T1–T8 Claude ne likhe; agle feature se pehle phir poochna ki user type karega ya Claude.
+
+---
+
 ### Decision: Bug-fix pass ke rules — QC/GRN backend validation, no list-route seeds, scratchpad guard, env-based secrets
 **Date:** 2026-10-06
 **Kya:**

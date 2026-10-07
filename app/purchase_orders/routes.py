@@ -15,7 +15,27 @@ def _allowed_invoice_file(filename):
 
 @purchase_orders_bp.route('/purchase_orders')
 def purchase_orders_list():
-    orders = PurchaseOrder.query.filter(PurchaseOrder.is_deleted == False).order_by(PurchaseOrder.id.desc()).all()
+    # §10.6: list do hisson me — "pending" (kaam baaki) aur "completed" (kaam khatam)
+    # URL me ?tab=completed aaye to completed, warna pending (default)
+    tab = (request.args.get("tab") or "pending").strip().lower()
+
+    # PO step ka kaam = banana + confirm karna. Isliye:
+    # pending = Draft (confirm baaki); confirm hote hi PO "completed" — uska maal ab GRN page ke Pending me dikhta hai
+    pending_statuses = ["Draft"]
+    completed_statuses = ["Open", "Partial", "Closed", "Cancelled"]
+
+    # Base query ek baar banao — .filter() naya query deta hai, base ko nahi badalta
+    base = PurchaseOrder.query.filter(PurchaseOrder.is_deleted == False)
+    pending_count = base.filter(PurchaseOrder.status.in_(pending_statuses)).count()
+    completed_count = base.filter(PurchaseOrder.status.in_(completed_statuses)).count()
+
+    if tab == "completed":
+        statuses = completed_statuses
+    else:
+        tab = "pending"  # ?tab=kuchbhi aaye to bhi pending hi dikhao
+        statuses = pending_statuses
+
+    orders = base.filter(PurchaseOrder.status.in_(statuses)).order_by(PurchaseOrder.id.desc()).all()
     total_count = len(orders)
 
     vendors = Vendor.query.filter(Vendor.is_deleted == False, Vendor.is_active == True).all()
@@ -30,6 +50,9 @@ def purchase_orders_list():
         "purchase_orders.html",
         active_nav='purchase_orders',
         orders=orders,
+        tab=tab,
+        pending_count=pending_count,
+        completed_count=completed_count,
         total_count=total_count,
         result_count=total_count,
         vendors=vendors,
@@ -162,7 +185,8 @@ def purchase_orders_confirm(po_id):
     po.vendor_invoice_date = vendor_invoice_date        
     po.status = "Open"
     db.session.commit()
-    flash(f"Purchase Order {po.po_no} confirmed — now Open.", "success")
+    # Confirm ke baad PO pending tab se hat jaata hai — user ko batao wo kahan gaya (GRN page ke Pending me)
+    flash(f"Purchase Order {po.po_no} confirmed — it is now waiting for goods on the GRN page.", "success")
     return redirect(url_for('purchase_orders.purchase_orders_list'))
 
 @purchase_orders_bp.route('/purchase_orders/short_close/<int:po_id>', methods=['POST'])

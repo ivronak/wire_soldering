@@ -97,14 +97,46 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Gate inward &amp; GRN</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Gate inward / GRN</h1>
         </div>
-        <button type="button" id="btn-new-grn"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-          New GRN
-        </button>
+        {# "New GRN" button jaan-boojhkar nahi hai — confirm hua PO khud Pending tab me aata hai,
+           wahan row ka "Receive goods" button GRN form kholta hai (PO pehle se bhara) #}
       </div>
 
+      {# Macro = Jinja ka chhota "function" — GRN ka View button Draft aur Posted dono tables me chahiye,
+         isliye ek baar yahan likha, dono jagah grn_view_button(g) se bulaya (copy-paste do jagah nahi) #}
+      {% macro grn_view_button(g) %}
+      <button type="button"
+        class="btn-view-grn px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+        data-grn="{{ g.grn_no }}"
+        data-po="{{ g.po.po_no if g.po else '' }}"
+        data-vendor="{{ g.po.vendor.name if g.po and g.po.vendor else '' }}"
+        data-status="{{ g.status }}"
+        data-date="{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else 'Not posted' }}"
+        data-challan="{{ g.challan_no or '—' }}"
+        data-transporter="{{ g.transporter or '—' }}"
+        data-vehicle="{{ g.vehicle_no or '—' }}"
+        data-gross="{{ (g.gross_weight ~ ' kg') if g.gross_weight else '—' }}"
+        data-remarks="{{ g.remarks or '' }}"
+        data-lines='{{ (g.lines | map(attribute="po_line.raw_material.code") | list) | tojson }}'
+        data-descs='{{ (g.lines | map(attribute="po_line.raw_material.name") | list) | tojson }}'
+        data-qtys='{{ (g.lines | map(attribute="received_qty") | list) | tojson }}'
+        data-units='{{ (g.lines | map(attribute="po_line.unit.code") | list) | tojson }}'
+        data-batches='{{ (g.lines | map(attribute="batch_lot_no") | list) | tojson }}'>
+        View
+      </button>
+      {% endmacro %}
+
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        {# §10.6 tabs — PO page jaisa: <a> link se ?tab=... jaata hai, route us tab ki list + counts bhejta hai #}
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('grns.grns_list', tab='pending') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Pending action <span class="tabular-nums">({{ pending_count }})</span>
+          </a>
+          <a href="{{ url_for('grns.grns_list', tab='completed') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Completed <span class="tabular-nums">({{ completed_count }})</span>
+          </a>
+        </div>
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
@@ -112,11 +144,17 @@
               class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
           </div>
           <div class="flex flex-wrap items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
-            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (0)</button>
-            <button type="button" data-filter="pending qc" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Pending QC (0)</button>
-            <button type="button" data-filter="partial qc" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial QC (0)</button>
-            <button type="button" data-filter="closed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Closed (0)</button>
+            {# Har tab me sirf usi tab ke status pills. data-label = JS count ke saath dikhne wala naam #}
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            {% if tab == 'completed' %}
+            <button type="button" data-filter="pending qc" data-label="Pending QC" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Pending QC (0)</button>
+            <button type="button" data-filter="partial qc" data-label="Partial QC" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial QC (0)</button>
+            <button type="button" data-filter="closed" data-label="Closed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Closed (0)</button>
+            {% else %}
+            <button type="button" data-filter="open" data-label="Awaiting goods" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Awaiting goods (0)</button>
+            <button type="button" data-filter="partial" data-label="Partially received" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partially received (0)</button>
+            <button type="button" data-filter="draft" data-label="Draft GRN" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft GRN (0)</button>
+            {% endif %}
           </div>
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
@@ -127,6 +165,95 @@
         </div>
 
         <div class="flex-1 overflow-auto min-h-0">
+          {% if tab == 'pending' %}
+          {# Pending queue — do tarah ki rows ek hi table me:
+             (1) open_pos: confirm hue PO jinka maal aana baaki → "Receive goods" (GRN form, PO pehle se select)
+             (2) draft_grns: save hui lekin post nahi hui GRN → "Post GRN"
+             data-status se pills filter karte hain: open / partial / draft #}
+          <table class="grn-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:17%" />
+              <col style="width:10%" />
+              <col style="width:18%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
+              <col style="width:15%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Document</th>
+                <th>Date</th>
+                <th>Vendor</th>
+                <th>Due / challan</th>
+                <th>Lines</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for po in open_pos %}
+              {# Kitni lines ka maal abhi baaki hai (remaining_qty > 0) — alag-alag units ka qty jodna galat hota, isliye lines gin rahe #}
+              {% set pending_lines = po.lines | selectattr('remaining_qty', 'gt', 0) | list | length %}
+              <tr class="grn-row"
+                  data-search="{{ (po.po_no ~ ' ' ~ (po.vendor.name if po.vendor else ''))|lower }}"
+                  data-status="{{ po.status|lower }}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td>
+                  <div class="font-mono font-semibold text-brand-teal">{{ po.po_no }}</div>
+                  <div class="text-[11.5px] text-ink-faint">Purchase order</div>
+                </td>
+                <td class="tabular-nums">{{ po.po_date.strftime('%d %b %Y') if po.po_date else '—' }}</td>
+                <td class="text-left">{{ po.vendor.name if po.vendor else '—' }}</td>
+                <td class="tabular-nums text-[12.5px]">{{ ('Due ' ~ po.expected_delivery_date.strftime('%d %b')) if po.expected_delivery_date else '—' }}</td>
+                <td class="tabular-nums text-[12.5px]">{{ pending_lines }} of {{ po.lines|length }} pending</td>
+                <td>
+                  {% if po.status == 'Partial' %}
+                  <span class="status-pill status-partial-qc">Partially received</span>
+                  {% else %}
+                  <span class="status-pill status-pending-qc">Awaiting goods</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <button type="button" class="btn-receive px-2.5 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
+                    data-po-id="{{ po.id }}">
+                    Receive goods
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+              {% for g in draft_grns %}
+              <tr class="grn-row opacity-90"
+                  data-search="{{ (g.grn_no ~ ' ' ~ g.po.po_no ~ ' ' ~ (g.po.vendor.name if g.po and g.po.vendor else '') ~ ' ' ~ (g.challan_no or ''))|lower }}"
+                  data-status="draft">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ open_pos|length + loop.index }}</td>
+                <td>
+                  <div class="font-mono font-semibold text-ink">{{ g.grn_no }}</div>
+                  <div class="text-[11.5px] text-ink-faint">Draft GRN · {{ g.po.po_no if g.po else '—' }}</div>
+                </td>
+                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}</td>
+                <td class="text-left">{{ g.po.vendor.name if g.po and g.po.vendor else '—' }}</td>
+                <td class="font-mono text-[12.5px]">{{ g.challan_no or '—' }}</td>
+                <td class="tabular-nums text-[12.5px]">{{ g.lines|length }} received</td>
+                <td><span class="status-pill status-draft">Draft</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    {{ grn_view_button(g) }}
+                    <form method="post" action="{{ url_for('grns.grns_post', grn_id=g.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Post GRN"
+                          data-confirm-ok="Post"
+                          data-confirm-message="Post {{ g.grn_no }}? Its lots will move to Inward QC.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post GRN</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
           <table class="grn-table">
             <colgroup>
               <col style="width:4%" />
@@ -174,36 +301,10 @@
                 </td>
                 <td>
                   <div class="flex flex-wrap justify-center gap-1">
-                    <button type="button"
-                      class="btn-view-grn px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
-                      data-grn="{{ g.grn_no }}"
-                      data-po="{{ g.po.po_no if g.po else '' }}"
-                      data-vendor="{{ g.po.vendor.name if g.po and g.po.vendor else '' }}"
-                      data-status="{{ g.status }}"
-                      data-date="{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else 'Not posted' }}"
-                      data-challan="{{ g.challan_no or '—' }}"
-                      data-transporter="{{ g.transporter or '—' }}"
-                      data-vehicle="{{ g.vehicle_no or '—' }}"
-                      data-gross="{{ (g.gross_weight ~ ' kg') if g.gross_weight else '—' }}"
-                      data-remarks="{{ g.remarks or '' }}"
-                      data-lines='{{ (g.lines | map(attribute="po_line.raw_material.code") | list) | tojson }}'
-                      data-descs='{{ (g.lines | map(attribute="po_line.raw_material.name") | list) | tojson }}'
-                      data-qtys='{{ (g.lines | map(attribute="received_qty") | list) | tojson }}'
-                      data-units='{{ (g.lines | map(attribute="po_line.unit.code") | list) | tojson }}'
-                      data-batches='{{ (g.lines | map(attribute="batch_lot_no") | list) | tojson }}'>
-                      View
-                    </button>
-                    {% if g.status == "Draft" %}
-                    <form method="post" action="{{ url_for('grns.grns_post', grn_id=g.id) }}" class="inline js-confirm-submit"
-                          data-confirm-title="Post GRN"
-                          data-confirm-ok="Post"
-                          data-confirm-message="Post {{ g.grn_no }}? Status will move to Pending QC.">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post GRN</button>
-                    </form>
-                    {% endif %}
+                    {{ grn_view_button(g) }}
                     {% if g.status in ("Pending QC", "Partial QC") %}
-                    {# Gate pe QC pending → Inward QC list pe le jao (lab inspection) #}
-                    <a href="{{ url_for('inward_qc.inward_qc_list') }}" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Inward QC</a>
+                    {# Post ho chuki GRN ka agla kaam lab QC — Inward QC ke Pending tab pe le jao #}
+                    <a href="{{ url_for('inward_qc.inward_qc_list', tab='pending') }}" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Inward QC</a>
                     {% endif %}
                   </div>
                 </td>
@@ -213,16 +314,21 @@
               {% endfor %}
             </tbody>
           </table>
+          {% endif %}
 
           <div id="empty-state" class="hidden py-12 text-center">
-            <p class="font-semibold text-ink">No GRN records found</p>
-            <p class="text-ink-faint mt-1 text-[13px]">Clear search or create a new GRN against an open PO.</p>
-            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">New GRN</button>
+            {% if tab == 'completed' %}
+            <p class="font-semibold text-ink">No posted GRNs found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">A GRN moves here once it is posted. Clear the search if you typed one.</p>
+            {% else %}
+            <p class="font-semibold text-ink">Nothing is waiting to be received</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Purchase orders appear here automatically once they are confirmed. Clear the search if you typed one.</p>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
-          <span id="result-count">Showing {{ result_count }} of {{ total_count }} GRN records</span>
+          <span id="result-count">Showing {{ result_count }} of {{ total_count }} {{ 'pending items' if tab == 'pending' else 'GRN records' }}</span>
           <span>After post: stock sits in QC Hold Bay until inward lab QC passes</span>
         </div>
       </div>
@@ -234,7 +340,7 @@
   <div role="dialog" aria-labelledby="grn-modal-title" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
-        <h2 id="grn-modal-title" class="text-[16px] font-bold text-ink">New goods receipt (GRN)</h2>
+        <h2 id="grn-modal-title" class="text-[16px] font-bold text-ink">Receive goods (GRN)</h2>
         <p class="text-[12.5px] text-ink-faint">Gate inward details + quantities received against PO</p>
       </div>
       <button type="button" id="btn-close-grn-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
@@ -253,7 +359,10 @@
         </div>
         <div class="md:col-span-2">
           <label for="grn-po" class="block text-[12.5px] font-semibold text-ink mb-1">Purchase order *</label>
-          <select id="grn-po" name="po_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          {# PO yahan choose nahi hota — Pending row ka "Receive goods" JS se set karta hai.
+             disabled nahi kiya (disabled field form ke saath submit hi nahi hota, po_id chala jaata) —
+             pointer-events-none + tabindex -1 se sirf click/keyboard band kiya #}
+          <select id="grn-po" name="po_id" required tabindex="-1" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-mist text-ink pointer-events-none">
             <option value="">Select open PO…</option>
             {% for po in open_pos %}
             <option value="{{ po.id }}">{{ po.po_no }} · {{ po.vendor.name if po.vendor else '—' }} · {{ po.status }}</option>
@@ -363,11 +472,20 @@
   var resultCount = document.getElementById('result-count');
   var tableEl = document.querySelector('.grn-table');
   var activeFilter = 'all';
+  // Footer "Showing X of Y ..." ka naam — tab ke hisaab se (Flask se aata hai)
+  var LIST_NOUN = {{ ('pending items' if tab == 'pending' else 'GRN records')|tojson }};
 
   function openGrnModal() {
     grnModal.classList.remove('hidden');
     grnModal.setAttribute('aria-hidden', 'false');
-    document.getElementById('grn-po').focus();
+    document.getElementById('grn-date').focus();
+  }
+
+  // Pending row ka "Receive goods" — form kholo, PO select karo, us PO ki lines (remaining qty ke saath) lao
+  function openReceive(poId) {
+    openGrnModal();
+    document.getElementById('grn-po').value = poId;
+    renderReceiptLines(poId);
   }
   function closeGrnModal() {
     grnModal.classList.add('hidden');
@@ -478,24 +596,21 @@
     var none = visible === 0;
     emptyState.classList.toggle('hidden', !none);
     if (tableEl) tableEl.classList.toggle('hidden', none);
-    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' GRN records';
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' ' + LIST_NOUN;
   }
+  // Har pill pe count: data-label + us status wali rows. Generic loop — har tab me alag pills hain (§10.6)
   function updateFilterCounts() {
-    var counts = {};
-    rows.forEach(function (row) {
-      var s = row.getAttribute('data-status');
-      counts[s] = (counts[s] || 0) + 1;
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      var f = btn.getAttribute('data-filter');
+      var n = f === 'all' ? rows.length : rows.filter(function (row) { return row.getAttribute('data-status') === f; }).length;
+      btn.textContent = btn.getAttribute('data-label') + ' (' + n + ')';
     });
-    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
-    document.querySelector('[data-filter="draft"]').textContent = 'Draft (' + (counts['draft'] || 0) + ')';
-    document.querySelector('[data-filter="pending qc"]').textContent = 'Pending QC (' + (counts['pending qc'] || 0) + ')';
-    document.querySelector('[data-filter="partial qc"]').textContent = 'Partial QC (' + (counts['partial qc'] || 0) + ')';
-    document.querySelector('[data-filter="closed"]').textContent = 'Closed (' + (counts['closed'] || 0) + ')';
   }
 
-  document.getElementById('btn-new-grn').addEventListener('click', openGrnModal);
-  var emptyNew = document.getElementById('btn-empty-new');
-  if (emptyNew) emptyNew.addEventListener('click', openGrnModal);
+  // "New GRN" button ab nahi hai — form sirf Pending row ke "Receive goods" se khulta hai
+  document.querySelectorAll('.btn-receive').forEach(function (btn) {
+    btn.addEventListener('click', function () { openReceive(btn.getAttribute('data-po-id')); });
+  });
   document.getElementById('btn-close-grn-modal').addEventListener('click', closeGrnModal);
   document.getElementById('btn-cancel-grn').addEventListener('click', closeGrnModal);
   document.getElementById('grn-modal-backdrop').addEventListener('click', closeGrnModal);

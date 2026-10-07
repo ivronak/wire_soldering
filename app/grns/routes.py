@@ -21,21 +21,39 @@ def refresh_po_status(po):
 
 @grns_bp.route('/grns')
 def grns_list():
-    grns = GRN.query.filter(GRN.is_deleted == False).order_by(GRN.id.desc()).all()
-    total_count = len(grns)
+    # §10.6 + auto-flow: "New GRN" button nahi hai — kaam pichle step (PO confirm) se khud yahan aata hai.
+    # GRN step ka kaam = maal receive karke GRN post karna. Isliye:
+    #   pending   = (1) confirm ho chuke PO jinka maal aana baaki (Open/Partial) → row pe "Receive goods"
+    #               (2) Draft GRN (save hui, post baaki) → row pe "Post GRN"
+    #   completed = post ho chuki GRN (Pending QC / Partial QC / Closed) — ab unka agla kaam QC page pe hai
+    tab = (request.args.get("tab") or "pending").strip().lower()
+    if tab != "completed":
+        tab = "pending"  # ?tab=kuchbhi aaye to bhi pending
 
     open_pos = PurchaseOrder.query.filter(
         PurchaseOrder.is_deleted == False,
         PurchaseOrder.status.in_(["Open", "Partial"])
-    ).all()
+    ).order_by(PurchaseOrder.id.desc()).all()
+
+    base = GRN.query.filter(GRN.is_deleted == False)
+    draft_grns = base.filter(GRN.status == "Draft").order_by(GRN.id.desc()).all()
+    posted_grns = base.filter(GRN.status != "Draft").order_by(GRN.id.desc()).all()
+
+    pending_count = len(open_pos) + len(draft_grns)
+    completed_count = len(posted_grns)
+    total_count = pending_count if tab == "pending" else completed_count
 
     return render_template(
         "grns.html",
         active_nav='grns',
-        grns=grns,
+        grns=posted_grns,
+        draft_grns=draft_grns,
+        open_pos=open_pos,
+        tab=tab,
+        pending_count=pending_count,
+        completed_count=completed_count,
         total_count=total_count,
         result_count=total_count,
-        open_pos=open_pos,
     )
 
 @grns_bp.route('/grns/po_lines/<int:po_id>')
@@ -147,7 +165,11 @@ def grns_add():
     refresh_po_status(po)
 
     db.session.commit()
-    flash(f"GRN {grn_no} saved as {status}.", "success")
+    # Post hui GRN completed tab me chali jaati hai — batao ki agla kaam (QC) kahan hai
+    if status == "Draft":
+        flash(f"GRN {grn_no} saved as Draft — post it from the Pending list when ready.", "success")
+    else:
+        flash(f"GRN {grn_no} posted — its lots are now waiting on the Inward QC page.", "success")
     return redirect(url_for('grns.grns_list'))        
 
 @grns_bp.route('/grns/post/<int:grn_id>', methods=['POST'])
@@ -160,5 +182,5 @@ def grns_post(grn_id):
     grn.status = "Pending QC"
     refresh_po_status(grn.po)
     db.session.commit()
-    flash(f"GRN {grn.grn_no} posted — now Pending QC.", "success")
+    flash(f"GRN {grn.grn_no} posted — its lots are now waiting on the Inward QC page.", "success")
     return redirect(url_for('grns.grns_list'))

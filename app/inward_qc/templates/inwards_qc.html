@@ -75,26 +75,39 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Inward lab QC</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Inward QC</h1>
         </div>
-        <button type="button" id="btn-new-inspect"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-          New inspection
-        </button>
+        {# "New inspection" button jaan-boojhkar nahi hai — post hui GRN ki lines khud Pending tab me aati hain,
+           wahan row ka "Inspect" button form kholta hai (GRN + line pehle se bhare) #}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        {# §10.6 tabs — PO/GRN jaisa. QC me Pending = jin GRN lots ka inspection baaki hai, Completed = final QC records #}
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('inward_qc.inward_qc_list', tab='pending') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Pending action <span class="tabular-nums">({{ pending_count }})</span>
+          </a>
+          <a href="{{ url_for('inward_qc.inward_qc_list', tab='completed') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Completed <span class="tabular-nums">({{ completed_count }})</span>
+          </a>
+        </div>
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
-            <input type="search" id="search-qc" placeholder="Search QC no., GRN, material, lot…"
+            <input type="search" id="search-qc" placeholder="{{ 'Search GRN, PO, material, lot…' if tab == 'pending' else 'Search QC no., GRN, material, lot, memo…' }}"
               class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
           </div>
           <div class="flex flex-wrap items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
-            <button type="button" data-filter="draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (0)</button>
-            <button type="button" data-filter="passed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Passed (0)</button>
-            <button type="button" data-filter="partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (0)</button>
-            <button type="button" data-filter="failed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Failed (0)</button>
+            {# Har tab me sirf usi tab ke pills. data-label = JS count ke saath dikhne wala naam #}
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            {% if tab == 'completed' %}
+            <button type="button" data-filter="passed" data-label="Passed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Passed (0)</button>
+            <button type="button" data-filter="partial" data-label="Partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (0)</button>
+            <button type="button" data-filter="failed" data-label="Failed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Failed (0)</button>
+            {% else %}
+            <button type="button" data-filter="awaiting" data-label="Not inspected" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Not inspected (0)</button>
+            <button type="button" data-filter="draft" data-label="Draft saved" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft saved (0)</button>
+            {% endif %}
           </div>
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
@@ -105,17 +118,89 @@
         </div>
 
         <div class="flex-1 overflow-auto min-h-0">
+          {% if tab == 'pending' %}
+          {# Pending queue — har row ek GRN line (material + lot) jiska final QC abhi nahi hua.
+             Route "awaiting" list bhejta hai: har item me grn, line, aur draft (agar adhoora QC save hai). #}
+          <table class="qc-table">
+            <colgroup>
+              <col style="width:4%" />
+              <col style="width:11%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+              <col style="width:16%" />
+              <col style="width:10%" />
+              <col style="width:8%" />
+              <col style="width:10%" />
+              <col style="width:8%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>GRN no.</th>
+                <th>GRN date</th>
+                <th>PO no.</th>
+                <th>Vendor</th>
+                <th>Material</th>
+                <th>Lot / batch</th>
+                <th>Received</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in awaiting %}
+              {% set g = a.grn %}
+              {% set gl = a.line %}
+              {% set po_line = gl.po_line %}
+              {% set rm = po_line.raw_material if po_line else none %}
+              <tr class="qc-row"
+                  data-search="{{ g.grn_no|lower }} {{ g.po.po_no|lower if g.po else '' }} {{ rm.code|lower if rm else '' }} {{ rm.name|lower if rm else '' }} {{ (gl.batch_lot_no or '')|lower }} {{ a.draft.qc_no|lower if a.draft else '' }}"
+                  data-status="{{ 'draft' if a.draft else 'awaiting' }}">
+                <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td class="font-mono font-semibold text-ink">{{ g.grn_no }}</td>
+                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}</td>
+                <td><span class="text-brand-teal font-medium">{{ g.po.po_no if g.po else '—' }}</span></td>
+                <td class="text-[13px]">{{ g.po.vendor.name if g.po and g.po.vendor else '—' }}</td>
+                <td class="text-left pl-3 !text-left text-[13px]">{% if rm %}{{ rm.code }} {{ rm.name }}{% else %}—{% endif %}</td>
+                <td class="font-mono text-[12.5px]">{{ gl.batch_lot_no or '—' }}</td>
+                <td class="tabular-nums">{{ gl.received_qty }}{% if po_line and po_line.unit %} {{ po_line.unit.code }}{% endif %}</td>
+                <td>
+                  {% if a.draft %}
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border" title="A draft inspection is saved — submit the final result to complete it">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Draft · {{ a.draft.qc_no }}
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Not inspected
+                  </span>
+                  {% endif %}
+                </td>
+                <td>
+                  {# Inspect = wahi "New inspection" modal, bas GRN + line pehle se select (JS neeche) #}
+                  <button type="button" class="btn-inspect-line px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white"
+                    data-grn-id="{{ g.id }}"
+                    data-line-id="{{ gl.id }}">
+                    Inspect
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
           <table class="qc-table">
             <colgroup>
               <col style="width:4%" />
               <col style="width:10%" />
+              <col style="width:8%" />
               <col style="width:9%" />
-              <col style="width:10%" />
-              <col style="width:14%" />
+              <col style="width:12%" />
+              <col style="width:9%" />
+              <col style="width:7%" />
+              <col style="width:6%" />
+              <col style="width:6%" />
               <col style="width:11%" />
-              <col style="width:8%" />
-              <col style="width:8%" />
-              <col style="width:8%" />
               <col style="width:8%" />
               <col style="width:10%" />
             </colgroup>
@@ -130,6 +215,7 @@
                 <th>Sample</th>
                 <th>Pass qty</th>
                 <th>Reject qty</th>
+                <th>Memo</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -142,14 +228,15 @@
               {% set grn = gl.grn if gl else none %}
               {% set st = (q.status or 'draft')|lower %}
               <tr class="qc-row"
-                  data-search="{{ q.qc_no|lower }} {{ grn.grn_no|lower if grn else '' }} {{ rm.code|lower if rm else '' }} {{ rm.name|lower if rm else '' }} {{ gl.batch_lot_no|lower if gl else '' }}"
+                  data-search="{{ q.qc_no|lower }} {{ grn.grn_no|lower if grn else '' }} {{ rm.code|lower if rm else '' }} {{ rm.name|lower if rm else '' }} {{ gl.batch_lot_no|lower if gl else '' }}  {{ q.memo.memo_no|lower if q.memo else '' }}"
                   data-status="{{ st }}">
                 <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ q.qc_no }}</td>
                 <td class="tabular-nums">{{ q.inspection_date.strftime('%d %b %Y') if q.inspection_date else '—' }}</td>
                 <td>
                   {% if grn %}
-                  <a href="{{ url_for('grns.grns_list') }}" class="text-brand-teal font-medium hover:underline">{{ grn.grn_no }}</a>
+                  {# GRN Closed ho to wo GRN list ke Completed tab me milegi, warna Pending me #}
+                  <a href="{{ url_for('grns.grns_list', tab='completed' if grn.status == 'Closed' else 'pending') }}" class="text-brand-teal font-medium hover:underline">{{ grn.grn_no }}</a>
                   {% else %}—{% endif %}
                 </td>
                 <td class="text-left pl-3 !text-left text-[13px]">
@@ -159,6 +246,7 @@
                 <td class="tabular-nums">{{ q.sample_size }}{% if po_line and po_line.unit %} {{ po_line.unit.code }}{% endif %}</td>
                 <td class="tabular-nums font-medium {% if q.passed_qty %}text-success{% endif %}">{{ q.passed_qty }}</td>
                 <td class="tabular-nums {% if q.rejected_qty %}font-medium text-stop{% endif %}">{{ q.rejected_qty }}</td>
+                <td class="font-mono text-[12.5px]">{{ q.memo.memo_no if q.memo else '—' }}</td>
                 <td>
                   {% if st == 'passed' %}
                   <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
@@ -194,13 +282,20 @@
                       data-remarks="{{ q.remarks or '' }}">
                       View
                     </button>
-                    {% if q.rejected_qty and q.rejected_qty > 0 %}
+                    {# Memo tabhi dikhao jab ban chuka ho. q.memo = model ka backref (RejectionMemo ya None) #}
+                    {% if q.memo %}
                     <button type="button" class="btn-memo px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white"
-                      title="Rejection memo (coming soon)"
+                      title="View rejection memo"
+                      data-memo="{{ q.memo.memo_no }}"
+                      data-memo-date="{{ q.memo.memo_date.strftime('%d %b %Y') }}"
+                      data-memo-status="{{ q.memo.status }}"
+                      data-reason="{{ q.memo.reason or '' }}"
                       data-qc="{{ q.qc_no }}"
+                      data-grn="{{ grn.grn_no if grn else '' }}"
+                      data-vendor="{{ grn.po.vendor.name if grn and grn.po and grn.po.vendor else '' }}"
                       data-material="{% if rm %}{{ rm.code }} — {{ rm.name }}{% endif %}"
                       data-lot="{{ gl.batch_lot_no if gl else '' }}"
-                      data-reject="{{ q.rejected_qty }}">
+                      data-reject="{{ q.memo.rejected_qty }}">
                       Memo
                     </button>
                     {% endif %}
@@ -212,16 +307,22 @@
               {% endfor %}
             </tbody>
           </table>
+          {% endif %}
 
           <div id="empty-state" class="hidden py-12 text-center">
-            <p class="font-semibold text-ink">No QC inspections found</p>
-            <p class="text-ink-faint mt-1 text-[13px]">Clear search or start inspection from a pending GRN.</p>
-            <button type="button" id="btn-empty-new" class="mt-3 px-3.5 py-2 text-[13px] font-semibold bg-copper text-white rounded border border-copper-dark">New inspection</button>
+            {% if tab == 'pending' %}
+            <p class="font-semibold text-ink">Nothing is waiting for inspection</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Lots appear here after a GRN is posted. Clear the search if you typed one.</p>
+            {% else %}
+            <p class="font-semibold text-ink">No completed QC inspections found</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Submitted results (Passed / Partial / Failed) appear here. Clear the search if you typed one.</p>
+            {% endif %}
           </div>
         </div>
 
+        {% set list_count = awaiting|length if tab == 'pending' else inwards|length %}
         <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
-          <span id="result-count">Showing {{ inwards|length }} of {{ inwards|length }} QC inspections</span>
+          <span id="result-count">Showing {{ list_count }} of {{ list_count }} {{ 'lots awaiting inspection' if tab == 'pending' else 'QC inspections' }}</span>
           <span>Accepted qty feeds Purchase invoice later · Rejected qty is not billable</span>
         </div>
       </div>
@@ -261,7 +362,9 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label for="qc-grn" class="block text-[12.5px] font-semibold text-ink mb-1">GRN *</label>
-          <select id="qc-grn" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          {# GRN aur line yahan choose nahi hote — Pending row ka "Inspect" JS se set karta hai.
+             disabled nahi kiya (disabled field submit nahi hota) — sirf click/keyboard band #}
+          <select id="qc-grn" required tabindex="-1" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-mist text-ink pointer-events-none">
             <option value="">Select pending GRN…</option>
             {% for g in pending_grns %}
             <option value="{{ g.id }}">{{ g.grn_no }} · {{ g.status }}</option>
@@ -270,7 +373,7 @@
         </div>
         <div>
           <label for="qc-line" class="block text-[12.5px] font-semibold text-ink mb-1">Material / lot *</label>
-          <select id="qc-line" name="grn_line_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <select id="qc-line" name="grn_line_id" required tabindex="-1" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-mist text-ink pointer-events-none">
             <option value="">Select after GRN…</option>
           </select>
         </div>
@@ -381,6 +484,8 @@
   var resultCount = document.getElementById('result-count');
   var tableEl = document.querySelector('.qc-table');
   var activeFilter = 'all';
+  // Footer "Showing X of Y ..." ka naam — tab ke hisaab se (Flask se aata hai)
+  var LIST_NOUN = {{ ('lots awaiting inspection' if tab == 'pending' else 'QC inspections')|tojson }};
 
   function openInspect() {
     inspectModal.classList.remove('hidden');
@@ -405,7 +510,8 @@
     qcRecv.value = '—';
   }
 
-  function loadGrnLines(grnId) {
+  // selectLineId (optional) — Pending tab ke "Inspect" se aaye to lines load hone ke baad wahi line select karo
+  function loadGrnLines(grnId, selectLineId) {
     resetQcLineSelect();
     if (!grnId) return;
     qcLine.innerHTML = '<option value="">Loading…</option>';
@@ -427,6 +533,11 @@
           opt.setAttribute('data-qty', line.received_qty);
           qcLine.appendChild(opt);
         });
+        if (selectLineId) {
+          qcLine.value = String(selectLineId);
+          // 'change' event khud chalao taaki "Received qty" box bhi bhar jaaye
+          qcLine.dispatchEvent(new Event('change'));
+        }
       })
       .catch(function () {
         qcLine.innerHTML = '<option value="">Could not load lines</option>';
@@ -442,9 +553,13 @@
     qcRecv.value = (qty !== null && qty !== '') ? qty : '—';
   });
 
+  // Text ko HTML ke liye safe banao: < > & ko &lt; &gt; &amp; me badal do, taaki user ka text HTML ban ke chale nahi
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
   function viewField(label, value) {
     return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
-      '</div><div class="mt-0.5 text-ink">' + (value || '—') + '</div></div>';
+      '</div><div class="mt-0.5 text-ink">' + (value ? esc(value) : '—') + '</div></div>';
   }
   function openView(btn) {
     document.getElementById('view-subtitle').textContent =
@@ -471,17 +586,26 @@
 
   function openMemo(btn) {
     document.getElementById('memo-subtitle').textContent =
-      (btn.getAttribute('data-qc') || '') + ' · rejected goods';
+      (btn.getAttribute('data-memo') || '') + ' · ' + (btn.getAttribute('data-memo-status') || '');
     document.getElementById('memo-body').innerHTML =
-      '<p class="text-[13.5px] text-ink-muted leading-relaxed">Rejection memo will be a separate document later. For now this is a preview of what failed QC.</p>' +
+      '<div class="grid grid-cols-2 gap-3">' +
+      viewField('Memo no.', btn.getAttribute('data-memo')) +
+      viewField('Memo date', btn.getAttribute('data-memo-date')) +
+      viewField('Vendor', btn.getAttribute('data-vendor')) +
+      viewField('GRN', btn.getAttribute('data-grn')) +
+      viewField('QC record', btn.getAttribute('data-qc')) +
+      viewField('Lot / batch', btn.getAttribute('data-lot')) +
+      '</div>' +
       '<div class="grid grid-cols-1 gap-3 mt-3">' +
       viewField('Material', btn.getAttribute('data-material')) +
-      viewField('Lot / batch', btn.getAttribute('data-lot')) +
       viewField('Rejected qty', btn.getAttribute('data-reject')) +
-      '</div>';
+      viewField('Reason', btn.getAttribute('data-reason')) +
+      '</div>' +
+      '<p class="text-[12.5px] text-ink-faint mt-3">Rejected quantity is not billable and is not added to stock.</p>';
     memoModal.classList.remove('hidden');
     memoModal.setAttribute('aria-hidden', 'false');
   }
+  
   function closeMemo() {
     memoModal.classList.add('hidden');
     memoModal.setAttribute('aria-hidden', 'true');
@@ -500,24 +624,27 @@
     var none = visible === 0;
     emptyState.classList.toggle('hidden', !none);
     if (tableEl) tableEl.classList.toggle('hidden', none);
-    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' QC inspections';
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' ' + LIST_NOUN;
   }
+  // Har pill pe count: data-label + us status wali rows. Generic loop — har tab me alag pills hain (§10.6)
   function updateFilterCounts() {
-    var counts = { draft: 0, passed: 0, partial: 0, failed: 0 };
-    rows.forEach(function (row) {
-      var s = row.getAttribute('data-status');
-      if (counts[s] !== undefined) counts[s] += 1;
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      var f = btn.getAttribute('data-filter');
+      var n = f === 'all' ? rows.length : rows.filter(function (row) { return row.getAttribute('data-status') === f; }).length;
+      btn.textContent = btn.getAttribute('data-label') + ' (' + n + ')';
     });
-    document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
-    document.querySelector('[data-filter="draft"]').textContent = 'Draft (' + counts.draft + ')';
-    document.querySelector('[data-filter="passed"]').textContent = 'Passed (' + counts.passed + ')';
-    document.querySelector('[data-filter="partial"]').textContent = 'Partial (' + counts.partial + ')';
-    document.querySelector('[data-filter="failed"]').textContent = 'Failed (' + counts.failed + ')';
   }
 
-  document.getElementById('btn-new-inspect').addEventListener('click', openInspect);
-  var emptyNew = document.getElementById('btn-empty-new');
-  if (emptyNew) emptyNew.addEventListener('click', openInspect);
+  // Pending tab ki "Inspect" button — modal kholo aur GRN + material/lot pehle se select kar do
+  document.querySelectorAll('.btn-inspect-line').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openInspect();
+      qcGrn.value = btn.getAttribute('data-grn-id');
+      loadGrnLines(qcGrn.value, btn.getAttribute('data-line-id'));
+    });
+  });
+
+  // "New inspection" button ab nahi hai — form sirf Pending row ke "Inspect" se khulta hai (listener upar)
   document.getElementById('btn-close-inspect').addEventListener('click', closeInspect);
   document.getElementById('btn-cancel-inspect').addEventListener('click', closeInspect);
   document.getElementById('inspect-modal-backdrop').addEventListener('click', closeInspect);

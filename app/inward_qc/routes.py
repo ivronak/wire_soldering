@@ -1,22 +1,56 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
-from app.models import InwardQC, GRN, GRNLine
+from app.models import InwardQC, GRN, GRNLine, RejectionMemo
 from app.extensions import db
 from datetime import datetime
 
 inward_qc_bp = Blueprint("inward_qc", __name__, template_folder="templates")
 
+def final_qc_line_ids():
+    # Jin GRN lines ka final (non-Draft) QC ho chuka — unka kaam khatam, dobara inspect nahi hongi
+    rows = InwardQC.query.filter(InwardQC.is_deleted == False, InwardQC.status != "Draft").all()
+    return {q.grn_line_id for q in rows}
+
 @inward_qc_bp.route('/inward_qc')
 def inward_qc_list():
-    inwards = InwardQC.query.filter(InwardQC.is_deleted == False).order_by(InwardQC.id.desc()).all()
+    # §10.6: ?tab=pending (default) / ?tab=completed
+    # QC me "pending" = woh GRN lines jinka inspection abhi baaki hai (QC record ho ya na ho),
+    # "completed" = final QC records (Passed / Partial / Failed)
+    tab = (request.args.get("tab") or "pending").strip().lower()
+    if tab != "completed":
+        tab = "pending"
+
     # Sirf wahi GRN jinka QC baaki hai — "Closed" GRN (saari lines ka QC ho chuka) dropdown me nahi aani chahiye
     pending_grns = GRN.query.filter(
         GRN.status.in_(["Pending QC", "Partial QC"]),
         GRN.is_deleted == False,
-    ).all()
+    ).order_by(GRN.id.desc()).all()
+
+    done_ids = final_qc_line_ids()
+
+    # Draft QC (adhoora save) — line id -> sabse naya draft (order id se, baad wala purane ko overwrite karta hai)
+    drafts = {}
+    for q in InwardQC.query.filter(InwardQC.is_deleted == False, InwardQC.status == "Draft").order_by(InwardQC.id).all():
+        drafts[q.grn_line_id] = q
+
+    # Pending queue: har pending GRN ki woh lines jinka final QC nahi hua
+    awaiting = []
+    for g in pending_grns:
+        for line in g.lines:
+            if line.id not in done_ids:
+                awaiting.append({"grn": g, "line": line, "draft": drafts.get(line.id)})
+
+    completed = InwardQC.query.filter(
+        InwardQC.is_deleted == False,
+        InwardQC.status != "Draft",
+    ).order_by(InwardQC.id.desc()).all()
 
     return render_template(
         "inwards_qc.html",
-        inwards=inwards,
+        tab=tab,
+        awaiting=awaiting,
+        inwards=completed,
+        pending_count=len(awaiting),
+        completed_count=len(completed),
         pending_grns=pending_grns,
         active_nav="inwards_qc",
     )
@@ -24,8 +58,12 @@ def inward_qc_list():
 @inward_qc_bp.route('/inward_qc/grn_lines/<int:grn_id>')
 def inward_qc_grn_lines(grn_id):
     grn = GRN.query.get_or_404(grn_id)
+    done_ids = final_qc_line_ids()
     lines=[]
     for line in grn.lines:
+        # Jis line ka final QC ho chuka wo dropdown me mat dikhao (backend waise bhi dobara final QC rokta hai)
+        if line.id in done_ids:
+            continue
         rm = line.po_line.raw_material if line.po_line else None
         lines.append({
             "id":line.id,
@@ -114,6 +152,23 @@ def inward_qc_add():
 
     db.session.add(inward_qc)
 
+    # §6.5 Rejection memo: final result me rejected qty ho (Failed / Partial) to memo apne aap bane.
+    # Draft me nahi — draft abhi pakka result nahi hai. Alag "New memo" button bhi nahi (auto-flow rule).
+    memo_no = None
+    if status != "Draft" and rejected_qty > 0:
+        db.session.flush()
+
+        memo_count = RejectionMemo.query.filter(RejectionMemo.memo_no.like(f"MEMO-{year}-%")).count()
+        memo_no = f"MEMO-{year}-{memo_count + 1:03d}"
+        db.session.add(RejectionMemo(
+            memo_no = memo_no,
+            inward_qc_id = inward_qc.id,
+            memo_date = inspection_date,
+            rejected_qty = rejected_qty,
+            reason = remarks or None,
+        ))    
+
+
     # Sirf final result pe GRN badlo — Draft pe mat chhedo
     if status != "Draft":
         # Upar load kiya hua grn_line use karo (inward_qc.grn_line abhi None hoga — save nahi hua)
@@ -136,5 +191,11 @@ def inward_qc_add():
             grn.status = "Closed"
 
     db.session.commit()
-    flash(f"Inward QC {qc_no} saved as {status}.", "success")
+    if status == "Draft":
+        flash(f"Inward QC {qc_no} saved as Draft — the lot stays in the Pending list until you submit a result.", "success")
+    else:
+        message = f"Inward QC {qc_no} saved as {status}."
+        if memo_no:
+            message += f" Rejection memo {memo_no} was raised."
+        flash(message, "success")
     return redirect(url_for('inward_qc.inward_qc_list'))        

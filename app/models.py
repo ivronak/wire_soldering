@@ -529,3 +529,18 @@ class PartyDocument(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+class RejectionMemo(db.Model):
+    __tablename__ = "rejection_memos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    memo_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    inward_qc_id = db.Column(db.Integer, db.ForeignKey("inward_qc.id"), unique=True, nullable=False)
+    inward_qc = db.relationship("InwardQC", foreign_keys=[inward_qc_id], backref=db.backref("memo", uselist=False))
+
+    memo_date = db.Column(db.Date, nullable=False)
+    rejected_qty = db.Column(db.Float, nullable=False)   # snapshot
+    reason = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), default="Issued", nullable=False)
+
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
