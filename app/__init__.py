@@ -21,6 +21,8 @@ from app.vendor_types.routes import vendor_types_bp
 from app.production_orders.routes import production_orders_bp
 from app.payment_terms.routes import payment_terms_bp
 from app.party_documents.routes import party_documents_bp
+from app.purchase_invoices.routes import purchase_invoices_bp
+from app.purchase_returns.routes import purchase_returns_bp
 from app.extensions import db, migrate
 
 
@@ -70,6 +72,8 @@ def create_app():
     app.register_blueprint(production_orders_bp)
     app.register_blueprint(payment_terms_bp)
     app.register_blueprint(party_documents_bp)
+    app.register_blueprint(purchase_invoices_bp)
+    app.register_blueprint(purchase_returns_bp)
 
     @app.route("/")
     def home():

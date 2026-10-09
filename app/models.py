@@ -393,6 +393,37 @@ class GRNLine(db.Model):
     batch_lot_no = db.Column(db.String(30), nullable=False)
     mfg_date = db.Column(db.Date, nullable=True)
 
+    @property
+    def final_qc(self):
+        # Is lot ka final QC result (Draft nahi, remove nahi). Nahi hua to None.
+        return InwardQC.query.filter(
+            InwardQC.grn_line_id == self.id,
+            InwardQC.is_deleted == False,
+            InwardQC.status != "Draft",
+        ).order_by(InwardQC.id.desc()).first()
+
+    @property
+    def passed_qty(self):
+        # QC me jitna maal PASS hua (bill sirf isi par ban sakta hai). QC nahi hua to 0.
+        qc = self.final_qc
+        return qc.passed_qty if qc else 0
+
+    @property
+    def billed_qty(self):
+        # Is lot par bane bill-lines ka jod. Cancelled / remove kiye hue bill ki quantity nahi ginte.
+        total = 0
+        for line in self.invoice_lines:
+            if line.invoice.is_deleted or line.invoice.status == "Cancelled":
+                continue
+            total += line.qty
+        return round(total, 4)
+
+    @property
+    def billable_qty(self):
+        # Abhi kitna bill ho sakta hai = pass hua - pehle se bill hua (kabhi minus nahi)
+        return max(round(self.passed_qty - self.billed_qty, 4), 0)        
+
+
 class InwardQC(db.Model):
     # Ek QC = ek GRN line (material + batch/lot) ki inspection
     __tablename__ = "inward_qc"
@@ -629,3 +660,292 @@ class InwardQCResult(db.Model):
             "actual": None if self.actual_value is None else f"{self.actual_value:g}",
             "passed": self.passed,
         }
+
+class PurchaseInvoice(db.Model):
+    __tablename__ = "purchase_invoices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Hamara apna number (PI-2026-001): route banata hai. Vendor ke bill ka number alag column me hai.
+    pi_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    vendor_id = db.Column(db.Integer, db.ForeignKey("vendors.id"), nullable=False)
+    vendor = db.relationship("Vendor", foreign_keys=[vendor_id])
+
+    # Vendor ke bill par jo number likha hai. Ek vendor ka same number do baar nahi (route check karega)
+    vendor_invoice_no = db.Column(db.String(50), nullable=False)
+    invoice_date = db.Column(db.Date, nullable=False)
+
+    # "intra" = CGST + SGST (vendor ka state = hamare branch ka state), "inter" = IGST. Bill banate waqt ki copy
+    tax_type = db.Column(db.String(10), nullable=False)
+
+    # Draft -> Posted -> Cancelled. Draft aur Posted dono "billed" ginte hain (lot do baar bill na ho);
+    # Cancelled bill ki quantity wapas khul jaati hai
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+
+    # Totals save / post par server nikaal ke yahan rakhta hai (rupee, 2 decimal tak round)
+    subtotal = db.Column(db.Float, default=0, nullable=False)       # discount ke baad, tax se pehle
+    tax_total = db.Column(db.Float, default=0, nullable=False)
+    charges_total = db.Column(db.Float, default=0, nullable=False)  # freight / other charges: Add (+) aur Minus (-) ka jod
+    total_amount = db.Column(db.Float, default=0, nullable=False)   # vendor ko dena baaki
+
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def active_returns(self):
+        # Is bill ke wo returns jo abhi chal rahe hain (Cancelled / remove kiye hue nahi). backref: PurchaseReturn.invoice
+        active = []
+        for purchase_return in self.returns:
+            if purchase_return.is_deleted or purchase_return.status == "Cancelled":
+                continue
+            active.append(purchase_return)
+        return active
+
+    @property
+    def returned_amount(self):
+        # Active returns ka total credit (vendor ne itna payable maaf kiya)
+        total = 0
+        for purchase_return in self.active_returns:
+            total += purchase_return.total_amount
+        return round(total, 2)
+
+    @property
+    def can_return(self):
+        # Return sirf Posted bill par, aur tab jab kisi line ki kuch qty wapas bhejne ke liye bachi ho
+        if self.status != "Posted":
+            return False
+        for line in self.lines:
+            if line.returnable_qty > 0:
+                return True
+        return False
+
+    @property
+    def returns_summary(self):
+        # View panel (JS) ke liye: is bill ke saare returns (Cancelled bhi, status ke saath), naye pehle
+        rows = []
+        for purchase_return in sorted(self.returns, key=lambda r: r.id, reverse=True):
+            if purchase_return.is_deleted:
+                continue
+            rows.append({
+                "pr_no": purchase_return.pr_no,
+                "date": purchase_return.return_date.strftime("%d %b %Y") if purchase_return.return_date else "",
+                "total": purchase_return.total_amount,
+                "status": purchase_return.status,
+            })
+        return rows
+
+class PurchaseInvoiceLine(db.Model):
+
+    # Bill ki ek line = ek lot (GRN line) ka kitna hissa bill hua. Rate / tax yahan COPY (snapshot) rehte hain,
+    # taaki baad me PO ya tax master badle to post ho chuka bill na badle.
+    __tablename__ = "purchase_invoice_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    invoice_id = db.Column(db.Integer, db.ForeignKey("purchase_invoices.id"), nullable=False)
+    invoice = db.relationship("PurchaseInvoice", foreign_keys=[invoice_id], backref="lines")
+
+    # Kaun sa lot. backref: grn_line.invoice_lines = is lot par bane saare bill-lines (billed qty isi se nikalegi)
+    grn_line_id = db.Column(db.Integer, db.ForeignKey("grn_lines.id"), nullable=False)
+    grn_line = db.relationship("GRNLine", foreign_keys=[grn_line_id], backref="invoice_lines")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+
+    unit_id = db.Column(db.Integer, db.ForeignKey("units.id"), nullable=False)
+    unit = db.relationship("Unit", foreign_keys=[unit_id])
+
+    qty = db.Column(db.Float, nullable=False)
+    rate = db.Column(db.Float, nullable=False)
+    discount_percent = db.Column(db.Float, default=0, nullable=False)
+
+    tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=False)
+    tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
+    tax_percent = db.Column(db.Float, nullable=False)
+
+    @property
+    def taxable_amount(self):
+        # Discount ke baad, tax se pehle: qty x rate, phir discount % kaat ke. Paise tak (2 decimal) round.
+        return round(self.qty * self.rate * (1 - self.discount_percent / 100), 2)
+
+    @property
+    def tax_amount(self):
+        # Is line ka GST: taxable amount ka tax_percent %
+        return round(self.taxable_amount * self.tax_percent / 100, 2)
+
+    @property
+    def summary(self):
+        # View panel (JS) ke liye ek dictionary: template me data-attribute me JSON ban kar jayegi
+        gl = self.grn_line
+        rm = self.raw_material
+        return {
+            "material": f"{rm.code} {rm.name}" if rm else "",
+            "lot": gl.batch_lot_no if gl else "",
+            "grn": gl.grn.grn_no if gl and gl.grn else "",
+            "qty": f"{self.qty:g}",
+            "unit": self.unit.code if self.unit else "",
+            "rate": self.rate,
+            "discount": self.discount_percent,
+            "tax_percent": self.tax_percent,
+            "taxable": self.taxable_amount,
+            "tax": self.tax_amount,
+        }
+
+    @property
+    def returned_qty(self):
+        total = 0
+        for return_line in self.return_lines:
+            if return_line.purchase_return.is_deleted or return_line.purchase_return.status == "Cancelled":
+                continue
+            total += return_line.qty
+        return round(total, 4)
+
+    @property
+    def returnable_qty(self):
+        return max(round(self.qty - self.returned_qty, 4), 0)
+
+    @property
+    def return_info(self):
+        # Return panel (JS) ke liye: bill ki qty, kitna wapas ja chuka, kitna aur ja sakta hai,
+        # aur paisa nikalne ke liye rate / discount / tax (panel me live value isi se dikhti hai)
+        grn_line = self.grn_line
+        material = self.raw_material
+        return {
+            "id": self.id,
+            "material": f"{material.code} {material.name}" if material else "",
+            "grn": grn_line.grn.grn_no if grn_line and grn_line.grn else "",
+            "lot": grn_line.batch_lot_no if grn_line else "",
+            "unit": self.unit.code if self.unit else "",
+            "qty": self.qty,
+            "returned": self.returned_qty,
+            "returnable": self.returnable_qty,
+            "rate": self.rate,
+            "discount": self.discount_percent,
+            "tax_percent": self.tax_percent,
+        }
+
+class PurchaseInvoiceCharge(db.Model):
+    # Bill par extra charge (freight, packing, etc.): Charges Master se, PO ke charges jaisa.
+    # "add" total badhata hai, "minus" total se ghatata hai.
+    __tablename__ = "purchase_invoice_charges"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    invoice_id = db.Column(db.Integer, db.ForeignKey("purchase_invoices.id"), nullable=False)
+    invoice = db.relationship("PurchaseInvoice", foreign_keys=[invoice_id], backref="charge_lines")
+
+    charge_id = db.Column(db.Integer, db.ForeignKey("charges.id"), nullable=False)
+    charge = db.relationship("Charge", foreign_keys=[charge_id])
+
+    amount = db.Column(db.Float, nullable=False)
+    effect = db.Column(db.String(10), nullable=False)   # "add" ya "minus"
+
+    @property
+    def signed_amount(self):
+        # Total me asar: "add" ka +amount, "minus" ka -amount
+        return -self.amount if self.effect == "minus" else self.amount
+
+    @property
+    def summary(self):
+        # View panel (JS) ke liye dictionary
+        return {"name": self.charge.name if self.charge else "Charge", "amount": self.amount, "effect": self.effect}
+
+class PurchaseReturn(db.Model):
+    # Posted bill ke against maal vendor ko wapas bhejna (debit note): vendor ka payable ghatata hai.
+    # Bill jaisa hi header + lines pattern. Bill khud Posted hi rehta hai.
+    __tablename__ = "purchase_returns"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Hamara number (PR-2026-001): route banata hai
+    pr_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    # Kis bill ke against. backref: invoice.returns = is bill par bane saare returns
+    invoice_id = db.Column(db.Integer, db.ForeignKey("purchase_invoices.id"), nullable=False)
+    invoice = db.relationship("PurchaseInvoice", foreign_keys=[invoice_id], backref="returns")
+
+    return_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.String(255), nullable=False)       # PRD: reason zaroori
+
+    # Posted -> Cancelled (Draft nahi: return seedha post hota hai)
+    status = db.Column(db.String(20), default="Posted", nullable=False)
+
+    # Totals route nikaal ke rakhta hai (rupee, 2 decimal tak round)
+    subtotal = db.Column(db.Float, default=0, nullable=False)     # discount ke baad, tax se pehle
+    tax_total = db.Column(db.Float, default=0, nullable=False)
+    charges_total = db.Column(db.Float, default=0, nullable=False)    # return charges: Add (+) aur Minus (-) ka jod
+    total_amount = db.Column(db.Float, default=0, nullable=False)     # = subtotal + tax + charges; vendor ke payable se itna ghatega
+
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class PurchaseReturnLine(db.Model):
+    # Return ki ek line = bill ki ek line ka kitna hissa wapas gaya. Rate / tax yahan nahi:
+    # bill ki line se hi nikalenge (wo kabhi badalti nahi)
+    __tablename__ = "purchase_return_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    return_id = db.Column(db.Integer, db.ForeignKey("purchase_returns.id"), nullable=False)
+    # "return" Python ka keyword hai, isliye relationship ka naam purchase_return
+    purchase_return = db.relationship("PurchaseReturn", foreign_keys=[return_id], backref="lines")
+
+    # backref: invoice_line.return_lines = is bill line par bane saare return-lines (returned qty isi se nikalegi)
+    invoice_line_id = db.Column(db.Integer, db.ForeignKey("purchase_invoice_lines.id"), nullable=False)
+    invoice_line = db.relationship("PurchaseInvoiceLine", foreign_keys=[invoice_line_id], backref="return_lines")
+
+    qty = db.Column(db.Float, nullable=False)   
+    
+    @property
+    def taxable_amount(self):
+        line = self.invoice_line
+        return round(self.qty * line.rate *(1 - line.discount_percent/100), 2)
+
+    @property
+    def tax_amount(self):
+        return round(self.taxable_amount * self.invoice_line.tax_percent/100, 2)
+
+    @property
+    def summary(self):
+        # View panel (JS) ke liye ek dictionary: material, lot, qty, aur bill line wala rate / discount / tax
+        line = self.invoice_line
+        grn_line = line.grn_line
+        material = line.raw_material
+        return {
+            "material": f"{material.code} {material.name}" if material else "",
+            "grn": grn_line.grn.grn_no if grn_line and grn_line.grn else "",
+            "lot": grn_line.batch_lot_no if grn_line else "",
+            "qty": f"{self.qty:g}",
+            "unit": line.unit.code if line.unit else "",
+            "rate": line.rate,
+            "discount": line.discount_percent,
+            "tax_percent": line.tax_percent,
+            "taxable": self.taxable_amount,
+            "tax": self.tax_amount,
+        }
+
+class PurchaseReturnCharge(db.Model):
+    # Return par extra charge (freight, handling, restocking fee...): Charges Master se, bill / PO ke charges jaisa.
+    # Return ke total par asar: "add" total badhata hai (vendor hamara kharcha lauta raha hai),
+    # "minus" total ghatata hai (vendor apni fees kaat raha hai).
+    __tablename__ = "purchase_return_charges"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    return_id = db.Column(db.Integer, db.ForeignKey("purchase_returns.id"), nullable=False)
+    purchase_return = db.relationship("PurchaseReturn", foreign_keys=[return_id], backref="charge_lines")
+
+    charge_id = db.Column(db.Integer, db.ForeignKey("charges.id"), nullable=False)
+    charge = db.relationship("Charge", foreign_keys=[charge_id])
+
+    amount = db.Column(db.Float, nullable=False)
+    effect = db.Column(db.String(10), nullable=False)   # "add" ya "minus"
+
+    @property
+    def signed_amount(self):
+        # Return ke total par asar: "add" ka +amount, "minus" ka -amount
+        return -self.amount if self.effect == "minus" else self.amount
+
+    @property
+    def summary(self):
+        # View panel (JS) ke liye dictionary
+        return {"name": self.charge.name if self.charge else "Charge", "amount": self.amount, "effect": self.effect}

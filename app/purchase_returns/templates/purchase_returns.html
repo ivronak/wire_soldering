@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Purchase Return{% endblock %}
+
+{% block page_css %}
+<style>
+  .pr-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .pr-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 8px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .pr-table thead th:first-child,
+  .pr-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .pr-table thead th:last-child { border-right: none; }
+  .pr-table tbody td {
+    padding: 11px 8px;
+    font-size: 13.5px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pr-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .pr-table tbody tr:hover { background: #FBF4EE; }
+  .search-wrap input { padding-left: 32px; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid;
+  }
+  #pr-view-modal.hidden { display: none; }
+  #pr-view-modal { display: flex; }
+  .status-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .status-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Purchase return</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Purchase return</h1>
+        </div>
+        {# "New return" button jaan-boojhkar nahi hai: return hamesha ek Posted bill ke against banta hai,
+           isliye Purchase invoice page ke Completed tab me Posted bill ki row par "Return" button hoga (auto-flow rule) #}
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        {# Pending / Completed tabs yahan nahi: koi return "baaki kaam" nahi hota, jab maal wapas bhejna ho tabhi banta hai.
+           Isliye ek hi list + Posted / Cancelled filter #}
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-pr" placeholder="Search return no., vendor, bill, reason…"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            {# data-label = JS count ke saath dikhne wala naam #}
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="posted" data-label="Posted" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Posted (0)</button>
+            <button type="button" data-filter="cancelled" data-label="Cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Cancelled (0)</button>
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              A return is made against a <strong>posted purchase invoice</strong> · only the quantity not yet returned can be sent back · the credit amount reduces what you owe the vendor
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="pr-table">
+            <colgroup>
+              <col style="width:5%" />
+              <col style="width:11%" />
+              <col style="width:9%" />
+              <col style="width:14%" />
+              <col style="width:14%" />
+              <col style="width:14%" />
+              <col style="width:11%" />
+              <col style="width:10%" />
+              <col style="width:12%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Return no.</th>
+                <th>Date</th>
+                <th>Vendor</th>
+                <th>Against bill</th>
+                <th>Reason</th>
+                <th>Credit amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in returns %}
+              {% set inv = r.invoice %}
+              <tr class="pr-row{% if r.status == 'Cancelled' %} opacity-70{% endif %}"
+                  data-search="{{ (r.pr_no ~ ' ' ~ (inv.vendor.name if inv and inv.vendor else '') ~ ' ' ~ (inv.pi_no if inv else '') ~ ' ' ~ (inv.vendor_invoice_no if inv else '') ~ ' ' ~ r.reason)|lower }}"
+                  data-status="{{ r.status|lower }}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td class="font-mono font-semibold text-ink">{{ r.pr_no }}</td>
+                <td class="tabular-nums">{{ r.return_date.strftime('%d %b %Y') if r.return_date else '—' }}</td>
+                <td class="text-left">{{ inv.vendor.name if inv and inv.vendor else '—' }}</td>
+                <td>
+                  <div class="font-mono font-semibold text-ink">{{ inv.pi_no if inv else '—' }}</div>
+                  <div class="text-[11.5px] text-ink-faint">Vendor invoice {{ inv.vendor_invoice_no if inv else '—' }}</div>
+                </td>
+                <td class="text-left text-[13px]" title="{{ r.reason }}">{{ r.reason }}</td>
+                <td class="tabular-nums font-semibold text-ink">₹{{ '{:,.2f}'.format(r.total_amount or 0) }}</td>
+                <td>
+                  {% if r.status == 'Cancelled' %}
+                  <span class="status-pill status-cancelled">Cancelled</span>
+                  {% else %}
+                  <span class="status-pill status-posted">{{ r.status }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                  {# View: return ki poori detail read-only panel me. Lines / charges ka JSON models ki "summary" property se #}
+                  <button type="button"
+                    class="btn-view-pr px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                    data-pr="{{ r.pr_no }}"
+                    data-status="{{ r.status }}"
+                    data-vendor="{{ inv.vendor.name if inv and inv.vendor else '' }}"
+                    data-bill="{{ inv.pi_no if inv else '' }}"
+                    data-vinv="{{ inv.vendor_invoice_no if inv else '' }}"
+                    data-date="{{ r.return_date.strftime('%d %b %Y') if r.return_date else '' }}"
+                    data-reason="{{ r.reason }}"
+                    data-tax-type="{{ inv.tax_type if inv else 'intra' }}"
+                    data-subtotal="{{ r.subtotal }}"
+                    data-tax="{{ r.tax_total }}"
+                    data-total="{{ r.total_amount }}"
+                    data-lines='{{ (r.lines | map(attribute="summary") | list) | tojson }}'
+                    data-charge-lines='{{ (r.charge_lines | map(attribute="summary") | list) | tojson }}'>View</button>
+                  {# Cancel sirf Posted return par. Message simple English me: kya hoga wahi likha hai #}
+                  {% if r.status == 'Posted' %}
+                  <form method="post" action="{{ url_for('purchase_returns.purchase_returns_cancel', ret_id=r.id) }}" class="inline js-confirm-submit"
+                        data-confirm-title="Cancel return"
+                        data-confirm-ok="Cancel return"
+                        data-confirm-message="Cancel {{ r.pr_no }}? The ₹{{ '{:,.2f}'.format(r.total_amount or 0) }} credit from {{ inv.vendor.name if inv and inv.vendor else 'the vendor' }} will be taken back, and these goods can be returned again.">
+                    <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                  </form>
+                  {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            <p class="font-semibold text-ink">No purchase returns yet</p>
+            <p class="text-ink-faint mt-1 text-[13px]">To return goods, open a posted bill on the Purchase invoice page and press Return. Clear the search if you typed one.</p>
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing {{ returns|length }} of {{ returns|length }} returns</span>
+          <span>A return reduces what you owe the vendor</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+{# ---- View return: sirf padhne ke liye. Wording saral: "Vendor credited us" ---- #}
+<div id="pr-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="pr-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="pr-view-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="pr-view-title" class="text-[16px] font-bold text-ink">Return detail</h2>
+        <p id="pr-view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-pr-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="pr-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-pr-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var searchInput = document.getElementById('search-pr');
+  var rows = Array.from(document.querySelectorAll('.pr-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.pr-table');
+  var activeFilter = 'all';
+
+  // Search + status pill, dono se rows chhupao / dikhao
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var blob = row.getAttribute('data-search') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || blob.indexOf(q) !== -1) && (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' returns';
+  }
+  // Har pill pe count: data-label + us status wali rows
+  function updateFilterCounts() {
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      var f = btn.getAttribute('data-filter');
+      var n = f === 'all' ? rows.length : rows.filter(function (row) { return row.getAttribute('data-status') === f; }).length;
+      btn.textContent = btn.getAttribute('data-label') + ' (' + n + ')';
+    });
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-btn').forEach(function (b) {
+        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+      });
+      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+      applyFilters();
+    });
+  });
+
+  // ---------- View return ----------
+  var viewModal = document.getElementById('pr-view-modal');
+  // User ka likha text (reason) innerHTML me daalte hain, isliye hamesha esc() se
+  function esc(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function money(x) {
+    return '₹' + Number(x || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function viewField(label, value) {
+    return '<div><dt class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</dt><dd class="mt-0.5 text-ink">' + esc(value || '—') + '</dd></div>';
+  }
+  function openView(btn) {
+    var taxType = btn.getAttribute('data-tax-type');
+    var lines = JSON.parse(btn.getAttribute('data-lines') || '[]');
+    var chargeLines = JSON.parse(btn.getAttribute('data-charge-lines') || '[]');
+    var tax = parseFloat(btn.getAttribute('data-tax')) || 0;
+    var cancelled = btn.getAttribute('data-status') === 'Cancelled';
+
+    document.getElementById('pr-view-title').textContent = btn.getAttribute('data-pr') + ' · ' + btn.getAttribute('data-status');
+    document.getElementById('pr-view-subtitle').textContent = btn.getAttribute('data-vendor');
+
+    var html = '<dl class="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-3 text-[13px]">';
+    html += viewField('Against bill', btn.getAttribute('data-bill'));
+    html += viewField('Vendor invoice no.', btn.getAttribute('data-vinv'));
+    html += viewField('Return date', btn.getAttribute('data-date'));
+    html += viewField('Reason', btn.getAttribute('data-reason'));
+    html += '</dl>';
+
+    html += '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">' +
+      '<th class="p-2 text-left">Material</th><th class="p-2 text-left">GRN / lot</th><th class="p-2">Returned</th><th class="p-2">Rate</th>' +
+      '<th class="p-2">Disc %</th><th class="p-2">GST %</th><th class="p-2 text-right">Goods</th><th class="p-2 text-right">GST</th></tr></thead><tbody>';
+    lines.forEach(function (l) {
+      html += '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '</td>' +
+        '<td class="p-2 font-mono text-[12px]">' + esc(l.grn) + ' · ' + esc(l.lot) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.qty) + ' ' + esc(l.unit) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + money(l.rate) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.discount) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.tax_percent) + '</td>' +
+        '<td class="p-2 text-right tabular-nums">' + money(l.taxable) + '</td>' +
+        '<td class="p-2 text-right tabular-nums">' + money(l.tax) + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+
+    // "What this return does": Add / Minus ki jagah saade shabd
+    html += '<div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">';
+    html += '<div class="flex items-center justify-between text-ink-muted"><span>Goods returned (before GST)</span><span class="tabular-nums">' + money(btn.getAttribute('data-subtotal')) + '</span></div>';
+    if (taxType === 'inter') {
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>IGST</span><span class="tabular-nums">' + money(tax) + '</span></div>';
+    } else {
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>CGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>SGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
+    }
+    chargeLines.forEach(function (c) {
+      var minus = c.effect === 'minus';
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>' + esc(c.name) + (minus ? ': vendor deducts' : ': vendor pays back') +
+        '</span><span class="tabular-nums">' + (minus ? '− ' : '+ ') + money(c.amount) + '</span></div>';
+    });
+    html += '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink"><span>' +
+      (cancelled ? 'Credit (cancelled, not applied)' : 'Vendor credited us') + '</span><span class="tabular-nums">' + money(btn.getAttribute('data-total')) + '</span></div>';
+    html += '</div>';
+
+    document.getElementById('pr-view-body').innerHTML = html;
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+  document.querySelectorAll('.btn-view-pr').forEach(function (btn) {
+    btn.addEventListener('click', function () { openView(btn); });
+  });
+  document.getElementById('btn-close-pr-view').addEventListener('click', closeView);
+  document.getElementById('btn-close-pr-view-2').addEventListener('click', closeView);
+  document.getElementById('pr-view-backdrop').addEventListener('click', closeView);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !viewModal.classList.contains('hidden')) closeView();
+  });
+
+  updateFilterCounts();
+  applyFilters();
+</script>
+{% endblock %}

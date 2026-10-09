@@ -1,0 +1,1228 @@
+{% extends "base.html" %}
+{% block title %}Purchase Invoice{% endblock %}
+
+{% block page_css %}
+<style>
+  .pi-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .pi-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 8px;
+    text-align: center;
+    border-bottom: 1px solid #D1D9D8;
+    border-right: 1px solid #E4EAE9;
+  }
+  .pi-table thead th:first-child,
+  .pi-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .pi-table thead th:last-child { border-right: none; }
+  .pi-table tbody td {
+    padding: 11px 8px;
+    font-size: 13.5px;
+    text-align: center;
+    border-bottom: 1px solid #E2E8E7;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pi-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .pi-table tbody tr:hover { background: #FBF4EE; }
+  .search-wrap input { padding-left: 32px; }
+  #pi-modal.hidden, #pi-view-modal.hidden, #rt-modal.hidden { display: none; }
+  #pi-modal, #pi-view-modal, #rt-modal { display: flex; }
+  details.help-tip summary { cursor: pointer; list-style: none; }
+  details.help-tip summary::-webkit-details-marker { display: none; }
+  .form-section-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8A4A1C;
+    margin-top: 4px;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid;
+  }
+  .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .status-tobill { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .status-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .status-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th {
+    background: #EEF2F1;
+    color: #3D5A5D;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 8px 6px;
+    border: 1px solid #D1D9D8;
+    text-align: center;
+  }
+  .lines-table td {
+    padding: 4px;
+    border: 1px solid #E2E8E7;
+    vertical-align: middle;
+  }
+  .lines-table input, .lines-table select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+  }
+  .lines-table input:focus, .lines-table select:focus {
+    outline: none;
+    border-color: #C46B2D;
+    box-shadow: 0 0 0 1px #C46B2D;
+  }
+  .lines-table input:read-only { background: #F4F6F5; color: #3D5A5D; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Procurement / Purchase invoice</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Purchase invoice</h1>
+        </div>
+        {# "New invoice" button jaan-boojhkar nahi hai: QC me pass hua maal khud Pending tab me aata hai,
+           wahan row ka "Create bill" button form kholta hai (auto-flow rule) #}
+      </div>
+
+      {# Macro = Jinja ka chhota "function": View button Pending (Draft) aur Completed dono tables me chahiye,
+         isliye ek baar yahan likha. Bill ki lines / charges ka JSON "summary" property se aata hai (models.py) #}
+      {% macro pi_view_button(inv) %}
+      <button type="button"
+        class="btn-view-pi px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+        data-pi="{{ inv.pi_no }}"
+        data-vendor="{{ inv.vendor.name if inv.vendor else '' }}"
+        data-status="{{ inv.status }}"
+        data-vinv="{{ inv.vendor_invoice_no }}"
+        data-date="{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '' }}"
+        data-tax-type="{{ inv.tax_type }}"
+        data-remarks="{{ inv.remarks or '' }}"
+        data-subtotal="{{ inv.subtotal }}"
+        data-tax="{{ inv.tax_total }}"
+        data-charges="{{ inv.charges_total }}"
+        data-total="{{ inv.total_amount }}"
+        data-returned="{{ inv.returned_amount }}"
+        data-lines='{{ (inv.lines | map(attribute="summary") | list) | tojson }}'
+        data-charge-lines='{{ (inv.charge_lines | map(attribute="summary") | list) | tojson }}'
+        data-returns='{{ inv.returns_summary | tojson }}'>View</button>
+      {% endmacro %}
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        {# §10.6 tabs: GRN / QC page jaisa. Flask route ?tab=pending|completed ke hisaab se list + counts bhejta hai #}
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('purchase_invoices.purchase_invoices_list', tab='pending') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Pending action <span class="tabular-nums">({{ pending_count }})</span>
+          </a>
+          <a href="{{ url_for('purchase_invoices.purchase_invoices_list', tab='completed') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Completed <span class="tabular-nums">({{ completed_count }})</span>
+          </a>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
+            <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            <input type="search" id="search-pi" placeholder="{{ 'Search GRN, QC, vendor, material, lot…' if tab == 'pending' else 'Search PI no., vendor, vendor invoice no…' }}"
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            {# Har tab me sirf usi tab ke pills. data-label = JS count ke saath dikhne wala naam #}
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            {% if tab == 'completed' %}
+            <button type="button" data-filter="posted" data-label="Posted" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Posted (0)</button>
+            <button type="button" data-filter="cancelled" data-label="Cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Cancelled (0)</button>
+            {% else %}
+            <button type="button" data-filter="tobill" data-label="To bill" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">To bill (0)</button>
+            <button type="button" data-filter="draft" data-label="Draft bill" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft bill (0)</button>
+            {% endif %}
+          </div>
+          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+            <summary class="font-semibold hover:underline">Quick help ▾</summary>
+            <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
+              A bill can be made only for the quantity that <strong>passed QC</strong> · a lot cannot be billed twice · rejected quantity is never billed · to change a draft bill, cancel it and create it again · goods are sent back with <strong>Return</strong> on a posted bill; a bill with an active return cannot be cancelled until the return is cancelled
+            </p>
+          </details>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          {% if tab == 'pending' %}
+          {# Pending: do tarah ki rows ek table me — (1) lots jinka QC final hai aur bill baaki hai (status "To bill"),
+             (2) Draft bills (save hue, post nahi hue). data-status se pills filter karte hain: tobill / draft #}
+          <table class="pi-table">
+            <colgroup>
+              <col style="width:5%" />
+              <col style="width:14%" />
+              <col style="width:14%" />
+              <col style="width:18%" />
+              <col style="width:17%" />
+              <col style="width:8%" />
+              <col style="width:9%" />
+              <col style="width:15%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Document</th>
+                <th>Vendor</th>
+                <th>Material / details</th>
+                <th>Quantity / amount</th>
+                <th>Rate</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for gl in lots %}
+              {% set grn = gl.grn %}
+              {% set po = grn.po if grn else none %}
+              {% set pol = gl.po_line %}
+              {% set rm = pol.raw_material if pol else none %}
+              {% set unit = pol.unit.code if pol and pol.unit else '' %}
+              {% set qc = gl.final_qc %}
+              {% set billable = gl.billable_qty %}
+              {# CGST+SGST (intra) ya IGST (inter): vendor ka state vs hamare delivery branch ka state. Server bhi yahi check karta hai #}
+              {% set branch = po.warehouse.branch if po and po.warehouse else none %}
+              {% set tax_type = 'intra' if (po and branch and po.vendor.state_id == branch.state_id) else 'inter' %}
+              <tr class="pi-row"
+                  data-search="{{ ((grn.grn_no if grn else '') ~ ' ' ~ (qc.qc_no if qc else '') ~ ' ' ~ (po.vendor.name if po and po.vendor else '') ~ ' ' ~ (rm.code if rm else '') ~ ' ' ~ (rm.name if rm else '') ~ ' ' ~ (gl.batch_lot_no or ''))|lower }}"
+                  data-status="tobill">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td>
+                  <div class="font-mono font-semibold text-ink">{{ grn.grn_no if grn else '—' }}</div>
+                  <div class="text-[11.5px] text-ink-faint">{{ qc.qc_no if qc else '—' }} · {{ po.po_no if po else '—' }}</div>
+                </td>
+                <td class="text-left">{{ po.vendor.name if po and po.vendor else '—' }}</td>
+                <td class="text-left">
+                  <div class="font-medium text-ink">{% if rm %}{{ rm.code }} {{ rm.name }}{% else %}—{% endif %}</div>
+                  <div class="text-[11.5px] text-ink-faint">Lot {{ gl.batch_lot_no or '—' }}</div>
+                </td>
+                <td class="tabular-nums">
+                  <div class="font-semibold text-ink">{{ '%g'|format(billable) }} {{ unit }} to bill</div>
+                  <div class="text-[11.5px] text-ink-faint">{{ '%g'|format(gl.passed_qty) }} passed · {{ '%g'|format(gl.billed_qty) }} billed</div>
+                </td>
+                <td class="tabular-nums text-[12.5px]">{% if pol %}₹{{ '{:,.2f}'.format(pol.rate or 0) }}{% else %}—{% endif %}</td>
+                <td><span class="status-pill status-tobill">To bill</span></td>
+                <td>
+                  {# Is lot ka saara data button par rakha hai: form kholne par JS isi se lines banata hai #}
+                  <button type="button"
+                    class="btn-create-bill px-2 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
+                    data-gl-id="{{ gl.id }}"
+                    data-grn-id="{{ grn.id }}"
+                    data-grn-no="{{ grn.grn_no }}"
+                    data-vendor-id="{{ po.vendor_id }}"
+                    data-vendor="{{ po.vendor.name }}"
+                    data-material="{{ (rm.code ~ ' ' ~ rm.name) if rm else '' }}"
+                    data-lot="{{ gl.batch_lot_no }}"
+                    data-unit="{{ unit }}"
+                    data-billable="{{ billable }}"
+                    data-rate="{{ pol.rate }}"
+                    data-discount="{{ pol.discount_percent or 0 }}"
+                    data-tax-id="{{ pol.tax_rate_id }}"
+                    data-tax-type="{{ tax_type }}">Create bill</button>
+                </td>
+              </tr>
+              {% endfor %}
+              {% for inv in draft_invoices %}
+              <tr class="pi-row"
+                  data-search="{{ (inv.pi_no ~ ' ' ~ (inv.vendor.name if inv.vendor else '') ~ ' ' ~ inv.vendor_invoice_no)|lower }}"
+                  data-status="draft">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ lots|length + loop.index }}</td>
+                <td>
+                  <div class="font-mono font-semibold text-ink">{{ inv.pi_no }}</div>
+                  <div class="text-[11.5px] text-ink-faint">Draft bill</div>
+                </td>
+                <td class="text-left">{{ inv.vendor.name if inv.vendor else '—' }}</td>
+                <td class="text-left">
+                  <div class="font-medium text-ink">Vendor invoice {{ inv.vendor_invoice_no }}</div>
+                  <div class="text-[11.5px] text-ink-faint">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }} · {{ inv.lines|length }} line{{ '' if inv.lines|length == 1 else 's' }}</div>
+                </td>
+                <td class="tabular-nums font-semibold text-ink">₹{{ '{:,.2f}'.format(inv.total_amount or 0) }}</td>
+                <td>—</td>
+                <td><span class="status-pill status-draft">Draft</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    {{ pi_view_button(inv) }}
+                    <form method="post" action="{{ url_for('purchase_invoices.purchase_invoices_post', inv_id=inv.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Post bill"
+                          data-confirm-ok="Post"
+                          data-confirm-message="Post {{ inv.pi_no }}? ₹{{ '{:,.2f}'.format(inv.total_amount or 0) }} will be added to what you owe {{ inv.vendor.name if inv.vendor else 'the vendor' }}.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post</button>
+                    </form>
+                    <form method="post" action="{{ url_for('purchase_invoices.purchase_invoices_cancel', inv_id=inv.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Cancel draft bill"
+                          data-confirm-ok="Cancel bill"
+                          data-confirm-message="Cancel draft {{ inv.pi_no }}? Its quantity will be free to bill again.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          {# Completed: post / cancel ho chuke bills #}
+          <table class="pi-table">
+            <colgroup>
+              <col style="width:5%" />
+              <col style="width:12%" />
+              <col style="width:10%" />
+              <col style="width:16%" />
+              <col style="width:14%" />
+              <col style="width:6%" />
+              <col style="width:13%" />
+              <col style="width:10%" />
+              <col style="width:14%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>PI no.</th>
+                <th>Date</th>
+                <th>Vendor</th>
+                <th>Vendor invoice no.</th>
+                <th>Lines</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv in invoices %}
+              <tr class="pi-row{% if inv.status == 'Cancelled' %} opacity-70{% endif %}"
+                  data-search="{{ (inv.pi_no ~ ' ' ~ (inv.vendor.name if inv.vendor else '') ~ ' ' ~ inv.vendor_invoice_no)|lower }}"
+                  data-status="{{ inv.status|lower }}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td class="font-mono font-semibold text-ink">{{ inv.pi_no }}</td>
+                <td class="tabular-nums">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}</td>
+                <td class="text-left">{{ inv.vendor.name if inv.vendor else '—' }}</td>
+                <td class="font-mono text-[12.5px]">{{ inv.vendor_invoice_no }}</td>
+                <td class="tabular-nums">{{ inv.lines|length }}</td>
+                <td class="tabular-nums">
+                  <div class="font-semibold text-ink">₹{{ '{:,.2f}'.format(inv.total_amount or 0) }}</div>
+                  {# Jis bill par return ho chuka ho uske total ke neeche chhota note, taaki "kitna wapas gaya" turant dikhe #}
+                  {% if inv.returned_amount > 0 %}
+                  <div class="text-[11.5px] text-ink-faint">Returned ₹{{ '{:,.2f}'.format(inv.returned_amount) }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if inv.status == 'Cancelled' %}
+                  <span class="status-pill status-cancelled">Cancelled</span>
+                  {% else %}
+                  <span class="status-pill status-posted">{{ inv.status }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    {{ pi_view_button(inv) }}
+                    {# Return sirf Posted bill par aur jab kuch qty wapas bhejne ko bachi ho. Poora wapas ja chuka ho to "Fully returned".
+                       Lines ka data button par rakha hai: panel kholne par JS isi se rows banata hai #}
+                    {% if inv.can_return %}
+                    <button type="button"
+                      class="btn-return px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-invoice-id="{{ inv.id }}"
+                      data-pi="{{ inv.pi_no }}"
+                      data-vendor="{{ inv.vendor.name if inv.vendor else '' }}"
+                      data-total="{{ inv.total_amount }}"
+                      data-returned="{{ inv.returned_amount }}"
+                      data-invoice-date="{{ inv.invoice_date.isoformat() if inv.invoice_date else '' }}"
+                      data-return-lines='{{ (inv.lines | map(attribute="return_info") | list) | tojson }}'>Return</button>
+                    {% elif inv.status == 'Posted' and inv.active_returns %}
+                    <span class="self-center text-[11.5px] text-ink-faint">Fully returned</span>
+                    {% endif %}
+                    {# Active return wale bill par Cancel nahi dikhate (server bhi refuse karta hai): pehle return cancel karo #}
+                    {% if inv.status == 'Posted' and not inv.active_returns %}
+                    <form method="post" action="{{ url_for('purchase_invoices.purchase_invoices_cancel', inv_id=inv.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Cancel posted bill"
+                          data-confirm-ok="Cancel bill"
+                          data-confirm-message="Cancel {{ inv.pi_no }}? ₹{{ '{:,.2f}'.format(inv.total_amount or 0) }} will be removed from what you owe {{ inv.vendor.name if inv.vendor else 'the vendor' }}, and its quantity will be free to bill again.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+
+          <div id="empty-state" class="hidden py-12 text-center">
+            {% if tab == 'completed' %}
+            <p class="font-semibold text-ink">No posted or cancelled bills yet</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Bills appear here once they are posted. Clear the search if you typed one.</p>
+            {% else %}
+            <p class="font-semibold text-ink">Nothing is waiting to be billed</p>
+            <p class="text-ink-faint mt-1 text-[13px]">Lots appear here automatically once their QC result is final. Clear the search if you typed one.</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
+          <span id="result-count">Showing {{ result_count }} of {{ result_count }} {{ 'pending items' if tab == 'pending' else 'bills' }}</span>
+          <span>Bills are made on QC-accepted quantity only</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+{# ---- Create bill: right se khulne wala panel. Vendor / lots / tax type Pending row ke "Create bill" se aate hain ---- #}
+<div id="pi-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="pi-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="pi-modal-title" class="relative ml-auto h-full w-full max-w-5xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="pi-modal-title" class="text-[16px] font-bold text-ink">Create purchase bill</h2>
+        <p class="text-[12.5px] text-ink-faint">Enter the vendor's bill against the lots that passed QC</p>
+      </div>
+      <button type="button" id="btn-close-pi-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+
+    <form id="pi-form" method="post" action="{{ url_for('purchase_invoices.purchase_invoices_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <p class="form-section-title">Bill header</p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div>
+          <label for="pi-no" class="block text-[12.5px] font-semibold text-ink mb-1">PI no.</label>
+          <input type="text" id="pi-no" value="Auto on save" readonly class="w-full px-2.5 py-2 text-[13px] font-mono bg-mist border border-slate-300 rounded text-ink-faint" />
+        </div>
+        <div class="md:col-span-1">
+          <label for="pi-vendor" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor</label>
+          <input type="hidden" id="pi-vendor-id" name="vendor_id" value="" />
+          <input type="text" id="pi-vendor" readonly class="w-full px-2.5 py-2 text-[14px] bg-mist border border-slate-300 rounded text-ink-muted" />
+        </div>
+        <div>
+          <label for="pi-vinv" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor invoice no. *</label>
+          <input type="text" id="pi-vinv" name="vendor_invoice_no" required maxlength="50" placeholder="As printed on the vendor's bill" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper font-mono" />
+        </div>
+        <div>
+          <label for="pi-date" class="block text-[12.5px] font-semibold text-ink mb-1">Invoice date *</label>
+          <input type="date" id="pi-date" name="invoice_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+      </div>
+      <div id="pi-tax-type-box" class="w-full px-2.5 py-2 text-[13.5px] border border-brand-border rounded bg-brand-soft text-brand-teal font-medium"></div>
+
+      <hr class="border-slate-200" />
+      <p class="form-section-title !mt-0">Lots to bill</p>
+      <p class="text-[12.5px] text-ink-faint">Only quantity that passed QC and is not billed yet can be entered. Leave <strong>Bill qty</strong> empty for a lot that is not on this vendor bill.</p>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th style="width:12%">GRN / lot</th>
+              <th style="width:16%">Material</th>
+              <th style="width:9%">Can bill</th>
+              <th style="width:9%">Bill qty</th>
+              <th style="width:11%">Rate (₹)</th>
+              <th style="width:7%">Disc %</th>
+              <th style="width:14%">Tax rate</th>
+              <th style="width:11%">Taxable (₹)</th>
+              <th style="width:11%">Tax (₹)</th>
+            </tr>
+          </thead>
+          <tbody id="pi-line-body"></tbody>
+        </table>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <p class="form-section-title !mt-0 !mb-0">Charges</p>
+        <button type="button" id="btn-add-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
+      </div>
+      <p class="text-[12.5px] text-ink-faint">Optional (freight, packing…). Pick a charge from the master. Add increases the total. Minus reduces it.</p>
+      <div class="border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th style="width:46%">Charge</th>
+              <th style="width:22%">Effect</th>
+              <th style="width:24%">Amount (₹)</th>
+              <th style="width:8%"></th>
+            </tr>
+          </thead>
+          <tbody id="pi-charge-list">
+            <tr id="pi-charge-empty">
+              <td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <label for="pi-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+        <textarea id="pi-remarks" name="remarks" rows="2" maxlength="255" placeholder="Anything to note about this bill…"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+      </div>
+
+      <div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">
+        <div class="flex items-center justify-between text-ink-muted">
+          <span>Subtotal (after discount)</span><span id="pi-subtotal" class="tabular-nums">₹0.00</span>
+        </div>
+        <div id="pi-tax-rows" class="text-ink-muted"></div>
+        <div id="pi-charge-rows" class="text-ink-muted"></div>
+        <div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">
+          <span>Bill total</span><span id="pi-grand-total" class="tabular-nums">₹0.00</span>
+        </div>
+      </div>
+      <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+        <strong>Save as draft</strong> keeps the bill for checking (the amount is not added to the vendor yet).
+        <strong>Post bill</strong> adds the total to what you owe the vendor. Totals are recalculated on the server when you save.
+      </p>
+    </form>
+
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="pi-form" name="invoice_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+      <button type="button" id="btn-cancel-pi" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="pi-form" name="invoice_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post bill</button>
+    </div>
+  </div>
+</div>
+
+{# ---- View bill: sirf padhne ke liye ---- #}
+<div id="pi-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="pi-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="pi-view-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="pi-view-title" class="text-[16px] font-bold text-ink">Bill detail</h2>
+        <p id="pi-view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-pi-view" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="pi-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 text-[14px]"></div>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" id="btn-close-pi-view-2" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+    </div>
+  </div>
+</div>
+
+{# ---- Return goods: Posted bill ki row ke "Return" button se khulta hai. Form Purchase return ke route par jaata hai.
+        Wording jaan-boojhkar saral hai (Add / Minus jaise shabd nahi): non-technical user ke liye ---- #}
+<div id="rt-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="rt-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="rt-modal-title" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="rt-modal-title" class="text-[16px] font-bold text-ink">Return goods to vendor</h2>
+        <p id="rt-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="btn-close-rt-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+
+    <form id="rt-form" method="post" action="{{ url_for('purchase_returns.purchase_returns_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <input type="hidden" name="invoice_id" id="rt-invoice-id" value="" />
+
+      <div>
+        <p class="text-[14px] font-semibold text-ink">1. What are you sending back?</p>
+        <p class="text-[12.5px] text-ink-faint mb-2">Type the quantity for each item you are returning. Leave the others empty.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded">
+          <table class="lines-table">
+            <thead>
+              <tr>
+                <th style="width:26%">Material</th>
+                <th style="width:13%">On the bill</th>
+                <th style="width:14%">Returned before</th>
+                <th style="width:14%">You can return</th>
+                <th style="width:16%">Return now</th>
+                <th style="width:17%">Value (with GST)</th>
+              </tr>
+            </thead>
+            <tbody id="rt-line-body"></tbody>
+          </table>
+        </div>
+        <p class="text-[12px] text-ink-faint mt-1.5">The value uses the same rate, discount and GST as the bill.</p>
+      </div>
+
+      <div>
+        <p class="text-[14px] font-semibold text-ink mb-2">2. When and why?</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label for="rt-date" class="block text-[12.5px] font-semibold text-ink mb-1">Return date *</label>
+            <input type="date" id="rt-date" name="return_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+          <div class="md:col-span-2">
+            <label for="rt-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason for the return *</label>
+            <input type="text" id="rt-reason" name="reason" required maxlength="255" placeholder="Wire was damaged on arrival" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between">
+          <p class="text-[14px] font-semibold text-ink">3. Extra charges <span class="font-normal text-ink-faint">(optional)</span></p>
+          <button type="button" id="btn-add-rt-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
+        </div>
+        <p class="text-[12.5px] text-ink-faint mb-2">Use this when the vendor keeps a fee, or pays back what you spent to send the goods.</p>
+        <div class="border border-slate-200 rounded">
+          <table class="lines-table">
+            <thead>
+              <tr>
+                <th style="width:32%">Charge</th>
+                <th style="width:40%">What happens?</th>
+                <th style="width:20%">Amount (₹)</th>
+                <th style="width:8%"></th>
+              </tr>
+            </thead>
+            <tbody id="rt-charge-list">
+              <tr id="rt-charge-empty">
+                <td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-mist border border-slate-200 rounded p-3.5 text-[13px]">
+        <p class="text-[14px] font-semibold text-ink mb-2">What this return does</p>
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between"><span class="text-ink-muted">Goods returned, including GST</span><span id="rt-s-goods" class="tabular-nums">₹0.00</span></div>
+          <div id="rt-s-charges" class="space-y-1.5"></div>
+          <div class="flex items-center justify-between pt-2 mt-1 border-t border-slate-300 text-[15px] font-bold text-ink"><span>Vendor will credit us</span><span id="rt-s-total" class="tabular-nums">₹0.00</span></div>
+          <p id="rt-s-error" class="text-[13px] text-stop"></p>
+        </div>
+        <div class="border-t border-slate-200 mt-3 pt-2.5 space-y-1.5">
+          <div class="flex items-center justify-between"><span class="text-ink-muted" id="rt-s-bill-label">Bill total</span><span id="rt-s-bill" class="tabular-nums">₹0.00</span></div>
+          <div id="rt-s-before-row" class="flex items-center justify-between"><span class="text-ink-muted">Less: returned before</span><span id="rt-s-before" class="tabular-nums">₹0.00</span></div>
+          <div class="flex items-center justify-between"><span class="text-ink-muted">Less: this return</span><span id="rt-s-less" class="tabular-nums">₹0.00</span></div>
+          <div class="flex items-center justify-between font-semibold text-ink"><span>Bill total after return</span><span id="rt-s-after" class="tabular-nums">₹0.00</span></div>
+        </div>
+        <p class="text-[12px] text-ink-faint mt-2.5">The original bill stays as it is. This return is a separate record against it.</p>
+      </div>
+    </form>
+
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-rt" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="rt-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post return</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var searchInput = document.getElementById('search-pi');
+  var rows = Array.from(document.querySelectorAll('.pi-row'));
+  var emptyState = document.getElementById('empty-state');
+  var resultCount = document.getElementById('result-count');
+  var tableEl = document.querySelector('.pi-table');
+  var activeFilter = 'all';
+  // Footer "Showing X of Y ..." ka naam: tab ke hisaab se (Flask se aata hai)
+  var LIST_NOUN = {{ ('pending items' if tab == 'pending' else 'bills')|tojson }};
+
+  // Flask se aaye dropdown data (Tax Rates master aur Charges master): code me fixed list nahi
+  var TAX_RATES = [{% for t in tax_rates %}{id: {{ t.id }}, label: {{ (t.code ~ ' (' ~ t.rate_percent ~ '%)')|tojson }}, pct: {{ t.rate_percent }}}{% if not loop.last %},{% endif %}{% endfor %}];
+  var CHARGE_OPTIONS = [{% for c in charges %}{id: {{ c.id }}, label: {{ (c.code ~ ' — ' ~ c.name)|tojson }}, name: {{ c.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+  var TODAY = {{ today|tojson }};
+
+  var piModal = document.getElementById('pi-modal');
+  var piForm = document.getElementById('pi-form');
+  var lineBody = document.getElementById('pi-line-body');
+  var chargeList = document.getElementById('pi-charge-list');
+  var viewModal = document.getElementById('pi-view-modal');
+  // Create bill khulne par is bill ka tax type (intra = CGST+SGST, inter = IGST)
+  var currentTaxType = 'intra';
+
+  // ---------- chhote helper functions ----------
+  function esc(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  // Paise tak round (server bhi 2 decimal tak round karta hai)
+  function r2(x) { return Math.round(x * 100) / 100; }
+  function money(x) {
+    return '₹' + Number(x || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtQty(x) { return String(Math.round(Number(x) * 10000) / 10000); }
+
+  // ---------- list: search + status pills ----------
+  function applyFilters() {
+    var q = (searchInput.value || '').trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var blob = row.getAttribute('data-search') || '';
+      var status = row.getAttribute('data-status') || '';
+      var show = (!q || blob.indexOf(q) !== -1) && (activeFilter === 'all' || status === activeFilter);
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    var none = visible === 0;
+    emptyState.classList.toggle('hidden', !none);
+    if (tableEl) tableEl.classList.toggle('hidden', none);
+    resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' ' + LIST_NOUN;
+  }
+  // Har pill pe count: data-label + us status wali rows (har tab me alag pills hain, isliye generic loop)
+  function updateFilterCounts() {
+    document.querySelectorAll('.filter-btn').forEach(function (btn) {
+      var f = btn.getAttribute('data-filter');
+      var n = f === 'all' ? rows.length : rows.filter(function (row) { return row.getAttribute('data-status') === f; }).length;
+      btn.textContent = btn.getAttribute('data-label') + ' (' + n + ')';
+    });
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-btn').forEach(function (b) {
+        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.add('border-slate-300', 'bg-white', 'text-ink');
+      });
+      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
+      applyFilters();
+    });
+  });
+
+  // ---------- Create bill form ----------
+  // "Create bill" button par rakha lot ka data -> ek JS object
+  function lotFromButton(btn) {
+    return {
+      id: btn.getAttribute('data-gl-id'),
+      grnId: btn.getAttribute('data-grn-id'),
+      grnNo: btn.getAttribute('data-grn-no'),
+      vendorId: btn.getAttribute('data-vendor-id'),
+      vendor: btn.getAttribute('data-vendor'),
+      material: btn.getAttribute('data-material'),
+      lotNo: btn.getAttribute('data-lot'),
+      unit: btn.getAttribute('data-unit'),
+      billable: parseFloat(btn.getAttribute('data-billable')) || 0,
+      rate: parseFloat(btn.getAttribute('data-rate')) || 0,
+      discount: parseFloat(btn.getAttribute('data-discount')) || 0,
+      taxId: btn.getAttribute('data-tax-id'),
+      taxType: btn.getAttribute('data-tax-type')
+    };
+  }
+
+  function taxSelectHtml(selectedId) {
+    var html = '';
+    TAX_RATES.forEach(function (t) {
+      html += '<option value="' + t.id + '" data-pct="' + t.pct + '"' + (String(t.id) === String(selectedId) ? ' selected' : '') + '>' + esc(t.label) + '</option>';
+    });
+    return html;
+  }
+
+  function lineRowHtml(lot, prefill) {
+    return '<tr class="pi-line-row">' +
+      '<td><input type="hidden" class="line-gl-id" value="' + esc(lot.id) + '" />' +
+        '<div class="font-mono text-[12px] font-semibold text-ink">' + esc(lot.grnNo) + '</div>' +
+        '<div class="text-[11px] text-ink-faint">Lot ' + esc(lot.lotNo) + '</div></td>' +
+      '<td>' + esc(lot.material) + '</td>' +
+      '<td class="tabular-nums text-center">' + fmtQty(lot.billable) + ' ' + esc(lot.unit) + '</td>' +
+      '<td><input type="number" class="line-qty tabular-nums" min="0" max="' + lot.billable + '" step="any" placeholder="0" value="' + (prefill ? lot.billable : '') + '" /></td>' +
+      '<td><input type="number" class="line-rate tabular-nums" min="0" step="any" required value="' + lot.rate + '" /></td>' +
+      '<td><input type="number" class="line-disc tabular-nums" min="0" max="100" step="any" value="' + lot.discount + '" /></td>' +
+      '<td><select class="line-tax">' + taxSelectHtml(lot.taxId) + '</select></td>' +
+      '<td><input type="text" readonly tabindex="-1" class="line-taxable tabular-nums text-right" value="0.00" /></td>' +
+      '<td><input type="text" readonly tabindex="-1" class="line-taxamt tabular-nums text-right" value="0.00" /></td>' +
+      '</tr>';
+  }
+
+  // Flask ko index ke hisaab se field naam chahiye: grn_line_id_0, qty_0, rate_0 ...
+  function renumberLines() {
+    document.querySelectorAll('.pi-line-row').forEach(function (row, index) {
+      row.querySelector('.line-gl-id').name = 'grn_line_id_' + index;
+      row.querySelector('.line-qty').name = 'qty_' + index;
+      row.querySelector('.line-rate').name = 'rate_' + index;
+      row.querySelector('.line-disc').name = 'discount_' + index;
+      row.querySelector('.line-tax').name = 'tax_rate_id_' + index;
+    });
+  }
+
+  function setTaxTypeBox() {
+    var box = document.getElementById('pi-tax-type-box');
+    if (currentTaxType === 'inter') {
+      box.textContent = 'Inter-state purchase (IGST)';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-copper-border rounded bg-copper-soft text-copper-text font-medium';
+    } else {
+      box.textContent = 'Intra-state purchase (CGST + SGST)';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-brand-border rounded bg-brand-soft text-brand-teal font-medium';
+    }
+  }
+
+  // Ek line ka taxable aur tax: server wala hi formula (qty x rate, discount % ghata ke, phir tax %)
+  function calcLine(row) {
+    var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
+    var rate = parseFloat(row.querySelector('.line-rate').value) || 0;
+    var disc = parseFloat(row.querySelector('.line-disc').value) || 0;
+    var taxOpt = row.querySelector('.line-tax').selectedOptions[0];
+    var pct = taxOpt ? (parseFloat(taxOpt.getAttribute('data-pct')) || 0) : 0;
+    var taxable = r2(qty * rate * (1 - disc / 100));
+    var tax = r2(taxable * pct / 100);
+    row.querySelector('.line-taxable').value = taxable.toFixed(2);
+    row.querySelector('.line-taxamt').value = tax.toFixed(2);
+    return { taxable: taxable, tax: tax };
+  }
+
+  function calcTotals() {
+    var subtotal = 0;
+    var totalTax = 0;
+    document.querySelectorAll('.pi-line-row').forEach(function (row) {
+      var amounts = calcLine(row);
+      subtotal += amounts.taxable;
+      totalTax += amounts.tax;
+    });
+    var chargeNet = 0;
+    var chargeHtml = '';
+    document.querySelectorAll('.pi-charge-row').forEach(function (row) {
+      var amt = parseFloat(row.querySelector('.charge-amount').value) || 0;
+      var effect = row.querySelector('.charge-effect').value;
+      var label = row.querySelector('.charge-id').selectedOptions[0];
+      var name = label && label.value ? label.textContent : 'Charge';
+      chargeNet += effect === 'minus' ? -amt : amt;
+      chargeHtml += '<div class="flex items-center justify-between"><span>' + esc(name) + '</span><span class="tabular-nums">' +
+        (effect === 'minus' ? '−' : '+') + ' ' + money(amt) + '</span></div>';
+    });
+    document.getElementById('pi-charge-rows').innerHTML = chargeHtml;
+
+    var taxRowsEl = document.getElementById('pi-tax-rows');
+    if (currentTaxType === 'inter') {
+      taxRowsEl.innerHTML = '<div class="flex items-center justify-between"><span>IGST</span><span class="tabular-nums">' + money(totalTax) + '</span></div>';
+    } else {
+      var half = totalTax / 2;
+      taxRowsEl.innerHTML =
+        '<div class="flex items-center justify-between"><span>CGST</span><span class="tabular-nums">' + money(half) + '</span></div>' +
+        '<div class="flex items-center justify-between"><span>SGST</span><span class="tabular-nums">' + money(half) + '</span></div>';
+    }
+    document.getElementById('pi-subtotal').textContent = money(subtotal);
+    document.getElementById('pi-grand-total').textContent = money(r2(subtotal) + r2(totalTax) + r2(chargeNet));
+  }
+
+  // --- Charges (PO jaisa) ---
+  function chargeSelectHtml() {
+    var html = '<option value="">Select charge…</option>';
+    CHARGE_OPTIONS.forEach(function (c) {
+      html += '<option value="' + c.id + '">' + esc(c.label) + '</option>';
+    });
+    return html;
+  }
+  function resetChargeList() {
+    chargeList.innerHTML = '<tr id="pi-charge-empty"><td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges yet.</td></tr>';
+  }
+  function renumberCharges() {
+    document.querySelectorAll('.pi-charge-row').forEach(function (row, index) {
+      row.querySelector('.charge-id').name = 'charge_id_' + index;
+      row.querySelector('.charge-amount').name = 'charge_amount_' + index;
+      row.querySelector('.charge-effect').name = 'charge_effect_' + index;
+    });
+  }
+  function addChargeRow() {
+    var empty = document.getElementById('pi-charge-empty');
+    if (empty) empty.remove();
+    var tr = document.createElement('tr');
+    tr.className = 'pi-charge-row';
+    tr.innerHTML =
+      '<td><select class="charge-id">' + chargeSelectHtml() + '</select></td>' +
+      '<td><select class="charge-effect"><option value="add">Add</option><option value="minus">Minus</option></select></td>' +
+      '<td><input type="number" class="charge-amount text-right tabular-nums" min="0" step="0.01" placeholder="0.00" /></td>' +
+      '<td class="text-center"><button type="button" class="btn-remove-charge text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove charge">&times;</button></td>';
+    chargeList.appendChild(tr);
+    renumberCharges();
+    calcTotals();
+  }
+
+  // Pending row ka "Create bill": usi vendor ke (aur same tax type ke) saare billable lots form me lao.
+  // Jis GRN ka button dabaya uske lots pehle se bhare (poori billable qty); baaki lots khaali, jo bill me hain wahi bharo.
+  function openCreate(btn) {
+    var clicked = lotFromButton(btn);
+    var sameVendorLots = [];
+    document.querySelectorAll('.btn-create-bill').forEach(function (b) {
+      var lot = lotFromButton(b);
+      if (lot.vendorId === clicked.vendorId && lot.taxType === clicked.taxType) sameVendorLots.push(lot);
+    });
+
+    currentTaxType = clicked.taxType;
+    document.getElementById('pi-vendor-id').value = clicked.vendorId;
+    document.getElementById('pi-vendor').value = clicked.vendor;
+    document.getElementById('pi-date').value = TODAY;
+    document.getElementById('pi-vinv').value = '';
+    document.getElementById('pi-remarks').value = '';
+    lineBody.innerHTML = sameVendorLots.map(function (lot) {
+      return lineRowHtml(lot, lot.grnId === clicked.grnId);
+    }).join('');
+    renumberLines();
+    resetChargeList();
+    setTaxTypeBox();
+    calcTotals();
+
+    piModal.classList.remove('hidden');
+    piModal.setAttribute('aria-hidden', 'false');
+    document.getElementById('pi-vinv').focus();
+  }
+  function closeCreate() {
+    piModal.classList.add('hidden');
+    piModal.setAttribute('aria-hidden', 'true');
+    piForm.reset();
+    lineBody.innerHTML = '';
+    resetChargeList();
+  }
+
+  document.querySelectorAll('.btn-create-bill').forEach(function (btn) {
+    btn.addEventListener('click', function () { openCreate(btn); });
+  });
+  document.getElementById('btn-close-pi-modal').addEventListener('click', closeCreate);
+  document.getElementById('btn-cancel-pi').addEventListener('click', closeCreate);
+  document.getElementById('pi-modal-backdrop').addEventListener('click', closeCreate);
+  document.getElementById('btn-add-charge').addEventListener('click', addChargeRow);
+  lineBody.addEventListener('input', calcTotals);
+  lineBody.addEventListener('change', calcTotals);
+  chargeList.addEventListener('input', calcTotals);
+  chargeList.addEventListener('change', calcTotals);
+  chargeList.addEventListener('click', function (e) {
+    var btn = e.target.closest('.btn-remove-charge');
+    if (!btn) return;
+    btn.closest('.pi-charge-row').remove();
+    if (!document.querySelector('.pi-charge-row')) resetChargeList();
+    renumberCharges();
+    calcTotals();
+  });
+
+  // Submit se pehle browser par jaldi jaanch (asli jaanch server karta hai), aur "Post bill" par confirm
+  piForm.addEventListener('submit', function (e) {
+    if (piForm.getAttribute('data-confirmed') === '1') {
+      piForm.removeAttribute('data-confirmed');
+      return;
+    }
+
+    var anyQty = false;
+    var tooMuch = null;
+    document.querySelectorAll('.pi-line-row').forEach(function (row) {
+      var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
+      if (qty > 0) anyQty = true;
+      var maxQty = parseFloat(row.querySelector('.line-qty').getAttribute('max')) || 0;
+      if (qty > maxQty) tooMuch = row;
+    });
+    if (!anyQty) {
+      e.preventDefault();
+      showToast('Enter a bill quantity for at least one lot.', 'error');
+      return;
+    }
+    if (tooMuch) {
+      e.preventDefault();
+      showToast('Bill quantity cannot be more than the quantity that passed QC and is not billed yet.', 'error');
+      return;
+    }
+
+    var submitter = e.submitter;
+    if (submitter && submitter.value === 'post') {
+      e.preventDefault();
+      var total = document.getElementById('pi-grand-total').textContent;
+      showConfirm('Post this bill? ' + total + ' will be added to what you owe ' + document.getElementById('pi-vendor').value + '.', {
+        title: 'Post bill',
+        confirmText: 'Post bill',
+        variant: 'warning'
+      }).then(function (ok) {
+        if (!ok) return;
+        piForm.setAttribute('data-confirmed', '1');
+        piForm.requestSubmit(submitter);
+      });
+    }
+  });
+
+  // ---------- View bill ----------
+  function viewField(label, value) {
+    return '<div><dt class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + label +
+      '</dt><dd class="mt-0.5 text-ink">' + esc(value || '—') + '</dd></div>';
+  }
+  function openView(btn) {
+    var taxType = btn.getAttribute('data-tax-type');
+    var lines = JSON.parse(btn.getAttribute('data-lines') || '[]');
+    var chargeLines = JSON.parse(btn.getAttribute('data-charge-lines') || '[]');
+    var tax = parseFloat(btn.getAttribute('data-tax')) || 0;
+
+    document.getElementById('pi-view-title').textContent = btn.getAttribute('data-pi') + ' · ' + btn.getAttribute('data-status');
+    document.getElementById('pi-view-subtitle').textContent = btn.getAttribute('data-vendor');
+
+    var html = '<dl class="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-3 text-[13px]">';
+    html += viewField('Vendor invoice no.', btn.getAttribute('data-vinv'));
+    html += viewField('Invoice date', btn.getAttribute('data-date'));
+    html += viewField('Tax type', taxType === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST + SGST)');
+    html += viewField('Remarks', btn.getAttribute('data-remarks'));
+    html += '</dl>';
+
+    html += '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">' +
+      '<th class="p-2 text-left">Material</th><th class="p-2 text-left">GRN / lot</th><th class="p-2">Qty</th><th class="p-2">Rate</th>' +
+      '<th class="p-2">Disc %</th><th class="p-2">Tax %</th><th class="p-2 text-right">Taxable</th><th class="p-2 text-right">Tax</th></tr></thead><tbody>';
+    lines.forEach(function (l) {
+      html += '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '</td>' +
+        '<td class="p-2 font-mono text-[12px]">' + esc(l.grn) + ' · ' + esc(l.lot) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.qty) + ' ' + esc(l.unit) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + money(l.rate) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.discount) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.tax_percent) + '</td>' +
+        '<td class="p-2 text-right tabular-nums">' + money(l.taxable) + '</td>' +
+        '<td class="p-2 text-right tabular-nums">' + money(l.tax) + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+
+    html += '<div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">';
+    html += '<div class="flex items-center justify-between text-ink-muted"><span>Subtotal (after discount)</span><span class="tabular-nums">' + money(btn.getAttribute('data-subtotal')) + '</span></div>';
+    if (taxType === 'inter') {
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>IGST</span><span class="tabular-nums">' + money(tax) + '</span></div>';
+    } else {
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>CGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>SGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
+    }
+    chargeLines.forEach(function (c) {
+      html += '<div class="flex items-center justify-between text-ink-muted"><span>' + esc(c.name) + '</span><span class="tabular-nums">' +
+        (c.effect === 'minus' ? '−' : '+') + ' ' + money(c.amount) + '</span></div>';
+    });
+    html += '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink"><span>Bill total</span><span class="tabular-nums">' + money(btn.getAttribute('data-total')) + '</span></div>';
+    html += '</div>';
+
+    // Is bill par bane returns (Cancelled bhi, status ke saath) aur return ke baad bill ka total
+    var returnsList = JSON.parse(btn.getAttribute('data-returns') || '[]');
+    if (returnsList.length) {
+      var returned = parseFloat(btn.getAttribute('data-returned')) || 0;
+      var billTotal = parseFloat(btn.getAttribute('data-total')) || 0;
+      html += '<div><p class="text-[13px] font-semibold text-ink mb-1.5">Returns against this bill</p>' +
+        '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">' +
+        '<th class="p-2 text-left">Return no.</th><th class="p-2 text-left">Date</th><th class="p-2 text-right">Credit</th><th class="p-2">Status</th></tr></thead><tbody>';
+      returnsList.forEach(function (r) {
+        html += '<tr class="border-t border-slate-100' + (r.status === 'Cancelled' ? ' opacity-60' : '') + '"><td class="p-2 font-mono text-[12px]">' + esc(r.pr_no) + '</td>' +
+          '<td class="p-2">' + esc(r.date) + '</td><td class="p-2 text-right tabular-nums">' + money(r.total) + '</td>' +
+          '<td class="p-2 text-center">' + esc(r.status) + '</td></tr>';
+      });
+      html += '</tbody></table></div>' +
+        '<div class="flex items-center justify-between mt-2 text-[13px] font-semibold text-ink"><span>Bill total after returns</span><span class="tabular-nums">' + money(billTotal - returned) + '</span></div></div>';
+    }
+
+    document.getElementById('pi-view-body').innerHTML = html;
+    viewModal.classList.remove('hidden');
+    viewModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() {
+    viewModal.classList.add('hidden');
+    viewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  document.querySelectorAll('.btn-view-pi').forEach(function (btn) {
+    btn.addEventListener('click', function () { openView(btn); });
+  });
+  document.getElementById('btn-close-pi-view').addEventListener('click', closeView);
+  document.getElementById('btn-close-pi-view-2').addEventListener('click', closeView);
+  document.getElementById('pi-view-backdrop').addEventListener('click', closeView);
+  // ---------- Return goods (Posted bill ke against) ----------
+  var rtModal = document.getElementById('rt-modal');
+  var rtForm = document.getElementById('rt-form');
+  var rtLineBody = document.getElementById('rt-line-body');
+  var rtChargeList = document.getElementById('rt-charge-list');
+  // Panel khulte waqt bill ka data (live summary ke liye): total, pehle ke returns ka total, bill no., vendor
+  var rtBill = { total: 0, returnedBefore: 0, piNo: '', vendor: '' };
+
+  // Ek bill line = ek row. Rate / discount / tax data- attribute me, taaki value live nikle (server wahi formula lagata hai)
+  function rtLineRowHtml(l) {
+    var canReturn = l.returnable > 0;
+    return '<tr class="rt-line-row" data-rate="' + l.rate + '" data-discount="' + l.discount + '" data-tax="' + l.tax_percent + '">' +
+      '<td><input type="hidden" class="rt-line-id" value="' + esc(l.id) + '" />' +
+        '<div class="font-medium text-ink">' + esc(l.material) + '</div>' +
+        '<div class="text-[11px] text-ink-faint font-mono">' + esc(l.grn) + ' · Lot ' + esc(l.lot) + '</div></td>' +
+      '<td class="tabular-nums text-center">' + fmtQty(l.qty) + ' ' + esc(l.unit) + '</td>' +
+      '<td class="tabular-nums text-center">' + fmtQty(l.returned) + ' ' + esc(l.unit) + '</td>' +
+      '<td class="tabular-nums text-center font-semibold">' + fmtQty(l.returnable) + ' ' + esc(l.unit) + '</td>' +
+      '<td>' + (canReturn
+        ? '<input type="number" class="rt-qty tabular-nums" min="0" max="' + l.returnable + '" step="any" placeholder="0" />'
+        : '<span class="text-[12px] text-ink-faint">Fully returned</span>') + '</td>' +
+      '<td class="rt-value tabular-nums text-right text-ink-faint">—</td></tr>';
+  }
+
+  // Flask ko index ke hisaab se naam chahiye: invoice_line_id_0, qty_0 ... charge_id_0, charge_amount_0, charge_effect_0
+  function rtRenumber() {
+    document.querySelectorAll('.rt-line-row').forEach(function (row, index) {
+      row.querySelector('.rt-line-id').name = 'invoice_line_id_' + index;
+      var qtyInput = row.querySelector('.rt-qty');
+      if (qtyInput) qtyInput.name = 'qty_' + index;
+    });
+    document.querySelectorAll('.rt-charge-row').forEach(function (row, index) {
+      row.querySelector('.rt-charge-id').name = 'charge_id_' + index;
+      row.querySelector('.rt-charge-amount').name = 'charge_amount_' + index;
+      row.querySelector('.rt-charge-effect').name = 'charge_effect_' + index;
+    });
+  }
+
+  // Live hisaab: server jaisa formula (qty x rate, discount ghata ke, phir GST), phir charges. Wapas: jaanch ke liye kuch flags
+  function calcReturn() {
+    var subtotal = 0, taxTotal = 0, anyQty = false, tooMuch = false;
+    document.querySelectorAll('.rt-line-row').forEach(function (row) {
+      var qtyInput = row.querySelector('.rt-qty');
+      var valueCell = row.querySelector('.rt-value');
+      var qty = qtyInput ? parseFloat(qtyInput.value) : NaN;
+      if (qtyInput) qtyInput.classList.remove('!border-stop');
+      if (isNaN(qty) || qty <= 0) { valueCell.textContent = '—'; valueCell.className = 'rt-value tabular-nums text-right text-ink-faint'; return; }
+      var maxQty = parseFloat(qtyInput.getAttribute('max')) || 0;
+      if (qty > maxQty) {
+        tooMuch = true;
+        qtyInput.classList.add('!border-stop');
+        valueCell.textContent = 'Too much';
+        valueCell.className = 'rt-value tabular-nums text-right text-stop';
+        return;
+      }
+      anyQty = true;
+      var rate = parseFloat(row.getAttribute('data-rate')) || 0;
+      var disc = parseFloat(row.getAttribute('data-discount')) || 0;
+      var pct = parseFloat(row.getAttribute('data-tax')) || 0;
+      var taxable = r2(qty * rate * (1 - disc / 100));
+      var tax = r2(taxable * pct / 100);
+      subtotal += taxable;
+      taxTotal += tax;
+      valueCell.textContent = money(taxable + tax);
+      valueCell.className = 'rt-value tabular-nums text-right font-medium text-ink';
+    });
+    var goods = r2(subtotal + taxTotal);
+
+    var net = 0, chargeHtml = '', chargeIncomplete = false;
+    document.querySelectorAll('.rt-charge-row').forEach(function (row) {
+      var amt = parseFloat(row.querySelector('.rt-charge-amount').value) || 0;
+      var minus = row.querySelector('.rt-charge-effect').value === 'minus';
+      var chosen = row.querySelector('.rt-charge-id').selectedOptions[0];
+      if (amt > 0 && !(chosen && chosen.value)) chargeIncomplete = true;
+      if (!amt) return;
+      net += minus ? -amt : amt;
+      var name = chosen && chosen.value ? chosen.getAttribute('data-name') : 'Charge';
+      chargeHtml += '<div class="flex items-center justify-between"><span class="text-ink-muted">' + esc(name) +
+        (minus ? ': vendor deducts' : ': vendor pays back') + '</span><span class="tabular-nums">' + (minus ? '− ' : '+ ') + money(amt) + '</span></div>';
+    });
+    var total = r2(goods + net);
+
+    document.getElementById('rt-s-goods').textContent = money(goods);
+    document.getElementById('rt-s-charges').innerHTML = chargeHtml;
+    document.getElementById('rt-s-total').textContent = (total < 0 ? '− ' : '') + money(Math.abs(total));
+    document.getElementById('rt-s-error').textContent = total < 0 ? 'The charges are more than the value of the goods. Check the amounts.' : '';
+    var credit = Math.max(total, 0);
+    document.getElementById('rt-s-bill-label').textContent = 'Bill ' + rtBill.piNo + ' total';
+    document.getElementById('rt-s-bill').textContent = money(rtBill.total);
+    document.getElementById('rt-s-before-row').classList.toggle('hidden', rtBill.returnedBefore <= 0);
+    document.getElementById('rt-s-before').textContent = '− ' + money(rtBill.returnedBefore);
+    document.getElementById('rt-s-less').textContent = '− ' + money(credit);
+    document.getElementById('rt-s-after').textContent = money(rtBill.total - rtBill.returnedBefore - credit);
+    return { anyQty: anyQty, tooMuch: tooMuch, total: total, chargeIncomplete: chargeIncomplete };
+  }
+
+  // Charges: PO / bill jaisa Charges Master se, par "Add / Minus" ki jagah saade shabd
+  function rtAddChargeRow() {
+    var empty = document.getElementById('rt-charge-empty');
+    if (empty) empty.remove();
+    var options = '<option value="">Select charge…</option>';
+    CHARGE_OPTIONS.forEach(function (c) {
+      options += '<option value="' + c.id + '" data-name="' + esc(c.name) + '">' + esc(c.name) + '</option>';
+    });
+    var tr = document.createElement('tr');
+    tr.className = 'rt-charge-row';
+    tr.innerHTML =
+      '<td><select class="rt-charge-id">' + options + '</select></td>' +
+      '<td><select class="rt-charge-effect"><option value="minus">Vendor deducts this from our credit</option><option value="add">Vendor pays this back to us</option></select></td>' +
+      '<td><input type="number" class="rt-charge-amount text-right tabular-nums" min="0" step="0.01" placeholder="0.00" /></td>' +
+      '<td class="text-center"><button type="button" class="btn-remove-rt-charge text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove charge">&times;</button></td>';
+    rtChargeList.appendChild(tr);
+    rtRenumber();
+    calcReturn();
+  }
+  function rtResetCharges() {
+    rtChargeList.innerHTML = '<tr id="rt-charge-empty"><td colspan="4" class="text-ink-faint" style="text-align:left;padding:8px 10px;">No charges.</td></tr>';
+  }
+
+  function openReturn(btn) {
+    var lines = JSON.parse(btn.getAttribute('data-return-lines') || '[]');
+    rtBill = {
+      total: parseFloat(btn.getAttribute('data-total')) || 0,
+      returnedBefore: parseFloat(btn.getAttribute('data-returned')) || 0,
+      piNo: btn.getAttribute('data-pi'),
+      vendor: btn.getAttribute('data-vendor')
+    };
+    document.getElementById('rt-invoice-id').value = btn.getAttribute('data-invoice-id');
+    document.getElementById('rt-modal-subtitle').textContent =
+      'Against bill ' + rtBill.piNo + ' · ' + rtBill.vendor + ' · bill total ' + money(rtBill.total);
+    var dateInput = document.getElementById('rt-date');
+    dateInput.min = btn.getAttribute('data-invoice-date') || '';
+    dateInput.value = TODAY;
+    document.getElementById('rt-reason').value = '';
+    rtLineBody.innerHTML = lines.map(rtLineRowHtml).join('');
+    rtResetCharges();
+    rtRenumber();
+    calcReturn();
+    rtModal.classList.remove('hidden');
+    rtModal.setAttribute('aria-hidden', 'false');
+    var firstQty = rtLineBody.querySelector('.rt-qty');
+    if (firstQty) firstQty.focus();
+  }
+  function closeReturn() {
+    rtModal.classList.add('hidden');
+    rtModal.setAttribute('aria-hidden', 'true');
+    rtForm.reset();
+    rtLineBody.innerHTML = '';
+    rtResetCharges();
+  }
+
+  document.querySelectorAll('.btn-return').forEach(function (btn) {
+    btn.addEventListener('click', function () { openReturn(btn); });
+  });
+  document.getElementById('btn-close-rt-modal').addEventListener('click', closeReturn);
+  document.getElementById('btn-cancel-rt').addEventListener('click', closeReturn);
+  document.getElementById('rt-modal-backdrop').addEventListener('click', closeReturn);
+  document.getElementById('btn-add-rt-charge').addEventListener('click', rtAddChargeRow);
+  rtLineBody.addEventListener('input', calcReturn);
+  rtChargeList.addEventListener('input', calcReturn);
+  rtChargeList.addEventListener('change', calcReturn);
+  rtChargeList.addEventListener('click', function (e) {
+    var removeBtn = e.target.closest('.btn-remove-rt-charge');
+    if (!removeBtn) return;
+    removeBtn.closest('.rt-charge-row').remove();
+    if (!document.querySelector('.rt-charge-row')) rtResetCharges();
+    rtRenumber();
+    calcReturn();
+  });
+
+  // Submit se pehle browser par jaldi jaanch (asli jaanch server karta hai) aur "Post return" par saade shabdon me confirm
+  rtForm.addEventListener('submit', function (e) {
+    if (rtForm.getAttribute('data-confirmed') === '1') {
+      rtForm.removeAttribute('data-confirmed');
+      return;
+    }
+    var s = calcReturn();
+    var problem = '';
+    if (s.tooMuch) problem = 'You cannot return more than the quantity shown under "You can return".';
+    else if (!s.anyQty) problem = 'Enter how many you are returning for at least one item.';
+    else if (s.chargeIncomplete) problem = 'Choose a charge for every charge amount.';
+    else if (s.total < 0) problem = 'The charges are more than the value of the goods. Check the amounts.';
+    if (problem) {
+      e.preventDefault();
+      showToast(problem, 'error');
+      return;
+    }
+    e.preventDefault();
+    showConfirm('Post this return? ' + rtBill.vendor + ' will credit you ' + money(s.total) + ' against bill ' + rtBill.piNo + '.', {
+      title: 'Post return',
+      confirmText: 'Post return',
+      variant: 'warning'
+    }).then(function (ok) {
+      if (!ok) return;
+      rtForm.setAttribute('data-confirmed', '1');
+      rtForm.requestSubmit();
+    });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!viewModal.classList.contains('hidden')) closeView();
+    else if (!rtModal.classList.contains('hidden')) closeReturn();
+    else if (!piModal.classList.contains('hidden')) closeCreate();
+  });
+
+  updateFilterCounts();
+  applyFilters();
+</script>
+{% endblock %}
