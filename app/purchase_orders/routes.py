@@ -1,12 +1,20 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, current_app, send_from_directory
 from app.models import PurchaseOrder, PurchaseOrderLine, Vendor, Warehouse, RawMaterial, Unit, TaxRate, PaymentTerm, Charge, PurchaseOrderCharge
 from app.extensions import db
+from app.purchase_orders.docket import build_docket, format_qty, format_rate, format_reading, format_inr
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
+from werkzeug.security import safe_join
 
 
 purchase_orders_bp = Blueprint("purchase_orders", __name__, template_folder="templates")
+
+# Docket template ke filters: {{ x|qty }} quantity, {{ x|rate }} rate, {{ x|reading }} lab ka number, {{ x|inr }} paisa (Indian grouping)
+purchase_orders_bp.add_app_template_filter(format_qty, "qty")
+purchase_orders_bp.add_app_template_filter(format_rate, "rate")
+purchase_orders_bp.add_app_template_filter(format_reading, "reading")
+purchase_orders_bp.add_app_template_filter(format_inr, "inr")
 
 ALLOWED_INVOICE_EXTENSIONS ={"pdf", "png", "jpg", "jpeg"}
 
@@ -216,6 +224,29 @@ def purchase_orders_print(po_id):
     if po.is_deleted:
         return redirect(url_for("purchase_orders.purchase_orders_list"))
     return render_template("purchase_order_print.html", po=po)
+
+@purchase_orders_bp.route('/purchase_orders/<int:po_id>/docket')
+def purchase_orders_docket(po_id):
+    # Procurement docket: is ek PO ke saare documents (GRN, QC, memo, bill, return) ek read-only A4 page par.
+    # Kuch save nahi hota; data jama karna docket.py ka kaam hai, yahan sirf route + template.
+    po = PurchaseOrder.query.get_or_404(po_id)
+    if po.is_deleted:
+        return redirect(url_for("purchase_orders.purchase_orders_list"))
+
+    # Vendor invoice ki file DB me likhi ho par server par na mile to dead link nahi dikhana
+    # safe_join wahi jaanch karta hai jo file khulne wala route karta hai (../ jaise raaste yahan bhi "nahi" maane jaate)
+    invoice_file_ok = False
+    if po.vendor_invoice_file:
+        file_path = safe_join(current_app.config['UPLOAD_FOLDER'], po.vendor_invoice_file)
+        invoice_file_ok = file_path is not None and os.path.isfile(file_path)
+
+    return render_template(
+        "purchase_order_docket.html",
+        po=po,
+        docket=build_docket(po),
+        invoice_file_ok=invoice_file_ok,
+        printed_at=datetime.now(),   # paper docket ko "kab ka" pata chale
+    )
 
 @purchase_orders_bp.route('/purchase_orders/<int:po_id>/invoice')
 def purchase_orders_invoice(po_id):

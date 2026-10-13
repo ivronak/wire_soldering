@@ -9,15 +9,23 @@ def refresh_po_status(po):
     if po.status in ("Draft", "Cancelled"):
         return
 
-    total_ordered = sum(line.ordered_qty for line in po.lines)
-    total_received = sum(line.received_qty for line in po.lines)
+    # Har line ko ALAG dekhte hain: pehle sab lines ka total jodte the, par KG aur PCS jaise alag units jod dene se
+    # (aur ek line ke over-receipt se doosri line ki kami chhup jaane se) PO "Closed" ho jaata tha jabki ek line baaki thi,
+    # aur phir uski GRN bhi nahi ban paati thi.
+    any_received = False
+    all_complete = True
+    for line in po.lines:
+        if line.received_qty > 0:
+            any_received = True
+        if line.received_qty < line.ordered_qty:
+            all_complete = False
 
-    if total_received <=0:
+    if not any_received:
         po.status = "Open"
-    elif total_received < total_ordered:
-        po.status = "Partial"
+    elif all_complete:
+        po.status = "Closed"
     else:
-        po.status = "Closed"            
+        po.status = "Partial"
 
 @grns_bp.route('/grns')
 def grns_list():

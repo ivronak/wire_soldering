@@ -158,13 +158,13 @@
           <table class="po-table">
             <colgroup>
               <col style="width:4%" />
-              <col style="width:14%" />
-              <col style="width:20%" />
-              <col style="width:13%" />
               <col style="width:13%" />
               <col style="width:15%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
+              <col style="width:15%" />
               <col style="width:10%" />
-              <col style="width:11%" />
+              <col style="width:19%" />
             </colgroup>
             <thead>
               <tr>
@@ -198,6 +198,11 @@
                   <div class="flex items-center justify-center gap-2 flex-wrap">
                     <a href="/purchase_orders/{{ o.id }}/print" target="_blank"
                       class="px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist">Print</a>
+                    {# Docket: is PO ke saare documents ek read-only page par. Draft PO ke abhi koi documents nahi, isliye tab link nahi #}
+                    {% if o.status != "Draft" %}
+                    <a href="{{ url_for('purchase_orders.purchase_orders_docket', po_id=o.id) }}" target="_blank"
+                      class="px-2.5 py-1 text-[12.5px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Docket</a>
+                    {% endif %}
                     <button type="button"
                       class="btn-view-po px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
                       data-po="{{ o.po_no }}"
