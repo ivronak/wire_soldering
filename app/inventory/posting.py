@@ -137,15 +137,58 @@ def return_to_stock(purchase_return):
 
 
 def return_cancelled(purchase_return):
-    # Cancel: us return ki har movement ke liye ulti row (qty / value ka sign ulta). Pehle se ulti ho chuki ho to chhod do.
-    rows = StockMovement.query.filter_by(ref_type="RETURN", ref_id=purchase_return.id).filter(StockMovement.reverses_movement_id.is_(None)).all()
+    reverse_document("RETURN", purchase_return.id, "Reversal: return cancelled")
+
+
+def wip_warehouse_for(warehouse):
+    # RM warehouse ki branch ka WIP warehouse (type WIP, active)
+    wip = Warehouse.query.filter_by(branch_id=warehouse.branch_id, warehouse_type="WIP", is_active=True, is_deleted=False).order_by(Warehouse.id).first()
+    if wip is None:
+        raise InventoryError(f"The branch of {warehouse.name} has no active WIP warehouse. Create one in Warehouses first.")
+    return wip
+
+
+def available_lots(raw_material_id):
+    # Is material ke wo lots jinka maal store (RM) me hai, purana lot pehle (FIFO). [(lot, warehouse, qty, value)]
+    result = []
+    for lot in StockLot.query.filter_by(raw_material_id=raw_material_id).order_by(StockLot.id).all():
+        store = rm_warehouse_of(lot) if StockMovement.query.filter_by(lot_id=lot.id, movement_type="QC_IN").first() else None
+        if store is None:
+            continue
+        qty, value = balance(lot.id, store.id)
+        if qty > 0.00005:
+            result.append((lot, store, qty, value))
+    return result
+
+
+def issue_to_wip(issue):
+    # Material issue post: har line ka maal store se nikal ke WIP warehouse me (value ke saath). Lot ka naam saath chalta hai.
+    db.session.flush()                 # nayi issue lines ki id chahiye (line_key)
+    for line in issue.lines:
+        lot = line.lot
+        store = rm_warehouse_of(lot)
+        wip = wip_warehouse_for(store)
+        qty = q4(line.qty)
+        rem_qty, rem_value = balance(lot.id, store.id)
+        out_value = value_for_out(rem_qty, rem_value, qty)
+        add_movement(lot, store, issue.issue_date, "ISSUE_OUT", -qty, -out_value, "ISSUE", issue.id, issue.issue_no, line.id)
+        add_movement(lot, wip, issue.issue_date, "ISSUE_IN", qty, out_value, "ISSUE", issue.id, issue.issue_no, line.id)
+
+
+def issue_cancelled(issue):
+    reverse_document("ISSUE", issue.id, "Reversal: material issue cancelled")
+
+
+def reverse_document(ref_type, ref_id, note):
+    # Cancel: us document ki har movement ke liye ulti row (qty / value ka sign ulta). Pehle se ulti ho chuki ho to chhod do.
+    rows = StockMovement.query.filter_by(ref_type=ref_type, ref_id=ref_id).filter(StockMovement.reverses_movement_id.is_(None)).all()
     for row in rows:
         if StockMovement.query.filter_by(reverses_movement_id=row.id).first() is not None:
             continue
         db.session.add(StockMovement(
             movement_date=row.movement_date, raw_material_id=row.raw_material_id, warehouse_id=row.warehouse_id, lot_id=row.lot_id,
             movement_type=row.movement_type, qty=q4(-row.qty), value=q2(-row.value), ref_type=row.ref_type, ref_id=row.ref_id,
-            ref_no=row.ref_no, line_key=row.line_key, reverses_movement_id=row.id, note="Reversal: return cancelled"))
+            ref_no=row.ref_no, line_key=row.line_key, reverses_movement_id=row.id, note=note))
     db.session.flush()
 
 

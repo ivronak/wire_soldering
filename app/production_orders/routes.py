@@ -204,3 +204,20 @@ def production_orders_add():
     db.session.commit()
     flash(f"Production order {order.prod_no} saved.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
+
+
+
+@production_orders_bp.route("/production_orders/release/<int:order_id>", methods=["POST"])
+def production_orders_release(order_id):
+    # Draft order ko Released karo: ab uske liye Material issue ho sakta hai (RM store se production ko).
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    if order.status != "Draft":
+        flash("Only a draft production order can be released.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if not order.lines:
+        flash("This production order has no materials, so it cannot be released.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    order.status = "Released"
+    db.session.commit()
+    flash(f"Production order {order.prod_no} released. Its material can now be issued from the Material issue page.", "success")
+    return redirect(url_for("production_orders.production_orders_list"))

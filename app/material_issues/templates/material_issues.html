@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}Material issue{% endblock %}
+
+{% block page_css %}
+<style>
+  .mi-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .mi-table thead th {
+    position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 8px; text-align: center;
+    border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9;
+  }
+  .mi-table thead th:first-child, .mi-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .mi-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  .mi-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .mi-table td.left, .mi-table th.left { text-align: left; }
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
+  .lines-table input { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; text-align: right; }
+  .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
+  .status-tobill { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .status-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .status-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  #mi-modal.hidden, #mi-view-modal.hidden { display: none; }
+  #mi-modal, #mi-view-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Material issue</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Material issue</h1>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('material_issues.material_issues_list', tab='pending') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Pending action <span class="tabular-nums">({{ pending_count }})</span>
+          </a>
+          <a href="{{ url_for('material_issues.material_issues_list', tab='completed') }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            Completed <span class="tabular-nums">({{ completed_count }})</span>
+          </a>
+        </div>
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+          Raw material is issued against a <strong>released production order</strong> · the lot is picked automatically, oldest lot first · posting moves the stock from the store to <strong>WIP</strong> · only what is still needed can be issued · a posted issue can be cancelled and the material goes back to the store.
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          {% if tab == 'pending' %}
+          <table class="mi-table">
+            <colgroup><col style="width:15%"><col style="width:30%"><col style="width:17%"><col style="width:14%"><col style="width:24%"></colgroup>
+            <thead><tr><th>Document</th><th class="left">Product / details</th><th>Materials</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for order in to_issue %}
+              <tr>
+                <td><div class="font-mono font-semibold text-ink">{{ order.prod_no }}</div><div class="text-[11.5px] text-ink-faint">Production order</div></td>
+                <td class="left"><div class="font-medium text-ink">{{ order.product.code if order.product else '—' }} {{ order.product.name if order.product else '' }}</div>
+                  <div class="text-[11.5px] text-ink-faint">{{ '%g'|format(order.planned_qty) }} {{ order.product.base_unit.code if order.product and order.product.base_unit else '' }} planned</div></td>
+                <td class="tabular-nums">{{ order.lines|length }} item{{ '' if order.lines|length == 1 else 's' }}</td>
+                <td><span class="status-pill status-tobill">{{ order.issue_status }}</span></td>
+                <td><button type="button" class="btn-issue px-2 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-plan='{{ plans[order.id]|tojson }}'>Issue material</button></td>
+              </tr>
+              {% endfor %}
+              {% for issue in draft_issues %}
+              <tr>
+                <td><div class="font-mono font-semibold text-ink">{{ issue.issue_no }}</div><div class="text-[11.5px] text-ink-faint">Draft issue · {{ issue.production_order.prod_no }}</div></td>
+                <td class="left"><div class="font-medium text-ink">{{ issue.issue_date.strftime('%d %b %Y') }}</div>{% if issue.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ issue.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</td>
+                <td><span class="status-pill status-draft">Draft</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view-mi px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-issue='{{ {"no": issue.issue_no, "order": issue.production_order.prod_no, "date": issue.issue_date.strftime("%d %b %Y"), "status": issue.status, "remarks": issue.remarks or "", "lines": (issue.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    <form method="post" action="{{ url_for('material_issues.material_issues_post', issue_id=issue.id) }}" class="inline js-confirm-submit" data-confirm-title="Post issue" data-confirm-ok="Post" data-confirm-message="Post {{ issue.issue_no }}? The material will move from the store to WIP.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post</button>
+                    </form>
+                    <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel draft" data-confirm-ok="Cancel issue" data-confirm-message="Cancel draft {{ issue.issue_no }}?">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+              {% if not to_issue and not draft_issues %}
+              <tr><td colspan="5" class="text-ink-faint" style="padding:28px;">Nothing to issue. Release a production order and it appears here.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+          {% else %}
+          <table class="mi-table">
+            <colgroup><col style="width:14%"><col style="width:14%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:26%"></colgroup>
+            <thead><tr><th>Issue no.</th><th>Date</th><th>Production order</th><th>Lot lines</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for issue in issues %}
+              <tr{% if issue.status == 'Cancelled' %} class="opacity-70"{% endif %}>
+                <td class="font-mono font-semibold text-ink">{{ issue.issue_no }}</td>
+                <td class="tabular-nums">{{ issue.issue_date.strftime('%d %b %Y') }}{% if issue.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ issue.created_at|ist }}</div>{% endif %}</td>
+                <td class="font-mono">{{ issue.production_order.prod_no }}</td>
+                <td class="tabular-nums">{{ issue.lines|length }}</td>
+                <td><span class="status-pill {{ 'status-cancelled' if issue.status == 'Cancelled' else 'status-posted' }}">{{ issue.status }}</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view-mi px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-issue='{{ {"no": issue.issue_no, "order": issue.production_order.prod_no, "date": issue.issue_date.strftime("%d %b %Y"), "status": issue.status, "remarks": issue.remarks or "", "lines": (issue.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    {% if issue.status == 'Posted' %}
+                    <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel issue" data-confirm-ok="Cancel issue" data-confirm-message="Cancel {{ issue.issue_no }}? The material will go back from WIP to the store.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-ink-faint" style="padding:28px;">No posted material issues yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">Showing {{ result_count }} {{ 'pending items' if tab == 'pending' else 'issues' }}</div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="mi-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="mi-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 class="text-[16px] font-bold text-ink">Issue material to production</h2>
+        <p id="mi-sub" class="text-[12.5px] text-ink-faint">—</p>
+      </div>
+      <button type="button" id="mi-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="mi-form" method="post" action="{{ url_for('material_issues.material_issues_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <input type="hidden" name="production_order_id" id="mi-order-id" value="" />
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Issue date *</label>
+          <input type="date" id="mi-date" name="issue_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
+          <input type="text" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        </div>
+      </div>
+      <p class="text-[12.5px] text-ink-faint">Type how much of each material to issue now. It is taken from the store, oldest lot first. You cannot issue more than is still needed or more than the store has free.</p>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead><tr><th style="width:30%">Material</th><th style="width:14%">Needed</th><th style="width:14%">Already issued</th><th style="width:14%">Still needed</th><th style="width:14%">Free in store</th><th style="width:14%">Issue now</th></tr></thead>
+          <tbody id="mi-lines"></tbody>
+        </table>
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="mi-form" name="issue_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+      <button type="button" id="mi-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="mi-form" name="issue_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post issue</button>
+    </div>
+  </div>
+</div>
+
+<div id="mi-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="mi-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 id="mi-view-title" class="text-[16px] font-bold text-ink">Material issue</h2><p id="mi-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="mi-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="mi-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; });
+  }
+  function fmt(x) { return String(Math.round(Number(x) * 10000) / 10000); }
+  var miModal = document.getElementById('mi-modal');
+  var miView = document.getElementById('mi-view-modal');
+  var TODAY = {{ today|tojson }};
+
+  function openIssue(btn) {
+    var plan = JSON.parse(btn.getAttribute('data-plan') || '{}');
+    document.getElementById('mi-order-id').value = plan.order_id;
+    document.getElementById('mi-sub').textContent = plan.prod_no + ' · ' + plan.product;
+    document.getElementById('mi-date').value = TODAY;
+    var html = '';
+    (plan.lines || []).forEach(function (l, i) {
+      // Default = jitna baaki hai, par store me jitna free hai usse zyada nahi
+      var suggest = Math.min(l.remaining, l.available);
+      var can = l.remaining > 0 && l.available > 0;
+      html += '<tr><td>' + esc(l.material) + '<input type="hidden" name="line_id_' + i + '" value="' + l.id + '"></td>' +
+        '<td class="text-right tabular-nums">' + fmt(l.required) + ' ' + esc(l.unit) + '</td>' +
+        '<td class="text-right tabular-nums">' + fmt(l.issued) + '</td>' +
+        '<td class="text-right tabular-nums">' + fmt(l.remaining) + '</td>' +
+        '<td class="text-right tabular-nums' + (l.available < l.remaining ? ' text-stop' : '') + '">' + fmt(l.available) + '</td>' +
+        '<td>' + (can ? '<input type="number" name="qty_' + i + '" min="0" max="' + suggest + '" step="any" value="' + suggest + '">'
+                      : '<span class="text-[12px] text-ink-faint">' + (l.remaining <= 0 ? 'Done' : 'No stock') + '</span>') + '</td></tr>';
+    });
+    document.getElementById('mi-lines').innerHTML = html;
+    miModal.classList.remove('hidden');
+    miModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeIssue() { miModal.classList.add('hidden'); miModal.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.btn-issue').forEach(function (b) { b.addEventListener('click', function () { openIssue(b); }); });
+  document.getElementById('mi-close').addEventListener('click', closeIssue);
+  document.getElementById('mi-cancel').addEventListener('click', closeIssue);
+  document.getElementById('mi-backdrop').addEventListener('click', closeIssue);
+
+  function openView(btn) {
+    var d = JSON.parse(btn.getAttribute('data-issue') || '{}');
+    document.getElementById('mi-view-title').textContent = d.no + ' · ' + d.status;
+    document.getElementById('mi-view-sub').textContent = d.order + ' · ' + d.date;
+    var rows = '';
+    (d.lines || []).forEach(function (l) {
+      rows += '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '</td><td class="p-2 font-mono text-[12px]">' + esc(l.lot) + (l.batch ? ' · ' + esc(l.batch) : '') +
+        '</td><td class="p-2 text-right tabular-nums">' + fmt(l.qty) + ' ' + esc(l.unit) + '</td></tr>';
+    });
+    document.getElementById('mi-view-body').innerHTML =
+      (d.remarks ? '<p class="text-[13px]"><span class="text-ink-faint">Remarks:</span> ' + esc(d.remarks) + '</p>' : '') +
+      '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted"><th class="p-2 text-left">Material</th><th class="p-2 text-left">Lot</th><th class="p-2 text-right">Qty issued</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="text-[12px] text-ink-faint">Each lot is listed separately so you can trace which lot went into this production order.</p>';
+    miView.classList.remove('hidden');
+    miView.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() { miView.classList.add('hidden'); miView.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.btn-view-mi').forEach(function (b) { b.addEventListener('click', function () { openView(b); }); });
+  document.getElementById('mi-view-close').addEventListener('click', closeView);
+  document.getElementById('mi-view-backdrop').addEventListener('click', closeView);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!miModal.classList.contains('hidden')) closeIssue();
+    else if (!miView.classList.contains('hidden')) closeView();
+  });
+</script>
+{% endblock %}

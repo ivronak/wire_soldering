@@ -24,6 +24,7 @@ from app.party_documents.routes import party_documents_bp
 from app.purchase_invoices.routes import purchase_invoices_bp
 from app.purchase_returns.routes import purchase_returns_bp
 from app.inventory.routes import inventory_bp
+from app.material_issues.routes import material_issues_bp
 from app.extensions import db, migrate
 from app.timeutil import format_ist
 
@@ -80,6 +81,7 @@ def create_app():
     app.register_blueprint(purchase_invoices_bp)
     app.register_blueprint(purchase_returns_bp)
     app.register_blueprint(inventory_bp)
+    app.register_blueprint(material_issues_bp)
 
     # "flask inventory-backfill": inventory banne se pehle ke GRN / QC / Return ki stock rows banata hai (dobara chalao to double nahi hoga)
     @app.cli.command("inventory-backfill")

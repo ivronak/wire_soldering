@@ -27,14 +27,14 @@
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
-          Stock moves by itself: <strong>GRN</strong> puts goods in the QC Hold warehouse (<em>Waiting for QC</em>) · <strong>QC pass</strong> moves the passed quantity to the store (<em>Available</em>) · the rejected quantity stays in QC Hold (<em>Rejected</em>) until a <strong>Purchase Return</strong> sends it back · a bill does not change stock. Values are estimated at the PO rate.
+          Stock moves by itself: <strong>GRN</strong> puts goods in the QC Hold warehouse (<em>Waiting for QC</em>) · <strong>QC pass</strong> moves the passed quantity to the store (<em>Available</em>) · the rejected quantity stays in QC Hold (<em>Rejected</em>) until a <strong>Purchase Return</strong> sends it back · a <strong>Material issue</strong> moves RM from the store to WIP (<em>In production</em>) · a bill does not change stock. Values are estimated at the PO rate.
         </div>
 
         <div class="flex-1 overflow-auto min-h-0">
           <p class="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">By material</p>
           <table class="st-table">
-            <colgroup><col style="width:30%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:22%"></colgroup>
-            <thead><tr><th class="left">Material</th><th>Waiting for QC</th><th>Available</th><th>Rejected</th><th>Value (estimated)</th></tr></thead>
+            <colgroup><col style="width:26%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:18%"></colgroup>
+            <thead><tr><th class="left">Material</th><th>Waiting for QC</th><th>Available</th><th>Rejected</th><th>In production</th><th>Value (estimated)</th></tr></thead>
             <tbody>
               {% for item in summary_rows %}
               <tr>
@@ -42,18 +42,19 @@
                 <td class="tabular-nums">{{ item.waiting|qty }} {{ item.unit }}</td>
                 <td class="tabular-nums font-semibold text-ink">{{ item.available|qty }} {{ item.unit }}</td>
                 <td class="tabular-nums {% if item.rejected > 0 %}text-stop{% endif %}">{{ item.rejected|qty }} {{ item.unit }}</td>
+                <td class="tabular-nums">{{ item.wip|qty }} {{ item.unit }}</td>
                 <td class="tabular-nums">₹{{ item.value|inr }}</td>
               </tr>
               {% else %}
-              <tr><td colspan="5" class="text-ink-faint" style="padding:18px;">No stock yet. Stock appears when a GRN is posted.</td></tr>
+              <tr><td colspan="6" class="text-ink-faint" style="padding:18px;">No stock yet. Stock appears when a GRN is posted.</td></tr>
               {% endfor %}
             </tbody>
           </table>
 
           <p class="px-4 pt-5 pb-1 text-[14px] font-semibold text-ink">By lot</p>
           <table class="st-table">
-            <colgroup><col style="width:10%"><col style="width:20%"><col style="width:13%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:10%"></colgroup>
-            <thead><tr><th>Lot</th><th class="left">Material</th><th>GRN / batch</th><th>Waiting</th><th>Available</th><th>Rejected</th><th>Where</th><th></th></tr></thead>
+            <colgroup><col style="width:9%"><col style="width:17%"><col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:14%"><col style="width:8%"></colgroup>
+            <thead><tr><th>Lot</th><th class="left">Material</th><th>GRN / batch</th><th>Waiting</th><th>Available</th><th>Rejected</th><th>In production</th><th>Where</th><th></th></tr></thead>
             <tbody>
               {% for row in lot_rows %}
               {% set lot = row.lot %}
@@ -64,6 +65,7 @@
                 <td class="tabular-nums">{{ row.waiting|qty }} {{ row.unit }}</td>
                 <td class="tabular-nums font-semibold text-ink">{{ row.available|qty }} {{ row.unit }}</td>
                 <td class="tabular-nums {% if row.rejected > 0 %}text-stop{% endif %}">{{ row.rejected|qty }} {{ row.unit }}</td>
+                <td class="tabular-nums">{{ row.wip|qty }} {{ row.unit }}</td>
                 <td class="text-[12px] text-ink-muted">{{ row.where|join(', ') or 'Empty' }}</td>
                 <td><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Ledger</a></td>
               </tr>

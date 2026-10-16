@@ -63,12 +63,12 @@
   <div class="flex-1 overflow-auto min-h-0">
     <table class="po-table">
       <colgroup>
-        <col style="width:16%" /><col style="width:14%" /><col style="width:34%" />
-        <col style="width:12%" /><col style="width:12%" /><col style="width:12%" />
+        <col style="width:13%" /><col style="width:11%" /><col style="width:27%" />
+        <col style="width:11%" /><col style="width:9%" /><col style="width:15%" /><col style="width:14%" />
       </colgroup>
       <thead>
         <tr>
-          <th>Order no.</th><th>Date</th><th>Product</th><th>Qty</th><th>Materials</th><th>Status</th>
+          <th>Order no.</th><th>Date</th><th>Product</th><th>Qty</th><th>Materials</th><th>Status</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -79,11 +79,22 @@
           <td style="text-align:left">{{ o.product.code if o.product else '—' }} — {{ o.product.name if o.product else '—' }}</td>
           <td class="font-mono">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}</td>
           <td>{{ o.lines|length }}</td>
-          <td><span class="status-pill">{{ o.status }}</span></td>
+          <td><span class="status-pill">{{ o.status }}</span>{% if o.status == 'Released' %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.issue_status }}</div>{% endif %}</td>
+          <td>
+            {% if o.status == 'Draft' %}
+            <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="inline js-confirm-submit"
+                  data-confirm-title="Release production order" data-confirm-ok="Release"
+                  data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
+              <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Release</button>
+            </form>
+            {% elif o.status == 'Released' %}
+            <a href="{{ url_for('material_issues.material_issues_list') }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Material issue</a>
+            {% endif %}
+          </td>
         </tr>
         {% if o.lines %}
         <tr>
-          <td colspan="6" style="text-align:left; background:#F8FAF9; font-size:13px; color:#3D5A5D;">
+          <td colspan="7" style="text-align:left; background:#F8FAF9; font-size:13px; color:#3D5A5D;">
             {% for line in o.lines %}
               {{ line.raw_material.code if line.raw_material else '—' }}
               {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}
@@ -94,7 +105,7 @@
         {% endif %}
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding:36px; color:#6B7F82;">No production orders yet. Create one from a product recipe.</td>
+          <td colspan="7" style="text-align:center; padding:36px; color:#6B7F82;">No production orders yet. Create one from a product recipe.</td>
         </tr>
         {% endfor %}
       </tbody>

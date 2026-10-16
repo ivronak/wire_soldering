@@ -649,6 +649,22 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     remarks = db.Column(db.String(255), nullable=True)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+    @property
+    def issue_status(self):
+        # Material issue ka haal, quantity se nikala (status column me store nahi): Not issued / Partly issued / Fully issued
+        if not self.lines:
+            return "No materials"
+        issued_any = False
+        all_done = True
+        for line in self.lines:
+            if line.issued_qty > 0:
+                issued_any = True
+            if line.remaining_qty > 0:
+                all_done = False
+        if all_done:
+            return "Fully issued"
+        return "Partly issued" if issued_any else "Not issued"
+
 
 class ProductionOrderLine(CreatedAtMixin, db.Model):
     # Us din ki recipe copy: ratio aur required qty. Recipe line ki id yahan nahi.
@@ -666,6 +682,22 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
     is_flux = db.Column(db.Boolean, default=False, nullable=False)
     # True = user ne packaging / extra RM add kiya. Ratio nahi, qty seedha type hoti hai.
     is_extra = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def issued_qty(self):
+        # Is line ke liye ab tak kitna RM production ko diya gaya: Draft + Posted issues ginte hain
+        # (Cancelled / remove kiye hue nahi) — wahi tarika jo bill me "billed qty" ka hai
+        total = 0
+        for issue_line in self.issue_lines:
+            issue = issue_line.issue
+            if issue.is_deleted or issue.status == "Cancelled":
+                continue
+            total += issue_line.qty
+        return round(total, 4)
+
+    @property
+    def remaining_qty(self):
+        return max(round(self.required_qty - self.issued_qty, 4), 0)
 
 
 class PaymentTerm(CreatedAtMixin, db.Model):
@@ -1254,3 +1286,52 @@ def _stock_movement_no_update(mapper, connection, target):
 @event.listens_for(StockMovement, "before_delete")
 def _stock_movement_no_delete(mapper, connection, target):
     raise RuntimeError("Stock ledger rows are never deleted. Add a reversing row instead.")
+
+
+
+# ======================= Material issue (RM store se production / WIP ko) =======================
+class MaterialIssue(CreatedAtMixin, db.Model):
+    # Released production order ke liye RM store se WIP me dena. Draft -> Posted (stock tab badalta hai) -> Cancelled.
+    __tablename__ = "material_issues"
+
+    id = db.Column(db.Integer, primary_key=True)
+    issue_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=False)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id], backref="issues")
+
+    issue_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class MaterialIssueLine(CreatedAtMixin, db.Model):
+    # Ek line = ek RM lot ka kitna hissa diya gaya (traceability: kaun sa lot kis production order me gaya)
+    __tablename__ = "material_issue_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    issue_id = db.Column(db.Integer, db.ForeignKey("material_issues.id"), nullable=False)
+    issue = db.relationship("MaterialIssue", foreign_keys=[issue_id], backref="lines")
+
+    # Production order ki kaun si requirement line ke liye (issued qty isi se ginti hai)
+    production_order_line_id = db.Column(db.Integer, db.ForeignKey("production_order_lines.id"), nullable=False)
+    production_order_line = db.relationship("ProductionOrderLine", foreign_keys=[production_order_line_id], backref="issue_lines")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+
+    lot_id = db.Column(db.Integer, db.ForeignKey("stock_lots.id"), nullable=False)
+    lot = db.relationship("StockLot", foreign_keys=[lot_id])
+
+    qty = db.Column(db.Float, nullable=False)
+
+    @property
+    def summary(self):
+        # View panel (JS) ke liye
+        material = self.raw_material
+        return {"material": (material.code + " " + material.name) if material else "",
+                "lot": self.lot.lot_code if self.lot else "",
+                "batch": self.lot.vendor_batch_no if self.lot else "",
+                "qty": self.qty,
+                "unit": material.base_unit.code if material and material.base_unit else ""}

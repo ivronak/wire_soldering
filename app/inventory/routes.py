@@ -13,6 +13,8 @@ MOVEMENT_LABELS = {
     "QC_OUT": "Passed QC: left QC Hold",
     "QC_IN": "Passed QC: into store",
     "PURCHASE_RETURN": "Returned to vendor",
+    "ISSUE_OUT": "Issued to production: left store",
+    "ISSUE_IN": "Issued to production: into WIP",
 }
 
 
@@ -38,7 +40,7 @@ def stock_list():
 
     lot_rows = []
     for lot in StockLot.query.order_by(StockLot.id.desc()).all():
-        row = {"lot": lot, "unit": lot_unit(lot), "waiting": 0, "available": 0, "rejected": 0, "value": 0, "where": []}
+        row = {"lot": lot, "unit": lot_unit(lot), "waiting": 0, "available": 0, "rejected": 0, "wip": 0, "value": 0, "where": []}
         has_qc = lot.grn_line.final_qc is not None if lot.grn_line else False
         for warehouse_id, qty, value in sums.get(lot.id, []):
             if abs(qty) < 0.00005:
@@ -46,7 +48,9 @@ def stock_list():
             warehouse = warehouses.get(warehouse_id)
             row["where"].append(warehouse.name if warehouse else "?")
             row["value"] += value
-            if warehouse is not None and warehouse.warehouse_type == "QC_HOLD":
+            if warehouse is not None and warehouse.warehouse_type == "WIP":
+                row["wip"] += qty
+            elif warehouse is not None and warehouse.warehouse_type == "QC_HOLD":
                 if has_qc:
                     row["rejected"] += qty
                 else:
@@ -60,8 +64,8 @@ def stock_list():
     summary = {}
     for row in lot_rows:
         key = (row["lot"].raw_material_id, row["unit"])
-        item = summary.setdefault(key, {"material": row["lot"].raw_material, "unit": row["unit"], "waiting": 0, "available": 0, "rejected": 0, "value": 0})
-        for name in ("waiting", "available", "rejected", "value"):
+        item = summary.setdefault(key, {"material": row["lot"].raw_material, "unit": row["unit"], "waiting": 0, "available": 0, "rejected": 0, "wip": 0, "value": 0})
+        for name in ("waiting", "available", "rejected", "wip", "value"):
             item[name] += row[name]
     summary_rows = sorted(summary.values(), key=lambda item: item["material"].name if item["material"] else "")
 
