@@ -188,7 +188,7 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ o.po_no }}</span></td>
                 <td class="text-left"><span class="font-medium text-ink">{{ o.vendor.name if o.vendor else "—" }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ o.po_date.strftime('%d-%b-%Y') if o.po_date else "—" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ o.po_date.strftime('%d-%b-%Y') if o.po_date else "—" }}{% if o.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ o.created_at|ist }}</div>{% endif %}</td>
                 <td class="text-[13px] text-ink-muted">{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else "—" }}</td>
                 <td class="text-[13px] text-ink-muted">{{ o.warehouse.name if o.warehouse else "—" }}</td>
                 <td class="text-center">
@@ -227,12 +227,15 @@
                       data-invoice-no="{{ o.vendor_invoice_no or '' }}"
                       data-invoice-date="{{ o.vendor_invoice_date.strftime('%d-%b-%Y') if o.vendor_invoice_date else '' }}"
                       data-invoice-url="{{ url_for('purchase_orders.purchase_orders_invoice', po_id=o.id) if o.vendor_invoice_file else '' }}"
-                      data-short-close-reason="{{ o.short_close_reason or '' }}">
+                      data-short-close-reason="{{ o.short_close_reason or '' }}"
+                      data-summary='{{ o.summary|tojson }}'
+                      data-revisions='{{ o.revision_data|tojson }}'>
                       View
                     </button>
                     {% if o.status == "Draft" %}
                     <button type="button" class="btn-confirm-po px-2.5 py-1 text-[12.5px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
-                      data-id="{{ o.id }}" data-po="{{ o.po_no }}">
+                      data-id="{{ o.id }}" data-po="{{ o.po_no }}"
+                      data-edit='{{ o.edit_data|tojson }}'>
                       Confirm
                     </button>
                     {% endif %}
@@ -428,8 +431,8 @@
         <div class="flex items-center justify-between text-ink-muted">
           <span>Subtotal</span><span id="po-subtotal" class="tabular-nums">₹0.00</span>
         </div>
-        <div id="po-tax-rows" class="text-ink-muted"></div>
         <div id="po-charge-rows" class="text-ink-muted"></div>
+        <div id="po-tax-rows" class="text-ink-muted"></div>
         <div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">
           <span>Grand total</span><span id="po-grand-total" class="tabular-nums">₹0.00</span>
         </div>
@@ -461,7 +464,7 @@
 
 <div id="confirm-po-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="confirm-po-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" aria-labelledby="confirm-po-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+  <div role="dialog" aria-labelledby="confirm-po-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="confirm-po-title" class="text-[16px] font-bold text-ink">Confirm purchase order</h2>
@@ -470,7 +473,8 @@
       <button type="button" id="btn-close-confirm-po" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
     <form id="confirm-po-form" method="post" enctype="multipart/form-data" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      <p class="text-[13px] text-ink-muted">Attach the vendor's invoice / bill copy to confirm this purchase order. It will move to <strong>Open</strong> status and become available for GRN.</p>
+      <p class="text-[13px] text-ink-muted">Attach the vendor's invoice / bill copy to confirm this purchase order. It will move to <strong>Open</strong> status and become available for GRN. If the vendor changed anything, correct it below first — the old and new values are saved with the order.</p>
+      <div id="confirm-po-edit"></div>
       <div>
         <label for="confirm-po-file" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor invoice / bill copy *</label>
         <input type="file" id="confirm-po-file" name="invoice_file" required accept=".pdf,.png,.jpg,.jpeg"
@@ -605,7 +609,7 @@
   function calcLineAmount(row) {
     var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
     var rate = parseFloat(row.querySelector('.line-rate').value) || 0;
-    var amount = qty * rate;
+    var amount = r2(qty * rate);
     row.querySelector('.line-amount').textContent = '₹' + amount.toFixed(2);
     return amount;
   }
@@ -636,16 +640,48 @@
     calcTotals();
   }
 
+  // ---- GST ka hisaab: app/tax.py (calc_tax) ka JS mirror. Charges items ke saath taxable value me judte hain,
+  // charge ko lines me value ke anupaat se baant ke har line apne rate se tax deti hai. Dono jagah same rule rakhna.
+  function r2(x) {
+    var sign = x < 0 ? -1 : 1;
+    return sign * Math.round((Math.abs(x) + 1e-9) * 100) / 100;
+  }
+  function poTax(lines, chargeNet) {
+    var items = 0;
+    lines.forEach(function (l) { items += l.value; });
+    var net = r2(chargeNet);
+    var given = 0;
+    var tax = 0;
+    lines.forEach(function (l, i) {
+      var share = 0;
+      if (items !== 0) {
+        share = (i === lines.length - 1) ? r2(net - given) : r2(net * l.value / items);
+      }
+      given += share;
+      tax += r2((l.value + share) * l.pct / 100);
+    });
+    tax = r2(tax);
+    var taxable = r2(items + net);
+    return { items: r2(items), net: net, taxable: taxable, tax: tax, grand: r2(taxable + tax) };
+  }
+  function taxRowsHtml(t, inter) {
+    var row = function (label, value) {
+      return '<div class="flex items-center justify-between"><span>' + label + '</span><span class="tabular-nums">₹' + value.toFixed(2) + '</span></div>';
+    };
+    var html = '';
+    if (t.net !== 0) html += row('Taxable value (items + charges)', t.taxable);
+    if (inter) return html + row('IGST', t.tax);
+    var cgst = r2(t.tax / 2);
+    return html + row('CGST', cgst) + row('SGST', r2(t.tax - cgst));
+  }
+
   function calcTotals() {
-    var lineRows = document.querySelectorAll('.po-line-row');
-    var subtotal = 0;
-    var totalTax = 0;
-    lineRows.forEach(function (row) {
+    var taxLines = [];
+    document.querySelectorAll('.po-line-row').forEach(function (row) {
       var amount = calcLineAmount(row);
-      subtotal += amount;
       var taxOpt = row.querySelector('.line-tax').selectedOptions[0];
       var pct = taxOpt ? (parseFloat(taxOpt.getAttribute('data-pct')) || 0) : 0;
-      totalTax += amount * pct / 100;
+      taxLines.push({ value: amount, pct: pct });
     });
     var chargeNet = 0;
     var chargeHtml = '';
@@ -654,24 +690,15 @@
       var effect = row.querySelector('.charge-effect').value;
       var label = row.querySelector('.charge-id').selectedOptions[0];
       var name = label && label.value ? label.textContent : 'Charge';
-      var signed = effect === 'minus' ? -amt : amt;
-      chargeNet += signed;
+      chargeNet += effect === 'minus' ? -amt : amt;
       var sign = effect === 'minus' ? '−' : '+';
       chargeHtml += '<div class="flex items-center justify-between"><span>' + esc(name) + '</span><span class="tabular-nums">' + sign + ' ₹' + amt.toFixed(2) + '</span></div>';
     });
     document.getElementById('po-charge-rows').innerHTML = chargeHtml;
-    var type = getTaxType();
-    var taxRowsEl = document.getElementById('po-tax-rows');
-    if (type === 'inter') {
-      taxRowsEl.innerHTML = '<div class="flex items-center justify-between"><span>IGST</span><span class="tabular-nums">₹' + totalTax.toFixed(2) + '</span></div>';
-    } else {
-      var half = totalTax / 2;
-      taxRowsEl.innerHTML =
-        '<div class="flex items-center justify-between"><span>CGST</span><span class="tabular-nums">₹' + half.toFixed(2) + '</span></div>' +
-        '<div class="flex items-center justify-between"><span>SGST</span><span class="tabular-nums">₹' + half.toFixed(2) + '</span></div>';
-    }
-    document.getElementById('po-subtotal').textContent = '₹' + subtotal.toFixed(2);
-    document.getElementById('po-grand-total').textContent = '₹' + (subtotal + totalTax + chargeNet).toFixed(2);
+    var t = poTax(taxLines, chargeNet);
+    document.getElementById('po-tax-rows').innerHTML = taxRowsHtml(t, getTaxType() === 'inter');
+    document.getElementById('po-subtotal').textContent = '₹' + t.items.toFixed(2);
+    document.getElementById('po-grand-total').textContent = '₹' + t.grand.toFixed(2);
   }
 
   // ---- Material select hote hi uski Unit + Tax Rate auto-fill (Raw Material Master se) ----
@@ -745,25 +772,27 @@
     });
     if (!linesHtml) linesHtml = '<div class="text-ink-faint text-[13px]">No line items</div>';
 
-    var chargeNet = 0;
-    var chargeHtml = '';
-    if (chargeNames.length) {
-      chargeNames.forEach(function (name, i) {
-        var amt = chargeAmounts[i] || 0;
-        var effect = chargeEffects[i] || 'add';
-        var signed = effect === 'minus' ? -amt : amt;
-        chargeNet += signed;
-        chargeHtml += '<div class="flex items-center justify-between"><span>' + esc(name || 'Charge') + '</span><span>' + (effect === 'minus' ? '−' : '+') + ' ₹' + Number(amt).toFixed(2) + '</span></div>';
-      });
-    } else if (freight) {
-      chargeNet = freight;
-      chargeHtml = '<div class="flex items-center justify-between"><span>Freight</span><span>₹' + freight.toFixed(2) + '</span></div>';
+    // Totals server ka PurchaseOrder.summary hai (app/tax.py) — View, print aur docket me ek hi total aaye
+    var sm = JSON.parse(btn.getAttribute('data-summary') || '{}');
+    var vrow = function (label, value) {
+      return '<div class="flex items-center justify-between"><span>' + label + '</span><span>' + value + '</span></div>';
+    };
+    var totalsHtml = vrow('Subtotal', '₹' + (sm.items_total || 0).toFixed(2));
+    (sm.charge_rows || []).forEach(function (c) {
+      totalsHtml += vrow(esc(c.name || 'Charge'), (c.effect === 'minus' ? '−' : '+') + ' ₹' + Number(c.amount || 0).toFixed(2));
+    });
+    if (sm.gst_on_charges && (sm.charge_rows || []).length) {
+      totalsHtml += vrow('Taxable value (items + charges)', '₹' + (sm.taxable_total || 0).toFixed(2));
     }
-
-    var taxHtml = taxType === 'inter'
-      ? '<div class="flex items-center justify-between"><span>IGST</span><span>₹' + totalTax.toFixed(2) + '</span></div>'
-      : '<div class="flex items-center justify-between"><span>CGST</span><span>₹' + (totalTax / 2).toFixed(2) + '</span></div>' +
-        '<div class="flex items-center justify-between"><span>SGST</span><span>₹' + (totalTax / 2).toFixed(2) + '</span></div>';
+    totalsHtml += sm.inter
+      ? vrow('IGST', '₹' + (sm.tax_total || 0).toFixed(2))
+      : vrow('CGST', '₹' + (sm.cgst || 0).toFixed(2)) + vrow('SGST', '₹' + (sm.sgst || 0).toFixed(2));
+    var revisions = JSON.parse(btn.getAttribute('data-revisions') || '[]');
+    var revisionHtml = '';
+    if (revisions.length) {
+      revisionHtml = '<div class="pt-2">' + viewField('Changed when confirmed',
+        revisions.map(function (r) { return '<span class="text-ink-faint">' + esc(r.when) + '</span><br>' + esc(r.note).replace(/\n/g, '<br>'); }).join('<hr class="my-1">')) + '</div>';
+    }
 
     document.getElementById('view-modal-body').innerHTML =
       '<div class="grid grid-cols-2 gap-3">' +
@@ -777,16 +806,15 @@
       '<div class="pt-2">' + viewField('Vendor invoice', invoiceFieldHtml(btn)) + '</div>' +
       (btn.getAttribute('data-short-close-reason') ? '<div class="pt-2">' + viewField('Short close reason', btn.getAttribute('data-short-close-reason')) + '</div>' : '') +
       '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>' +
+      revisionHtml +
       '<div class="pt-3 border-t border-slate-200 mt-2">' +
       '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Line items</div>' +
       linesHtml +
       '</div>' +
       '<div class="bg-mist border border-slate-200 rounded-lg p-3 mt-2 space-y-1 text-[13px] text-ink-muted">' +
-      '<div class="flex items-center justify-between"><span>Subtotal</span><span>₹' + subtotal.toFixed(2) + '</span></div>' +
-      taxHtml +
-      chargeHtml +
+      totalsHtml +
       '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">' +
-      '<span>Grand total</span><span>₹' + (subtotal + totalTax + chargeNet).toFixed(2) + '</span></div>' +
+      '<span>Grand total</span><span>₹' + (sm.grand_total || 0).toFixed(2) + '</span></div>' +
       '</div>';
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
@@ -799,10 +827,85 @@
   // ---- Confirm PO modal (vendor invoice upload) ----
   var confirmPoModal = document.getElementById('confirm-po-modal');
   var confirmPoForm = document.getElementById('confirm-po-form');
+  var PO_TAX_RATES = [{% for t in tax_rates %}{id: {{ t.id }}, label: {{ (t.code ~ ' (' ~ t.rate_percent ~ '%)')|tojson }}, pct: {{ t.rate_percent }}}{% if not loop.last %},{% endif %}{% endfor %}];
+  var CE_INPUT = 'w-full px-2 py-1 text-[13px] border border-slate-300 rounded text-right tabular-nums focus:ring-1 focus:ring-copper focus:border-copper';
+  var ceInter = false;
+
+  // Confirm panel: PO ki lines / charges ko vendor ke bill se milao, kuch badla ho to yahin theek karo (F10)
+  function renderConfirmEdit(data) {
+    var box = document.getElementById('confirm-po-edit');
+    ceInter = !!data.inter;
+    var lines = data.lines || [];
+    var charges = data.charges || [];
+    var html = '<div class="text-[13px] font-semibold text-ink mb-1.5">Check against the vendor\'s bill</div>' +
+      '<table class="lines-table"><colgroup><col style="width:34%"><col style="width:16%"><col style="width:16%"><col style="width:18%"><col style="width:16%"></colgroup>' +
+      '<thead><tr><th>Item</th><th>Qty</th><th>Rate (₹)</th><th>Tax</th><th>Amount</th></tr></thead><tbody>';
+    lines.forEach(function (l, i) {
+      var options = PO_TAX_RATES.map(function (t) {
+        return '<option value="' + t.id + '"' + (t.id === l.tax_rate_id ? ' selected' : '') + '>' + esc(t.label) + '</option>';
+      }).join('');
+      html += '<tr class="ce-line"><td>' + esc(l.name) + '<div class="text-[11.5px] text-ink-faint">' + esc(l.unit) + '</div>' +
+        '<input type="hidden" name="line_id_' + i + '" value="' + l.id + '"></td>' +
+        '<td><input type="number" class="ce-qty ' + CE_INPUT + '" name="line_qty_' + i + '" value="' + l.qty + '" min="0" step="any"></td>' +
+        '<td><input type="number" class="ce-rate ' + CE_INPUT + '" name="line_rate_' + i + '" value="' + l.rate + '" min="0" step="any"></td>' +
+        '<td><select class="ce-tax w-full px-1 py-1 text-[13px] border border-slate-300 rounded" name="line_tax_' + i + '">' + options + '</select></td>' +
+        '<td class="ce-amount tabular-nums text-right"></td></tr>';
+    });
+    html += '</tbody></table>';
+    if (charges.length) {
+      html += '<div class="text-[13px] font-semibold text-ink mt-3 mb-1.5">Charges <span class="font-normal text-ink-faint">(clear the amount to remove a charge)</span></div>' +
+        '<table class="lines-table"><colgroup><col style="width:50%"><col style="width:22%"><col style="width:28%"></colgroup>' +
+        '<thead><tr><th>Charge</th><th>Type</th><th>Amount (₹)</th></tr></thead><tbody>';
+      charges.forEach(function (c, j) {
+        html += '<tr class="ce-charge"><td>' + esc(c.name) + '<input type="hidden" name="charge_row_id_' + j + '" value="' + c.id + '"></td>' +
+          '<td><select class="ce-effect w-full px-1 py-1 text-[13px] border border-slate-300 rounded" name="charge_row_effect_' + j + '">' +
+          '<option value="add"' + (c.effect === 'add' ? ' selected' : '') + '>Add</option>' +
+          '<option value="minus"' + (c.effect === 'minus' ? ' selected' : '') + '>Minus</option></select></td>' +
+          '<td><input type="number" class="ce-charge-amount ' + CE_INPUT + '" name="charge_row_amount_' + j + '" value="' + c.amount + '" min="0" step="0.01"></td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '<div id="ce-totals" class="bg-mist border border-slate-200 rounded-lg p-3 mt-3 space-y-1 text-[13px] text-ink-muted"></div>';
+    box.innerHTML = lines.length ? html : '';
+    box.oninput = ceRecalc;
+    box.onchange = ceRecalc;
+    ceRecalc();
+  }
+  function ceRecalc() {
+    var box = document.getElementById('confirm-po-edit');
+    var totals = document.getElementById('ce-totals');
+    if (!totals) return;
+    var taxLines = [];
+    box.querySelectorAll('.ce-line').forEach(function (row) {
+      var qty = parseFloat(row.querySelector('.ce-qty').value) || 0;
+      var rate = parseFloat(row.querySelector('.ce-rate').value) || 0;
+      var taxId = parseInt(row.querySelector('.ce-tax').value, 10);
+      var pct = 0;
+      PO_TAX_RATES.forEach(function (t) { if (t.id === taxId) pct = t.pct; });
+      var value = r2(qty * rate);
+      row.querySelector('.ce-amount').textContent = '₹' + value.toFixed(2);
+      taxLines.push({ value: value, pct: pct });
+    });
+    var chargeNet = 0;
+    var chargeHtml = '';
+    box.querySelectorAll('.ce-charge').forEach(function (row) {
+      var amt = parseFloat(row.querySelector('.ce-charge-amount').value) || 0;
+      var minus = row.querySelector('.ce-effect').value === 'minus';
+      chargeNet += minus ? -amt : amt;
+      if (amt) {
+        chargeHtml += '<div class="flex items-center justify-between"><span>' + esc(row.firstElementChild.textContent) + '</span><span class="tabular-nums">' + (minus ? '−' : '+') + ' ₹' + amt.toFixed(2) + '</span></div>';
+      }
+    });
+    var t = poTax(taxLines, chargeNet);
+    totals.innerHTML = '<div class="flex items-center justify-between"><span>Subtotal</span><span class="tabular-nums">₹' + t.items.toFixed(2) + '</span></div>' +
+      chargeHtml + taxRowsHtml(t, ceInter) +
+      '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink"><span>Grand total</span><span class="tabular-nums">₹' + t.grand.toFixed(2) + '</span></div>';
+  }
   function openConfirmPoModal(btn) {
     var id = btn.getAttribute('data-id');
     var poNo = btn.getAttribute('data-po') || '';
     confirmPoForm.reset();
+    renderConfirmEdit(JSON.parse(btn.getAttribute('data-edit') || '{}'));
     confirmPoForm.action = '/purchase_orders/confirm/' + id;
     document.getElementById('confirm-po-subtitle').textContent = poNo;
     confirmPoModal.classList.remove('hidden');

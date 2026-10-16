@@ -24,6 +24,7 @@ from app.party_documents.routes import party_documents_bp
 from app.purchase_invoices.routes import purchase_invoices_bp
 from app.purchase_returns.routes import purchase_returns_bp
 from app.extensions import db, migrate
+from app.timeutil import format_ist
 
 
 def create_app():
@@ -43,6 +44,9 @@ def create_app():
     # Poori request ki max size (10 MB) — isse bada upload Flask khud hi rok deta hai,
     # file poori server pe aane se pehle. (Party documents ki apni 5 MB limit alag se bhi hai.)
     app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
+    # Templates me {{ x.created_at|ist }} — UTC se India time ("16 Oct 2026, 03:42 PM")
+    app.add_template_filter(format_ist, "ist")
 
     db.init_app(app)
     migrate.init_app(app, db)

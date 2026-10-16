@@ -115,45 +115,41 @@ def _signed_charges(charge_lines):
 
 
 def _po_summary(po):
-    # PO ki lines + total: PO print / PO View jaisa hi hisaab (qty x rate, tax % alag, charges Add / Minus,
-    # purani freight sirf tab jab koi charge line na ho), taaki ek PO ke do alag total na dikhein.
-    # Line ka discount_percent PO print aur View me bhi nahi lagta (naye PO me hamesha 0), isliye yahan bhi nahi.
+    # PO ki lines + total: PO print / PO View jaisa hi hisaab — PurchaseOrder.summary (app/tax.py) se, taaki ek PO ke do
+    # alag total na dikhein. Line ka discount_percent PO print aur View me bhi nahi lagta, isliye yahan bhi nahi.
+    summary = po.summary
     line_rows = []
-    subtotal = 0
-    tax_total = 0
-    for line in po.lines:
-        amount = (line.ordered_qty or 0) * (line.rate or 0)
-        tax_percent = line.tax_rate.rate_percent if line.tax_rate else 0
-        subtotal += amount
-        tax_total += amount * tax_percent / 100
+    for line, tax_line in zip(po.lines, summary["lines"]):
+        # Is PO line ka maal GRN-wise alag-alag: "GRN-001 ne 250, GRN-002 ne 250" — total ek number me nahi (client rule).
+        # Draft GRN abhi post nahi hui, isliye nahi ginte (docket ke baaki hisson jaisa).
+        receipts = []
+        received_total = 0
+        for grn_line in sorted(line.grn_lines, key=lambda gl: gl.id):
+            grn = grn_line.grn
+            if grn is None or grn.is_deleted or grn.status == "Draft":
+                continue
+            receipts.append({"grn_no": grn.grn_no, "grn_date": grn.grn_date, "created_at": grn.created_at,
+                             "qty": grn_line.received_qty or 0})
+            received_total += grn_line.received_qty or 0
+        still_to_come = round((line.ordered_qty or 0) - received_total, 4)
+
         line_rows.append({
             "line": line,
             "unit": _unit_code(line),
-            "amount": round(amount, 2),
-            "tax_percent": tax_percent,
+            "amount": tax_line["value"],
+            "tax_percent": tax_line["rate"],
+            "receipts": receipts,
+            "still_to_come": still_to_come if still_to_come > 0 else 0,
         })
 
-    charge_rows = []
-    charges_total = 0
-    for charge_line in po.charge_lines:
-        signed = -charge_line.amount if charge_line.effect == "minus" else charge_line.amount
-        charges_total += signed
-        charge_rows.append({
-            "name": charge_line.charge.name if charge_line.charge else "Charge",
-            "amount": charge_line.amount,
-            "effect": charge_line.effect,
-        })
-    if not po.charge_lines and po.freight:
-        charges_total += po.freight
-        charge_rows.append({"name": "Freight", "amount": po.freight, "effect": "add"})
-
+    charge_rows = summary["charge_rows"]
     return {
         "lines": line_rows,
         "charges": charge_rows,
-        "subtotal": round(subtotal, 2),
-        "tax_total": round(tax_total, 2),
-        "charges_total": round(charges_total, 2),
-        "total": round(subtotal + tax_total + charges_total, 2),
+        "subtotal": summary["items_total"],
+        "tax_total": summary["tax_total"],
+        "charges_total": summary["charges_net"],
+        "total": summary["grand_total"],
     }
 
 

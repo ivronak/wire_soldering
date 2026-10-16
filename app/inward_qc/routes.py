@@ -1,10 +1,33 @@
-from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
+import os
+
+from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify, current_app, send_from_directory
+from werkzeug.utils import secure_filename
 from app.models import InwardQC, GRN, GRNLine, RejectionMemo, RMQCParameter, InwardQCResult
 from app.raw_materials.routes import qc_parameter_to_dict
 from app.extensions import db
 from datetime import datetime
 
 inward_qc_bp = Blueprint("inward_qc", __name__, template_folder="templates")
+
+# F11: QC report / certificate ki file. PO invoice upload jaisa pattern: sirf PDF / PNG / JPG, 5 MB tak.
+ALLOWED_REPORT_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
+MAX_REPORT_BYTES = 5 * 1024 * 1024
+
+
+def check_report_file(report):
+    # Wapas: error message (galat ho to) ya None (theek hai / file di hi nahi)
+    if report is None or not report.filename:
+        return None
+    ext = report.filename.rsplit(".", 1)[1].lower() if "." in report.filename else ""
+    if ext not in ALLOWED_REPORT_EXTENSIONS:
+        return "QC report must be a PDF, PNG or JPG file."
+    report.stream.seek(0, os.SEEK_END)
+    size = report.stream.tell()
+    report.stream.seek(0)
+    if size > MAX_REPORT_BYTES:
+        return "The QC report file is too large (maximum 5 MB)."
+    return None
+
 
 def final_qc_line_ids():
     # Jin GRN lines ka final (non-Draft) QC ho chuka — unka kaam khatam, dobara inspect nahi hongi
@@ -129,6 +152,10 @@ def inward_qc_list():
         InwardQC.status != "Draft",
     ).order_by(InwardQC.id.desc()).all()
 
+    # F3: PO-wise grouping — ek PO ke lots / QC saath-saath (naya PO pehle)
+    awaiting.sort(key=lambda a: (-a["grn"].po_id, -a["grn"].id, a["line"].id))
+    completed.sort(key=lambda qc: (-(qc.grn_line.grn.po_id if qc.grn_line and qc.grn_line.grn else 0), -qc.id))
+
     return render_template(
         "inwards_qc.html",
         tab=tab,
@@ -218,11 +245,21 @@ def inward_qc_add():
         flash(error,"error")
         return redirect(url_for('inward_qc.inward_qc_list'))
 
+    # QC report file (optional): galat file ho to kuch bhi save hone se pehle yahin ruk jao
+    report = request.files.get("report_file")
+    report_error = check_report_file(report)
+    if report_error:
+        flash(report_error, "error")
+        return redirect(url_for('inward_qc.inward_qc_list'))
+
     # Sab checks pass ho gaye. Draft = "kaam chalu hai", isliye naya save (draft ya final) is lot ke purane draft ko
     # replace karta hai (purana hide ho jata hai) — warna har draft save par ek aur draft jama hota jata.
     # Ye checks ke BAAD isliye ki galti hone par purana draft na ud jaye.
+    inherited_report = None            # naya file nahi diya to purane draft ki file saath chale
     for old_draft in InwardQC.query.filter_by(grn_line_id=grn_line_id, status="Draft", is_deleted=False).all():
         old_draft.is_deleted = True
+        if old_draft.report_file:
+            inherited_report = old_draft.report_file
 
     inspection_date = datetime.strptime(inspection_date_raw, "%Y-%m-%d").date()
 
@@ -253,6 +290,18 @@ def inward_qc_add():
     )            
 
     db.session.add(inward_qc)
+    db.session.flush()                 # id chahiye: file ka folder QC id se banta hai
+
+    if report is not None and report.filename:
+        ext = report.filename.rsplit(".", 1)[1].lower()
+        safe_name = secure_filename(report.filename) or ("report." + ext)
+        folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'inward_qc', str(inward_qc.id))
+        os.makedirs(folder, exist_ok=True)
+        report.save(os.path.join(folder, safe_name))
+        inward_qc.report_file = 'inward_qc/' + str(inward_qc.id) + '/' + safe_name      # DB me hamesha "/" (Windows ka \ nahi)
+    else:
+        inward_qc.report_file = inherited_report
+
     saved_results=[]
     for row in result_rows:
         p = row["parameter"]
@@ -327,3 +376,12 @@ def inward_qc_add():
             message += f" Rejection memo {memo_no} was raised."
         flash(message, "success")
     return redirect(url_for('inward_qc.inward_qc_list'))        
+
+
+@inward_qc_bp.route('/inward_qc/<int:qc_id>/report')
+def inward_qc_report(qc_id):
+    # QC report / certificate ki file kholna (View panel ka link)
+    qc = InwardQC.query.get_or_404(qc_id)
+    if not qc.report_file or qc.is_deleted:
+        return redirect(url_for('inward_qc.inward_qc_list'))
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], qc.report_file)

@@ -1,5 +1,6 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, current_app, send_from_directory
-from app.models import PurchaseOrder, PurchaseOrderLine, Vendor, Warehouse, RawMaterial, Unit, TaxRate, PaymentTerm, Charge, PurchaseOrderCharge
+from app.timeutil import ist_now
+from app.models import PurchaseOrder, PurchaseOrderLine, Vendor, Warehouse, RawMaterial, Unit, TaxRate, PaymentTerm, Charge, PurchaseOrderCharge, PurchaseOrderRevision
 from app.extensions import db
 from app.purchase_orders.docket import build_docket, format_qty, format_rate, format_reading, format_inr
 from datetime import datetime
@@ -163,6 +164,92 @@ def purchase_orders_add():
     flash(f"Purchase Order {po_no} saved.", "success")
     return redirect(url_for('purchase_orders.purchase_orders_list'))
 
+def read_confirm_edits(po):
+    """Confirm panel me vendor ke kehne par badle hue rate / qty / tax / charges padhta hai (F10).
+    Pehle sab check karta hai, kuch save nahi karta. Return: (errors, changes, notes)
+    changes = [(object, field, new_value)], notes = revision ke liye "purana -> naya" ki lines."""
+    errors = []
+    changes = []
+    notes = []
+    if request.form.get("line_id_0") is None:
+        return errors, changes, notes      # panel ke edit fields aaye hi nahi — kuch badla nahi
+
+    lines_by_id = {line.id: line for line in po.lines}
+    i = 0
+    while request.form.get(f"line_id_{i}") is not None:
+        line = lines_by_id.get(request.form.get(f"line_id_{i}", type=int))
+        qty = request.form.get(f"line_qty_{i}", type=float)
+        rate = request.form.get(f"line_rate_{i}", type=float)
+        tax_id = request.form.get(f"line_tax_{i}", type=int)
+        i += 1
+        if line is None:
+            errors.append("One of the lines does not belong to this purchase order.")
+            continue
+        name = line.raw_material.name if line.raw_material else "Item"
+        tax = TaxRate.query.get(tax_id) if tax_id else None
+        if qty is None or qty <= 0:
+            errors.append(f"{name}: quantity must be more than 0.")
+            continue
+        if rate is None or rate < 0:
+            errors.append(f"{name}: rate cannot be negative.")
+            continue
+        if tax is None or tax.is_deleted:
+            errors.append(f"{name}: please choose a valid tax rate.")
+            continue
+
+        parts = []
+        if round(qty, 4) != round(line.ordered_qty, 4):
+            parts.append(f"qty {format_qty(line.ordered_qty)} \u2192 {format_qty(qty)}")
+            changes.append((line, "ordered_qty", qty))
+        if round(rate, 4) != round(line.rate, 4):
+            parts.append(f"rate {format_rate(line.rate)} \u2192 {format_rate(rate)}")
+            changes.append((line, "rate", rate))
+        if tax.id != line.tax_rate_id:
+            old_percent = line.tax_rate.rate_percent if line.tax_rate else 0
+            parts.append(f"tax {format_qty(old_percent)}% \u2192 {format_qty(tax.rate_percent)}%")
+            changes.append((line, "tax_rate_id", tax.id))
+        if parts:
+            notes.append(f"{name}: " + ", ".join(parts))
+
+    charges_by_id = {charge_line.id: charge_line for charge_line in po.charge_lines}
+    j = 0
+    while request.form.get(f"charge_row_id_{j}") is not None:
+        charge_line = charges_by_id.get(request.form.get(f"charge_row_id_{j}", type=int))
+        amount_raw = (request.form.get(f"charge_row_amount_{j}") or "").strip()
+        effect = (request.form.get(f"charge_row_effect_{j}") or "").strip()
+        j += 1
+        if charge_line is None:
+            errors.append("One of the charges does not belong to this purchase order.")
+            continue
+        name = charge_line.charge.name if charge_line.charge else "Charge"
+        if effect not in ("add", "minus"):
+            errors.append(f"{name}: please choose Add or Minus.")
+            continue
+        if amount_raw == "":
+            # Amount khaali = vendor ne ye charge hata diya
+            notes.append(f"{name}: removed (was {format_inr(charge_line.amount)})")
+            changes.append((charge_line, "remove", None))
+            continue
+        try:
+            amount = float(amount_raw)
+        except ValueError:
+            errors.append(f"{name}: amount must be a number.")
+            continue
+        if amount < 0:
+            errors.append(f"{name}: amount cannot be negative.")
+            continue
+        parts = []
+        if round(amount, 2) != round(charge_line.amount, 2):
+            parts.append(f"amount {format_inr(charge_line.amount)} \u2192 {format_inr(amount)}")
+            changes.append((charge_line, "amount", amount))
+        if effect != charge_line.effect:
+            parts.append(f"{charge_line.effect} \u2192 {effect}")
+            changes.append((charge_line, "effect", effect))
+        if parts:
+            notes.append(f"{name}: " + ", ".join(parts))
+    return errors, changes, notes
+
+
 @purchase_orders_bp.route('/purchase_orders/confirm/<int:po_id>', methods=['POST'])
 def purchase_orders_confirm(po_id):
     po = PurchaseOrder.query.get_or_404(po_id)
@@ -183,11 +270,26 @@ def purchase_orders_confirm(po_id):
         flash("Invoice file must be PDF, PNG or JPG.", "error")
         return redirect(url_for('purchase_orders.purchase_orders_list'))
 
+    # Vendor ne kuch badla ho to panel ke edits pehle check karo — galti ho to file bhi save nahi hogi, PO Draft hi rahegi
+    edit_errors, edit_changes, edit_notes = read_confirm_edits(po)
+    if edit_errors:
+        flash(" ".join(edit_errors), "error")
+        return redirect(url_for('purchase_orders.purchase_orders_list'))
+
     folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'purchase_orders', str(po_id))
     os.makedirs(folder, exist_ok=True)
     safe_name = secure_filename(invoice_file.filename)
     invoice_file.save(os.path.join(folder, safe_name))
     po.vendor_invoice_file = 'purchase_orders/' + str(po_id) + '/' + safe_name
+
+    for target, field, new_value in edit_changes:
+        if field == "remove":
+            db.session.delete(target)       # sirf is Draft PO ki ek charge line; kya hata, revision note me likha rehta hai
+        else:
+            setattr(target, field, new_value)
+    if edit_notes:
+        db.session.add(PurchaseOrderRevision(po_id=po.id, note="\n".join(edit_notes)))
+    po.gst_on_charges = True                 # confirm ke baad PO nayi GST rule se (items + charges par) chalti hai
 
     po.vendor_invoice_no = vendor_invoice_no or None
     po.vendor_invoice_date = vendor_invoice_date        
@@ -245,7 +347,7 @@ def purchase_orders_docket(po_id):
         po=po,
         docket=build_docket(po),
         invoice_file_ok=invoice_file_ok,
-        printed_at=datetime.now(),   # paper docket ko "kab ka" pata chale
+        printed_at=ist_now(),   # paper docket ko "kab ka" pata chale
     )
 
 @purchase_orders_bp.route('/purchase_orders/<int:po_id>/invoice')

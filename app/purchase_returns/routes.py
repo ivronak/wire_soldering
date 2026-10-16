@@ -7,6 +7,7 @@ from app.models import (
     PurchaseInvoice, PurchaseInvoiceLine, Charge,
 )
 from app.purchase_invoices.posting import post_return, cancel_return
+from app.tax import calc_tax
 
 purchase_returns_bp = Blueprint("purchase_returns", __name__, template_folder="templates")
 
@@ -39,24 +40,22 @@ def read_return_form():
     if len(reason) > 255:
         return None, "The reason is too long (maximum 255 characters)."
 
-    # ---- Lines: bill ki kaun si line se kitna wapas ----
+    # ---- Lines: bill ki kaun si line se kitna wapas, aur kis me se (Passed ya Rejected) ----
     # Har item ek dictionary hai (model object nahi): PurchaseReturnLine object abhi banaya to wo
-    # invoice_line.return_lines me chala jaata aur returned_qty galat ginta. Object tab banenge jab sab jaanch pass ho.   
+    # invoice_line.return_lines me chala jaata aur returned qty galat ginta. Object tab banenge jab sab jaanch pass ho.
     line_rows = []
     seen_ids = []
-    i=0
+    i = 0
     while True:
-
-        line_id = request.form.get(f'invoice_line_id_{i}', type=int)     
+        line_id = request.form.get(f'invoice_line_id_{i}', type=int)
         if line_id is None:
             break
 
-        qty = request.form.get(f"qty_{i}", type=float)
+        # Ek bill line se do tarah ka maal wapas ja sakta hai: qty_N = passed me se, rejected_qty_N = rejected me se
+        amounts = {"passed": request.form.get(f"qty_{i}", type=float),
+                   "rejected": request.form.get(f"rejected_qty_{i}", type=float)}
         # qty khaali ya 0 = ye line return me nahi hai, chhod do
-        if qty is not None and qty != 0:
-            if qty < 0:
-                return None, "Quantity cannot be negative."
-
+        if any(value not in (None, 0) for value in amounts.values()):
             invoice_line = db.session.get(PurchaseInvoiceLine, line_id)
             if invoice_line is None or invoice_line.invoice_id != invoice.id:
                 return None, "A selected line does not belong to this bill."
@@ -65,15 +64,22 @@ def read_return_form():
             seen_ids.append(line_id)
 
             material_name = invoice_line.raw_material.name if invoice_line.raw_material else "Material"
-            unit_code = invoice_line.unit.code if invoice_line.unit else "" 
-            if round(qty, 4) > invoice_line.returnable_qty:
-                return None, (f"{material_name}: only {invoice_line.returnable_qty:g} {unit_code} can still be returned "
-                              f"({invoice_line.qty:g} on the bill, {invoice_line.returned_qty:g} already returned).")     
+            unit_code = invoice_line.unit.code if invoice_line.unit else ""
+            for source in ("passed", "rejected"):
+                qty = amounts[source]
+                if qty is None or qty == 0:
+                    continue
+                if qty < 0:
+                    return None, "Quantity cannot be negative."
+                can_return = invoice_line.returnable_passed if source == "passed" else invoice_line.returnable_rejected
+                if round(qty, 4) > can_return:
+                    return None, (f"{material_name}: only {can_return:g} {unit_code} can still be returned from the {source} goods "
+                                  f"({invoice_line.qty:g} on the bill, {invoice_line.returned_qty:g} already returned).")
 
-            # Paisa bill line ke rate / discount / tax se (PurchaseReturnLine ki properties wala hi formula)
-            taxable = round(qty * invoice_line.rate * (1 - invoice_line.discount_percent / 100), 2)
-            tax = round(taxable * invoice_line.tax_percent / 100, 2)
-            line_rows.append({"invoice_line": invoice_line, "qty": qty, "taxable": taxable, "tax": tax})
+                # Paisa bill line ke rate / discount / tax se (PurchaseReturnLine ki properties wala hi formula)
+                taxable = round(qty * invoice_line.rate * (1 - invoice_line.discount_percent / 100), 2)
+                tax = round(taxable * invoice_line.tax_percent / 100, 2)
+                line_rows.append({"invoice_line": invoice_line, "qty": qty, "source": source, "taxable": taxable, "tax": tax})
         i += 1
 
     if not line_rows:
@@ -102,20 +108,16 @@ def read_return_form():
             charge_rows.append(PurchaseReturnCharge(charge_id=charge.id, amount=round(amount, 2), effect=effect))
         j += 1
 
-     # ---- Totals: server nikalta hai ----
-    subtotal = 0
-    tax_total = 0
-    for row in line_rows:
-        subtotal += row["taxable"]
-        tax_total += row["tax"]
-    charges_total = 0
+    # ---- Totals: server nikalta hai. GST goods + charges ke total par (app/tax.py), charge lines me value ke anupaat se ----
+    charges_net = 0
     for charge_row in charge_rows:
-        charges_total += charge_row.signed_amount
+        charges_net += charge_row.signed_amount
+    result = calc_tax([(row["taxable"], row["invoice_line"].tax_percent) for row in line_rows], round(charges_net, 2))
 
-    subtotal = round(subtotal, 2)
-    tax_total = round(tax_total, 2)
-    charges_total = round(charges_total, 2)
-    total_amount = round(subtotal + tax_total + charges_total, 2)
+    subtotal = result["items_total"]
+    tax_total = result["tax_total"]
+    charges_total = result["charges_net"]
+    total_amount = result["grand_total"]
     if total_amount < 0:
         return None, "The charges are more than the value of the goods. Check the amounts."
 
@@ -137,6 +139,11 @@ def purchase_return_list():
     # Purchase return page: saare returns ki list. Pending / Completed tabs nahi: return koi "baaki kaam" nahi,
     # jab maal wapas bhejna ho tabhi banta hai (Purchase invoice ke Posted bill se).
     returns = PurchaseReturn.query.filter(PurchaseReturn.is_deleted == False).order_by(PurchaseReturn.id.desc()).all()
+    # F3: PO-wise grouping — ek PO ke returns saath-saath (naya PO pehle, PO ke andar naya return pehle)
+    def po_key(purchase_return):
+        po = purchase_return.invoice.po if purchase_return.invoice else None
+        return (-(po.id if po else 0), -purchase_return.id)
+    returns.sort(key=po_key)
     return render_template(
         "purchase_returns.html", 
         active_nav="purchase_returns", 
@@ -166,6 +173,7 @@ def purchase_returns_add():
         tax_total = data["tax_total"],
         charges_total = data["charges_total"],
         total_amount = data["total_amount"],
+        gst_on_charges = True,
         is_deleted = False,
     )
     db.session.add(purchase_return)
@@ -177,6 +185,7 @@ def purchase_returns_add():
             purchase_return=purchase_return,
             invoice_line=row["invoice_line"],
             qty=row["qty"],
+            source=row["source"],
         ))
     for charge_row in data["charge_rows"]:
         charge_row.purchase_return = purchase_return

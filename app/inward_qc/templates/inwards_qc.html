@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_po_group.html" import po_group_row %}
 {% block title %}Inward QC{% endblock %}
 
 {% block page_css %}
@@ -112,7 +113,7 @@
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
-              Inspect one GRN lot at a time · <strong>Passed qty</strong> can be invoiced later · <strong>Rejected qty</strong> needs a rejection memo (not billable)
+              Inspect one GRN lot at a time · The whole received qty is billed on the vendor's invoice · <strong>Rejected qty</strong> gets a rejection memo and goes back with a Purchase Return
             </p>
           </details>
         </div>
@@ -150,6 +151,7 @@
             </thead>
             <tbody>
               {% for a in awaiting %}
+              {% if loop.first or a.grn.po_id != loop.previtem.grn.po_id %}{{ po_group_row(a.grn.po, 10) }}{% endif %}
               {% set g = a.grn %}
               {% set gl = a.line %}
               {% set po_line = gl.po_line %}
@@ -159,7 +161,7 @@
                   data-status="{{ 'draft' if a.draft else 'awaiting' }}">
                 <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ g.grn_no }}</td>
-                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}</td>
+                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
                 <td><span class="text-brand-teal font-medium">{{ g.po.po_no if g.po else '—' }}</span></td>
                 <td class="text-[13px]">{{ g.po.vendor.name if g.po and g.po.vendor else '—' }}</td>
                 <td class="text-left pl-3 !text-left text-[13px]">{% if rm %}{{ rm.code }} {{ rm.name }}{% else %}—{% endif %}</td>
@@ -222,6 +224,8 @@
             </thead>
             <tbody id="qc-tbody">
               {% for q in inwards %}
+              {% set q_po = q.grn_line.grn.po if q.grn_line and q.grn_line.grn else none %}
+              {% if loop.first or (q_po.id if q_po else 0) != (loop.previtem.grn_line.grn.po_id if loop.previtem.grn_line and loop.previtem.grn_line.grn else 0) %}{{ po_group_row(q_po, 12) }}{% endif %}
               {% set gl = q.grn_line %}
               {% set po_line = gl.po_line if gl else none %}
               {% set rm = po_line.raw_material if po_line else none %}
@@ -232,7 +236,7 @@
                   data-status="{{ st }}">
                 <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ q.qc_no }}</td>
-                <td class="tabular-nums">{{ q.inspection_date.strftime('%d %b %Y') if q.inspection_date else '—' }}</td>
+                <td class="tabular-nums">{{ q.inspection_date.strftime('%d %b %Y') if q.inspection_date else '—' }}{% if q.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ q.created_at|ist }}</div>{% endif %}</td>
                 <td>
                   {% if grn %}
                   {# GRN Closed ho to wo GRN list ke Completed tab me milegi, warna Pending me #}
@@ -280,6 +284,7 @@
                       data-reject="{{ q.rejected_qty }}"
                       data-status="{{ q.status or '' }}"
                       data-remarks="{{ q.remarks or '' }}"
+                      data-report-url="{{ url_for('inward_qc.inward_qc_report', qc_id=q.id) if q.report_file else '' }}"
                       {# Parameter-wise results: model ki @property "summary" (dictionary) se, JSON bana kar. Attribute single quote me
                          kyunki JSON me double quotes aate hain (tojson andar ke ' ko khud safe kar deta hai) #}
                       data-results='{{ q.results | map(attribute="summary") | list | tojson }}'>
@@ -326,7 +331,7 @@
         {% set list_count = awaiting|length if tab == 'pending' else inwards|length %}
         <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
           <span id="result-count">Showing {{ list_count }} of {{ list_count }} {{ 'lots awaiting inspection' if tab == 'pending' else 'QC inspections' }}</span>
-          <span>Accepted qty feeds Purchase invoice later · Rejected qty is not billable</span>
+          <span>The vendor bills the whole received qty · Rejected qty goes back with a Purchase Return</span>
         </div>
       </div>
 {% endblock %}
@@ -344,7 +349,7 @@
     </div>
 
     {# Add route → form yahan POST karega #}
-    <form id="inspect-form" method="post" action="{{ url_for('inward_qc.inward_qc_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <form id="inspect-form" method="post" enctype="multipart/form-data" action="{{ url_for('inward_qc.inward_qc_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       {# Is lot ka adhoora draft ho to JS yahan batata hai aur values wapas bhar deta hai (applyDraft) #}
       <p id="qc-draft-note" class="hidden text-[12.5px] text-warning bg-warning-bg border border-warning-border rounded px-2.5 py-2"></p>
       <p class="form-section-title">Header</p>
@@ -433,8 +438,14 @@
         <label for="qc-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
         <textarea id="qc-remarks" name="remarks" rows="2" placeholder="Visual notes, instrument ID…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
       </div>
+      <div>
+        <label for="qc-report" class="block text-[12.5px] font-semibold text-ink mb-1">QC report / certificate <span class="font-normal text-ink-faint">(optional)</span></label>
+        <input type="file" id="qc-report" name="report_file" accept=".pdf,.png,.jpg,.jpeg"
+          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="text-[11.5px] text-ink-faint mt-1">PDF, PNG or JPG, up to 5 MB. A file saved with an earlier draft stays unless you choose a new one.</p>
+      </div>
       <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
-        After submit: <strong>passed qty</strong> can move to available stock later · <strong>rejected qty</strong> needs a rejection memo (blocks billing).
+        After submit: <strong>passed qty</strong> can move to available stock later · <strong>rejected qty</strong> is on the vendor's bill and goes back to the vendor with a Purchase Return.
       </p>
     </form>
 
@@ -749,6 +760,10 @@
       (btn.getAttribute('data-qc') || '') + ' · ' + (btn.getAttribute('data-status') || '');
     var results = [];
     try { results = JSON.parse(btn.getAttribute('data-results') || '[]'); } catch (err) { results = []; }
+    var reportUrl = btn.getAttribute('data-report-url') || '';
+    var reportHtml = reportUrl
+      ? '<div class="pt-2"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">QC report</div><div class="mt-0.5"><a href="' + reportUrl + '" target="_blank" class="text-copper-text font-semibold hover:underline">View uploaded file</a></div></div>'
+      : '';
     document.getElementById('view-body').innerHTML =
       '<div class="grid grid-cols-2 gap-3">' +
       viewField('Date', btn.getAttribute('data-date')) +
@@ -761,7 +776,8 @@
       viewField('Rejected qty', btn.getAttribute('data-reject')) +
       '</div>' +
       resultsTableHtml(results) +
-      '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>';
+      '<div class="pt-2">' + viewField('Remarks', btn.getAttribute('data-remarks')) + '</div>' +
+      reportHtml;
     viewModal.classList.remove('hidden');
     viewModal.setAttribute('aria-hidden', 'false');
   }
@@ -787,7 +803,7 @@
       viewField('Rejected qty', btn.getAttribute('data-reject')) +
       viewField('Reason', btn.getAttribute('data-reason')) +
       '</div>' +
-      '<p class="text-[12.5px] text-ink-faint mt-3">Rejected quantity is not billable and is not added to stock.</p>';
+      '<p class="text-[12.5px] text-ink-faint mt-3">Rejected quantity is on the vendor\'s bill and is not added to stock. Send it back with a Purchase Return.</p>';
     memoModal.classList.remove('hidden');
     memoModal.setAttribute('aria-hidden', 'false');
   }

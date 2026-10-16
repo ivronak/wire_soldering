@@ -184,24 +184,22 @@
           <div class="sign"><div class="line">Approved by</div></div>
         </div>
       </div>
+      {% set sm = po.summary %}
       <div class="totals">
-        <div class="row"><span>Subtotal</span><span>₹{{ '{:,.2f}'.format(ns.subtotal) }}</span></div>
-        {% if intra %}
-        <div class="row"><span>CGST</span><span>₹{{ '{:,.2f}'.format(ns.tax / 2) }}</span></div>
-        <div class="row"><span>SGST</span><span>₹{{ '{:,.2f}'.format(ns.tax / 2) }}</span></div>
-        {% else %}
-        <div class="row"><span>IGST</span><span>₹{{ '{:,.2f}'.format(ns.tax) }}</span></div>
-        {% endif %}
-        {% for cl in po.charge_lines %}
-        {% set signed = (cl.amount or 0) if cl.effect != 'minus' else -(cl.amount or 0) %}
-        {% set ns.charges = ns.charges + signed %}
-        <div class="row"><span>{{ cl.charge.name if cl.charge else 'Charge' }}</span><span>{{ '−' if cl.effect == 'minus' else '+' }} ₹{{ '{:,.2f}'.format(cl.amount or 0) }}</span></div>
+        <div class="row"><span>Subtotal</span><span>₹{{ '{:,.2f}'.format(sm.items_total) }}</span></div>
+        {% for cr in sm.charge_rows %}
+        <div class="row"><span>{{ cr.name }}</span><span>{{ '−' if cr.effect == 'minus' else '+' }} ₹{{ '{:,.2f}'.format(cr.amount or 0) }}</span></div>
         {% endfor %}
-        {% if not po.charge_lines and po.freight %}
-        {% set ns.charges = ns.charges + po.freight %}
-        <div class="row"><span>Freight</span><span>₹{{ '{:,.2f}'.format(po.freight) }}</span></div>
+        {% if po.gst_on_charges and sm.charge_rows %}
+        <div class="row"><span>Taxable value</span><span>₹{{ '{:,.2f}'.format(sm.taxable_total) }}</span></div>
         {% endif %}
-        <div class="grand"><span>Grand total</span><span>₹{{ '{:,.2f}'.format(ns.subtotal + ns.tax + ns.charges) }}</span></div>
+        {% if intra %}
+        <div class="row"><span>CGST</span><span>₹{{ '{:,.2f}'.format(sm.cgst) }}</span></div>
+        <div class="row"><span>SGST</span><span>₹{{ '{:,.2f}'.format(sm.sgst) }}</span></div>
+        {% else %}
+        <div class="row"><span>IGST</span><span>₹{{ '{:,.2f}'.format(sm.tax_total) }}</span></div>
+        {% endif %}
+        <div class="grand"><span>Grand total</span><span>₹{{ '{:,.2f}'.format(sm.grand_total) }}</span></div>
       </div>
     </div>
     <footer class="foot">

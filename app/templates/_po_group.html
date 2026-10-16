@@ -1,0 +1,16 @@
+{# F3: list me PO-wise grouping. Har PO ke rows se pehle ek header row: PO no., vendor, PO status.
+   cols = us table ke columns ki ginti (colspan). Header row ka class "po-group" hai; base.html ka chhota JS
+   search / filter se saari rows chhup jaayen to header bhi chhupa deta hai. #}
+{% macro po_group_row(po, cols) %}
+<tr class="po-group">
+  <td colspan="{{ cols }}" style="text-align:left;background:#eef4f7;border-top:2px solid #c9d4de;padding:6px 12px;">
+    {% if po %}
+    <span class="font-mono font-bold text-ink">{{ po.po_no }}</span>
+    <span class="text-ink-muted"> · {{ po.vendor.name if po.vendor else '—' }}</span>
+    <span class="text-[11.5px] text-ink-faint"> · PO {{ 'short closed' if po.status == 'Cancelled' else po.status|lower }}</span>
+    {% else %}
+    <span class="text-ink-muted">Purchase order not found</span>
+    {% endif %}
+  </td>
+</tr>
+{% endmacro %}

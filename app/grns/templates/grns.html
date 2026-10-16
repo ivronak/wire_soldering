@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_po_group.html" import po_group_row %}
 {% block title %}Gate Inward / GRN{% endblock %}
 
 {% block page_css %}
@@ -205,7 +206,7 @@
                   <div class="font-mono font-semibold text-brand-teal">{{ po.po_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">Purchase order</div>
                 </td>
-                <td class="tabular-nums">{{ po.po_date.strftime('%d %b %Y') if po.po_date else '—' }}</td>
+                <td class="tabular-nums">{{ po.po_date.strftime('%d %b %Y') if po.po_date else '—' }}{% if po.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ po.created_at|ist }}</div>{% endif %}</td>
                 <td class="text-left">{{ po.vendor.name if po.vendor else '—' }}</td>
                 <td class="tabular-nums text-[12.5px]">{{ ('Due ' ~ po.expected_delivery_date.strftime('%d %b')) if po.expected_delivery_date else '—' }}</td>
                 <td class="tabular-nums text-[12.5px]">{{ pending_lines }} of {{ po.lines|length }} pending</td>
@@ -225,6 +226,7 @@
               </tr>
               {% endfor %}
               {% for g in draft_grns %}
+              {% if loop.first or g.po_id != loop.previtem.po_id %}{{ po_group_row(g.po, 8) }}{% endif %}
               <tr class="grn-row opacity-90"
                   data-search="{{ (g.grn_no ~ ' ' ~ g.po.po_no ~ ' ' ~ (g.po.vendor.name if g.po and g.po.vendor else '') ~ ' ' ~ (g.challan_no or ''))|lower }}"
                   data-status="draft">
@@ -233,7 +235,7 @@
                   <div class="font-mono font-semibold text-ink">{{ g.grn_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">Draft GRN · {{ g.po.po_no if g.po else '—' }}</div>
                 </td>
-                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}</td>
+                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
                 <td class="text-left">{{ g.po.vendor.name if g.po and g.po.vendor else '—' }}</td>
                 <td class="font-mono text-[12.5px]">{{ g.challan_no or '—' }}</td>
                 <td class="tabular-nums text-[12.5px]">{{ g.lines|length }} received</td>
@@ -284,12 +286,13 @@
             <tbody id="grn-tbody">
               {# Flask: grns list pass karega #}
               {% for g in grns %}
+              {% if loop.first or g.po_id != loop.previtem.po_id %}{{ po_group_row(g.po, 10) }}{% endif %}
               <tr class="grn-row{% if g.status == 'Draft' %} opacity-80{% endif %}"
                   data-search="{{ (g.grn_no ~ ' ' ~ g.po.po_no ~ ' ' ~ (g.po.vendor.name if g.po and g.po.vendor else '') ~ ' ' ~ (g.challan_no or ''))|lower }}"
                   data-status="{{ g.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold {% if g.status == 'Draft' %}text-ink-faint{% else %}text-ink{% endif %}">{{ g.grn_no }}</td>
-                <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}</td>
+                <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
                 <td><span class="text-brand-teal font-medium">{{ g.po.po_no if g.po else "—" }}</span></td>
                 <td class="text-left {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.po.vendor.name if g.po and g.po.vendor else "—" }}</td>
                 <td class="font-mono text-[12.5px] {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.challan_no or "—" }}</td>

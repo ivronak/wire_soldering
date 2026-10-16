@@ -120,6 +120,7 @@
     <div class="meta">
       <div><span class="lbl">Vendor</span><span class="val">{{ po.vendor.name if po.vendor else '—' }}</span></div>
       <div><span class="lbl">PO date</span><span class="val">{{ po.po_date.strftime('%d %b %Y') if po.po_date else '—' }}</span></div>
+      {% if po.created_at %}<div><span class="lbl">PO entered</span><span class="val">{{ po.created_at|ist }}</span></div>{% endif %}
       <div><span class="lbl">Expected delivery</span><span class="val">{{ po.expected_delivery_date.strftime('%d %b %Y') if po.expected_delivery_date else '—' }}</span></div>
       <div><span class="lbl">Deliver to</span><span class="val">{{ po.warehouse.name if po.warehouse else '—' }}</span></div>
     </div>
@@ -182,7 +183,7 @@
     {# ---------- 1. Purchase order ---------- #}
     <h2 class="sec">1 · Purchase order (PO)</h2>
     <table class="t">
-      <thead><tr><th>Material</th><th class="num">Ordered</th><th class="num">Rate</th><th class="num">GST</th><th class="num">Amount (before GST)</th></tr></thead>
+      <thead><tr><th>Material</th><th class="num">Ordered</th><th class="num">Rate</th><th class="num">GST</th><th class="num">Amount (before GST)</th><th>Goods received, GRN by GRN</th></tr></thead>
       <tbody>
         {% for row in s.lines %}
         {% set rm = row.line.raw_material %}
@@ -192,20 +193,31 @@
           <td class="num">₹{{ (row.line.rate or 0)|rate }}</td>
           <td class="num">{{ '%g'|format(row.tax_percent) }}%</td>
           <td class="num strong">₹{{ row.amount|inr }}</td>
+          <td>
+            {% for r in row.receipts %}
+            <span class="sub"><b>{{ r.grn_no }}</b> · {{ r.qty|qty }} {{ row.unit }} · {{ r.grn_date.strftime('%d %b %Y') if r.grn_date else '—' }}{% if r.created_at %} · entered {{ r.created_at|ist }}{% endif %}</span>
+            {% else %}
+            <span class="sub">Nothing received yet</span>
+            {% endfor %}
+            {% if row.receipts and row.still_to_come > 0 %}<span class="sub todo">{{ row.still_to_come|qty }} {{ row.unit }} still to come</span>{% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="empty">No line items</td></tr>
+        <tr><td colspan="6" class="empty">No line items</td></tr>
         {% endfor %}
       </tbody>
     </table>
     <div class="total-row">
       <span>Subtotal&nbsp; <b>₹{{ s.subtotal|inr }}</b></span>
-      <span>GST&nbsp; <b>₹{{ s.tax_total|inr }}</b></span>
       {% for ch in s.charges %}
       <span>{{ ch.name }}&nbsp; {{ '−' if ch.effect == 'minus' else '+' }} ₹{{ ch.amount|inr }}</span>
       {% endfor %}
+      <span>GST{{ ' (on items + charges)' if po.gst_on_charges and s.charges else '' }}&nbsp; <b>₹{{ s.tax_total|inr }}</b></span>
       <span>PO total&nbsp; <b>₹{{ s.total|inr }}</b></span>
     </div>
+    {% for rv in po.revisions %}
+    <p class="note">Changed when the order was confirmed ({{ rv.created_at|ist if rv.created_at else '—' }}): {{ rv.note|replace('\n', '; ') }}</p>
+    {% endfor %}
     <p class="note">
       Vendor's invoice copy (attached when this PO was confirmed):
       {% if po.vendor_invoice_file and invoice_file_ok %}
@@ -224,7 +236,7 @@
     {% set grn = g.grn %}
     <div class="block big{% if grn.status == 'Draft' %} dim{% endif %}">
       <div class="block-h">
-        <span><span class="id">{{ grn.grn_no }}</span><span class="when">{{ grn.grn_date.strftime('%d %b %Y') if grn.grn_date else '—' }}{% if grn.challan_no %} · challan {{ grn.challan_no }}{% endif %}</span></span>
+        <span><span class="id">{{ grn.grn_no }}</span><span class="when">{{ grn.grn_date.strftime('%d %b %Y') if grn.grn_date else '—' }}{% if grn.challan_no %} · challan {{ grn.challan_no }}{% endif %}{% if grn.created_at %} · entered {{ grn.created_at|ist }}{% endif %}</span></span>
         <span class="pill {{ g.pill }}">{{ g.label }}</span>
       </div>
       {% if grn.status == 'Draft' %}
@@ -251,7 +263,7 @@
             <td>
               {% if qc %}
               <span class="mono">{{ qc.qc_no }}</span> <span class="pill {{ lot.qc_pill }}">{{ lot.qc_label }}</span>
-              <span class="sub">Inspected {{ qc.inspection_date.strftime('%d %b %Y') if qc.inspection_date else '—' }}{% if qc.inspector %} by {{ qc.inspector }}{% endif %}</span>
+              <span class="sub">Inspected {{ qc.inspection_date.strftime('%d %b %Y') if qc.inspection_date else '—' }}{% if qc.inspector %} by {{ qc.inspector }}{% endif %}{% if qc.created_at %} · entered {{ qc.created_at|ist }}{% endif %}</span>
               {% elif grn.status == 'Draft' %}
               <span class="sub" style="margin:0;">GRN not posted yet</span>
               {% else %}
@@ -307,7 +319,7 @@
     {% set inv = b.invoice %}
     <div class="block{% if inv.status in ('Cancelled', 'Draft') %} dim{% endif %}{% if b.lines|length > 5 %} big{% endif %}">
       <div class="block-h">
-        <span><span class="id">{{ inv.pi_no }}</span><span class="when">vendor's invoice no. {{ inv.vendor_invoice_no }} · {{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}</span></span>
+        <span><span class="id">{{ inv.pi_no }}</span><span class="when">vendor's invoice no. {{ inv.vendor_invoice_no }} · {{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}{% if inv.created_at %} · entered {{ inv.created_at|ist }}{% endif %}</span></span>
         <span class="pill {{ pill_class.get(inv.status, 'p-grey') }}">{{ inv.status or 'Unknown' }}</span>
       </div>
       {% if inv.status == 'Cancelled' %}
@@ -355,7 +367,7 @@
     {% if loop.last %}<div class="endkeep">{% endif %}
     <div class="block{% if pr.status == 'Cancelled' %} dim{% endif %}{% if rb.lines|length > 5 %} big{% endif %}">
       <div class="block-h">
-        <span><span class="id">{{ pr.pr_no }}</span><span class="when">against {{ rb.invoice.pi_no }} · {{ pr.return_date.strftime('%d %b %Y') if pr.return_date else '—' }}</span></span>
+        <span><span class="id">{{ pr.pr_no }}</span><span class="when">against {{ rb.invoice.pi_no }} · {{ pr.return_date.strftime('%d %b %Y') if pr.return_date else '—' }}{% if pr.created_at %} · entered {{ pr.created_at|ist }}{% endif %}</span></span>
         <span class="pill {{ pill_class.get(pr.status, 'p-grey') }}">{{ pr.status or 'Unknown' }}</span>
       </div>
       {% if pr.status == 'Cancelled' %}
@@ -368,7 +380,7 @@
           {% set il = rl.invoice_line %}
           <tr>
             <td><span class="strong">{{ il.raw_material.name if il.raw_material else '—' }}</span><span class="sub">Lot {{ il.grn_line.batch_lot_no if il.grn_line else '' }}</span></td>
-            <td class="num">{{ rl.qty|qty }} {{ il.unit.code if il.unit else '' }}</td>
+            <td class="num">{{ rl.qty|qty }} {{ il.unit.code if il.unit else '' }}{% if rl.source == 'rejected' %} <span class="sub">(rejected goods)</span>{% endif %}</td>
             <td class="num">₹{{ (rl.taxable_amount + rl.tax_amount)|inr }}</td>
           </tr>
           {% endfor %}
@@ -384,7 +396,7 @@
         {% if rb.other %}<span>Other lines (not shown here)&nbsp; {{ '−' if rb.other < 0 else '+' }} ₹{{ rb.other|abs|inr }}</span>{% endif %}
         {% endif %}
         {% for ch in pr.charge_lines %}
-        <span>{{ ch.charge.name if ch.charge else 'Charge' }}{{ ' (whole return)' if rb.mixed else '' }}: {{ 'vendor deducts − ' if ch.effect == 'minus' else 'vendor pays back + ' }}₹{{ ch.amount|inr }}</span>
+        <span>{{ ch.charge.name if ch.charge else 'Charge' }}{{ ' (whole return)' if rb.mixed else '' }}: {{ 'Minus − ' if ch.effect == 'minus' else 'Add + ' }}₹{{ ch.amount|inr }}</span>
         {% endfor %}
         <span>{{ 'Credit (cancelled, not applied)' if pr.status == 'Cancelled' else 'Vendor credited us' }}{{ ' · whole return' if rb.mixed else '' }}&nbsp; <b>₹{{ (pr.total_amount or 0)|inr }}</b></span>
       </div>

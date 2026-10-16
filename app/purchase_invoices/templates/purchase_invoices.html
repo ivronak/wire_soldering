@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_po_group.html" import po_group_row %}
 {% block title %}Purchase Invoice{% endblock %}
 
 {% block page_css %}
@@ -112,6 +113,9 @@
         data-vinv="{{ inv.vendor_invoice_no }}"
         data-date="{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '' }}"
         data-tax-type="{{ inv.tax_type }}"
+        data-gst-on-charges="{{ 1 if inv.gst_on_charges else 0 }}"
+        data-grn="{{ inv.grn.grn_no if inv.grn else '' }}"
+        data-rejected='{{ inv.rejected_note | tojson }}'
         data-remarks="{{ inv.remarks or '' }}"
         data-subtotal="{{ inv.subtotal }}"
         data-tax="{{ inv.tax_total }}"
@@ -156,7 +160,7 @@
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
-              A bill can be made only for the quantity that <strong>passed QC</strong> · a lot cannot be billed twice · rejected quantity is never billed · to change a draft bill, cancel it and create it again · goods are sent back with <strong>Return</strong> on a posted bill; a bill with an active return cannot be cancelled until the return is cancelled
+              One bill per <strong>GRN</strong>, made after its quality check · the bill covers everything received, <strong>including rejected quantity</strong> (the vendor's invoice is final) · rejected goods go back with <strong>Return</strong> on the posted bill · to change a draft bill, cancel it and create it again · a bill with an active return cannot be cancelled until the return is cancelled
             </p>
           </details>
         </div>
@@ -189,61 +193,47 @@
               </tr>
             </thead>
             <tbody>
-              {% for gl in lots %}
-              {% set grn = gl.grn %}
-              {% set po = grn.po if grn else none %}
-              {% set pol = gl.po_line %}
-              {% set rm = pol.raw_material if pol else none %}
-              {% set unit = pol.unit.code if pol and pol.unit else '' %}
-              {% set qc = gl.final_qc %}
-              {% set billable = gl.billable_qty %}
-              {# CGST+SGST (intra) ya IGST (inter): vendor ka state vs hamare delivery branch ka state. Server bhi yahi check karta hai #}
-              {% set branch = po.warehouse.branch if po and po.warehouse else none %}
-              {% set tax_type = 'intra' if (po and branch and po.vendor.state_id == branch.state_id) else 'inter' %}
+              {% for grn in ready_grns %}
+              {% if loop.first or grn.po_id != loop.previtem.po_id %}{{ po_group_row(grn.po, 8) }}{% endif %}
+              {% set po = grn.po %}
               <tr class="pi-row"
-                  data-search="{{ ((grn.grn_no if grn else '') ~ ' ' ~ (qc.qc_no if qc else '') ~ ' ' ~ (po.vendor.name if po and po.vendor else '') ~ ' ' ~ (rm.code if rm else '') ~ ' ' ~ (rm.name if rm else '') ~ ' ' ~ (gl.batch_lot_no or ''))|lower }}"
+                  data-search="{{ (grn.grn_no ~ ' ' ~ (po.po_no if po else '') ~ ' ' ~ (po.vendor.name if po and po.vendor else '') ~ ' ' ~ (grn.lines | map(attribute='po_line.raw_material.name') | join(' ')) ~ ' ' ~ (grn.lines | map(attribute='batch_lot_no') | join(' ')))|lower }}"
                   data-status="tobill">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td>
-                  <div class="font-mono font-semibold text-ink">{{ grn.grn_no if grn else '—' }}</div>
-                  <div class="text-[11.5px] text-ink-faint">{{ qc.qc_no if qc else '—' }} · {{ po.po_no if po else '—' }}</div>
+                  <div class="font-mono font-semibold text-ink">{{ grn.grn_no }}</div>
+                  <div class="text-[11.5px] text-ink-faint">{{ po.po_no if po else '—' }}</div>
+                  {% if grn.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ grn.created_at|ist }}</div>{% endif %}
                 </td>
                 <td class="text-left">{{ po.vendor.name if po and po.vendor else '—' }}</td>
                 <td class="text-left">
-                  <div class="font-medium text-ink">{% if rm %}{{ rm.code }} {{ rm.name }}{% else %}—{% endif %}</div>
-                  <div class="text-[11.5px] text-ink-faint">Lot {{ gl.batch_lot_no or '—' }}</div>
+                  {% for gl in grn.lines %}
+                  <div class="text-[13px]"><span class="font-medium text-ink">{{ gl.po_line.raw_material.name if gl.po_line and gl.po_line.raw_material else '—' }}</span> <span class="text-[11.5px] text-ink-faint">Lot {{ gl.batch_lot_no }}</span></div>
+                  {% endfor %}
                 </td>
                 <td class="tabular-nums">
-                  <div class="font-semibold text-ink">{{ '%g'|format(billable) }} {{ unit }} to bill</div>
-                  <div class="text-[11.5px] text-ink-faint">{{ '%g'|format(gl.passed_qty) }} passed · {{ '%g'|format(gl.billed_qty) }} billed</div>
+                  {# Poori received qty bill hoti hai (rejected samet); neeche QC ka hisaab dikhta hai #}
+                  {% for gl in grn.lines %}
+                  <div class="text-[13px]"><span class="font-semibold text-ink">{{ '%g'|format(gl.received_qty) }} {{ gl.po_line.unit.code if gl.po_line and gl.po_line.unit else '' }}</span>
+                    <span class="text-[11.5px] text-ink-faint">· {{ '%g'|format(gl.passed_qty) }} passed{% if gl.rejected_qty > 0 %} · <span class="text-stop">{{ '%g'|format(gl.rejected_qty) }} rejected</span>{% endif %}</span></div>
+                  {% endfor %}
                 </td>
-                <td class="tabular-nums text-[12.5px]">{% if pol %}₹{{ '{:,.2f}'.format(pol.rate or 0) }}{% else %}—{% endif %}</td>
+                <td class="tabular-nums text-[12.5px]">PO rate</td>
                 <td><span class="status-pill status-tobill">To bill</span></td>
                 <td>
-                  {# Is lot ka saara data button par rakha hai: form kholne par JS isi se lines banata hai #}
+                  {# Is GRN ka saara data button par JSON me rakha hai (GRN.billing_data): form kholne par JS isi se lines banata hai #}
                   <button type="button"
                     class="btn-create-bill px-2 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
-                    data-gl-id="{{ gl.id }}"
-                    data-grn-id="{{ grn.id }}"
-                    data-grn-no="{{ grn.grn_no }}"
-                    data-vendor-id="{{ po.vendor_id }}"
-                    data-vendor="{{ po.vendor.name }}"
-                    data-material="{{ (rm.code ~ ' ' ~ rm.name) if rm else '' }}"
-                    data-lot="{{ gl.batch_lot_no }}"
-                    data-unit="{{ unit }}"
-                    data-billable="{{ billable }}"
-                    data-rate="{{ pol.rate }}"
-                    data-discount="{{ pol.discount_percent or 0 }}"
-                    data-tax-id="{{ pol.tax_rate_id }}"
-                    data-tax-type="{{ tax_type }}">Create bill</button>
+                    data-bill='{{ grn.billing_data|tojson }}'>Create bill</button>
                 </td>
               </tr>
               {% endfor %}
               {% for inv in draft_invoices %}
+              {% if loop.first or (inv.po.id if inv.po else 0) != (loop.previtem.po.id if loop.previtem.po else 0) %}{{ po_group_row(inv.po, 8) }}{% endif %}
               <tr class="pi-row"
                   data-search="{{ (inv.pi_no ~ ' ' ~ (inv.vendor.name if inv.vendor else '') ~ ' ' ~ inv.vendor_invoice_no)|lower }}"
                   data-status="draft">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ lots|length + loop.index }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ ready_grns|length + loop.index }}</td>
                 <td>
                   <div class="font-mono font-semibold text-ink">{{ inv.pi_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">Draft bill</div>
@@ -252,6 +242,7 @@
                 <td class="text-left">
                   <div class="font-medium text-ink">Vendor invoice {{ inv.vendor_invoice_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }} · {{ inv.lines|length }} line{{ '' if inv.lines|length == 1 else 's' }}</div>
+                  {% if inv.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ inv.created_at|ist }}</div>{% endif %}
                 </td>
                 <td class="tabular-nums font-semibold text-ink">₹{{ '{:,.2f}'.format(inv.total_amount or 0) }}</td>
                 <td>—</td>
@@ -306,12 +297,13 @@
             </thead>
             <tbody>
               {% for inv in invoices %}
+              {% if loop.first or (inv.po.id if inv.po else 0) != (loop.previtem.po.id if loop.previtem.po else 0) %}{{ po_group_row(inv.po, 9) }}{% endif %}
               <tr class="pi-row{% if inv.status == 'Cancelled' %} opacity-70{% endif %}"
                   data-search="{{ (inv.pi_no ~ ' ' ~ (inv.vendor.name if inv.vendor else '') ~ ' ' ~ inv.vendor_invoice_no)|lower }}"
                   data-status="{{ inv.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ inv.pi_no }}</td>
-                <td class="tabular-nums">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}</td>
+                <td class="tabular-nums">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}{% if inv.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ inv.created_at|ist }}</div>{% endif %}</td>
                 <td class="text-left">{{ inv.vendor.name if inv.vendor else '—' }}</td>
                 <td class="font-mono text-[12.5px]">{{ inv.vendor_invoice_no }}</td>
                 <td class="tabular-nums">{{ inv.lines|length }}</td>
@@ -341,6 +333,7 @@
                       data-pi="{{ inv.pi_no }}"
                       data-vendor="{{ inv.vendor.name if inv.vendor else '' }}"
                       data-total="{{ inv.total_amount }}"
+                      data-tax-type="{{ inv.tax_type }}"
                       data-returned="{{ inv.returned_amount }}"
                       data-invoice-date="{{ inv.invoice_date.isoformat() if inv.invoice_date else '' }}"
                       data-return-lines='{{ (inv.lines | map(attribute="return_info") | list) | tojson }}'>Return</button>
@@ -390,7 +383,7 @@
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="pi-modal-title" class="text-[16px] font-bold text-ink">Create purchase bill</h2>
-        <p class="text-[12.5px] text-ink-faint">Enter the vendor's bill against the lots that passed QC</p>
+        <p id="pi-modal-sub" class="text-[12.5px] text-ink-faint">Enter the vendor's bill for everything received in this GRN</p>
       </div>
       <button type="button" id="btn-close-pi-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -404,7 +397,7 @@
         </div>
         <div class="md:col-span-1">
           <label for="pi-vendor" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor</label>
-          <input type="hidden" id="pi-vendor-id" name="vendor_id" value="" />
+          <input type="hidden" id="pi-grn-id" name="grn_id" value="" />
           <input type="text" id="pi-vendor" readonly class="w-full px-2.5 py-2 text-[14px] bg-mist border border-slate-300 rounded text-ink-muted" />
         </div>
         <div>
@@ -419,21 +412,18 @@
       <div id="pi-tax-type-box" class="w-full px-2.5 py-2 text-[13.5px] border border-brand-border rounded bg-brand-soft text-brand-teal font-medium"></div>
 
       <hr class="border-slate-200" />
-      <p class="form-section-title !mt-0">Lots to bill</p>
-      <p class="text-[12.5px] text-ink-faint">Only quantity that passed QC and is not billed yet can be entered. Leave <strong>Bill qty</strong> empty for a lot that is not on this vendor bill.</p>
+      <p class="form-section-title !mt-0">Goods on this bill</p>
+      <p class="text-[12.5px] text-ink-faint">The bill covers <strong>everything received</strong> in this GRN, including any quantity rejected in QC (the vendor's invoice is final). Rate and tax come from the purchase order; change a rate only if the vendor's bill is different. Rejected goods are sent back later with a <strong>Return</strong>.</p>
       <div class="overflow-x-auto border border-slate-200 rounded">
         <table class="lines-table">
           <thead>
             <tr>
-              <th style="width:12%">GRN / lot</th>
-              <th style="width:16%">Material</th>
-              <th style="width:9%">Can bill</th>
-              <th style="width:9%">Bill qty</th>
-              <th style="width:11%">Rate (₹)</th>
-              <th style="width:7%">Disc %</th>
-              <th style="width:14%">Tax rate</th>
-              <th style="width:11%">Taxable (₹)</th>
-              <th style="width:11%">Tax (₹)</th>
+              <th style="width:12%">Lot</th>
+              <th style="width:24%">Material</th>
+              <th style="width:22%">Received / QC</th>
+              <th style="width:14%">Rate (₹)</th>
+              <th style="width:16%">Tax rate</th>
+              <th style="width:12%">Amount (₹)</th>
             </tr>
           </thead>
           <tbody id="pi-line-body"></tbody>
@@ -444,7 +434,7 @@
         <p class="form-section-title !mt-0 !mb-0">Charges</p>
         <button type="button" id="btn-add-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
       </div>
-      <p class="text-[12.5px] text-ink-faint">Optional (freight, packing…). Pick a charge from the master. Add increases the total. Minus reduces it.</p>
+      <p class="text-[12.5px] text-ink-faint">Optional (freight, packing…). Pick a charge from the master. Add increases the total. Minus reduces it. GST is calculated on items + charges together.</p>
       <div class="border border-slate-200 rounded">
         <table class="lines-table">
           <thead>
@@ -471,10 +461,10 @@
 
       <div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">
         <div class="flex items-center justify-between text-ink-muted">
-          <span>Subtotal (after discount)</span><span id="pi-subtotal" class="tabular-nums">₹0.00</span>
+          <span>Subtotal</span><span id="pi-subtotal" class="tabular-nums">₹0.00</span>
         </div>
-        <div id="pi-tax-rows" class="text-ink-muted"></div>
         <div id="pi-charge-rows" class="text-ink-muted"></div>
+        <div id="pi-tax-rows" class="text-ink-muted"></div>
         <div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink">
           <span>Bill total</span><span id="pi-grand-total" class="tabular-nums">₹0.00</span>
         </div>
@@ -529,23 +519,23 @@
 
       <div>
         <p class="text-[14px] font-semibold text-ink">1. What are you sending back?</p>
-        <p class="text-[12.5px] text-ink-faint mb-2">Type the quantity for each item you are returning. Leave the others empty.</p>
+        <p class="text-[12.5px] text-ink-faint mb-2">For each item, say where the goods come from: the <strong>passed</strong> goods or the goods <strong>rejected in QC</strong>. Type the quantity; leave the rest empty.</p>
         <div class="overflow-x-auto border border-slate-200 rounded">
           <table class="lines-table">
             <thead>
               <tr>
-                <th style="width:26%">Material</th>
-                <th style="width:13%">On the bill</th>
-                <th style="width:14%">Returned before</th>
-                <th style="width:14%">You can return</th>
-                <th style="width:16%">Return now</th>
-                <th style="width:17%">Value (with GST)</th>
+                <th style="width:24%">Material</th>
+                <th style="width:11%">On the bill</th>
+                <th style="width:12%">Returned before</th>
+                <th style="width:17%">Return from passed</th>
+                <th style="width:17%">Return from rejected</th>
+                <th style="width:19%">Value (with GST)</th>
               </tr>
             </thead>
             <tbody id="rt-line-body"></tbody>
           </table>
         </div>
-        <p class="text-[12px] text-ink-faint mt-1.5">The value uses the same rate, discount and GST as the bill.</p>
+        <p class="text-[12px] text-ink-faint mt-1.5">The value uses the same rate and GST rate as the bill. GST on any charges is added below.</p>
       </div>
 
       <div>
@@ -567,7 +557,6 @@
           <p class="text-[14px] font-semibold text-ink">3. Extra charges <span class="font-normal text-ink-faint">(optional)</span></p>
           <button type="button" id="btn-add-rt-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
         </div>
-        <p class="text-[12.5px] text-ink-faint mb-2">Use this when the vendor keeps a fee, or pays back what you spent to send the goods.</p>
         <div class="border border-slate-200 rounded">
           <table class="lines-table">
             <thead>
@@ -590,7 +579,7 @@
       <div class="bg-mist border border-slate-200 rounded p-3.5 text-[13px]">
         <p class="text-[14px] font-semibold text-ink mb-2">What this return does</p>
         <div class="space-y-1.5">
-          <div class="flex items-center justify-between"><span class="text-ink-muted">Goods returned, including GST</span><span id="rt-s-goods" class="tabular-nums">₹0.00</span></div>
+          <div class="flex items-center justify-between"><span class="text-ink-muted">Goods returned (before GST)</span><span id="rt-s-goods" class="tabular-nums">₹0.00</span></div>
           <div id="rt-s-charges" class="space-y-1.5"></div>
           <div class="flex items-center justify-between pt-2 mt-1 border-t border-slate-300 text-[15px] font-bold text-ink"><span>Vendor will credit us</span><span id="rt-s-total" class="tabular-nums">₹0.00</span></div>
           <p id="rt-s-error" class="text-[13px] text-stop"></p>
@@ -643,7 +632,7 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   // Paise tak round (server bhi 2 decimal tak round karta hai)
-  function r2(x) { return Math.round(x * 100) / 100; }
+  function r2(x) { var sign = x < 0 ? -1 : 1; return sign * Math.round((Math.abs(x) + 1e-9) * 100) / 100; }
   function money(x) {
     return '₹' + Number(x || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
@@ -689,23 +678,25 @@
   });
 
   // ---------- Create bill form ----------
-  // "Create bill" button par rakha lot ka data -> ek JS object
-  function lotFromButton(btn) {
-    return {
-      id: btn.getAttribute('data-gl-id'),
-      grnId: btn.getAttribute('data-grn-id'),
-      grnNo: btn.getAttribute('data-grn-no'),
-      vendorId: btn.getAttribute('data-vendor-id'),
-      vendor: btn.getAttribute('data-vendor'),
-      material: btn.getAttribute('data-material'),
-      lotNo: btn.getAttribute('data-lot'),
-      unit: btn.getAttribute('data-unit'),
-      billable: parseFloat(btn.getAttribute('data-billable')) || 0,
-      rate: parseFloat(btn.getAttribute('data-rate')) || 0,
-      discount: parseFloat(btn.getAttribute('data-discount')) || 0,
-      taxId: btn.getAttribute('data-tax-id'),
-      taxType: btn.getAttribute('data-tax-type')
-    };
+  // GST ka hisaab: app/tax.py (calc_tax) ka JS mirror — PO page ke poTax jaisa hi. Charges items ke saath taxable value me
+  // judte hain; charge ko lines me value ke anupaat se baant ke har line apne rate se tax deti hai. Dono jagah same rule rakhna.
+  function poTax(lines, chargeNet) {
+    var items = 0;
+    lines.forEach(function (l) { items += l.value; });
+    var net = r2(chargeNet);
+    var given = 0;
+    var tax = 0;
+    lines.forEach(function (l, i) {
+      var share = 0;
+      if (items !== 0) {
+        share = (i === lines.length - 1) ? r2(net - given) : r2(net * l.value / items);
+      }
+      given += share;
+      tax += r2((l.value + share) * l.pct / 100);
+    });
+    tax = r2(tax);
+    var taxable = r2(items + net);
+    return { items: r2(items), net: net, taxable: taxable, tax: tax, grand: r2(taxable + tax) };
   }
 
   function taxSelectHtml(selectedId) {
@@ -716,29 +707,28 @@
     return html;
   }
 
-  function lineRowHtml(lot, prefill) {
+  // Ek GRN line = bill ki ek line. Qty badli nahi ja sakti (poori received qty); rate / tax PO se aate hain.
+  function lineRowHtml(l) {
+    var qc = fmtQty(l.passed) + ' passed' + (l.rejected > 0 ? ' · <span class="text-stop font-semibold">' + fmtQty(l.rejected) + ' rejected</span>' : '');
     return '<tr class="pi-line-row">' +
-      '<td><input type="hidden" class="line-gl-id" value="' + esc(lot.id) + '" />' +
-        '<div class="font-mono text-[12px] font-semibold text-ink">' + esc(lot.grnNo) + '</div>' +
-        '<div class="text-[11px] text-ink-faint">Lot ' + esc(lot.lotNo) + '</div></td>' +
-      '<td>' + esc(lot.material) + '</td>' +
-      '<td class="tabular-nums text-center">' + fmtQty(lot.billable) + ' ' + esc(lot.unit) + '</td>' +
-      '<td><input type="number" class="line-qty tabular-nums" min="0" max="' + lot.billable + '" step="any" placeholder="0" value="' + (prefill ? lot.billable : '') + '" /></td>' +
-      '<td><input type="number" class="line-rate tabular-nums" min="0" step="any" required value="' + lot.rate + '" /></td>' +
-      '<td><input type="number" class="line-disc tabular-nums" min="0" max="100" step="any" value="' + lot.discount + '" /></td>' +
-      '<td><select class="line-tax">' + taxSelectHtml(lot.taxId) + '</select></td>' +
-      '<td><input type="text" readonly tabindex="-1" class="line-taxable tabular-nums text-right" value="0.00" /></td>' +
-      '<td><input type="text" readonly tabindex="-1" class="line-taxamt tabular-nums text-right" value="0.00" /></td>' +
+      '<td><input type="hidden" class="line-gl-id" value="' + esc(l.id) + '" />' +
+        '<div class="text-[12px] text-ink-muted">Lot ' + esc(l.lot) + '</div></td>' +
+      '<td>' + esc(l.material) + '</td>' +
+      '<td class="tabular-nums"><input type="hidden" class="line-qty" value="' + l.received + '" />' +
+        '<div class="font-semibold">' + fmtQty(l.received) + ' ' + esc(l.unit) + '</div>' +
+        '<div class="text-[11px] text-ink-faint">' + qc + '</div></td>' +
+      '<td><input type="number" class="line-rate tabular-nums" min="0" step="any" required value="' + l.rate + '" data-po-rate="' + l.rate + '" />' +
+        '<div class="rate-flag text-[11px] text-copper-text"></div></td>' +
+      '<td><select class="line-tax">' + taxSelectHtml(l.tax_id) + '</select></td>' +
+      '<td class="line-amount tabular-nums text-right">₹0.00</td>' +
       '</tr>';
   }
 
-  // Flask ko index ke hisaab se field naam chahiye: grn_line_id_0, qty_0, rate_0 ...
+  // Flask ko index ke hisaab se field naam chahiye: grn_line_id_0, rate_0, tax_rate_id_0 ...
   function renumberLines() {
     document.querySelectorAll('.pi-line-row').forEach(function (row, index) {
       row.querySelector('.line-gl-id').name = 'grn_line_id_' + index;
-      row.querySelector('.line-qty').name = 'qty_' + index;
       row.querySelector('.line-rate').name = 'rate_' + index;
-      row.querySelector('.line-disc').name = 'discount_' + index;
       row.querySelector('.line-tax').name = 'tax_rate_id_' + index;
     });
   }
@@ -754,27 +744,20 @@
     }
   }
 
-  // Ek line ka taxable aur tax: server wala hi formula (qty x rate, discount % ghata ke, phir tax %)
-  function calcLine(row) {
-    var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
-    var rate = parseFloat(row.querySelector('.line-rate').value) || 0;
-    var disc = parseFloat(row.querySelector('.line-disc').value) || 0;
-    var taxOpt = row.querySelector('.line-tax').selectedOptions[0];
-    var pct = taxOpt ? (parseFloat(taxOpt.getAttribute('data-pct')) || 0) : 0;
-    var taxable = r2(qty * rate * (1 - disc / 100));
-    var tax = r2(taxable * pct / 100);
-    row.querySelector('.line-taxable').value = taxable.toFixed(2);
-    row.querySelector('.line-taxamt').value = tax.toFixed(2);
-    return { taxable: taxable, tax: tax };
-  }
-
   function calcTotals() {
-    var subtotal = 0;
-    var totalTax = 0;
+    var taxLines = [];
     document.querySelectorAll('.pi-line-row').forEach(function (row) {
-      var amounts = calcLine(row);
-      subtotal += amounts.taxable;
-      totalTax += amounts.tax;
+      var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
+      var rateInput = row.querySelector('.line-rate');
+      var rate = parseFloat(rateInput.value) || 0;
+      var taxOpt = row.querySelector('.line-tax').selectedOptions[0];
+      var pct = taxOpt ? (parseFloat(taxOpt.getAttribute('data-pct')) || 0) : 0;
+      var value = r2(qty * rate);
+      row.querySelector('.line-amount').textContent = money(value);
+      // Vendor ka rate PO se alag ho to chhota flag
+      var poRate = parseFloat(rateInput.getAttribute('data-po-rate'));
+      row.querySelector('.rate-flag').textContent = (rate !== poRate) ? ('PO rate was ' + money(poRate)) : '';
+      taxLines.push({ value: value, pct: pct });
     });
     var chargeNet = 0;
     var chargeHtml = '';
@@ -789,17 +772,20 @@
     });
     document.getElementById('pi-charge-rows').innerHTML = chargeHtml;
 
-    var taxRowsEl = document.getElementById('pi-tax-rows');
+    var t = poTax(taxLines, chargeNet);
+    var rowHtml = function (label, value) {
+      return '<div class="flex items-center justify-between"><span>' + label + '</span><span class="tabular-nums">' + money(value) + '</span></div>';
+    };
+    var taxHtml = (t.net !== 0) ? rowHtml('Taxable value (items + charges)', t.taxable) : '';
     if (currentTaxType === 'inter') {
-      taxRowsEl.innerHTML = '<div class="flex items-center justify-between"><span>IGST</span><span class="tabular-nums">' + money(totalTax) + '</span></div>';
+      taxHtml += rowHtml('IGST', t.tax);
     } else {
-      var half = totalTax / 2;
-      taxRowsEl.innerHTML =
-        '<div class="flex items-center justify-between"><span>CGST</span><span class="tabular-nums">' + money(half) + '</span></div>' +
-        '<div class="flex items-center justify-between"><span>SGST</span><span class="tabular-nums">' + money(half) + '</span></div>';
+      var cgst = r2(t.tax / 2);
+      taxHtml += rowHtml('CGST', cgst) + rowHtml('SGST', r2(t.tax - cgst));
     }
-    document.getElementById('pi-subtotal').textContent = money(subtotal);
-    document.getElementById('pi-grand-total').textContent = money(r2(subtotal) + r2(totalTax) + r2(chargeNet));
+    document.getElementById('pi-tax-rows').innerHTML = taxHtml;
+    document.getElementById('pi-subtotal').textContent = money(t.items);
+    document.getElementById('pi-grand-total').textContent = money(t.grand);
   }
 
   // --- Charges (PO jaisa) ---
@@ -835,25 +821,17 @@
     calcTotals();
   }
 
-  // Pending row ka "Create bill": usi vendor ke (aur same tax type ke) saare billable lots form me lao.
-  // Jis GRN ka button dabaya uske lots pehle se bhare (poori billable qty); baaki lots khaali, jo bill me hain wahi bharo.
+  // Pending row ka "Create bill": us GRN ki saari lines (poori received qty) form me aati hain.
   function openCreate(btn) {
-    var clicked = lotFromButton(btn);
-    var sameVendorLots = [];
-    document.querySelectorAll('.btn-create-bill').forEach(function (b) {
-      var lot = lotFromButton(b);
-      if (lot.vendorId === clicked.vendorId && lot.taxType === clicked.taxType) sameVendorLots.push(lot);
-    });
-
-    currentTaxType = clicked.taxType;
-    document.getElementById('pi-vendor-id').value = clicked.vendorId;
-    document.getElementById('pi-vendor').value = clicked.vendor;
+    var bill = JSON.parse(btn.getAttribute('data-bill') || '{}');
+    currentTaxType = bill.tax_type;
+    document.getElementById('pi-grn-id').value = bill.grn_id;
+    document.getElementById('pi-vendor').value = bill.vendor;
+    document.getElementById('pi-modal-sub').textContent = bill.grn_no + ' · ' + bill.po_no + ' — everything received in this GRN';
     document.getElementById('pi-date').value = TODAY;
     document.getElementById('pi-vinv').value = '';
     document.getElementById('pi-remarks').value = '';
-    lineBody.innerHTML = sameVendorLots.map(function (lot) {
-      return lineRowHtml(lot, lot.grnId === clicked.grnId);
-    }).join('');
+    lineBody.innerHTML = (bill.lines || []).map(lineRowHtml).join('');
     renumberLines();
     resetChargeList();
     setTaxTypeBox();
@@ -891,32 +869,12 @@
     calcTotals();
   });
 
-  // Submit se pehle browser par jaldi jaanch (asli jaanch server karta hai), aur "Post bill" par confirm
+  // "Post bill" par confirm (asli jaanch server karta hai)
   piForm.addEventListener('submit', function (e) {
     if (piForm.getAttribute('data-confirmed') === '1') {
       piForm.removeAttribute('data-confirmed');
       return;
     }
-
-    var anyQty = false;
-    var tooMuch = null;
-    document.querySelectorAll('.pi-line-row').forEach(function (row) {
-      var qty = parseFloat(row.querySelector('.line-qty').value) || 0;
-      if (qty > 0) anyQty = true;
-      var maxQty = parseFloat(row.querySelector('.line-qty').getAttribute('max')) || 0;
-      if (qty > maxQty) tooMuch = row;
-    });
-    if (!anyQty) {
-      e.preventDefault();
-      showToast('Enter a bill quantity for at least one lot.', 'error');
-      return;
-    }
-    if (tooMuch) {
-      e.preventDefault();
-      showToast('Bill quantity cannot be more than the quantity that passed QC and is not billed yet.', 'error');
-      return;
-    }
-
     var submitter = e.submitter;
     if (submitter && submitter.value === 'post') {
       e.preventDefault();
@@ -969,18 +927,41 @@
     });
     html += '</tbody></table></div>';
 
-    html += '<div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">';
-    html += '<div class="flex items-center justify-between text-ink-muted"><span>Subtotal (after discount)</span><span class="tabular-nums">' + money(btn.getAttribute('data-subtotal')) + '</span></div>';
-    if (taxType === 'inter') {
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>IGST</span><span class="tabular-nums">' + money(tax) + '</span></div>';
-    } else {
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>CGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>SGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
+    var gstOnCharges = btn.getAttribute('data-gst-on-charges') === '1';
+    var rejected = JSON.parse(btn.getAttribute('data-rejected') || '[]');
+    if (rejected.length) {
+      html += '<div class="bg-copper-soft border border-copper-border rounded p-3 text-[13px] text-ink">' +
+        '<strong>Rejected in QC but billed here:</strong> ' +
+        rejected.map(function (r) { return esc(r.material) + ' ' + fmtQty(r.qty) + ' ' + esc(r.unit); }).join(', ') +
+        '. The vendor\'s invoice is final, so this quantity is on the bill. Send it back with <strong>Return</strong>.</div>';
     }
+    var vrow = function (label, value) {
+      return '<div class="flex items-center justify-between text-ink-muted"><span>' + label + '</span><span class="tabular-nums">' + value + '</span></div>';
+    };
+    var chargeHtml = '';
     chargeLines.forEach(function (c) {
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>' + esc(c.name) + '</span><span class="tabular-nums">' +
-        (c.effect === 'minus' ? '−' : '+') + ' ' + money(c.amount) + '</span></div>';
+      chargeHtml += vrow(esc(c.name), (c.effect === 'minus' ? '−' : '+') + ' ' + money(c.amount));
     });
+    var subtotalValue = parseFloat(btn.getAttribute('data-subtotal')) || 0;
+    var chargesValue = parseFloat(btn.getAttribute('data-charges')) || 0;
+    var taxHtml;
+    if (taxType === 'inter') {
+      taxHtml = vrow('IGST', money(tax));
+    } else {
+      var cgst = r2(tax / 2);
+      taxHtml = vrow('CGST', money(cgst)) + vrow('SGST', money(r2(tax - cgst)));
+    }
+    html += '<div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">';
+    html += vrow(gstOnCharges ? 'Subtotal' : 'Subtotal (after discount)', money(subtotalValue));
+    if (gstOnCharges) {
+      // Naya bill: charges pehle, phir items + charges par GST
+      html += chargeHtml;
+      if (chargeLines.length) html += vrow('Taxable value (items + charges)', money(subtotalValue + chargesValue));
+      html += taxHtml;
+    } else {
+      // Purana bill: GST sirf items par tha, charges baad me
+      html += taxHtml + chargeHtml;
+    }
     html += '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink"><span>Bill total</span><span class="tabular-nums">' + money(btn.getAttribute('data-total')) + '</span></div>';
     html += '</div>';
 
@@ -1022,21 +1003,26 @@
   var rtLineBody = document.getElementById('rt-line-body');
   var rtChargeList = document.getElementById('rt-charge-list');
   // Panel khulte waqt bill ka data (live summary ke liye): total, pehle ke returns ka total, bill no., vendor
-  var rtBill = { total: 0, returnedBefore: 0, piNo: '', vendor: '' };
+  var rtBill = { total: 0, returnedBefore: 0, piNo: '', vendor: '', taxType: 'intra' };
 
-  // Ek bill line = ek row. Rate / discount / tax data- attribute me, taaki value live nikle (server wahi formula lagata hai)
+  // Ek bill line = ek row, do qty boxes: passed me se aur rejected me se. Rate / discount / tax data- attribute me.
+  function rtQtyCell(cls, cap) {
+    if (cap <= 0) return '<td class="text-center"><span class="text-[12px] text-ink-faint">—</span></td>';
+    return '<td><input type="number" class="' + cls + ' tabular-nums" min="0" max="' + cap + '" step="any" placeholder="0" />' +
+      '<div class="text-[11px] text-ink-faint">up to ' + fmtQty(cap) + '</div></td>';
+  }
   function rtLineRowHtml(l) {
-    var canReturn = l.returnable > 0;
+    var fully = l.returnable_passed <= 0 && l.returnable_rejected <= 0;
     return '<tr class="rt-line-row" data-rate="' + l.rate + '" data-discount="' + l.discount + '" data-tax="' + l.tax_percent + '">' +
       '<td><input type="hidden" class="rt-line-id" value="' + esc(l.id) + '" />' +
         '<div class="font-medium text-ink">' + esc(l.material) + '</div>' +
-        '<div class="text-[11px] text-ink-faint font-mono">' + esc(l.grn) + ' · Lot ' + esc(l.lot) + '</div></td>' +
+        '<div class="text-[11px] text-ink-faint font-mono">' + esc(l.grn) + ' · Lot ' + esc(l.lot) + '</div>' +
+        '<div class="text-[11.5px] text-ink-muted">Rate ' + money(l.rate) + ' per ' + esc(l.unit) + ' (as on the bill)</div></td>' +
       '<td class="tabular-nums text-center">' + fmtQty(l.qty) + ' ' + esc(l.unit) + '</td>' +
       '<td class="tabular-nums text-center">' + fmtQty(l.returned) + ' ' + esc(l.unit) + '</td>' +
-      '<td class="tabular-nums text-center font-semibold">' + fmtQty(l.returnable) + ' ' + esc(l.unit) + '</td>' +
-      '<td>' + (canReturn
-        ? '<input type="number" class="rt-qty tabular-nums" min="0" max="' + l.returnable + '" step="any" placeholder="0" />'
-        : '<span class="text-[12px] text-ink-faint">Fully returned</span>') + '</td>' +
+      (fully
+        ? '<td colspan="2" class="text-center"><span class="text-[12px] text-ink-faint">Fully returned</span></td>'
+        : rtQtyCell('rt-qty', l.returnable_passed) + rtQtyCell('rt-rej-qty', l.returnable_rejected)) +
       '<td class="rt-value tabular-nums text-right text-ink-faint">—</td></tr>';
   }
 
@@ -1046,6 +1032,8 @@
       row.querySelector('.rt-line-id').name = 'invoice_line_id_' + index;
       var qtyInput = row.querySelector('.rt-qty');
       if (qtyInput) qtyInput.name = 'qty_' + index;
+      var rejInput = row.querySelector('.rt-rej-qty');
+      if (rejInput) rejInput.name = 'rejected_qty_' + index;
     });
     document.querySelectorAll('.rt-charge-row').forEach(function (row, index) {
       row.querySelector('.rt-charge-id').name = 'charge_id_' + index;
@@ -1054,35 +1042,34 @@
     });
   }
 
-  // Live hisaab: server jaisa formula (qty x rate, discount ghata ke, phir GST), phir charges. Wapas: jaanch ke liye kuch flags
+  // Live hisaab: server jaisa formula (qty x rate, discount ghata ke), phir charges, phir GST items + charges ke total par (poTax)
   function calcReturn() {
-    var subtotal = 0, taxTotal = 0, anyQty = false, tooMuch = false;
+    var taxLines = [], anyQty = false, tooMuch = false;
     document.querySelectorAll('.rt-line-row').forEach(function (row) {
-      var qtyInput = row.querySelector('.rt-qty');
-      var valueCell = row.querySelector('.rt-value');
-      var qty = qtyInput ? parseFloat(qtyInput.value) : NaN;
-      if (qtyInput) qtyInput.classList.remove('!border-stop');
-      if (isNaN(qty) || qty <= 0) { valueCell.textContent = '—'; valueCell.className = 'rt-value tabular-nums text-right text-ink-faint'; return; }
-      var maxQty = parseFloat(qtyInput.getAttribute('max')) || 0;
-      if (qty > maxQty) {
-        tooMuch = true;
-        qtyInput.classList.add('!border-stop');
-        valueCell.textContent = 'Too much';
-        valueCell.className = 'rt-value tabular-nums text-right text-stop';
-        return;
-      }
-      anyQty = true;
       var rate = parseFloat(row.getAttribute('data-rate')) || 0;
       var disc = parseFloat(row.getAttribute('data-discount')) || 0;
       var pct = parseFloat(row.getAttribute('data-tax')) || 0;
-      var taxable = r2(qty * rate * (1 - disc / 100));
-      var tax = r2(taxable * pct / 100);
-      subtotal += taxable;
-      taxTotal += tax;
-      valueCell.textContent = money(taxable + tax);
+      var valueCell = row.querySelector('.rt-value');
+      var rowTaxable = 0, rowAny = false, rowBad = false;
+      ['.rt-qty', '.rt-rej-qty'].forEach(function (sel) {
+        var input = row.querySelector(sel);
+        if (!input) return;
+        input.classList.remove('!border-stop');
+        var qty = parseFloat(input.value);
+        if (isNaN(qty) || qty <= 0) return;
+        var maxQty = parseFloat(input.getAttribute('max')) || 0;
+        if (qty > maxQty) { rowBad = true; tooMuch = true; input.classList.add('!border-stop'); return; }
+        var taxable = r2(qty * rate * (1 - disc / 100));
+        taxLines.push({ value: taxable, pct: pct });
+        rowTaxable += taxable;
+        rowAny = true;
+      });
+      if (rowAny) anyQty = true;
+      if (rowBad) { valueCell.textContent = 'Too much'; valueCell.className = 'rt-value tabular-nums text-right text-stop'; return; }
+      if (!rowAny) { valueCell.textContent = '—'; valueCell.className = 'rt-value tabular-nums text-right text-ink-faint'; return; }
+      valueCell.textContent = money(r2(rowTaxable) + r2(rowTaxable * pct / 100));
       valueCell.className = 'rt-value tabular-nums text-right font-medium text-ink';
     });
-    var goods = r2(subtotal + taxTotal);
 
     var net = 0, chargeHtml = '', chargeIncomplete = false;
     document.querySelectorAll('.rt-charge-row').forEach(function (row) {
@@ -1094,12 +1081,23 @@
       net += minus ? -amt : amt;
       var name = chosen && chosen.value ? chosen.getAttribute('data-name') : 'Charge';
       chargeHtml += '<div class="flex items-center justify-between"><span class="text-ink-muted">' + esc(name) +
-        (minus ? ': vendor deducts' : ': vendor pays back') + '</span><span class="tabular-nums">' + (minus ? '− ' : '+ ') + money(amt) + '</span></div>';
+        (minus ? ' (Minus)' : ' (Add)') + '</span><span class="tabular-nums">' + (minus ? '− ' : '+ ') + money(amt) + '</span></div>';
     });
-    var total = r2(goods + net);
+    var t = poTax(taxLines, net);
+    var line = function (label, value) {
+      return '<div class="flex items-center justify-between"><span class="text-ink-muted">' + label + '</span><span class="tabular-nums">' + money(value) + '</span></div>';
+    };
+    var taxHtml = (t.net !== 0) ? line('Taxable value (goods + charges)', t.taxable) : '';
+    if (rtBill.taxType === 'inter') {
+      taxHtml += line('IGST', t.tax);
+    } else {
+      var cgst = r2(t.tax / 2);
+      taxHtml += line('CGST', cgst) + line('SGST', r2(t.tax - cgst));
+    }
+    var total = t.grand;
 
-    document.getElementById('rt-s-goods').textContent = money(goods);
-    document.getElementById('rt-s-charges').innerHTML = chargeHtml;
+    document.getElementById('rt-s-goods').textContent = money(t.items);
+    document.getElementById('rt-s-charges').innerHTML = chargeHtml + taxHtml;
     document.getElementById('rt-s-total').textContent = (total < 0 ? '− ' : '') + money(Math.abs(total));
     document.getElementById('rt-s-error').textContent = total < 0 ? 'The charges are more than the value of the goods. Check the amounts.' : '';
     var credit = Math.max(total, 0);
@@ -1124,7 +1122,7 @@
     tr.className = 'rt-charge-row';
     tr.innerHTML =
       '<td><select class="rt-charge-id">' + options + '</select></td>' +
-      '<td><select class="rt-charge-effect"><option value="minus">Vendor deducts this from our credit</option><option value="add">Vendor pays this back to us</option></select></td>' +
+      '<td><select class="rt-charge-effect"><option value="add">Add</option><option value="minus">Minus</option></select></td>' +
       '<td><input type="number" class="rt-charge-amount text-right tabular-nums" min="0" step="0.01" placeholder="0.00" /></td>' +
       '<td class="text-center"><button type="button" class="btn-remove-rt-charge text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove charge">&times;</button></td>';
     rtChargeList.appendChild(tr);
@@ -1141,7 +1139,8 @@
       total: parseFloat(btn.getAttribute('data-total')) || 0,
       returnedBefore: parseFloat(btn.getAttribute('data-returned')) || 0,
       piNo: btn.getAttribute('data-pi'),
-      vendor: btn.getAttribute('data-vendor')
+      vendor: btn.getAttribute('data-vendor'),
+      taxType: btn.getAttribute('data-tax-type')
     };
     document.getElementById('rt-invoice-id').value = btn.getAttribute('data-invoice-id');
     document.getElementById('rt-modal-subtitle').textContent =
@@ -1175,6 +1174,7 @@
   document.getElementById('rt-modal-backdrop').addEventListener('click', closeReturn);
   document.getElementById('btn-add-rt-charge').addEventListener('click', rtAddChargeRow);
   rtLineBody.addEventListener('input', calcReturn);
+  rtLineBody.addEventListener('change', calcReturn);
   rtChargeList.addEventListener('input', calcReturn);
   rtChargeList.addEventListener('change', calcReturn);
   rtChargeList.addEventListener('click', function (e) {

@@ -46,6 +46,9 @@ def grns_list():
     base = GRN.query.filter(GRN.is_deleted == False)
     draft_grns = base.filter(GRN.status == "Draft").order_by(GRN.id.desc()).all()
     posted_grns = base.filter(GRN.status != "Draft").order_by(GRN.id.desc()).all()
+    # F3: PO-wise grouping — ek PO ke GRN saath-saath (naya PO pehle, PO ke andar naya GRN pehle)
+    draft_grns.sort(key=lambda grn: (-grn.po_id, -grn.id))
+    posted_grns.sort(key=lambda grn: (-grn.po_id, -grn.id))
 
     pending_count = len(open_pos) + len(draft_grns)
     completed_count = len(posted_grns)

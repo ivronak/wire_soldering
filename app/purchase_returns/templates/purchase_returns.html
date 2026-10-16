@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_po_group.html" import po_group_row %}
 {% block title %}Purchase Return{% endblock %}
 
 {% block page_css %}
@@ -112,13 +113,15 @@
             </thead>
             <tbody>
               {% for r in returns %}
+              {% set r_po = r.invoice.po if r.invoice else none %}
+              {% if loop.first or (r_po.id if r_po else 0) != ((loop.previtem.invoice.po.id if loop.previtem.invoice and loop.previtem.invoice.po else 0)) %}{{ po_group_row(r_po, 9) }}{% endif %}
               {% set inv = r.invoice %}
               <tr class="pr-row{% if r.status == 'Cancelled' %} opacity-70{% endif %}"
                   data-search="{{ (r.pr_no ~ ' ' ~ (inv.vendor.name if inv and inv.vendor else '') ~ ' ' ~ (inv.pi_no if inv else '') ~ ' ' ~ (inv.vendor_invoice_no if inv else '') ~ ' ' ~ r.reason)|lower }}"
                   data-status="{{ r.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ r.pr_no }}</td>
-                <td class="tabular-nums">{{ r.return_date.strftime('%d %b %Y') if r.return_date else '—' }}</td>
+                <td class="tabular-nums">{{ r.return_date.strftime('%d %b %Y') if r.return_date else '—' }}{% if r.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ r.created_at|ist }}</div>{% endif %}</td>
                 <td class="text-left">{{ inv.vendor.name if inv and inv.vendor else '—' }}</td>
                 <td>
                   <div class="font-mono font-semibold text-ink">{{ inv.pi_no if inv else '—' }}</div>
@@ -146,6 +149,7 @@
                     data-date="{{ r.return_date.strftime('%d %b %Y') if r.return_date else '' }}"
                     data-reason="{{ r.reason }}"
                     data-tax-type="{{ inv.tax_type if inv else 'intra' }}"
+                    data-gst-on-charges="{{ 1 if r.gst_on_charges else 0 }}"
                     data-subtotal="{{ r.subtotal }}"
                     data-tax="{{ r.tax_total }}"
                     data-total="{{ r.total_amount }}"
@@ -285,7 +289,7 @@
     lines.forEach(function (l) {
       html += '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '</td>' +
         '<td class="p-2 font-mono text-[12px]">' + esc(l.grn) + ' · ' + esc(l.lot) + '</td>' +
-        '<td class="p-2 text-center tabular-nums">' + esc(l.qty) + ' ' + esc(l.unit) + '</td>' +
+        '<td class="p-2 text-center tabular-nums">' + esc(l.qty) + ' ' + esc(l.unit) + (l.source === 'rejected' ? '<div class="text-[11px] text-stop">from rejected goods</div>' : '<div class="text-[11px] text-ink-faint">from passed goods</div>') + '</td>' +
         '<td class="p-2 text-center tabular-nums">' + money(l.rate) + '</td>' +
         '<td class="p-2 text-center tabular-nums">' + esc(l.discount) + '</td>' +
         '<td class="p-2 text-center tabular-nums">' + esc(l.tax_percent) + '</td>' +
@@ -294,20 +298,35 @@
     });
     html += '</tbody></table></div>';
 
-    // "What this return does": Add / Minus ki jagah saade shabd
-    html += '<div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">';
-    html += '<div class="flex items-center justify-between text-ink-muted"><span>Goods returned (before GST)</span><span class="tabular-nums">' + money(btn.getAttribute('data-subtotal')) + '</span></div>';
-    if (taxType === 'inter') {
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>IGST</span><span class="tabular-nums">' + money(tax) + '</span></div>';
-    } else {
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>CGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>SGST</span><span class="tabular-nums">' + money(tax / 2) + '</span></div>';
-    }
+    // "What this return does". Naya return: charges pehle, phir goods + charges par GST. Purana return: GST sirf goods par, charges baad me.
+    var gstOnCharges = btn.getAttribute('data-gst-on-charges') === '1';
+    var subtotalValue = parseFloat(btn.getAttribute('data-subtotal')) || 0;
+    var chargesValue = 0;
+    var vrow = function (label, value) {
+      return '<div class="flex items-center justify-between text-ink-muted"><span>' + label + '</span><span class="tabular-nums">' + value + '</span></div>';
+    };
+    var chargeHtml = '';
     chargeLines.forEach(function (c) {
       var minus = c.effect === 'minus';
-      html += '<div class="flex items-center justify-between text-ink-muted"><span>' + esc(c.name) + (minus ? ': vendor deducts' : ': vendor pays back') +
-        '</span><span class="tabular-nums">' + (minus ? '− ' : '+ ') + money(c.amount) + '</span></div>';
+      chargesValue += minus ? -c.amount : c.amount;
+      chargeHtml += vrow(esc(c.name) + (minus ? ' (Minus)' : ' (Add)'), (minus ? '− ' : '+ ') + money(c.amount));
     });
+    var taxHtml;
+    if (taxType === 'inter') {
+      taxHtml = vrow('IGST', money(tax));
+    } else {
+      var cgst = Math.round(tax / 2 * 100) / 100;
+      taxHtml = vrow('CGST', money(cgst)) + vrow('SGST', money(Math.round((tax - cgst) * 100) / 100));
+    }
+    html += '<div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">';
+    html += vrow('Goods returned (before GST)', money(subtotalValue));
+    if (gstOnCharges) {
+      html += chargeHtml;
+      if (chargeLines.length) html += vrow('Taxable value (goods + charges)', money(subtotalValue + chargesValue));
+      html += taxHtml;
+    } else {
+      html += taxHtml + chargeHtml;
+    }
     html += '<div class="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-300 text-[14px] font-bold text-ink"><span>' +
       (cancelled ? 'Credit (cancelled, not applied)' : 'Vendor credited us') + '</span><span class="tabular-nums">' + money(btn.getAttribute('data-total')) + '</span></div>';
     html += '</div>';

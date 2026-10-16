@@ -215,6 +215,36 @@
     <script>
     // Sidebar ka active link dhundo aur use nav ke beech me dikhao,
     // taaki page reload ke baad bhi focus active menu par rahe (list lambi ho tab bhi)
+    // F3: PO-wise grouping ke header rows (tr.po-group). Search / filter se kisi PO ki saari rows chhup jaayein to
+      // uska header bhi chhupa do. Rows kaise chhupti hain (style ya class) usse fark nahi: dono dekhte hain.
+      (function () {
+        var syncing = false;
+        function rowShown(row) {
+          return row.style.display !== "none" && !row.classList.contains("hidden");
+        }
+        function syncGroups() {
+          if (syncing) return;
+          syncing = true;
+          document.querySelectorAll("tbody").forEach(function (body) {
+            var header = null, anyShown = false;
+            var flush = function () {
+              if (!header) return;
+              var want = anyShown ? "" : "none";
+              if (header.style.display !== want) header.style.display = want;
+            };
+            Array.prototype.forEach.call(body.rows, function (row) {
+              if (row.classList.contains("po-group")) { flush(); header = row; anyShown = false; }
+              else if (header && rowShown(row)) { anyShown = true; }
+            });
+            flush();
+          });
+          syncing = false;
+        }
+        if (document.querySelector("tr.po-group")) {
+          new MutationObserver(syncGroups).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["style", "class"] });
+          syncGroups();
+        }
+      })();
     var activeLink = document.querySelector(".nav-link.is-active");
     if (activeLink) {
       activeLink.scrollIntoView({ block: "center" });
