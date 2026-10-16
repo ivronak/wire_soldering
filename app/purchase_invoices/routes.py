@@ -45,6 +45,15 @@ def purchase_invoices_list():
     draft_invoices.sort(key=po_key)
     invoices.sort(key=po_key)
 
+    # Pending tab ek hi list: har PO ke neeche pehle uske bill-ke-liye-tayyar GRN, phir uske Draft bills
+    pending_items = []
+    for grn in ready_grns:
+        pending_items.append({"kind": "grn", "po": grn.po, "po_id": grn.po_id, "grn": grn, "inv": None, "order": 0, "rid": grn.id})
+    for inv in draft_invoices:
+        po = inv.po
+        pending_items.append({"kind": "draft", "po": po, "po_id": po.id if po else 0, "grn": None, "inv": inv, "order": 1, "rid": inv.id})
+    pending_items.sort(key=lambda item: (-item["po_id"], item["order"], -item["rid"]))
+
     pending_count = len(ready_grns) + len(draft_invoices)
     completed_count = len(invoices)
     result_count = pending_count if tab == "pending" else completed_count
@@ -59,6 +68,7 @@ def purchase_invoices_list():
         tab=tab,
         ready_grns=ready_grns,
         draft_invoices=draft_invoices,
+        pending_items=pending_items,
         invoices=invoices,
         pending_count=pending_count,
         completed_count=completed_count,

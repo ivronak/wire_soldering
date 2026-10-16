@@ -193,8 +193,10 @@
               </tr>
             </thead>
             <tbody>
-              {% for grn in ready_grns %}
-              {% if loop.first or grn.po_id != loop.previtem.po_id %}{{ po_group_row(grn.po, 8) }}{% endif %}
+              {% for it in pending_items %}
+              {% if loop.first or it.po_id != loop.previtem.po_id %}{{ po_group_row(it.po, 8) }}{% endif %}
+              {% if it.kind == 'grn' %}
+              {% set grn = it.grn %}
               {% set po = grn.po %}
               <tr class="pi-row"
                   data-search="{{ (grn.grn_no ~ ' ' ~ (po.po_no if po else '') ~ ' ' ~ (po.vendor.name if po and po.vendor else '') ~ ' ' ~ (grn.lines | map(attribute='po_line.raw_material.name') | join(' ')) ~ ' ' ~ (grn.lines | map(attribute='batch_lot_no') | join(' ')))|lower }}"
@@ -227,13 +229,12 @@
                     data-bill='{{ grn.billing_data|tojson }}'>Create bill</button>
                 </td>
               </tr>
-              {% endfor %}
-              {% for inv in draft_invoices %}
-              {% if loop.first or (inv.po.id if inv.po else 0) != (loop.previtem.po.id if loop.previtem.po else 0) %}{{ po_group_row(inv.po, 8) }}{% endif %}
+              {% else %}
+              {% set inv = it.inv %}
               <tr class="pi-row"
                   data-search="{{ (inv.pi_no ~ ' ' ~ (inv.vendor.name if inv.vendor else '') ~ ' ' ~ inv.vendor_invoice_no)|lower }}"
                   data-status="draft">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ ready_grns|length + loop.index }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td>
                   <div class="font-mono font-semibold text-ink">{{ inv.pi_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">Draft bill</div>
@@ -265,6 +266,7 @@
                   </div>
                 </td>
               </tr>
+              {% endif %}
               {% endfor %}
             </tbody>
           </table>

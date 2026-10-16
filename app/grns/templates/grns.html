@@ -195,7 +195,10 @@
               </tr>
             </thead>
             <tbody>
-              {% for po in open_pos %}
+              {% for it in pending_items %}
+              {% if loop.first or it.po_id != loop.previtem.po_id %}{{ po_group_row(it.po, 8) }}{% endif %}
+              {% if it.kind == 'po' %}
+              {% set po = it.po %}
               {# Kitni lines ka maal abhi baaki hai (remaining_qty > 0) — alag-alag units ka qty jodna galat hota, isliye lines gin rahe #}
               {% set pending_lines = po.lines | selectattr('remaining_qty', 'gt', 0) | list | length %}
               <tr class="grn-row"
@@ -224,13 +227,12 @@
                   </button>
                 </td>
               </tr>
-              {% endfor %}
-              {% for g in draft_grns %}
-              {% if loop.first or g.po_id != loop.previtem.po_id %}{{ po_group_row(g.po, 8) }}{% endif %}
+              {% else %}
+              {% set g = it.grn %}
               <tr class="grn-row opacity-90"
                   data-search="{{ (g.grn_no ~ ' ' ~ g.po.po_no ~ ' ' ~ (g.po.vendor.name if g.po and g.po.vendor else '') ~ ' ' ~ (g.challan_no or ''))|lower }}"
                   data-status="draft">
-                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ open_pos|length + loop.index }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td>
                   <div class="font-mono font-semibold text-ink">{{ g.grn_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">Draft GRN · {{ g.po.po_no if g.po else '—' }}</div>
@@ -252,6 +254,7 @@
                   </div>
                 </td>
               </tr>
+              {% endif %}
               {% endfor %}
             </tbody>
           </table>

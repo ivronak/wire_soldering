@@ -48,6 +48,14 @@ def grns_list():
     posted_grns = base.filter(GRN.status != "Draft").order_by(GRN.id.desc()).all()
     # F3: PO-wise grouping — ek PO ke GRN saath-saath (naya PO pehle, PO ke andar naya GRN pehle)
     draft_grns.sort(key=lambda grn: (-grn.po_id, -grn.id))
+
+    # Pending tab ek hi list: har PO ke neeche pehle uski "maal aana baaki" row, phir uske Draft GRN (F3: PO-wise group)
+    pending_items = []
+    for po in open_pos:
+        pending_items.append({"kind": "po", "po": po, "po_id": po.id, "grn": None, "order": 0, "gid": 0})
+    for grn in draft_grns:
+        pending_items.append({"kind": "draft", "po": grn.po, "po_id": grn.po_id, "grn": grn, "order": 1, "gid": grn.id})
+    pending_items.sort(key=lambda item: (-item["po_id"], item["order"], -item["gid"]))
     posted_grns.sort(key=lambda grn: (-grn.po_id, -grn.id))
 
     pending_count = len(open_pos) + len(draft_grns)
@@ -59,6 +67,7 @@ def grns_list():
         active_nav='grns',
         grns=posted_grns,
         draft_grns=draft_grns,
+        pending_items=pending_items,
         open_pos=open_pos,
         tab=tab,
         pending_count=pending_count,
