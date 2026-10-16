@@ -22,9 +22,14 @@ def cancel_invoice(invoice):
         ledger.current_balance = round(ledger.current_balance - invoice.total_amount, 2)
     invoice.status = "Cancelled"
 
+from app.inventory.posting import return_to_stock, return_cancelled
+
+
 def post_return(purchase_return):
     # Return post karo: vendor ka payable total_amount se GHATTA hai (Dr = minus, bill ke ulta).
     # total_amount me goods + GST + charges (Add / Minus) sab aa chuka hai, route use pehle nikal deta hai.
+    # Pehle stock se maal nikalo (kam stock ho to InventoryError, kuch save nahi hoga), phir paisa
+    return_to_stock(purchase_return)
     ledger = purchase_return.invoice.vendor.ledger
     ledger.current_balance =  round(ledger.current_balance - purchase_return.total_amount, 2)
     purchase_return.status = "Posted"
@@ -32,6 +37,7 @@ def post_return(purchase_return):
 def cancel_return(purchase_return):
     # Return cancel karo: ledger ka asar wapas (reverse). Sirf Posted par; pehle se Cancelled par dobara nahi.
     if purchase_return.status == "Posted":
+        return_cancelled(purchase_return)      # stock wapas (ulti rows)
         ledger = purchase_return.invoice.vendor.ledger
         ledger.current_balance = round(ledger.current_balance + purchase_return.total_amount, 2)
     purchase_return.status = "Cancelled"

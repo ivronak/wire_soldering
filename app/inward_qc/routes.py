@@ -2,6 +2,7 @@ import os
 
 from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify, current_app, send_from_directory
 from werkzeug.utils import secure_filename
+from app.inventory.posting import qc_passed_to_stock, InventoryError
 from app.models import InwardQC, GRN, GRNLine, RejectionMemo, RMQCParameter, InwardQCResult
 from app.raw_materials.routes import qc_parameter_to_dict
 from app.extensions import db
@@ -366,6 +367,15 @@ def inward_qc_add():
             grn.status = "Partial QC"
         else:
             grn.status = "Closed"
+
+    # Final QC: passed qty QC Hold se store me (rejected QC Hold me rehti hai) — app/inventory/posting.py
+    if status != "Draft":
+        try:
+            qc_passed_to_stock(inward_qc, grn_line)
+        except InventoryError as error:
+            db.session.rollback()
+            flash(str(error), "error")
+            return redirect(url_for('inward_qc.inward_qc_list'))
 
     db.session.commit()
     if status == "Draft":

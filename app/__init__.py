@@ -23,6 +23,7 @@ from app.payment_terms.routes import payment_terms_bp
 from app.party_documents.routes import party_documents_bp
 from app.purchase_invoices.routes import purchase_invoices_bp
 from app.purchase_returns.routes import purchase_returns_bp
+from app.inventory.routes import inventory_bp
 from app.extensions import db, migrate
 from app.timeutil import format_ist
 
@@ -78,6 +79,16 @@ def create_app():
     app.register_blueprint(party_documents_bp)
     app.register_blueprint(purchase_invoices_bp)
     app.register_blueprint(purchase_returns_bp)
+    app.register_blueprint(inventory_bp)
+
+    # "flask inventory-backfill": inventory banne se pehle ke GRN / QC / Return ki stock rows banata hai (dobara chalao to double nahi hoga)
+    @app.cli.command("inventory-backfill")
+    def inventory_backfill_command():
+        from app.inventory.posting import backfill
+        problems = backfill()
+        print("Inventory backfill done.")
+        for problem in problems:
+            print("PROBLEM:", problem)
 
     @app.route("/")
     def home():

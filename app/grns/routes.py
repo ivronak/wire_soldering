@@ -1,4 +1,5 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
+from app.inventory.posting import receive_grn, InventoryError
 from app.models import GRN, PurchaseOrder, GRNLine
 from app.extensions import db
 from datetime import datetime
@@ -184,6 +185,16 @@ def grns_add():
 
     refresh_po_status(po)
 
+    # Post hui GRN (Draft nahi) ka maal turant stock me: QC Hold warehouse me (app/inventory/posting.py)
+    if status != "Draft":
+        try:
+            db.session.flush()
+            receive_grn(grn)
+        except InventoryError as error:
+            db.session.rollback()
+            flash(str(error), "error")
+            return redirect(url_for('grns.grns_list'))
+
     db.session.commit()
     # Post hui GRN completed tab me chali jaati hai — batao ki agla kaam (QC) kahan hai
     if status == "Draft":
@@ -201,6 +212,12 @@ def grns_post(grn_id):
 
     grn.status = "Pending QC"
     refresh_po_status(grn.po)
+    try:
+        receive_grn(grn)
+    except InventoryError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+        return redirect(url_for('grns.grns_list'))
     db.session.commit()
     flash(f"GRN {grn.grn_no} posted — its lots are now waiting on the Inward QC page.", "success")
     return redirect(url_for('grns.grns_list'))

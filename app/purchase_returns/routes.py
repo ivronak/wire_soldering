@@ -8,6 +8,7 @@ from app.models import (
 )
 from app.purchase_invoices.posting import post_return, cancel_return
 from app.tax import calc_tax
+from app.inventory.posting import InventoryError
 
 purchase_returns_bp = Blueprint("purchase_returns", __name__, template_folder="templates")
 
@@ -192,7 +193,12 @@ def purchase_returns_add():
         db.session.add(charge_row)
 
     # Vendor ledger me paisa ghatao (posting.py), phir ek hi commit: sab kuch ya kuch nahi
-    post_return(purchase_return)
+    try:
+        post_return(purchase_return)
+    except InventoryError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+        return redirect(url_for("purchase_invoices.purchase_invoices_list", tab="completed"))
     db.session.commit()
 
     vendor_name = data["invoice"].vendor.name

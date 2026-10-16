@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Lot ledger{% endblock %}
+
+{% block page_css %}
+<style>
+  .st-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .st-table thead th {
+    position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 8px; text-align: center;
+    border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9;
+  }
+  .st-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
+  .st-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .st-table td.left, .st-table th.left { text-align: left; padding-left: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('inventory.stock_list') }}" class="hover:underline">Inventory / Stock</a> / Lot ledger</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">{{ lot.lot_code }} · {{ lot.raw_material.name if lot.raw_material else '' }}</h1>
+          <div class="text-[12.5px] text-ink-faint">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else '' }} · vendor batch {{ lot.vendor_batch_no or '—' }} · unit {{ unit }}</div>
+        </div>
+        <a href="{{ url_for('inventory.stock_list') }}" class="px-3 py-1.5 text-[13px] text-ink border border-slate-300 rounded hover:bg-mist">Back to stock</a>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+          Every row is permanent (like a passbook): a mistake is corrected by a new reversing row, never by editing. <em>Total</em> is this lot's quantity across all warehouses.
+        </div>
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="st-table">
+            <colgroup><col style="width:12%"><col style="width:22%"><col style="width:20%"><col style="width:12%"><col style="width:14%"><col style="width:10%"><col style="width:10%"></colgroup>
+            <thead><tr><th class="left">Date</th><th class="left">What happened</th><th class="left">Warehouse</th><th>Qty</th><th>Value (estimated)</th><th>Total</th><th>Document</th></tr></thead>
+            <tbody>
+              {% for r in rows %}
+              {% set m = r.m %}
+              <tr{% if m.reverses_movement_id %} class="opacity-70"{% endif %}>
+                <td class="left tabular-nums">{{ m.movement_date.strftime('%d %b %Y') }}{% if m.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ m.created_at|ist }}</div>{% endif %}</td>
+                <td class="left">{{ r.label }}{% if m.reverses_movement_id %}<div class="text-[11.5px] text-stop">Reversal (return cancelled)</div>{% endif %}</td>
+                <td class="left">{{ m.warehouse.name if m.warehouse else '—' }}</td>
+                <td class="tabular-nums font-semibold {% if m.qty < 0 %}text-stop{% else %}text-success{% endif %}">{{ '+' if m.qty > 0 else '−' }}{{ (m.qty|abs)|qty }} {{ unit }}</td>
+                <td class="tabular-nums">{{ '+' if m.value > 0 else '−' }}₹{{ (m.value|abs)|inr }}</td>
+                <td class="tabular-nums">{{ r.running|qty }}</td>
+                <td class="font-mono text-[12px]">{{ m.ref_no or '' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-ink-faint" style="padding:18px;">No movements yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+{% endblock %}

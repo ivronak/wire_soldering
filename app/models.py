@@ -1,3 +1,4 @@
+from sqlalchemy import event, text
 from app.extensions import db
 from datetime import datetime
 from app.timeutil import utc_now
@@ -1189,3 +1190,67 @@ class PurchaseReturnCharge(CreatedAtMixin, db.Model):
     def summary(self):
         # View panel (JS) ke liye dictionary
         return {"name": self.charge.name if self.charge else "Charge", "amount": self.amount, "effect": self.effect}
+
+
+# ======================= Inventory (stock ledger) =======================
+# Stock ledger = bank ki passbook: ek baar likhi row kabhi badalti / mitti nahi. Galti = ulti row. Balance kahin store nahi
+# hota — rows ka SUM hai. Saare rules app/inventory/posting.py me.
+
+class StockLot(CreatedAtMixin, db.Model):
+    # Ek lot = ek GRN line. lot_code hamara apna (LOT-0001); vendor ka batch number sirf copy hai.
+    __tablename__ = "stock_lots"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lot_code = db.Column(db.String(20), unique=True, nullable=False)
+
+    grn_line_id = db.Column(db.Integer, db.ForeignKey("grn_lines.id"), unique=True, nullable=False)
+    grn_line = db.relationship("GRNLine", foreign_keys=[grn_line_id], backref=db.backref("stock_lot", uselist=False))
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+
+    vendor_batch_no = db.Column(db.String(30), nullable=True)
+
+
+class StockMovement(CreatedAtMixin, db.Model):
+    # Stock ki ek entry: qty aur value dono signed (+ aaya, - gaya). Kabhi UPDATE / DELETE nahi (neeche listener rokta hai).
+    __tablename__ = "stock_movements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    movement_date = db.Column(db.Date, nullable=False)          # document ki business date (GRN date, QC date, return date)
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
+    lot_id = db.Column(db.Integer, db.ForeignKey("stock_lots.id"), nullable=False)
+    lot = db.relationship("StockLot", foreign_keys=[lot_id], backref="movements")
+
+    # GRN_RECEIPT, QC_OUT, QC_IN, PURCHASE_RETURN (reversal me wahi type, ulta sign)
+    movement_type = db.Column(db.String(30), nullable=False)
+    qty = db.Column(db.Float, nullable=False)                   # signed, 4 decimal
+    value = db.Column(db.Float, nullable=False)                 # signed, 2 decimal (abhi PO rate par "estimated")
+
+    ref_type = db.Column(db.String(20), nullable=False)         # GRN / QC / RETURN
+    ref_id = db.Column(db.Integer, nullable=False)
+    ref_no = db.Column(db.String(30), nullable=True)
+    line_key = db.Column(db.String(30), nullable=False)         # document ki kaun si line (GRN line id / return line id)
+
+    reverses_movement_id = db.Column(db.Integer, db.ForeignKey("stock_movements.id"), nullable=True, unique=True)
+    note = db.Column(db.String(255), nullable=True)
+
+    __table_args__ = (
+        # Ek document line ka ek movement type do baar nahi (double click / dobara chalane se double entry nahi). Reversal rows chhoot.
+        db.Index("uq_stock_movement_once", "ref_type", "ref_id", "line_key", "movement_type", unique=True,
+                 sqlite_where=text("reverses_movement_id IS NULL")),
+    )
+
+
+@event.listens_for(StockMovement, "before_update")
+def _stock_movement_no_update(mapper, connection, target):
+    raise RuntimeError("Stock ledger rows are never edited. Add a reversing row instead.")
+
+
+@event.listens_for(StockMovement, "before_delete")
+def _stock_movement_no_delete(mapper, connection, target):
+    raise RuntimeError("Stock ledger rows are never deleted. Add a reversing row instead.")

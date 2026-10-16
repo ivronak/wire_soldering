@@ -335,7 +335,7 @@
 
         <div class="px-3.5 py-2 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} {{ 'pending items' if tab == 'pending' else 'GRN records' }}</span>
-          <span>After post: stock sits in QC Hold Bay until inward lab QC passes</span>
+          <span>After post: stock sits in the QC Hold warehouse of the delivery branch until inward lab QC passes</span>
         </div>
       </div>
 {% endblock %}
@@ -383,7 +383,7 @@
         </div>
         <div>
           <label for="grn-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Stock location after post</label>
-          <input type="text" id="grn-warehouse" readonly value="QC Hold Bay — Under QC inspection" class="w-full px-2.5 py-2 text-[13px] bg-brand-soft border border-brand-border rounded text-brand-teal font-medium" />
+          <input type="text" id="grn-warehouse" readonly value="QC Hold warehouse — Under QC inspection" class="w-full px-2.5 py-2 text-[13px] bg-brand-soft border border-brand-border rounded text-brand-teal font-medium" />
         </div>
         <div>
           <label for="grn-gross" class="block text-[12.5px] font-semibold text-ink mb-1">Gross weight (kg)</label>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Stock ledger{% endblock %}
+
+{% block page_css %}
+<style>
+  .st-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .st-table thead th {
+    position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 8px; text-align: center;
+    border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9;
+  }
+  .st-table thead th:first-child, .st-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .st-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  .st-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .st-table tbody tr:hover { background: #FBF4EE; }
+  .st-table td.left, .st-table th.left { text-align: left; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock ledger</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Stock</h1>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+          Stock moves by itself: <strong>GRN</strong> puts goods in the QC Hold warehouse (<em>Waiting for QC</em>) · <strong>QC pass</strong> moves the passed quantity to the store (<em>Available</em>) · the rejected quantity stays in QC Hold (<em>Rejected</em>) until a <strong>Purchase Return</strong> sends it back · a bill does not change stock. Values are estimated at the PO rate.
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <p class="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">By material</p>
+          <table class="st-table">
+            <colgroup><col style="width:30%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:22%"></colgroup>
+            <thead><tr><th class="left">Material</th><th>Waiting for QC</th><th>Available</th><th>Rejected</th><th>Value (estimated)</th></tr></thead>
+            <tbody>
+              {% for item in summary_rows %}
+              <tr>
+                <td class="left"><div class="font-medium text-ink">{{ item.material.name if item.material else '—' }}</div><div class="text-[11.5px] text-ink-faint">{{ item.material.code if item.material else '' }}</div></td>
+                <td class="tabular-nums">{{ item.waiting|qty }} {{ item.unit }}</td>
+                <td class="tabular-nums font-semibold text-ink">{{ item.available|qty }} {{ item.unit }}</td>
+                <td class="tabular-nums {% if item.rejected > 0 %}text-stop{% endif %}">{{ item.rejected|qty }} {{ item.unit }}</td>
+                <td class="tabular-nums">₹{{ item.value|inr }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-ink-faint" style="padding:18px;">No stock yet. Stock appears when a GRN is posted.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <p class="px-4 pt-5 pb-1 text-[14px] font-semibold text-ink">By lot</p>
+          <table class="st-table">
+            <colgroup><col style="width:10%"><col style="width:20%"><col style="width:13%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:10%"></colgroup>
+            <thead><tr><th>Lot</th><th class="left">Material</th><th>GRN / batch</th><th>Waiting</th><th>Available</th><th>Rejected</th><th>Where</th><th></th></tr></thead>
+            <tbody>
+              {% for row in lot_rows %}
+              {% set lot = row.lot %}
+              <tr>
+                <td class="font-mono font-semibold text-ink">{{ lot.lot_code }}</td>
+                <td class="left">{{ lot.raw_material.name if lot.raw_material else '—' }}</td>
+                <td><div class="font-mono text-[12px]">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else '—' }}</div><div class="text-[11px] text-ink-faint">{{ lot.vendor_batch_no or '' }}</div></td>
+                <td class="tabular-nums">{{ row.waiting|qty }} {{ row.unit }}</td>
+                <td class="tabular-nums font-semibold text-ink">{{ row.available|qty }} {{ row.unit }}</td>
+                <td class="tabular-nums {% if row.rejected > 0 %}text-stop{% endif %}">{{ row.rejected|qty }} {{ row.unit }}</td>
+                <td class="text-[12px] text-ink-muted">{{ row.where|join(', ') or 'Empty' }}</td>
+                <td><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Ledger</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+{% endblock %}
