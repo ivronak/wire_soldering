@@ -67,7 +67,7 @@
                 <td class="tabular-nums {% if row.rejected > 0 %}text-stop{% endif %}">{{ row.rejected|qty }} {{ row.unit }}</td>
                 <td class="tabular-nums">{{ row.wip|qty }} {{ row.unit }}</td>
                 <td class="text-[12px] text-ink-muted">{{ row.where|join(', ') or 'Empty' }}</td>
-                <td><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Ledger</a></td>
+                <td><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">History</a></td>
               </tr>
               {% endfor %}
             </tbody>

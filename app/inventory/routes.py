@@ -72,15 +72,95 @@ def stock_list():
     return render_template("stock.html", active_nav="stock", lot_rows=lot_rows, summary_rows=summary_rows)
 
 
+# Lot history ki ek "event" = ek kaam (jaise QC pass). Ek kaam ki do rows (ek godown se minus, doosre me plus) ek line me dikhti hain.
+EVENT_TITLES = {
+    "GRN": "Goods received",
+    "QC": "Quality check passed",
+    "ISSUE": "Issued to production",
+    "RETURN": "Returned to vendor",
+}
+
+
+def build_events(movements, unit):
+    groups = {}
+    order = []
+    for movement in movements:
+        key = (movement.ref_type, movement.ref_id, movement.line_key, movement.reverses_movement_id is not None)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(movement)
+
+    events = []
+    for key in order:
+        rows = groups[key]
+        ref_type, _ref_id, _line_key, cancelled = key
+        first = rows[0]
+        leaving = [r for r in rows if r.qty < 0]
+        arriving = [r for r in rows if r.qty > 0]
+        qty = abs(first.qty)
+        title = EVENT_TITLES.get(ref_type, ref_type)
+        if cancelled:
+            title = "Cancelled: " + title.lower()
+        qty_text = ("%g" % qty) + " " + unit
+
+        def name(row):
+            return row.warehouse.name if row.warehouse else "?"
+
+        if leaving and arriving:
+            kind = "move"
+            sentence = "%s moved from %s to %s." % (qty_text, name(leaving[0]), name(arriving[0]))
+            value = abs(arriving[0].value)
+        elif arriving:
+            kind = "in"
+            verb = "came back into" if cancelled else "came into"
+            sentence = "%s %s %s." % (qty_text, verb, name(arriving[0]))
+            value = abs(arriving[0].value)
+        else:
+            kind = "out"
+            tail = " back to the vendor" if ref_type == "RETURN" else ""
+            sentence = "%s went out of %s%s." % (qty_text, name(leaving[0]), tail)
+            value = abs(leaving[0].value)
+        events.append({
+            "date": first.movement_date, "created_at": first.created_at, "title": title, "sentence": sentence,
+            "kind": kind, "qty": qty, "value": value, "ref_no": first.ref_no, "cancelled": cancelled,
+        })
+    return events
+
+
 @inventory_bp.route("/inventory/stock/<int:lot_id>")
 def stock_lot(lot_id):
     lot = db.session.get(StockLot, lot_id)
     if lot is None:
         abort(404)
+    unit = lot_unit(lot)
     movements = StockMovement.query.filter_by(lot_id=lot.id).order_by(StockMovement.id).all()
-    running = 0
-    rows = []
+
+    # "Abhi kahan kitna hai": har godown ka balance (rows ka SUM)
+    from app.models import Warehouse
+    has_qc = lot.grn_line.final_qc is not None if lot.grn_line else False
+    totals = {}
     for movement in movements:
-        running = round(running + movement.qty, 4)
-        rows.append({"m": movement, "label": MOVEMENT_LABELS.get(movement.movement_type, movement.movement_type), "running": running})
-    return render_template("stock_lot.html", active_nav="stock", lot=lot, unit=lot_unit(lot), rows=rows)
+        item = totals.setdefault(movement.warehouse_id, [0, 0])
+        item[0] += movement.qty
+        item[1] += movement.value
+    where_now = []
+    for warehouse_id, (qty, value) in totals.items():
+        if abs(qty) < 0.00005:
+            continue
+        warehouse = db.session.get(Warehouse, warehouse_id)
+        wtype = warehouse.warehouse_type if warehouse else ""
+        if wtype == "QC_HOLD":
+            label = "Rejected, waiting to go back" if has_qc else "Waiting for QC"
+            tone = "bad" if has_qc else "wait"
+        elif wtype == "WIP":
+            label, tone = "In production", "wip"
+        else:
+            label, tone = "Available to use", "good"
+        where_now.append({"warehouse": warehouse.name if warehouse else "?", "label": label, "tone": tone,
+                          "qty": round(qty, 4), "value": round(value, 2)})
+    where_now.sort(key=lambda w: {"good": 0, "wip": 1, "wait": 2, "bad": 3}[w["tone"]])
+
+    received = sum(m.qty for m in movements if m.movement_type == "GRN_RECEIPT" and m.reverses_movement_id is None)
+    return render_template("stock_lot.html", active_nav="stock", lot=lot, unit=unit,
+                           events=build_events(movements, unit), where_now=where_now, received=received)
