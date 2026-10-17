@@ -49,6 +49,8 @@ def create_app():
 
     # Templates me {{ x.created_at|ist }} — UTC se India time ("16 Oct 2026, 03:42 PM")
     app.add_template_filter(format_ist, "ist")
+    from datetime import date as _date
+    app.add_template_global(lambda: _date.today(), "today_date")
 
     db.init_app(app)
     migrate.init_app(app, db)

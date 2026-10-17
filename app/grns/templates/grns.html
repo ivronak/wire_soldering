@@ -174,13 +174,13 @@
           <table class="grn-table">
             <colgroup>
               <col style="width:4%" />
-              <col style="width:17%" />
-              <col style="width:10%" />
-              <col style="width:18%" />
-              <col style="width:12%" />
-              <col style="width:12%" />
-              <col style="width:12%" />
               <col style="width:15%" />
+              <col style="width:9%" />
+              <col style="width:15%" />
+              <col style="width:10%" />
+              <col style="width:25%" />
+              <col style="width:11%" />
+              <col style="width:11%" />
             </colgroup>
             <thead>
               <tr>
@@ -188,8 +188,8 @@
                 <th>Document</th>
                 <th>Date</th>
                 <th>Vendor</th>
-                <th>Due / challan</th>
-                <th>Lines</th>
+                <th>Challan</th>
+                <th>Goods</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -206,13 +206,22 @@
                   data-status="{{ po.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td>
-                  <div class="font-mono font-semibold text-brand-teal">{{ po.po_no }}</div>
-                  <div class="text-[11.5px] text-ink-faint">Purchase order</div>
+                  <div class="font-semibold text-ink">Waiting for goods</div>
+                  <div class="text-[11.5px] text-ink-faint">Against {{ po.po_no }}</div>
                 </td>
                 <td class="tabular-nums">{{ po.po_date.strftime('%d %b %Y') if po.po_date else '—' }}{% if po.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ po.created_at|ist }}</div>{% endif %}</td>
                 <td class="text-left">{{ po.vendor.name if po.vendor else '—' }}</td>
-                <td class="tabular-nums text-[12.5px]">{{ ('Due ' ~ po.expected_delivery_date.strftime('%d %b')) if po.expected_delivery_date else '—' }}</td>
-                <td class="tabular-nums text-[12.5px]">{{ pending_lines }} of {{ po.lines|length }} pending</td>
+                <td class="text-[12.5px] text-ink-faint">—</td>
+                <td class="text-left">
+                  {# Kaunsa maal kitna aana baaki hai: seedha line-wise, taaki "3 of 3 pending" jaisa andaza na lagana pade #}
+                  {% for pl in po.lines if pl.remaining_qty > 0 %}
+                  <div class="text-[13px]"><span class="font-medium text-ink">{{ pl.raw_material.name if pl.raw_material else '—' }}</span>
+                    <span class="tabular-nums text-ink-muted">· {{ pl.remaining_qty|qty }} {{ pl.unit.code if pl.unit else '' }} to come</span>
+                    {% if pl.received_qty > 0 %}<span class="text-[11.5px] text-ink-faint">(of {{ pl.ordered_qty|qty }}, {{ pl.received_qty|qty }} received)</span>{% endif %}</div>
+                  {% else %}
+                  <div class="text-[12.5px] text-ink-faint">Everything ordered has arrived</div>
+                  {% endfor %}
+                </td>
                 <td>
                   {% if po.status == 'Partial' %}
                   <span class="status-pill status-partial-qc">Partially received</span>

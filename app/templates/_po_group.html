@@ -8,6 +8,15 @@
     <span class="font-mono font-bold text-ink">{{ po.po_no }}</span>
     <span class="text-ink-muted"> · {{ po.vendor.name if po.vendor else '—' }}</span>
     <span class="text-[11.5px] text-ink-faint"> · PO {{ 'short closed' if po.status == 'Cancelled' else po.status|lower }}</span>
+    {% if po.po_date %}<span class="text-[11.5px] text-ink-faint"> · ordered {{ po.po_date.strftime('%d %b') }}</span>{% endif %}
+    {% if po.expected_delivery_date %}
+      {% set days_late = (today_date() - po.expected_delivery_date).days %}
+      {% if days_late > 0 and po.status in ('Open', 'Partial') %}
+      <span class="text-[11.5px] font-semibold text-stop"> · overdue by {{ days_late }} day{{ '' if days_late == 1 else 's' }}</span>
+      {% else %}
+      <span class="text-[11.5px] text-ink-faint"> · due {{ po.expected_delivery_date.strftime('%d %b') }}</span>
+      {% endif %}
+    {% endif %}
     {% else %}
     <span class="text-ink-muted">Purchase order not found</span>
     {% endif %}
