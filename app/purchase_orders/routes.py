@@ -48,7 +48,8 @@ def purchase_orders_list():
     total_count = len(orders)
 
     vendors = Vendor.query.filter(Vendor.is_deleted == False, Vendor.is_active == True).all()
-    warehouses = Warehouse.query.filter(Warehouse.is_deleted == False, Warehouse.is_active == True).all()
+    # PO ka warehouse = jahan QC ke baad maal rakha jaayega, isliye sirf store (RM) type; QC Hold GRN me khud lagta hai
+    warehouses = Warehouse.query.filter(Warehouse.is_deleted == False, Warehouse.is_active == True, Warehouse.warehouse_type == "RM").all()
     raw_materials = RawMaterial.query.filter(RawMaterial.is_deleted == False, RawMaterial.is_active == True).all()
     units = Unit.query.filter(Unit.is_active == True, Unit.is_deleted == False).all()
     tax_rates = TaxRate.query.filter(TaxRate.is_active == True, TaxRate.is_deleted == False).all()
@@ -94,6 +95,11 @@ def purchase_orders_add():
     # Payment terms optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
     if payment_terms_id and not PaymentTerm.query.filter(PaymentTerm.id == payment_terms_id, PaymentTerm.is_deleted == False).first():
         flash("Please select valid payment terms.", "error")
+        return redirect(url_for('purchase_orders.purchase_orders_list'))
+
+    chosen = db.session.get(Warehouse, warehouse_id)
+    if chosen is None or chosen.is_deleted or chosen.warehouse_type != "RM":
+        flash("Choose a store (raw material) warehouse for the purchase order.", "error")
         return redirect(url_for('purchase_orders.purchase_orders_list'))
 
     po_date = datetime.strptime(po_date_raw, "%Y-%m-%d").date()

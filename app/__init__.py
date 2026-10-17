@@ -92,7 +92,7 @@ def create_app():
         problems = backfill()
         print("Inventory backfill done.")
         for problem in problems:
-            print("PROBLEM:", problem)
+            print("NOTE:", problem)
 
     @app.route("/")
     def home():

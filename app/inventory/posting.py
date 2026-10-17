@@ -79,12 +79,26 @@ def lot_for(grn_line):
     return lot
 
 
+def store_warehouse_for(po):
+    # Passed maal ka ghar: PO me jo warehouse chuna hai wo RM (store) type ka ho to wahi. QC Hold / koi aur type chuna ho
+    # (galti se) to us branch ka active RM warehouse — warna passed maal wapas QC Hold me hi baith ke "Rejected" dikhta tha.
+    warehouse = po.warehouse
+    if warehouse is not None and warehouse.warehouse_type == "RM":
+        return warehouse
+    branch_id = warehouse.branch_id if warehouse else None
+    store = Warehouse.query.filter_by(branch_id=branch_id, warehouse_type="RM", is_active=True, is_deleted=False).order_by(Warehouse.id).first()
+    if store is None:
+        raise InventoryError(f"The branch of {po.po_no} has no active store (RM) warehouse. Create one in Warehouses first.")
+    return store
+
+
 def rm_warehouse_of(lot):
-    # Passed maal jahan gaya: us lot ki QC_IN row ka warehouse; nahi mila to PO ka warehouse
-    row = StockMovement.query.filter_by(lot_id=lot.id, movement_type="QC_IN").first()
-    if row is not None:
-        return row.warehouse
-    return lot.grn_line.grn.po.warehouse
+    # Passed maal jahan gaya: us lot ki QC_IN row ka warehouse (QC Hold nahi); nahi mila to PO ke hisaab se store
+    rows = StockMovement.query.filter_by(lot_id=lot.id, movement_type="QC_IN").filter(StockMovement.reverses_movement_id.is_(None)).order_by(StockMovement.id.desc()).all()
+    for row in rows:
+        if row.warehouse is not None and row.warehouse.warehouse_type != "QC_HOLD":
+            return row.warehouse
+    return store_warehouse_for(lot.grn_line.grn.po)
 
 
 # ---------------- 1. GRN post ----------------
@@ -116,7 +130,7 @@ def qc_passed_to_stock(inward_qc, grn_line):
     out_value = value_for_out(rem_qty, rem_value, qty)
     date_ = inward_qc.inspection_date
     add_movement(lot, hold, date_, "QC_OUT", -qty, -out_value, "QC", inward_qc.id, inward_qc.qc_no, grn_line.id)
-    add_movement(lot, po.warehouse, date_, "QC_IN", qty, out_value, "QC", inward_qc.id, inward_qc.qc_no, grn_line.id)
+    add_movement(lot, store_warehouse_for(po), date_, "QC_IN", qty, out_value, "QC", inward_qc.id, inward_qc.qc_no, grn_line.id)
 
 
 # ---------------- 4. Purchase Return ----------------
@@ -193,6 +207,32 @@ def reverse_document(ref_type, ref_id, note):
 
 
 # ---------------- purane documents ke liye ----------------
+def repair_wrong_store():
+    # Pehle ki galti theek karta hai: jis QC ka passed maal QC Hold me hi "QC_IN" ho gaya (PO me warehouse QC Hold chuna tha),
+    # use sahi store me bhejta hai. Ledger ki row badalti nahi: ulti row + sahi row jodte hain (note "Correction ..."). Dobara chalao to double nahi.
+    fixed = []
+    rows = StockMovement.query.filter_by(movement_type="QC_IN").filter(StockMovement.reverses_movement_id.is_(None)).order_by(StockMovement.id).all()
+    for row in rows:
+        if row.warehouse is None or row.warehouse.warehouse_type != "QC_HOLD":
+            continue
+        if StockMovement.query.filter_by(reverses_movement_id=row.id).first() is not None:
+            continue                                   # pehle hi theek ho chuka
+        lot = row.lot
+        store = store_warehouse_for(lot.grn_line.grn.po)
+        db.session.add(StockMovement(
+            movement_date=row.movement_date, raw_material_id=row.raw_material_id, warehouse_id=row.warehouse_id, lot_id=row.lot_id,
+            movement_type=row.movement_type, qty=q4(-row.qty), value=q2(-row.value), ref_type=row.ref_type, ref_id=row.ref_id,
+            ref_no=row.ref_no, line_key=row.line_key, reverses_movement_id=row.id,
+            note="Correction: passed goods were put back in QC Hold by mistake"))
+        db.session.add(StockMovement(
+            movement_date=row.movement_date, raw_material_id=row.raw_material_id, warehouse_id=store.id, lot_id=row.lot_id,
+            movement_type="QC_IN", qty=row.qty, value=row.value, ref_type=row.ref_type, ref_id=row.ref_id,
+            ref_no=row.ref_no, line_key=str(row.line_key) + ":fix", note="Correction: passed goods moved to the store"))
+        fixed.append(row.ref_no)
+    db.session.commit()
+    return fixed
+
+
 def backfill():
     # Inventory banne se pehle ke GRN / QC / Return ki rows banata hai (wahi functions, to wahi rules). Dobara chalao to double nahi hoga.
     from app.models import GRN, InwardQC, PurchaseReturn
@@ -215,4 +255,6 @@ def backfill():
         except InventoryError as error:
             problems.append(f"{purchase_return.pr_no}: {error}")
     db.session.commit()
+    for ref_no in repair_wrong_store():
+        problems.append(f"{ref_no}: passed goods were in QC Hold, corrected to the store")
     return problems

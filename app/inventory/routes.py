@@ -102,6 +102,9 @@ def build_events(movements, unit):
         title = EVENT_TITLES.get(ref_type, ref_type)
         if cancelled:
             title = "Cancelled: " + title.lower()
+        if first.note and first.note.startswith("Correction"):
+            title = "Correction"
+            cancelled = False
         qty_text = ("%g" % qty) + " " + unit
 
         def name(row):
