@@ -442,6 +442,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ko order me hi clarity chahiye; machine double-booking chupke na ho. Cancel par WIP me issue hua maal bhoolna nahi chahiye (CLAUDE.md §5: no hard delete).
 **How to apply:** Naya status (jaise Completed) aaye to `ACTIVE_STATUSES` (routes.py) me tay karo ki booking ginni hai ya nahi. Clash logic `_clashes` + JS `makePlanWidget.clashesFor` dono badlo (aur `order_rest_test.py` chalao).
 
+### Decision: Production queue — scheduler, RM check, Start (2026-10-19)
+**Date:** 2026-10-19
+**Kya:** Open orders ek queue (priority = queue_position). Dates scheduler se: stage sequential, machines ek baar me ek order ko, Mon–Sat. RM check queue order me soft reservation (stock -> Open/Partial PO -> buy). "Start production" order ko In production karta hai aur uski dates freeze. Manual start date ki jagah "Earliest start"; machine-clash/"Save anyway" hata diya.
+**Kyun:** User ne kaha order queue me hon, priority se chalen, har order par dikhe RM stock hai ya kharidna hai, aur estimated days list me dikhe. Recommended design user ne approve kiya (auto-dates, RM short par date PO tak khisake).
+**How to apply:** Naya status (jaise Completed) aaye to `OPEN_STATUSES` (scheduler.py) aur `ACTIVE_STATUSES` (routes.py) dono sochna. Scheduler / `materials.py` ka koi hisaab badlo to `queue_test.py` chalao. Material check abhi lock nahi karta (hard reservation baad me, agar zaroorat padi).
+
 ---
 
 ## Session Log

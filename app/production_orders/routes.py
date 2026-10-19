@@ -3,11 +3,12 @@
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import abort, Blueprint, flash, redirect, render_template, request, url_for
 from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
-from app.production_orders.planning import plan_stages, windows_overlap
+from app.production_orders.planning import plan_stages
+from app.production_orders.scheduler import OPEN_STATUSES, live_schedule, persist_schedule, queue_orders, renumber_queue, today_ist
 
 production_orders_bp = Blueprint("production_orders", __name__, template_folder="templates")
 
@@ -67,49 +68,24 @@ def read_plan(product, batch_kg, order_date, routing=None):
         if not machines:
             return None, f"Choose at least one machine for {stage['name']}."
         chosen.append({"stage_id": stage["stage_id"], "name": stage["name"], "machines": machines})
-    return plan_stages(batch_kg, chosen, start_date), None
+    plan = plan_stages(batch_kg, chosen, start_date)
+    plan["earliest_start"] = start_date
+    return plan, None
 
 
+# Cancel / reschedule sirf in status par (In production order frozen hai)
 ACTIVE_STATUSES = ("Draft", "Released")
 
 
-def _bookings(exclude_order_id=None):
-    """Kaun si machine kis din busy hai: {machine_id: [{order, stage, start, end}]} — sirf Draft / Released orders (Cancelled free).
-    Form ka JS isi se live warning dikhata hai, server bhi isi se save rokta hai."""
-    rows = (ProductionOrderStageMachine.query.join(ProductionOrderStage, ProductionOrderStageMachine.stage_id == ProductionOrderStage.id)
-            .join(ProductionOrder, ProductionOrderStage.production_order_id == ProductionOrder.id)
-            .filter(ProductionOrder.is_deleted == False, ProductionOrder.status.in_(ACTIVE_STATUSES),
-                    ProductionOrderStage.start_date.isnot(None)))
-    if exclude_order_id:
-        rows = rows.filter(ProductionOrder.id != exclude_order_id)
-    booked = {}
-    for row in rows.all():
-        stage = row.stage
-        booked.setdefault(row.machine_id, []).append({
-            "order": stage.production_order.prod_no, "stage": stage.stage_name,
-            "start": stage.start_date.isoformat(), "end": stage.end_date.isoformat()})
-    return booked
-
-
-def _clashes(plan, exclude_order_id=None):
-    # Plan ki har chuni machine ko doosre active orders ki booking se milao. Message order-wise ek line me
-    # ("PROD-2026-001: Flux Mixer 1, Melting Furnace 1 (19 Oct to 22 Oct)") — machine-wise 11 line ka message padhna mushkil hota hai.
-    booked = _bookings(exclude_order_id)
-    per_order = {}
-    for stage in plan["stages"]:
-        for machine in stage["machines"]:
-            for other in booked.get(machine["id"], []):
-                other_start = datetime.strptime(other["start"], "%Y-%m-%d").date()
-                other_end = datetime.strptime(other["end"], "%Y-%m-%d").date()
-                if windows_overlap(stage["start_date"], stage["end_date"], other_start, other_end):
-                    entry = per_order.setdefault(other["order"], {"machines": [], "start": other_start, "end": other_end})
-                    if machine["name"] not in entry["machines"]:
-                        entry["machines"].append(machine["name"])
-                    entry["start"] = min(entry["start"], other_start)
-                    entry["end"] = max(entry["end"], other_end)
-    return [f"{order_no} already uses {', '.join(info['machines'])} "
-            f"({info['start'].strftime('%d %b')} to {info['end'].strftime('%d %b %Y')})."
-            for order_no, info in per_order.items()]
+def _read_needed_by():
+    # "Needed by" optional date. (date, None) ya (None, "error"); khaali ho to (None, None)
+    raw = (request.form.get("needed_by") or "").strip()
+    if not raw:
+        return None, None
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date(), None
+    except ValueError:
+        return None, "Enter a valid 'needed by' date."
 
 
 def _save_plan(order, plan):
@@ -120,7 +96,8 @@ def _save_plan(order, plan):
             db.session.delete(machine)
         db.session.delete(old)
     db.session.flush()
-    order.planned_start_date = plan["start_date"]
+    order.earliest_start_date = plan["earliest_start"]
+    order.planned_start_date = plan["start_date"]        # ye purani / andaza dates hain; queue ke hisaab se persist_schedule() badal deta hai
     order.planned_end_date = plan["end_date"]
     order.planned_hours = plan["total_hours"]
     order.planned_days = plan["working_days"]
@@ -174,15 +151,19 @@ def _planner_products():
 
 @production_orders_bp.route("/production_orders")
 def production_orders_list():
-    # Open = Draft + Released (kaam chalu), Cancelled = alag tab (aage Completed bhi yahin judega)
+    # Open = queue me saare orders (Draft / Released / In production), Cancelled = alag tab (aage Completed bhi yahin judega)
     tab = request.args.get("tab", "open")
     if tab not in ("open", "cancelled"):
         tab = "open"
     base = ProductionOrder.query.filter(ProductionOrder.is_deleted == False)
-    open_count = base.filter(ProductionOrder.status.in_(ACTIVE_STATUSES)).count()
+    open_count = base.filter(ProductionOrder.status.in_(OPEN_STATUSES)).count()
     cancelled_count = base.filter(ProductionOrder.status == "Cancelled").count()
-    shown = base.filter(ProductionOrder.status == "Cancelled") if tab == "cancelled" else base.filter(ProductionOrder.status.in_(ACTIVE_STATUSES))
-    orders = shown.order_by(ProductionOrder.id.desc()).all()
+    # Queue + schedule + raw material ka live hisaab ek hi baar: list isi se dikhti hai
+    queue, materials, schedule = live_schedule()
+    if tab == "cancelled":
+        orders = base.filter(ProductionOrder.status == "Cancelled").order_by(ProductionOrder.id.desc()).all()
+    else:
+        orders = queue
     products, planner = _planner_products()
     # Reschedule ke liye har open order ka data: kaun se stages, kaun si machines chuni hain, batch KG
     resched = {}
@@ -201,8 +182,9 @@ def production_orders_list():
         else:
             routing = _routing_for(o.product) if o.product else []
             chosen = {}
+        earliest = o.earliest_start_date or o.planned_start_date or o.order_date
         resched[str(o.id)] = {"prod_no": o.prod_no, "batch_kg": o.planned_qty * o.unit_weight, "routing": routing, "chosen": chosen,
-                              "start": o.planned_start_date.isoformat() if o.planned_start_date else o.order_date.isoformat()}
+                              "start": earliest.isoformat(), "needed_by": o.needed_by_date.isoformat() if o.needed_by_date else ""}
     categories = (
         ProductCategories.query.filter(
             ProductCategories.is_deleted == False,
@@ -231,7 +213,9 @@ def production_orders_list():
         cancelled_count=cancelled_count,
         total_count=len(orders),
         result_count=len(orders),
-        bookings=_bookings(),
+        schedule=schedule,
+        materials=materials,
+        today=today_ist(),
         resched=resched,
         products=products,
         categories=categories,
@@ -289,11 +273,10 @@ def production_orders_add():
     if plan_error:
         flash(plan_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
-    if plan and not request.form.get("allow_clash"):
-        clashes = _clashes(plan)
-        if clashes:
-            flash("Machine clash: " + " ".join(clashes) + " Change the machines or the start date, or tick \"Save anyway\".", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
+    needed_by, needed_error = _read_needed_by()
+    if needed_error:
+        flash(needed_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
     year = order_date.year
     count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
     prod_no = f"PROD-{year}-{count + 1:03d}"
@@ -307,6 +290,9 @@ def production_orders_add():
         status="Draft",
         remarks=remarks,
         is_deleted=False,
+        needed_by_date=needed_by,
+        earliest_start_date=plan["earliest_start"] if plan else order_date,
+        queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
     )
     db.session.add(order)
     db.session.flush()
@@ -375,8 +361,9 @@ def production_orders_add():
             is_extra=True,
         ))
 
+    persist_schedule()
     db.session.commit()
-    flash(f"Production order {order.prod_no} saved.", "success")
+    flash(f"Production order {order.prod_no} saved and added to the end of the queue.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
 
 
@@ -416,8 +403,11 @@ def production_orders_cancel(order_id):
     order.status = "Cancelled"
     order.cancel_reason = reason[:255]
     order.cancelled_at = datetime.utcnow()
+    order.queue_position = None
+    renumber_queue()
+    persist_schedule()
     db.session.commit()
-    flash(f"Production order {order.prod_no} cancelled. Its machine booking is free again.", "success")
+    flash(f"Production order {order.prod_no} cancelled. Its place in the queue and its machines are free again.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
 
 
@@ -437,12 +427,78 @@ def production_orders_reschedule(order_id):
     if plan_error:
         flash(plan_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
-    if not request.form.get("allow_clash"):
-        clashes = _clashes(plan, exclude_order_id=order.id)
-        if clashes:
-            flash("Machine clash: " + " ".join(clashes) + " Change the machines or the start date, or tick \"Save anyway\".", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
+    needed_by, needed_error = _read_needed_by()
+    if needed_error:
+        flash(needed_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    order.needed_by_date = needed_by
     _save_plan(order, plan)
+    persist_schedule()
     db.session.commit()
-    flash(f"Plan updated for {order.prod_no}: ready by {plan['end_date'].strftime('%d %b %Y')}.", "success")
+    flash(f"Plan updated for {order.prod_no}. Its start and finish dates now come from its place in the queue.", "success")
+    return redirect(url_for("production_orders.production_orders_list"))
+
+
+@production_orders_bp.route("/production_orders/move/<int:order_id>/<direction>", methods=["POST"])
+def production_orders_move(order_id, direction):
+    # Queue me order ko upar / neeche / sabse aage karo. "In production" orders frozen hain (hamesha sabse aage), unhe nahi hilate.
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    if order.status not in ACTIVE_STATUSES:
+        flash("Only a draft or released order can be moved in the queue.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if direction not in ("up", "down", "first"):
+        abort(404)
+    waiting = [o for o in queue_orders() if o.status in ACTIVE_STATUSES]
+    index = waiting.index(order)
+    if direction == "first":
+        waiting.insert(0, waiting.pop(index))
+    elif direction == "up" and index > 0:
+        waiting[index - 1], waiting[index] = waiting[index], waiting[index - 1]
+    elif direction == "down" and index < len(waiting) - 1:
+        waiting[index + 1], waiting[index] = waiting[index], waiting[index + 1]
+    frozen = [o for o in queue_orders() if o.status == "In production"]
+    for position, item in enumerate(frozen + waiting, start=1):
+        item.queue_position = position
+    db.session.flush()
+    persist_schedule()
+    db.session.commit()
+    flash(f"{order.prod_no} is now number {order.queue_position} in the queue.", "success")
+    return redirect(url_for("production_orders.production_orders_list"))
+
+
+@production_orders_bp.route("/production_orders/start/<int:order_id>", methods=["POST"])
+def production_orders_start(order_id):
+    # Released order ko "In production" karo. Uski dates aaj se shuru hoke us waqt freeze ho jaati hain; baaki queue un ke aas-paas chalti hai.
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    if order.status != "Released":
+        flash("Only a released production order can be started.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if order.issue_status == "Not issued":
+        flash(f"Issue material for {order.prod_no} first (Material issue page), then start production.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if not order.stages:
+        flash("This order has no production plan (stages and machines). Add one with Reschedule first.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    today = today_ist()
+    # Is order ko frozen waalon ke turant baad rakh ke aaj se schedule karo, uski dates save karo
+    queue = queue_orders()
+    frozen = [o for o in queue if o.status == "In production"]
+    rest = [o for o in queue if o.status != "In production" and o.id != order.id]
+    ordered, _materials, schedule = live_schedule(today, frozen + [order] + rest, {order.id: today})
+    info = schedule.get(order.id)
+    if not info:
+        flash("This order's plan is incomplete (a stage has no machine capacity).", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    for stage, (start, end) in zip(order.stages, info["windows"]):
+        stage.start_date = start
+        stage.end_date = end
+    order.planned_start_date = info["start"]
+    order.planned_end_date = info["end"]
+    order.earliest_start_date = today
+    order.started_date = today
+    order.status = "In production"
+    renumber_queue()
+    persist_schedule(today)
+    db.session.commit()
+    flash(f"{order.prod_no} is now in production. Planned finish: {info['end'].strftime('%d %b %Y')}.", "success")
     return redirect(url_for("production_orders.production_orders_list"))

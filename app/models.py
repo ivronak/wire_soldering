@@ -684,6 +684,12 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     daily_capacity = db.Column(db.Float, nullable=True)          # roz ka maximum, KG (sabse dheeme stage se)
     bottleneck_stage = db.Column(db.String(100), nullable=True)  # kaunsa stage sabse dheema hai
 
+    # Queue: open orders ek line me chalte hain (1 = sabse pehle). Status: Draft -> Released -> In production -> (Completed baad me) / Cancelled.
+    queue_position = db.Column(db.Integer, nullable=True)
+    needed_by_date = db.Column(db.Date, nullable=True)           # client ko kab tak chahiye (optional); der hone par list me "Late" dikhta hai
+    earliest_start_date = db.Column(db.Date, nullable=True)      # isse pehle start nahi; asli start / end queue + machines + RM se nikalte hain
+    started_date = db.Column(db.Date, nullable=True)             # "Start production" dabane ka din
+
     # Cancel: order delete nahi hota, status "Cancelled" + wajah (audit trail ke liye)
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)

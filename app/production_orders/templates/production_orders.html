@@ -47,7 +47,7 @@
 <div class="flex items-center justify-between gap-3 shrink-0">
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Production orders</div>
-    <h1 class="text-[20px] font-bold text-ink leading-tight">Production orders</h1>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Production queue</h1>
   </div>
   <button type="button" id="btn-add-mo"
     class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
@@ -56,11 +56,13 @@
   </button>
 </div>
 
+{% macro date_short(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
+
 <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
   <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
     <a href="{{ url_for('production_orders.production_orders_list', tab='open') }}"
       class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'open' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
-      Open <span class="tabular-nums">({{ open_count }})</span>
+      Queue <span class="tabular-nums">({{ open_count }})</span>
     </a>
     <a href="{{ url_for('production_orders.production_orders_list', tab='cancelled') }}"
       class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'cancelled' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
@@ -68,29 +70,75 @@
     </a>
   </div>
   <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
-    Showing {{ result_count }} {{ 'cancelled' if tab == 'cancelled' else 'open' }} orders · Material lines are copied from the product recipe when you save
+    {% if tab == 'open' %}
+    Orders run in queue order (number 1 first). Use the arrows to change priority. Dates are worked out from the queue, the machines and the raw material in store; an order ahead in the queue gets the stock first.
+    {% else %}
+    Showing {{ result_count }} cancelled orders.
+    {% endif %}
   </div>
   <div class="flex-1 overflow-auto min-h-0">
     <table class="po-table">
       <colgroup>
-        <col style="width:12%" /><col style="width:10%" /><col style="width:23%" />
-        <col style="width:12%" /><col style="width:8%" /><col style="width:12%" /><col style="width:23%" />
+        <col style="width:7%" /><col style="width:12%" /><col style="width:17%" /><col style="width:9%" />
+        <col style="width:14%" /><col style="width:17%" /><col style="width:9%" /><col style="width:15%" />
       </colgroup>
       <thead>
         <tr>
-          <th>Order no.</th><th>Date</th><th>Product</th><th>Qty</th><th>Materials</th><th>Status</th><th>Actions</th>
+          <th>#</th><th>Order no.</th><th>Product</th><th>Qty</th><th>Raw material</th><th>Schedule</th><th>Status</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for o in orders %}
+        {% set sc = schedule.get(o.id) %}
+        {% set mat = materials.get(o.id) %}
         <tr>
-          <td class="font-mono font-semibold">{{ o.prod_no }}</td>
-          <td>{{ o.order_date.strftime('%d %b %Y') }}</td>
+          <td style="vertical-align:middle">
+            {% if o.status in ('Draft', 'Released') %}
+            <div class="font-mono font-bold text-[15px]">{{ o.queue_position }}</div>
+            <div class="flex items-center justify-center gap-0.5 mt-0.5">
+              {% for d, sym, tip in (('up', '↑', 'Move up'), ('down', '↓', 'Move down'), ('first', '⤒', 'Make first')) %}
+              <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction=d) }}" class="inline">
+                <button type="submit" title="{{ tip }}" aria-label="{{ tip }}" class="w-5 h-5 text-[12px] leading-none text-ink-faint border border-slate-300 rounded hover:bg-mist hover:text-ink">{{ sym }}</button>
+              </form>
+              {% endfor %}
+            </div>
+            {% elif o.status == 'In production' %}
+            <div class="font-mono font-bold text-[15px]">{{ o.queue_position }}</div>
+            <div class="text-[11px] text-ink-faint">running</div>
+            {% else %}<span class="text-ink-faint">—</span>{% endif %}
+          </td>
+          <td class="font-mono font-semibold">{{ o.prod_no }}
+            <div class="font-sans font-normal text-[11.5px] text-ink-faint">{{ o.order_date.strftime('%d %b %Y') }}</div>
+            {% if o.needed_by_date %}<div class="font-sans font-normal text-[11.5px] text-ink-faint">Needed by {{ o.needed_by_date.strftime('%d %b') }}</div>{% endif %}
+          </td>
           <td style="text-align:left">{{ o.product.code if o.product else '—' }} — {{ o.product.name if o.product else '—' }}</td>
-          <td class="font-mono">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.planned_end_date %}<div class="font-sans text-[11.5px] text-ink-faint">~{{ o.planned_hours|round(1) }} h · {{ o.planned_days }} working day{{ '' if o.planned_days == 1 else 's' }}<br>done by {{ o.planned_end_date.strftime('%d %b %Y') }}</div>{% endif %}</td>
-          <td>{{ o.lines|length }}</td>
-          <td><span class="status-pill">{{ o.status }}</span>{% if o.status == 'Cancelled' and o.cancelled_at %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.cancelled_at.strftime('%d %b %Y') }}</div>{% endif %}{% if o.status == 'Released' %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.issue_status }}</div>{% endif %}</td>
+          <td class="font-mono">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}</td>
           <td>
+            {% if o.status == 'Cancelled' or not mat %}<span class="text-ink-faint">—</span>
+            {% elif mat.status == 'buy' %}<span class="status-pill" style="background:#FEF2F2;border-color:#FCA5A5;color:#B91C1C">Need to buy</span>
+            {% elif mat.status == 'coming' %}<span class="status-pill" style="background:#FFFBEB;border-color:#FCD34D;color:#92400E">Short · PO coming</span>
+            {% else %}<span class="status-pill" style="background:#F0FDF4;border-color:#86EFAC;color:#15803D">{{ 'Issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
+            {% if mat and mat.status != 'ok' %}
+            <div class="text-[11.5px] text-ink-faint mt-0.5">
+              {% for l in mat.lines if l.buy > 0.000001 %}{{ l.code }} buy {{ '%.2f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}
+              {% if mat.status == 'coming' %}{% for l in mat.lines if l.from_po %}{% for po in l.from_po %}{{ po[0] }}{% if po[2] %} due {{ po[2].strftime('%d %b') }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+            </div>
+            {% endif %}
+          </td>
+          <td style="font-size:13px; line-height:1.35">
+            {% if o.status == 'Cancelled' %}<span class="text-ink-faint">—</span>
+            {% elif sc %}
+            <div>Starts <strong>{{ sc.start.strftime('%d %b') }}</strong></div>
+            <div>Ready by <strong>{{ sc.end.strftime('%d %b %Y') }}</strong></div>
+            <div class="text-[11.5px] text-ink-faint">~{{ (o.planned_hours or 0)|round(1) }} h · {{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }}</div>
+            {% if sc.waits_for_material %}<div class="text-[11.5px]" style="color:#92400E">Waits for material until {{ sc.waits_for_material.strftime('%d %b') }}</div>{% endif %}
+            {% if mat and mat.status == 'buy' %}<div class="text-[11.5px]" style="color:#B91C1C">Dates assume the material is bought in time</div>{% endif %}
+            {% if o.needed_by_date and sc.end > o.needed_by_date %}<div class="text-[11.5px] font-semibold" style="color:#B91C1C">Late by {{ (sc.end - o.needed_by_date).days }} day{{ '' if (sc.end - o.needed_by_date).days == 1 else 's' }}</div>{% endif %}
+            {% else %}<span class="text-ink-faint text-[12px]">No plan (set stages in Product Master)</span>{% endif %}
+          </td>
+          <td><span class="status-pill">{{ o.status }}</span>{% if o.status == 'Released' %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.issue_status }}</div>{% endif %}{% if o.status == 'In production' and o.started_date %}<div class="text-[11.5px] text-ink-faint mt-0.5">since {{ o.started_date.strftime('%d %b') }}</div>{% endif %}{% if o.status == 'Cancelled' and o.cancelled_at %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.cancelled_at.strftime('%d %b %Y') }}</div>{% endif %}</td>
+          <td>
+            <div class="flex flex-wrap items-center justify-center gap-1">
             {% if o.status == 'Draft' %}
             <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="inline js-confirm-submit"
                   data-confirm-title="Release production order" data-confirm-ok="Release"
@@ -99,41 +147,56 @@
             </form>
             {% elif o.status == 'Released' %}
             <a href="{{ url_for('material_issues.material_issues_list') }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Material issue</a>
+            <form method="post" action="{{ url_for('production_orders.production_orders_start', order_id=o.id) }}" class="inline js-confirm-submit"
+                  data-confirm-title="Start production" data-confirm-ok="Start"
+                  data-confirm-message="Start {{ o.prod_no }} now? Its dates are fixed from today and other orders in the queue are planned around it.">
+              <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Start</button>
+            </form>
+            {% elif o.status == 'In production' %}
+            <a href="{{ url_for('material_issues.material_issues_list') }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Material issue</a>
             {% endif %}
             {% if o.status in ('Draft', 'Released') %}
             <button type="button" class="btn-resched px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist" data-id="{{ o.id }}">Reschedule</button>
             <button type="button" class="btn-cancel-order px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel</button>
             {% endif %}
+            </div>
           </td>
         </tr>
         {% if o.status == 'Cancelled' and o.cancel_reason %}
         <tr>
-          <td colspan="7" style="text-align:left; background:#FEF2F2; font-size:12.5px; color:#B91C1C;"><strong>Cancelled:</strong> {{ o.cancel_reason }}</td>
+          <td colspan="8" style="text-align:left; background:#FEF2F2; font-size:12.5px; color:#B91C1C;"><strong>Cancelled:</strong> {{ o.cancel_reason }}</td>
         </tr>
         {% endif %}
         {% if o.stages %}
         <tr>
-          <td colspan="7" style="text-align:left; background:#F4F8FE; font-size:12.5px; color:#2B5FA8;">
+          <td colspan="8" style="text-align:left; background:#F4F8FE; font-size:12.5px; color:#2B5FA8;">
             <strong>Plan:</strong>
-            {% for st in o.stages %}{{ st.stage_name }} ({{ st.machines | map(attribute='machine_name') | join(', ') }}) {{ st.planned_hours|round(1) }} h{% if st.start_date %}, {{ st.start_date.strftime('%d %b') }}{% if st.end_date != st.start_date %}–{{ st.end_date.strftime('%d %b') }}{% endif %}{% endif %}{% if not loop.last %} → {% endif %}{% endfor %}
+            {% for st in o.stages %}{{ st.stage_name }} ({{ st.machines | map(attribute='machine_name') | join(', ') }}) {{ st.planned_hours|round(1) }} h{% if sc %}, {{ sc.windows[loop.index0][0].strftime('%d %b') }}{% if sc.windows[loop.index0][1] != sc.windows[loop.index0][0] %}–{{ sc.windows[loop.index0][1].strftime('%d %b') }}{% endif %}{% endif %}{% if not loop.last %} → {% endif %}{% endfor %}
             · slowest stage {{ o.bottleneck_stage }}, up to {{ '%.0f'|format(o.daily_capacity or 0) }} KG per day
           </td>
         </tr>
         {% endif %}
         {% if o.lines %}
         <tr>
-          <td colspan="7" style="text-align:left; background:#F8FAF9; font-size:13px; color:#3D5A5D;">
+          <td colspan="8" style="text-align:left; background:#F8FAF9; font-size:13px; color:#3D5A5D; line-height:1.7;">
             {% for line in o.lines %}
-              {{ line.raw_material.code if line.raw_material else '—' }}
+              {% set ml = mat.lines[loop.index0] if mat else None %}
+              <span style="white-space:nowrap">{{ line.raw_material.code if line.raw_material else '—' }}
               {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}
-              {% if line.is_extra %}(added){% else %}({{ '%.1f'|format(line.ratio_percent) }}%){% endif %}{% if o.status == 'Released' %} <span style="color:{{ '#15803D' if line.remaining_qty <= 0 else '#8A4A1C' }};">issued {{ '%.2f'|format(line.issued_qty) }}</span>{% endif %}{% if not loop.last %} · {% endif %}
+              {% if line.is_extra %}(added){% else %}({{ '%.1f'|format(line.ratio_percent) }}%){% endif %}
+              {% if o.status != 'Cancelled' and ml %}
+                {% if ml.issued_all %}<span style="color:#15803D">✓ issued</span>
+                {% elif ml.buy > 0.000001 or ml.from_po %}<span style="color:{{ '#B91C1C' if ml.buy > 0.000001 else '#92400E' }}">short {{ '%.2f'|format(ml.need - ml.from_stock) }}{% for po in ml.from_po %} — {{ po[0] }} {{ '%.2f'|format(po[1]) }}{% if po[2] %} due {{ po[2].strftime('%d %b') }}{% endif %}{% endfor %}{% if ml.buy > 0.000001 %} — buy {{ '%.2f'|format(ml.buy) }}{% endif %}</span>
+                {% else %}<span style="color:#15803D">✓ in stock</span>{% endif %}
+                {% if line.issued_qty > 0 and not ml.issued_all %}<span style="color:#8A4A1C">(issued {{ '%.2f'|format(line.issued_qty) }})</span>{% endif %}
+              {% endif %}</span>{% if not loop.last %} · {% endif %}
             {% endfor %}
           </td>
         </tr>
         {% endif %}
         {% else %}
         <tr>
-          <td colspan="7" style="text-align:center; padding:36px; color:#6B7F82;">No production orders yet. Create one from a product recipe.</td>
+          <td colspan="8" style="text-align:center; padding:36px; color:#6B7F82;">{{ 'No cancelled orders.' if tab == 'cancelled' else 'The queue is empty. Create a production order from a product recipe.' }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -225,10 +288,16 @@
       </table>
 
       <p class="form-section-title">Production plan</p>
-      <p class="text-[12.5px] text-ink-faint">The stages this product goes through, the machines to use at each stage, and how long it will take. The plan is an estimate from each machine's output per hour (set in Machines).</p>
+      <p class="text-[12.5px] text-ink-faint">The stages this product goes through, the machines to use at each stage, and how long it will take. The order joins the end of the queue; its exact start and finish dates are worked out from the queue after saving.</p>
       <div class="max-w-xs">
-        <label for="mo-start" class="block text-[12.5px] font-semibold text-ink mb-1">Planned start date</label>
+        <label for="mo-start" class="block text-[12.5px] font-semibold text-ink mb-1">Earliest start date</label>
         <input type="date" id="mo-start" name="start_date" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Not before this day. The real start comes from the queue.</p>
+      </div>
+      <div class="max-w-xs">
+        <label for="mo-needed" class="block text-[12.5px] font-semibold text-ink mb-1">Needed by (optional)</label>
+        <input type="date" id="mo-needed" name="needed_by" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        <p class="text-[11.5px] text-ink-faint mt-1">The list warns if the order will finish after this date.</p>
       </div>
       <div id="mo-plan" class="text-[13px] text-ink-faint">Select a product to see its stages.</div>
     </form>
@@ -245,13 +314,17 @@
   <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div><h2 class="text-[16px] font-bold text-ink">Reschedule <span id="rs-no"></span></h2>
-        <p class="text-[12.5px] text-ink-faint">Change the start date or the machines. Quantity and materials stay as they are.</p></div>
+        <p class="text-[12.5px] text-ink-faint">Change the earliest start, the needed-by date or the machines. Quantity and materials stay as they are. To change priority use the arrows in the queue.</p></div>
       <button type="button" id="rs-close" class="w-8 h-8 text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
     <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
       <div class="max-w-xs">
-        <label for="rs-start" class="block text-[12.5px] font-semibold text-ink mb-1">Planned start date</label>
+        <label for="rs-start" class="block text-[12.5px] font-semibold text-ink mb-1">Earliest start date</label>
         <input type="date" id="rs-start" name="start_date" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      </div>
+      <div class="max-w-xs">
+        <label for="rs-needed" class="block text-[12.5px] font-semibold text-ink mb-1">Needed by (optional)</label>
+        <input type="date" id="rs-needed" name="needed_by" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
       </div>
       <div id="rs-plan" class="text-[13px] text-ink-faint"></div>
     </form>
@@ -492,7 +565,6 @@
   // ---------- Production plan (kitne ghante / din, kab tak, machine clash) ----------
   // Formula app/production_orders/planning.py ka JS mirror: stage ek ke baad ek, stage ki capacity = chuni machines ka jod,
   // kaam ke din Monday-Saturday (Sunday off). Ek hi widget naye order form aur Reschedule dono me chalta hai.
-  var BOOKINGS = {{ bookings | tojson }};   // {machine_id: [{order, stage, start, end}]} — Draft / Released orders ki booking
   var RESCHED = {{ resched | tojson }};     // {order_id: {prod_no, batch_kg, routing, chosen, start}}
   var planBox = document.getElementById('mo-plan');
   var startInput = document.getElementById('mo-start');
@@ -594,29 +666,6 @@
         return { stage_id: stage.stage_id, name: stage.name, machines: machines };
       });
     };
-    // Dusre active orders ki booking se takrao (ownOrder = reschedule wale order ka no., use chhod do)
-    w.clashesFor = function (plan, chosen, ownOrder) {
-      var perOrder = {}, order = [];
-      plan.stages.forEach(function (row, i) {
-        if (!row.startIso) return;
-        chosen[i].machines.forEach(function (m) {
-          (BOOKINGS[String(m.id)] || []).forEach(function (b) {
-            if (b.order === ownOrder) return;
-            if (row.startIso <= b.end && b.start <= row.endIso) {
-              if (!perOrder[b.order]) { perOrder[b.order] = { machines: [], start: b.start, end: b.end }; order.push(b.order); }
-              var info = perOrder[b.order];
-              if (info.machines.indexOf(m.name) === -1) info.machines.push(m.name);
-              if (b.start < info.start) info.start = b.start;
-              if (b.end > info.end) info.end = b.end;
-            }
-          });
-        });
-      });
-      return order.map(function (no) {
-        var info = perOrder[no];
-        return esc(no) + ' already uses ' + info.machines.map(esc).join(', ') + ' (' + fmtShort(info.start) + ' to ' + fmtShort(info.end) + ').';
-      });
-    };
     w.sync = function (key, routing, chosenMap, batchKg, ownOrder) {
       if (String(w.key) !== String(key)) {
         w.key = key;
@@ -636,28 +685,17 @@
         cell.textContent = row.perHour > 0 ? row.hours + ' h' : 'pick a machine';
       });
       var summaryEl = box.querySelector('.plan-summary');
-      var allowBox = box.querySelector('.plan-allow');
-      var wasAllowed = !!(allowBox && allowBox.checked);
       var missing = plan.stages.filter(function (r) { return r.perHour <= 0; });
       if (missing.length) {
         w.clash = false;
         summaryEl.innerHTML = '<span class="text-stop">Choose at least one machine for: ' + missing.map(function (r) { return esc(r.name); }).join(', ') + '.</span>';
         return;
       }
-      var clashes = w.clashesFor(plan, chosen, ownOrder);
-      w.clash = clashes.length > 0;
+      // Start / finish date yahan nahi: wo queue me is order ki jagah, machines aur raw material se nikalti hai (save ke baad list me dikhti hai)
       summaryEl.innerHTML =
-        '<div>Total time: <strong>' + plan.totalHours + ' hours</strong> (' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's') + ', Sunday off)</div>' +
-        (plan.start && plan.end ? '<div>Starts <strong>' + fmtDate(plan.start) + '</strong> · ready by <strong>' + fmtDate(plan.end) + '</strong></div>' : '') +
+        '<div>Takes <strong>' + plan.totalHours + ' hours</strong> of work (' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's') + ', Sunday off) once it starts</div>' +
         '<div>Most you can make per day: <strong>' + plan.dailyCapacity + ' KG</strong> <span class="text-ink-faint">(slowest stage: ' + esc(plan.bottleneck) + ')</span></div>' +
-        (clashes.length ? '<div class="mt-2 rounded px-2.5 py-2 text-[12.5px]" style="background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;"><strong>Machine clash</strong><br>' + clashes.join('<br>') +
-          '<label class="mt-1.5 flex items-center gap-1.5 text-ink"><input type="checkbox" name="allow_clash" value="1" class="plan-allow"' + (wasAllowed ? ' checked' : '') + '> Save anyway (both orders will use the machine on the same day)</label></div>' : '');
-    };
-    // Submit se pehle: clash hai aur "Save anyway" tick nahi to rok do
-    w.blocked = function () {
-      if (!w.clash) return false;
-      var allowBox = box.querySelector('.plan-allow');
-      return !(allowBox && allowBox.checked);
+        '<div class="text-[12px] text-ink-faint">The start and finish dates follow this order\'s place in the queue.</div>';
     };
     return w;
   }
@@ -675,6 +713,7 @@
   function openModal() {
     document.getElementById('mo-date').value = todayIso();
     startInput.value = todayIso();
+    document.getElementById('mo-needed').value = '';
     mainPlan.reset('Select a product to see its stages.');
     categorySel.value = '';
     fillProducts();
@@ -766,6 +805,7 @@
       rsForm.action = '/production_orders/reschedule/' + id;
       document.getElementById('rs-no').textContent = data.prod_no;
       rsStart.value = data.start;
+      document.getElementById('rs-needed').value = data.needed_by || '';
       rsPlan.reset('');
       rsModal.style.display = 'flex'; rsModal.setAttribute('aria-hidden', 'false');
       rsRefresh();
@@ -776,12 +816,6 @@
     if (event.target.classList.contains('plan-machine')) rsRefresh();
   });
   ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', rsClose); });
-  rsForm.addEventListener('submit', function (event) {
-    if (rsPlan.blocked()) {
-      event.preventDefault();
-      showToast('A machine is already booked on those days. Change the machines or the date, or tick "Save anyway".', 'error');
-    }
-  });
 
   // ---------- Cancel order ----------
   var coModal = document.getElementById('co-modal');
@@ -802,10 +836,7 @@
       showToast('Choose the product first: pick the category and then every attribute.', 'error');
       return;
     }
-    if (mainPlan.blocked()) {
-      event.preventDefault();
-      showToast('A machine is already booked on those days. Change the machines or the date, or tick "Save anyway".', 'error');
-    }
+
   });
 </script>
 {% endblock %}

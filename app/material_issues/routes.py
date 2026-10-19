@@ -64,7 +64,7 @@ def material_issues_list():
     if tab != "completed":
         tab = "pending"
 
-    released = ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status == "Released").order_by(ProductionOrder.id.desc()).all()
+    released = ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status.in_(["Released", "In production"])).order_by(ProductionOrder.id.desc()).all()
     to_issue = [order for order in released if order.issue_status != "Fully issued"]
 
     base = MaterialIssue.query.filter(MaterialIssue.is_deleted == False)
@@ -88,7 +88,7 @@ def read_issue_form():
     order = db.session.get(ProductionOrder, order_id) if order_id else None
     if order is None or order.is_deleted:
         return None, "Production order not found."
-    if order.status != "Released":
+    if order.status not in ("Released", "In production"):
         return None, f"{order.prod_no} is not released yet. Release the production order first."
 
     try:

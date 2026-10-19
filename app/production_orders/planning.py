@@ -29,11 +29,6 @@ def add_working_days(start, count):
     return day
 
 
-def windows_overlap(a_start, a_end, b_start, b_end):
-    # Do date-windows (dono taraf inclusive) ek doosre se takraate hain ya nahi
-    return a_start <= b_end and b_start <= a_end
-
-
 def plan_stages(batch_kg, stages, start_date):
     """batch_kg: kitne KG banana hai. stages: [{"stage_id", "name", "machines": [{"id", "name", "per_hour", "hours_per_day"}]}] (order me).
     Wapas: dict — har stage ka hisaab, total ghante, kaam ke din, start / end date, roz ka maximum (KG) aur kaunsa stage dheema hai."""
