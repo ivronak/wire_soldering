@@ -77,6 +77,8 @@ def production_orders_list():
         products=products,
         categories=categories,
         planner=planner,
+        # Category ke attribute fields (order me): form me ek ke baad ek dropdown isi order me aate hain
+        category_fields={str(c.id): list(c.attribute_fields or []) for c in categories},
         material_options=material_options,
     )
 

@@ -121,7 +121,7 @@
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="mo-title" class="text-[16px] font-bold text-ink">New production order</h2>
-        <p class="text-[12.5px] text-ink-faint">Pick a category, then a product. Specs and materials show below.</p>
+        <p class="text-[12.5px] text-ink-faint">Pick a category, then choose each attribute one by one. Only the options that really exist are shown.</p>
       </div>
       <button type="button" id="btn-close-mo" class="w-8 h-8 text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -141,6 +141,11 @@
             {% endfor %}
           </select>
         </div>
+      </div>
+      <div id="mo-cascade-wrap" class="hidden">
+        <p class="text-[12.5px] font-semibold text-ink mb-1">Choose the product step by step</p>
+        <div id="mo-cascade" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+        <p id="mo-cascade-note" class="text-[12px] text-ink-faint mt-1.5"></p>
       </div>
       <div>
         <label for="mo-product" class="block text-[12.5px] font-semibold text-ink mb-1">Product *</label>
@@ -203,6 +208,7 @@
 <script>
   var planner = {{ planner | tojson }};
   var materialOptions = {{ material_options | tojson }};
+  var CATEGORY_FIELDS = {{ category_fields | tojson }};   // {category_id: ["Alloy grade", "Thickness", ...]} (order me)
   var byId = {};
   planner.forEach(function (p) { byId[String(p.id)] = p; });
 
@@ -265,22 +271,128 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
   }
-  function fillProducts() {
-    var categoryId = categorySel.value;
-    var matches = planner.filter(function (p) { return String(p.category_id) === String(categoryId); });
+  // ---------- Product ka cascade: category -> attribute 1 -> attribute 2 -> ... ----------
+  // Har step ke options sirf wahi hain jo pichhle chune hue attributes wale products me maujood hain.
+  // Jaise Alloy 60/40 chuna to Thickness me sirf 60/40 ke products ki thickness aayengi.
+  var cascadeWrap = document.getElementById('mo-cascade-wrap');
+  var cascadeBox = document.getElementById('mo-cascade');
+  var cascadeNote = document.getElementById('mo-cascade-note');
+  var NOT_SET = '__not_set__';
+
+  function attrValue(product, field) {
+    var value = (product.attributes || {})[field];
+    return (value === undefined || value === null || String(value).trim() === '') ? NOT_SET : String(value);
+  }
+  function categoryProducts() {
+    return planner.filter(function (p) { return String(p.category_id) === String(categorySel.value); });
+  }
+  function matchingProducts(fields, chosen) {
+    // chosen[i] = field i ki chuni hui value (ya undefined)
+    return categoryProducts().filter(function (p) {
+      return chosen.every(function (value, i) { return value === undefined || attrValue(p, fields[i]) === value; });
+    });
+  }
+  function naturalSort(a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  }
+  function optionValues(fields, chosen, index) {
+    var seen = {};
+    matchingProducts(fields, chosen.slice(0, index)).forEach(function (p) { seen[attrValue(p, fields[index])] = true; });
+    return Object.keys(seen).sort(naturalSort);
+  }
+  function setProductChoices(products, message) {
+    // Final product dropdown: ek hi product bacha to wahi (chuna hua), kai bache to unme se chuno, koi nahi to disabled
     productSel.innerHTML = '';
     var blank = document.createElement('option');
     blank.value = '';
-    blank.textContent = categoryId ? (matches.length ? 'Select product' : 'No products in this category') : 'Select a category first';
+    blank.textContent = message;
     productSel.appendChild(blank);
-    matches.forEach(function (p) {
+    products.forEach(function (p) {
       var opt = document.createElement('option');
       opt.value = String(p.id);
       opt.textContent = p.code + ' — ' + p.name;
       productSel.appendChild(opt);
     });
-    productSel.disabled = !categoryId || !matches.length;
+    productSel.disabled = products.length === 0;
+    if (products.length === 1) productSel.value = String(products[0].id);
   }
+  function stepSelectHtml(index, field, values) {
+    var options = '<option value="">Select ' + esc(field) + '</option>' + values.map(function (v) {
+      return '<option value="' + esc(v) + '">' + (v === NOT_SET ? '(not set)' : esc(v)) + '</option>';
+    }).join('');
+    return '<div class="cascade-step" data-index="' + index + '">' +
+      '<label class="block text-[12.5px] font-semibold text-ink mb-1">' + (index + 1) + '. ' + esc(field) + ' *</label>' +
+      '<select class="cascade-select w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">' + options + '</select></div>';
+  }
+  function updateCascade(fromIndex) {
+    // fromIndex tak ke steps rakho (unki chuni value ke saath), usse aage ke steps hata ke naye sire se banao
+    var fields = CATEGORY_FIELDS[categorySel.value] || [];
+    var steps = Array.prototype.slice.call(cascadeBox.querySelectorAll('.cascade-step'));
+    steps.forEach(function (step) { if (parseInt(step.getAttribute('data-index'), 10) > fromIndex) step.remove(); });
+    var chosen = [];
+    cascadeBox.querySelectorAll('.cascade-select').forEach(function (select) { chosen.push(select.value === '' ? undefined : select.value); });
+
+    var filled = chosen.length > 0 && chosen.every(function (v) { return v !== undefined; });
+    var matches = matchingProducts(fields, chosen);
+    cascadeNote.textContent = '';
+
+    if (!filled) {
+      setProductChoices([], 'Choose the attributes above');
+      return;
+    }
+    if (matches.length === 0) {
+      setProductChoices([], 'No product matches');
+      cascadeNote.textContent = 'No product has this combination.';
+      return;
+    }
+    if (matches.length === 1 || chosen.length >= fields.length) {
+      setProductChoices(matches, matches.length === 1 ? '' : 'Select product');
+      if (matches.length === 1) {
+        cascadeNote.textContent = chosen.length < fields.length ? 'Only one product matches, so the rest is decided: ' + matches[0].name : 'Product found: ' + matches[0].name;
+      }
+      return;
+    }
+    // Abhi kai products bache hain aur attributes baaki: agla step banao
+    var next = chosen.length;
+    var values = optionValues(fields, chosen, next);
+    cascadeBox.insertAdjacentHTML('beforeend', stepSelectHtml(next, fields[next], values));
+    setProductChoices([], 'Choose the attributes above');
+    if (values.length === 1) {
+      // Sirf ek hi option hai to khud chun do aur aage badho
+      var select = cascadeBox.querySelector('.cascade-step[data-index="' + next + '"] .cascade-select');
+      select.value = values[0];
+      updateCascade(next);
+    }
+  }
+  function fillProducts() {
+    // Category badli: cascade naye sire se
+    var categoryId = categorySel.value;
+    var fields = CATEGORY_FIELDS[categoryId] || [];
+    var products = categoryProducts();
+    cascadeBox.innerHTML = '';
+    cascadeNote.textContent = '';
+    cascadeWrap.classList.toggle('hidden', !(categoryId && fields.length && products.length));
+
+    if (!categoryId) { setProductChoices([], 'Select a category first'); productSel.disabled = true; return; }
+    if (!products.length) { setProductChoices([], 'No products in this category'); productSel.disabled = true; return; }
+    if (!fields.length) {
+      // Is category me attributes define nahi: seedha product list (purana tarika)
+      setProductChoices(products, 'Select product');
+      return;
+    }
+    var values = optionValues(fields, [], 0);
+    cascadeBox.insertAdjacentHTML('beforeend', stepSelectHtml(0, fields[0], values));
+    setProductChoices([], 'Choose the attributes above');
+    if (values.length === 1) {
+      cascadeBox.querySelector('.cascade-select').value = values[0];
+      updateCascade(0);
+    }
+  }
+  cascadeBox.addEventListener('change', function (event) {
+    if (!event.target.classList.contains('cascade-select')) return;
+    updateCascade(parseInt(event.target.closest('.cascade-step').getAttribute('data-index'), 10));
+    refreshPlan();
+  });
   function renderAttrs(product) {
     var attrs = (product && product.attributes) || {};
     var keys = Object.keys(attrs);
@@ -373,5 +485,11 @@
   document.getElementById('btn-add-extra').addEventListener('click', addExtraLine);
   qtyInput.addEventListener('input', refreshPlan);
   weightInput.addEventListener('input', refreshPlan);
+  document.getElementById('mo-form').addEventListener('submit', function (event) {
+    if (!productSel.value) {
+      event.preventDefault();
+      showToast('Choose the product first: pick the category and then every attribute.', 'error');
+    }
+  });
 </script>
 {% endblock %}
