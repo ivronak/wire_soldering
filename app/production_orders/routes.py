@@ -8,6 +8,8 @@ from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
 from app.production_orders.planning import plan_stages
+from app.inventory.alerts import store_stock_by_material
+from app.production_orders.timeline import build_timeline
 from app.production_orders.scheduler import OPEN_STATUSES, live_schedule, persist_schedule, queue_orders, renumber_queue, today_ist
 
 production_orders_bp = Blueprint("production_orders", __name__, template_folder="templates")
@@ -153,8 +155,9 @@ def _planner_products():
 def production_orders_list():
     # Open = queue me saare orders (Draft / Released / In production), Cancelled = alag tab (aage Completed bhi yahin judega)
     tab = request.args.get("tab", "open")
-    if tab not in ("open", "cancelled"):
+    if tab not in ("open", "timeline", "cancelled"):
         tab = "open"
+    by = "machine" if request.args.get("by") == "machine" else "order"
     base = ProductionOrder.query.filter(ProductionOrder.is_deleted == False)
     open_count = base.filter(ProductionOrder.status.in_(OPEN_STATUSES)).count()
     cancelled_count = base.filter(ProductionOrder.status == "Cancelled").count()
@@ -164,6 +167,20 @@ def production_orders_list():
         orders = base.filter(ProductionOrder.status == "Cancelled").order_by(ProductionOrder.id.desc()).all()
     else:
         orders = queue
+    today = today_ist()
+    # Upar ke chhote cards (KPI): kitne chal rahe, kitno ko material chahiye, kitne der se
+    kpi = {"running": len([o for o in queue if o.status == "In production"]),
+           "material": len([o for o in queue if materials.get(o.id, {}).get("status") in ("coming", "buy")]),
+           "buy": len([o for o in queue if materials.get(o.id, {}).get("status") == "buy"]),
+           "late": len([o for o in queue if o.needed_by_date and schedule.get(o.id) and schedule[o.id]["end"] > o.needed_by_date])}
+    # "In production" order ka progress % (aaj kitna din beet chuka us ke start se end tak)
+    progress = {}
+    for o in queue:
+        info = schedule.get(o.id)
+        if o.status == "In production" and info:
+            total = max((info["end"] - info["start"]).days + 1, 1)
+            progress[o.id] = int(min(max((today - info["start"]).days + 1, 0) / total, 1) * 100)
+    timeline = build_timeline(queue, schedule, today, by) if tab == "timeline" else None
     products, planner = _planner_products()
     # Reschedule ke liye har open order ka data: kaun se stages, kaun si machines chuni hain, batch KG
     resched = {}
@@ -215,7 +232,12 @@ def production_orders_list():
         result_count=len(orders),
         schedule=schedule,
         materials=materials,
-        today=today_ist(),
+        today=today,
+        kpi=kpi,
+        progress=progress,
+        timeline=timeline,
+        by=by,
+        store_stock={str(k): v for k, v in store_stock_by_material().items()},
         resched=resched,
         products=products,
         categories=categories,

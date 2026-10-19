@@ -3,352 +3,509 @@
 
 {% block page_css %}
 <style>
-  .po-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .po-table thead th {
-    position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D;
-    font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
-    padding: 12px 14px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9;
+  /* Production queue UI — card rows (Linear / Asana jaise grouped list), Timeline (Gantt), do-column create drawer (summary card) */
+  .po-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .po-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .po-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .po-kpi .h { font-size: 12px; color: #6B7F82; }
+  .po-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .po-kpi.warn .v { color: #8A4A1C; }
+  .po-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .po-kpi.bad .v { color: #B42318; }
+  .po-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .po-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .po-tabs a:hover { color: #0F2F32; }
+  .po-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .po-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
+  .po-group { display: flex; align-items: center; gap: 8px; padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; }
+  .po-group b { background: #E9EEED; color: #3D5A5D; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  .po-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; transition: box-shadow .15s, border-color .15s; }
+  .po-card:hover { border-color: #BFC9C8; box-shadow: 0 2px 8px rgba(15,47,50,.07); }
+  .po-card.is-run { border-left: 4px solid #C46B2D; }
+  .po-row { display: grid; grid-template-columns: 62px minmax(220px, 1.6fr) minmax(150px, 1fr) minmax(210px, 1.3fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px; cursor: pointer; }
+  .po-pos { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .po-pos .n { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #8A4A1C; line-height: 1.2; }
+  .po-pos button { width: 24px; height: 16px; line-height: 1; font-size: 11px; color: #98A5A4; border-radius: 4px; border: 0; background: transparent; }
+  .po-pos button:hover { background: #FBF4EE; color: #8A4A1C; }
+  .po-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .po-prod { font-size: 13.5px; color: #1C2B2D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .po-meta { font-size: 12px; color: #6B7F82; }
+  .po-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .po-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .po-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .po-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .po-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .po-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  .po-chip.rel { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .po-chip.draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .po-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .po-dates { font-size: 14px; font-weight: 700; color: #0F2F32; white-space: nowrap; }
+  .po-dates span { color: #98A5A4; font-weight: 500; margin: 0 4px; }
+  .po-bar { height: 6px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 7px; }
+  .po-bar div { height: 100%; background: #C46B2D; border-radius: 999px; }
+  .po-act { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .po-btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .po-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .po-btn.primary:hover { background: #A35522; }
+  .po-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .po-btn.teal:hover { background: #1F5558; }
+  .po-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .po-btn.ghost:hover { background: #F4F6F5; }
+  .po-menu { position: relative; }
+  .po-menu summary { list-style: none; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #D1D9D8; color: #3D5A5D; background: #fff; font-size: 18px; line-height: 1; }
+  .po-menu summary::-webkit-details-marker { display: none; }
+  .po-menu summary:hover { background: #F4F6F5; }
+  .po-menu .items { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 190px; background: #fff; border: 1px solid #D1D9D8; border-radius: 10px; box-shadow: 0 8px 24px rgba(15,47,50,.15); padding: 5px; }
+  .po-menu .items button, .po-menu .items a { display: block; width: 100%; text-align: left; padding: 8px 10px; font-size: 13.5px; color: #1C2B2D; border: 0; background: transparent; border-radius: 6px; cursor: pointer; text-decoration: none; }
+  .po-menu .items button:hover, .po-menu .items a:hover { background: #F4F6F5; }
+  .po-menu .items .danger { color: #B42318; } .po-menu .items .danger:hover { background: #FDECEC; }
+  .po-chev { border: 0; background: transparent; color: #98A5A4; font-size: 13px; transition: transform .15s; cursor: pointer; }
+  .po-card.is-open .po-chev { transform: rotate(180deg); }
+  .po-detail { display: none; border-top: 1px solid #E4EAE9; background: #F8FAF9; border-radius: 0 0 12px 12px; padding: 14px 16px; }
+  .po-card.is-open .po-detail { display: block; }
+  .po-detail h4 { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; margin-bottom: 8px; }
+  .po-stage { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed #DDE5E4; font-size: 13.5px; }
+  .po-stage:last-child { border-bottom: 0; }
+  .po-stage .i { width: 22px; height: 22px; border-radius: 50%; background: #E3F1F1; color: #1F5E61; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+  .po-mat { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px dashed #DDE5E4; font-size: 13.5px; }
+  .po-mat:last-child { border-bottom: 0; }
+  .po-foot { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #E4EAE9; font-size: 12.5px; color: #3D5A5D; }
+  .po-foot b { color: #0F2F32; }
+  .po-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .po-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) {
+    .po-row { grid-template-columns: 56px 1fr auto 28px; }
+    .po-row .po-mcol, .po-row .po-scol { grid-column: 2 / 4; }
   }
-  .po-table thead th:first-child, .po-table tbody td:first-child { text-align: left; padding-left: 18px; }
-  .po-table thead th:last-child { border-right: none; }
-  .po-table tbody td {
-    padding: 11px 14px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle;
-  }
-  .po-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .po-table tbody tr:hover { background: #FBF4EE; }
+  /* Timeline (Gantt) */
+  .po-tl { --dw: 92px; --lw: 210px; background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; overflow: hidden; }
+  .po-tl-scroll { overflow: auto; position: relative; max-height: calc(100vh - 330px); min-height: 220px; }
+  .po-tl-inner { position: relative; }
+  .po-tl-head { position: sticky; top: 0; z-index: 6; background: #F4F6F5; }
+  .po-tl-line { display: flex; }
+  .po-tl-lab { flex: none; width: var(--lw); position: sticky; left: 0; z-index: 5; background: #fff; border-right: 1px solid #D1D9D8; padding: 9px 12px; display: flex; flex-direction: column; justify-content: center; }
+  .po-tl-head .po-tl-lab { background: #F4F6F5; z-index: 7; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .po-tl-cell { flex: none; width: var(--dw); text-align: center; font-size: 12px; color: #3D5A5D; padding: 5px 0; border-left: 1px solid #E4EAE9; }
+  .po-tl-cell b { display: block; font-size: 14px; color: #0F2F32; }
+  .po-tl-cell.wk { border-left: 1px solid #BFC9C8; }
+  .po-tl-cell.today { background: #FBF4EE; } .po-tl-cell.today b { color: #C46B2D; }
+  .po-tl-month { flex: none; text-align: left; padding: 6px 10px; font-size: 11.5px; font-weight: 700; color: #3D5A5D; border-left: 1px solid #BFC9C8; border-bottom: 1px solid #E4EAE9; background: #EEF2F1; white-space: nowrap; }
+  .po-tl-track { position: relative; flex: none; height: 50px; border-bottom: 1px solid #EDF1F0; background-image: linear-gradient(to right, #EEF2F1 1px, transparent 1px); background-size: var(--dw) 100%; }
+  .po-tl-bar { position: absolute; top: 8px; height: 34px; border-radius: 7px; border: 1px solid; padding: 3px 7px; font-size: 12px; font-weight: 600; line-height: 1.15; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; flex-direction: column; justify-content: center; }
+  .po-tl-bar small { font-weight: 500; font-size: 10.5px; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+  .po-tl-now { position: absolute; top: 0; bottom: 0; width: 2px; background: #C46B2D; opacity: .55; z-index: 4; pointer-events: none; }
+  .po-tl-need { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed #B42318; z-index: 3; }
+  .po-tl-need em { position: absolute; top: 1px; left: 3px; font-style: normal; font-size: 9.5px; font-weight: 700; color: #B42318; background: #fff; padding: 0 3px; border-radius: 3px; }
+  /* Create drawer */
+  .po-step { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .po-step-h { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+  .po-step-n { width: 24px; height: 24px; border-radius: 50%; background: #FBF4EE; color: #8A4A1C; border: 1px solid #E8C9A8; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; margin-top: 1px; }
+  .po-step-h h3 { font-size: 15px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .po-step-h p { font-size: 12.5px; color: #6B7F82; margin-top: 1px; }
+  .po-side { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 16px; position: sticky; top: 0; align-self: start; }
+  .po-side .row { padding: 9px 0; border-bottom: 1px dashed #E1E8E7; font-size: 13.5px; }
+  .po-side .row:last-child { border-bottom: 0; }
+  .po-side .lab { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; margin-bottom: 2px; }
   #mo-modal.hidden { display: none; }
   #mo-modal { display: flex; }
-  .form-section-title {
-    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8A4A1C;
-  }
+  .form-section-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8A4A1C; }
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .lines-table th {
-    background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase;
-    padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left;
-  }
-  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
-  .status-pill {
-    display: inline-flex; align-items: center; font-size: 12px; font-weight: 600;
-    padding: 3px 9px; border-radius: 999px; border: 1px solid #E2E8F0; background: #F1F5F9; color: #475569;
-  }
-  .attr-chip {
-    display: inline-flex; align-items: stretch; margin: 3px 6px 3px 0;
-    border: 1px solid #D1D9D8; border-radius: 6px; overflow: hidden; background: #fff; line-height: 1;
-  }
-  .attr-chip .attr-k {
-    padding: 5px 7px; background: #EEF2F1; border-right: 1px solid #D1D9D8;
-    color: #3D5A5D; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
-  }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 8px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 7px 8px; border: 1px solid #E2E8E7; }
+  .attr-chip { display: inline-flex; align-items: stretch; margin: 3px 6px 3px 0; border: 1px solid #D1D9D8; border-radius: 6px; overflow: hidden; background: #fff; line-height: 1; }
+  .attr-chip .attr-k { padding: 5px 7px; background: #EEF2F1; border-right: 1px solid #D1D9D8; color: #3D5A5D; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   .attr-chip .attr-v { padding: 5px 9px; color: #0F2F32; font-size: 12.5px; font-weight: 600; }
+  .po-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .po-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .po-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between gap-3 shrink-0">
+{% macro dshort(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
+
+{% macro status_chip(o) %}
+  {% if o.status == 'In production' %}<span class="po-chip run"><i></i>In production</span>
+  {% elif o.status == 'Released' %}<span class="po-chip rel"><i></i>Released</span>
+  {% elif o.status == 'Draft' %}<span class="po-chip draft"><i></i>Draft</span>
+  {% else %}<span class="po-chip gone"><i></i>{{ o.status }}</span>{% endif %}
+{% endmacro %}
+
+{% macro order_card(o) %}
+  {% set sc = schedule.get(o.id) %}
+  {% set mat = materials.get(o.id) %}
+  {% set late_days = (sc.end - o.needed_by_date).days if (sc and o.needed_by_date and sc.end > o.needed_by_date) else 0 %}
+  <article class="po-card {{ 'is-run' if o.status == 'In production' else '' }}">
+    <div class="po-row">
+      <div class="po-pos">
+        {% if o.status in ('Draft', 'Released') %}
+        <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='up') }}"><button type="submit" title="Move up (higher priority)" aria-label="Move up">▲</button></form>
+        <div class="n">{{ o.queue_position }}</div>
+        <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='down') }}"><button type="submit" title="Move down" aria-label="Move down">▼</button></form>
+        {% elif o.status == 'In production' %}
+        <div class="n">{{ o.queue_position }}</div>
+        {% else %}<div class="n" style="color:#98A5A4">—</div>{% endif %}
+      </div>
+
+      <div style="min-width:0">
+        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}</div>
+        <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
+        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}</div>
+      </div>
+
+      <div class="po-mcol">
+        {% if o.status == 'Cancelled' or not mat %}<span class="po-meta">—</span>
+        {% elif mat.status == 'buy' %}<span class="po-chip bad"><i></i>Need to buy</span>
+        {% elif mat.status == 'coming' %}<span class="po-chip warn"><i></i>PO coming</span>
+        {% else %}<span class="po-chip ok"><i></i>{{ 'Material issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
+        {% if mat and mat.status == 'buy' %}
+        <div class="po-meta mt-1">{% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} −{{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        {% elif mat and mat.status == 'coming' %}
+        <div class="po-meta mt-1">{% for l in mat.lines if l.from_po %}{% for po in l.from_po %}{{ po[0] }}{% if po[2] %} · {{ dshort(po[2]) }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        {% endif %}
+      </div>
+
+      <div class="po-scol">
+        {% if o.status == 'Cancelled' %}
+        <div class="po-meta">Cancelled {{ o.cancelled_at.strftime('%d %b %Y') if o.cancelled_at else '' }}</div>
+        {% elif sc %}
+        <div class="po-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
+        <div class="po-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · ~{{ (o.planned_hours or 0)|round(0)|int }} h</div>
+        {% if o.status == 'In production' %}<div class="po-bar" title="{{ progress.get(o.id, 0) }}% of the planned time has passed"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>{% endif %}
+        <div class="flex flex-wrap gap-1 mt-1.5">
+          {% if late_days %}<span class="po-chip bad"><i></i>Late {{ late_days }}d · needed {{ dshort(o.needed_by_date) }}</span>
+          {% elif o.needed_by_date %}<span class="po-chip ok"><i></i>On time · needed {{ dshort(o.needed_by_date) }}</span>{% endif %}
+          {% if sc.waits_for_material %}<span class="po-chip warn"><i></i>Waits for material till {{ dshort(sc.waits_for_material) }}</span>{% endif %}
+        </div>
+        {% else %}<span class="po-meta">No plan · set stages in Product Master</span>{% endif %}
+      </div>
+
+      <div class="po-act">
+        {% if o.status == 'Draft' %}
+        <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
+              data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
+          <button type="submit" class="po-btn teal">Release</button></form>
+        {% elif o.status == 'Released' %}
+        <form method="post" action="{{ url_for('production_orders.production_orders_start', order_id=o.id) }}" class="js-confirm-submit"
+              data-confirm-title="Start production" data-confirm-ok="Start" data-confirm-message="Start {{ o.prod_no }} now? Its dates are fixed from today and other orders in the queue are planned around it.">
+          <button type="submit" class="po-btn primary">Start</button></form>
+        {% elif o.status == 'In production' %}
+        <a href="{{ url_for('material_issues.material_issues_list') }}" class="po-btn ghost">Material issue</a>
+        {% endif %}
+        {% if o.status in ('Draft', 'Released') %}
+        <details class="po-menu"><summary aria-label="More actions">⋯</summary>
+          <div class="items">
+            {% if o.status == 'Released' %}<a href="{{ url_for('material_issues.material_issues_list') }}">Issue material</a>{% endif %}
+            <button type="button" class="btn-resched" data-id="{{ o.id }}">Reschedule / change machines</button>
+            <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><button type="submit">Make first in queue</button></form>
+            <button type="button" class="btn-cancel-order danger" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>
+          </div>
+        </details>
+        {% endif %}
+      </div>
+      <button type="button" class="po-chev" aria-label="Show details">▾</button>
+    </div>
+
+    <div class="po-detail">
+      {% if o.status == 'Cancelled' and o.cancel_reason %}
+      <div class="mb-3 text-[13px]" style="color:#B42318"><b>Cancelled:</b> {{ o.cancel_reason }}</div>
+      {% endif %}
+      <div class="grid gap-6 md:grid-cols-2">
+        <div>
+          <h4>Production plan</h4>
+          {% for st in o.stages %}
+          <div class="po-stage">
+            <span class="i">{{ loop.index }}</span>
+            <div style="flex:1;min-width:0"><div class="font-semibold text-ink">{{ st.stage_name }}</div>
+              <div class="po-meta">{{ st.machines | map(attribute='machine_name') | join(', ') }}</div></div>
+            <div class="text-right"><div class="font-semibold">{{ st.planned_hours|round(1) }} h</div>
+              {% if sc %}{% set w = sc.windows[loop.index0] %}<div class="po-meta">{{ dshort(w[0]) }}{% if w[1] != w[0] %}–{{ dshort(w[1]) }}{% endif %}</div>{% endif %}</div>
+          </div>
+          {% else %}<div class="po-meta">No production stages for this order.</div>{% endfor %}
+        </div>
+        <div>
+          <h4>Raw material</h4>
+          {% for line in o.lines %}
+          {% set ml = mat.lines[loop.index0] if mat else None %}
+          <div class="po-mat">
+            <div style="min-width:0"><div class="font-semibold text-ink">{{ line.raw_material.name if line.raw_material else '—' }}{% if line.is_extra %} <span class="po-meta">(added)</span>{% endif %}</div>
+              <div class="po-meta">{{ line.raw_material.code if line.raw_material else '' }} · need {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}{% if line.issued_qty > 0 %} · issued {{ '%.2f'|format(line.issued_qty) }}{% endif %}</div></div>
+            {% if o.status != 'Cancelled' and ml %}
+              {% if ml.issued_all %}<span class="po-chip ok"><i></i>Issued</span>
+              {% elif ml.buy > 0.000001 %}<span class="po-chip bad" title="{% for po in ml.from_po %}{{ po[0] }} {{ '%.2f'|format(po[1]) }}; {% endfor %}"><i></i>Buy {{ '%.2f'|format(ml.buy) }}</span>
+              {% elif ml.from_po %}<span class="po-chip warn"><i></i>{{ ml.from_po[0][0] }}{% if ml.from_po[0][2] %} · {{ dshort(ml.from_po[0][2]) }}{% endif %}</span>
+              {% else %}<span class="po-chip ok"><i></i>In stock</span>{% endif %}
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="po-foot">
+        {% if o.daily_capacity %}<span>Max per day <b>{{ '%.0f'|format(o.daily_capacity) }} KG</b> (slowest: {{ o.bottleneck_stage }})</span>{% endif %}
+        {% if o.earliest_start_date %}<span>Earliest start <b>{{ dshort(o.earliest_start_date) }}</b></span>{% endif %}
+        {% if o.needed_by_date %}<span>Needed by <b>{{ dshort(o.needed_by_date) }}</b></span>{% endif %}
+        {% if o.started_date %}<span>Started <b>{{ dshort(o.started_date) }}</b></span>{% endif %}
+        {% if o.remarks %}<span>Remarks: <b>{{ o.remarks }}</b></span>{% endif %}
+      </div>
+    </div>
+  </article>
+{% endmacro %}
+
+<div class="flex flex-wrap items-end justify-between gap-3 shrink-0">
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Production orders</div>
-    <h1 class="text-[20px] font-bold text-ink leading-tight">Production queue</h1>
+    <h1 class="text-[22px] font-bold text-ink leading-tight">Production queue</h1>
+    <p class="text-[13px] text-ink-faint">Orders run top to bottom. Dates come from the queue, the machines and the raw material in store.</p>
   </div>
-  <button type="button" id="btn-add-mo"
-    class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-    New production order
+  <button type="button" id="btn-add-mo" class="po-btn primary" style="padding:10px 18px;font-size:14px;box-shadow:0 1px 2px rgba(15,47,50,.2)">
+    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>New production order
   </button>
 </div>
 
-{% macro date_short(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="po-kpi"><span class="k">In the queue</span><span class="v">{{ open_count }}</span><span class="h">{{ open_count - kpi.running }} waiting to start</span></div>
+  <div class="po-kpi {{ 'warn' if kpi.running else '' }}"><span class="k">In production</span><span class="v">{{ kpi.running }}</span><span class="h">dates are fixed</span></div>
+  <div class="po-kpi {{ 'bad' if kpi.buy else ('warn' if kpi.material else '') }}"><span class="k">Need material</span><span class="v">{{ kpi.material }}</span><span class="h">{{ kpi.buy }} need buying</span></div>
+  <div class="po-kpi {{ 'bad' if kpi.late else '' }}"><span class="k">Running late</span><span class="v">{{ kpi.late }}</span><span class="h">after the needed-by date</span></div>
+</div>
 
-<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
-  <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
-    <a href="{{ url_for('production_orders.production_orders_list', tab='open') }}"
-      class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'open' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
-      Queue <span class="tabular-nums">({{ open_count }})</span>
-    </a>
-    <a href="{{ url_for('production_orders.production_orders_list', tab='cancelled') }}"
-      class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'cancelled' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
-      Cancelled <span class="tabular-nums">({{ cancelled_count }})</span>
-    </a>
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="po-tabs">
+    <a href="{{ url_for('production_orders.production_orders_list', tab='open') }}" class="{{ 'on' if tab == 'open' else '' }}">Queue<span>{{ open_count }}</span></a>
+    <a href="{{ url_for('production_orders.production_orders_list', tab='timeline') }}" class="{{ 'on' if tab == 'timeline' else '' }}">Timeline</a>
+    <a href="{{ url_for('production_orders.production_orders_list', tab='cancelled') }}" class="{{ 'on' if tab == 'cancelled' else '' }}">Cancelled<span>{{ cancelled_count }}</span></a>
   </div>
-  <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
-    {% if tab == 'open' %}
-    Orders run in queue order (number 1 first). Use the arrows to change priority. Dates are worked out from the queue, the machines and the raw material in store; an order ahead in the queue gets the stock first.
-    {% else %}
-    Showing {{ result_count }} cancelled orders.
-    {% endif %}
+  {% if tab == 'timeline' %}
+  <div class="po-tabs">
+    <a href="{{ url_for('production_orders.production_orders_list', tab='timeline', by='order') }}" class="{{ 'on' if by == 'order' else '' }}">By order</a>
+    <a href="{{ url_for('production_orders.production_orders_list', tab='timeline', by='machine') }}" class="{{ 'on' if by == 'machine' else '' }}">By machine</a>
   </div>
-  <div class="flex-1 overflow-auto min-h-0">
-    <table class="po-table">
-      <colgroup>
-        <col style="width:7%" /><col style="width:12%" /><col style="width:17%" /><col style="width:9%" />
-        <col style="width:14%" /><col style="width:17%" /><col style="width:9%" /><col style="width:15%" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>#</th><th>Order no.</th><th>Product</th><th>Qty</th><th>Raw material</th><th>Schedule</th><th>Status</th><th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for o in orders %}
-        {% set sc = schedule.get(o.id) %}
-        {% set mat = materials.get(o.id) %}
-        <tr>
-          <td style="vertical-align:middle">
-            {% if o.status in ('Draft', 'Released') %}
-            <div class="font-mono font-bold text-[15px]">{{ o.queue_position }}</div>
-            <div class="flex items-center justify-center gap-0.5 mt-0.5">
-              {% for d, sym, tip in (('up', '↑', 'Move up'), ('down', '↓', 'Move down'), ('first', '⤒', 'Make first')) %}
-              <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction=d) }}" class="inline">
-                <button type="submit" title="{{ tip }}" aria-label="{{ tip }}" class="w-5 h-5 text-[12px] leading-none text-ink-faint border border-slate-300 rounded hover:bg-mist hover:text-ink">{{ sym }}</button>
-              </form>
+  {% elif tab == 'open' and orders %}
+  <button type="button" id="po-expand-all" class="po-btn ghost" style="padding:5px 12px">Expand all</button>
+  {% endif %}
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {% if tab == 'timeline' %}
+    {% if timeline %}
+    <div class="po-tl" style="--dw:92px">
+      {% if timeline.legend %}
+      <div class="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 border-b border-slate-200 text-[12px] text-ink-muted">
+        {% for l in timeline.legend %}<span class="inline-flex items-center gap-1.5"><span style="width:12px;height:12px;border-radius:3px;background:{{ l.bg }};border:1px solid {{ l.border }}"></span>{{ l.name }}</span>{% endfor %}
+        <span class="inline-flex items-center gap-1.5"><span style="width:2px;height:12px;background:#C46B2D"></span>Today</span>
+        <span class="inline-flex items-center gap-1.5"><span style="width:0;height:12px;border-left:2px dashed #B42318"></span>Needed by</span>
+      </div>
+      {% else %}
+      <div class="px-4 py-2.5 border-b border-slate-200 text-[12px] text-ink-muted">Each machine's row shows which order is using it and when. Colours are orders.</div>
+      {% endif %}
+      <div class="po-tl-scroll" id="po-tl-scroll">
+        <div class="po-tl-inner" style="width:calc(var(--lw) + var(--dw) * {{ timeline.count }})">
+          <div class="po-tl-head">
+            <div class="po-tl-line"><div class="po-tl-lab" style="padding:6px 12px">{{ 'Order' if by == 'order' else 'Machine' }}</div>
+              {% for m in timeline.months %}<div class="po-tl-month" style="width:calc(var(--dw) * {{ m.span }})">{{ m.label }}</div>{% endfor %}</div>
+            <div class="po-tl-line"><div class="po-tl-lab" style="padding:4px 12px"></div>
+              {% for d in timeline.days %}<div class="po-tl-cell {{ 'wk' if d.week_start else '' }} {{ 'today' if d.is_today else '' }}">{{ d.dow }}<b>{{ d.num }}</b></div>{% endfor %}</div>
+          </div>
+          <div id="po-tl-today" class="po-tl-now" style="left:calc(var(--lw) + var(--dw) * {{ timeline.today_i }} + var(--dw) / 2)"></div>
+          {% for row in timeline.rows %}
+          <div class="po-tl-line">
+            <div class="po-tl-lab">
+              <div class="font-semibold text-ink text-[13px] {{ 'font-mono' if by == 'order' else '' }}">{{ row.label }}</div>
+              {% if row.sub %}<div class="po-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.sub }}</div>{% endif %}
+            </div>
+            <div class="po-tl-track" style="width:calc(var(--dw) * {{ timeline.count }})">
+              {% if row.needed_i is not none %}<div class="po-tl-need" style="left:calc(var(--dw) * {{ row.needed_i + 1 }})"><em>Needed</em></div>{% endif %}
+              {% for b in row.bars %}
+              <div class="po-tl-bar" title="{{ b.tip }}" style="left:calc(var(--dw) * {{ b.left }} + 2px);width:calc(var(--dw) * {{ b.span }} - 4px);background:{{ b.bg }};border-color:{{ b.border }};color:{{ b.text }}">
+                {{ b.label }}{% if b.sub %}<small>{{ b.sub }}</small>{% endif %}
+              </div>
               {% endfor %}
             </div>
-            {% elif o.status == 'In production' %}
-            <div class="font-mono font-bold text-[15px]">{{ o.queue_position }}</div>
-            <div class="text-[11px] text-ink-faint">running</div>
-            {% else %}<span class="text-ink-faint">—</span>{% endif %}
-          </td>
-          <td class="font-mono font-semibold">{{ o.prod_no }}
-            <div class="font-sans font-normal text-[11.5px] text-ink-faint">{{ o.order_date.strftime('%d %b %Y') }}</div>
-            {% if o.needed_by_date %}<div class="font-sans font-normal text-[11.5px] text-ink-faint">Needed by {{ o.needed_by_date.strftime('%d %b') }}</div>{% endif %}
-          </td>
-          <td style="text-align:left">{{ o.product.code if o.product else '—' }} — {{ o.product.name if o.product else '—' }}</td>
-          <td class="font-mono">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}</td>
-          <td>
-            {% if o.status == 'Cancelled' or not mat %}<span class="text-ink-faint">—</span>
-            {% elif mat.status == 'buy' %}<span class="status-pill" style="background:#FEF2F2;border-color:#FCA5A5;color:#B91C1C">Need to buy</span>
-            {% elif mat.status == 'coming' %}<span class="status-pill" style="background:#FFFBEB;border-color:#FCD34D;color:#92400E">Short · PO coming</span>
-            {% else %}<span class="status-pill" style="background:#F0FDF4;border-color:#86EFAC;color:#15803D">{{ 'Issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
-            {% if mat and mat.status != 'ok' %}
-            <div class="text-[11.5px] text-ink-faint mt-0.5">
-              {% for l in mat.lines if l.buy > 0.000001 %}{{ l.code }} buy {{ '%.2f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}
-              {% if mat.status == 'coming' %}{% for l in mat.lines if l.from_po %}{% for po in l.from_po %}{{ po[0] }}{% if po[2] %} due {{ po[2].strftime('%d %b') }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
-            </div>
-            {% endif %}
-          </td>
-          <td style="font-size:13px; line-height:1.35">
-            {% if o.status == 'Cancelled' %}<span class="text-ink-faint">—</span>
-            {% elif sc %}
-            <div>Starts <strong>{{ sc.start.strftime('%d %b') }}</strong></div>
-            <div>Ready by <strong>{{ sc.end.strftime('%d %b %Y') }}</strong></div>
-            <div class="text-[11.5px] text-ink-faint">~{{ (o.planned_hours or 0)|round(1) }} h · {{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }}</div>
-            {% if sc.waits_for_material %}<div class="text-[11.5px]" style="color:#92400E">Waits for material until {{ sc.waits_for_material.strftime('%d %b') }}</div>{% endif %}
-            {% if mat and mat.status == 'buy' %}<div class="text-[11.5px]" style="color:#B91C1C">Dates assume the material is bought in time</div>{% endif %}
-            {% if o.needed_by_date and sc.end > o.needed_by_date %}<div class="text-[11.5px] font-semibold" style="color:#B91C1C">Late by {{ (sc.end - o.needed_by_date).days }} day{{ '' if (sc.end - o.needed_by_date).days == 1 else 's' }}</div>{% endif %}
-            {% else %}<span class="text-ink-faint text-[12px]">No plan (set stages in Product Master)</span>{% endif %}
-          </td>
-          <td><span class="status-pill">{{ o.status }}</span>{% if o.status == 'Released' %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.issue_status }}</div>{% endif %}{% if o.status == 'In production' and o.started_date %}<div class="text-[11.5px] text-ink-faint mt-0.5">since {{ o.started_date.strftime('%d %b') }}</div>{% endif %}{% if o.status == 'Cancelled' and o.cancelled_at %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.cancelled_at.strftime('%d %b %Y') }}</div>{% endif %}</td>
-          <td>
-            <div class="flex flex-wrap items-center justify-center gap-1">
-            {% if o.status == 'Draft' %}
-            <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="inline js-confirm-submit"
-                  data-confirm-title="Release production order" data-confirm-ok="Release"
-                  data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
-              <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Release</button>
-            </form>
-            {% elif o.status == 'Released' %}
-            <a href="{{ url_for('material_issues.material_issues_list') }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Material issue</a>
-            <form method="post" action="{{ url_for('production_orders.production_orders_start', order_id=o.id) }}" class="inline js-confirm-submit"
-                  data-confirm-title="Start production" data-confirm-ok="Start"
-                  data-confirm-message="Start {{ o.prod_no }} now? Its dates are fixed from today and other orders in the queue are planned around it.">
-              <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Start</button>
-            </form>
-            {% elif o.status == 'In production' %}
-            <a href="{{ url_for('material_issues.material_issues_list') }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Material issue</a>
-            {% endif %}
-            {% if o.status in ('Draft', 'Released') %}
-            <button type="button" class="btn-resched px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist" data-id="{{ o.id }}">Reschedule</button>
-            <button type="button" class="btn-cancel-order px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel</button>
-            {% endif %}
-            </div>
-          </td>
-        </tr>
-        {% if o.status == 'Cancelled' and o.cancel_reason %}
-        <tr>
-          <td colspan="8" style="text-align:left; background:#FEF2F2; font-size:12.5px; color:#B91C1C;"><strong>Cancelled:</strong> {{ o.cancel_reason }}</td>
-        </tr>
-        {% endif %}
-        {% if o.stages %}
-        <tr>
-          <td colspan="8" style="text-align:left; background:#F4F8FE; font-size:12.5px; color:#2B5FA8;">
-            <strong>Plan:</strong>
-            {% for st in o.stages %}{{ st.stage_name }} ({{ st.machines | map(attribute='machine_name') | join(', ') }}) {{ st.planned_hours|round(1) }} h{% if sc %}, {{ sc.windows[loop.index0][0].strftime('%d %b') }}{% if sc.windows[loop.index0][1] != sc.windows[loop.index0][0] %}–{{ sc.windows[loop.index0][1].strftime('%d %b') }}{% endif %}{% endif %}{% if not loop.last %} → {% endif %}{% endfor %}
-            · slowest stage {{ o.bottleneck_stage }}, up to {{ '%.0f'|format(o.daily_capacity or 0) }} KG per day
-          </td>
-        </tr>
-        {% endif %}
-        {% if o.lines %}
-        <tr>
-          <td colspan="8" style="text-align:left; background:#F8FAF9; font-size:13px; color:#3D5A5D; line-height:1.7;">
-            {% for line in o.lines %}
-              {% set ml = mat.lines[loop.index0] if mat else None %}
-              <span style="white-space:nowrap">{{ line.raw_material.code if line.raw_material else '—' }}
-              {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}
-              {% if line.is_extra %}(added){% else %}({{ '%.1f'|format(line.ratio_percent) }}%){% endif %}
-              {% if o.status != 'Cancelled' and ml %}
-                {% if ml.issued_all %}<span style="color:#15803D">✓ issued</span>
-                {% elif ml.buy > 0.000001 or ml.from_po %}<span style="color:{{ '#B91C1C' if ml.buy > 0.000001 else '#92400E' }}">short {{ '%.2f'|format(ml.need - ml.from_stock) }}{% for po in ml.from_po %} — {{ po[0] }} {{ '%.2f'|format(po[1]) }}{% if po[2] %} due {{ po[2].strftime('%d %b') }}{% endif %}{% endfor %}{% if ml.buy > 0.000001 %} — buy {{ '%.2f'|format(ml.buy) }}{% endif %}</span>
-                {% else %}<span style="color:#15803D">✓ in stock</span>{% endif %}
-                {% if line.issued_qty > 0 and not ml.issued_all %}<span style="color:#8A4A1C">(issued {{ '%.2f'|format(line.issued_qty) }})</span>{% endif %}
-              {% endif %}</span>{% if not loop.last %} · {% endif %}
-            {% endfor %}
-          </td>
-        </tr>
-        {% endif %}
-        {% else %}
-        <tr>
-          <td colspan="8" style="text-align:center; padding:36px; color:#6B7F82;">{{ 'No cancelled orders.' if tab == 'cancelled' else 'The queue is empty. Create a production order from a product recipe.' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <p class="po-meta mt-2">Sundays are skipped. A bar shows the days a stage uses its machines. Hover a bar for the exact dates.</p>
+    {% else %}
+    <div class="po-empty"><h3>Nothing to show on the timeline yet</h3><p>Create a production order with a plan and it will appear here.</p></div>
+    {% endif %}
+
+  {% elif not orders %}
+    <div class="po-empty">
+      <h3>{{ 'No cancelled orders' if tab == 'cancelled' else 'The queue is empty' }}</h3>
+      <p>{{ 'Cancelled orders will be listed here.' if tab == 'cancelled' else 'Create a production order from a product recipe. It will join the end of the queue.' }}</p>
+    </div>
+  {% else %}
+    {% set running = orders | selectattr('status', 'equalto', 'In production') | list %}
+    {% set waiting = orders | rejectattr('status', 'equalto', 'In production') | list %}
+    {% if running %}
+    <div class="po-group">In production <b>{{ running|length }}</b></div>
+    {% for o in running %}{{ order_card(o) }}{% endfor %}
+    {% endif %}
+    {% if waiting %}
+    <div class="po-group">{{ 'Cancelled' if tab == 'cancelled' else 'Waiting in the queue' }} <b>{{ waiting|length }}</b></div>
+    {% for o in waiting %}{{ order_card(o) }}{% endfor %}
+    {% endif %}
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block modals %}
 <div id="mo-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="mo-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" aria-labelledby="mo-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+  <div role="dialog" aria-labelledby="mo-title" class="relative ml-auto h-full w-full max-w-5xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
       <div>
-        <h2 id="mo-title" class="text-[16px] font-bold text-ink">New production order</h2>
-        <p class="text-[12.5px] text-ink-faint">Pick a category, then choose each attribute one by one. Only the options that really exist are shown.</p>
+        <h2 id="mo-title" class="text-[17px] font-bold text-ink">New production order</h2>
+        <p class="text-[12.5px] text-ink-faint">Pick the product, set the quantity, choose the machines. The order joins the end of the queue.</p>
       </div>
-      <button type="button" id="btn-close-mo" class="w-8 h-8 text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+      <button type="button" id="btn-close-mo" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
-    <form id="mo-form" method="post" action="{{ url_for('production_orders.production_orders_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-      <p class="form-section-title">Order</p>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label for="mo-date" class="block text-[12.5px] font-semibold text-ink mb-1">Order date *</label>
-          <input type="date" id="mo-date" name="order_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
-        </div>
-        <div>
-          <label for="mo-category" class="block text-[12.5px] font-semibold text-ink mb-1">Product category *</label>
-          <select id="mo-category" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
-            <option value="">Select category</option>
-            {% for c in categories %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div id="mo-cascade-wrap" class="hidden">
-        <p class="text-[12.5px] font-semibold text-ink mb-1">Choose the product step by step</p>
-        <div id="mo-cascade" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
-        <p id="mo-cascade-note" class="text-[12px] text-ink-faint mt-1.5"></p>
-      </div>
-      <div>
-        <label for="mo-product" class="block text-[12.5px] font-semibold text-ink mb-1">Product *</label>
-        <select id="mo-product" name="product_id" required disabled class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white disabled:bg-mist">
-          <option value="">Select a category first</option>
-        </select>
-      </div>
-      <div>
-        <label id="mo-qty-label" for="mo-qty" class="block text-[12.5px] font-semibold text-ink mb-1">Quantity to make *</label>
-        <input type="number" id="mo-qty" name="planned_qty" min="0" step="0.01" value="500" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
-      </div>
-      <div id="mo-weight-box" class="hidden rounded border border-copper-border bg-copper-soft px-3 py-2.5">
-        <p id="mo-weight-note" class="text-[13px] text-ink mb-2"></p>
-        <label id="mo-weight-label" for="mo-weight" class="block text-[12.5px] font-semibold text-ink mb-1">Kilograms in one unit *</label>
-        <input type="number" id="mo-weight" name="unit_weight" min="0" step="0.01" value="0.5" class="w-full max-w-xs px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white" />
-      </div>
-      <div>
-        <label for="mo-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
-        <input type="text" id="mo-remarks" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
-      </div>
-      <p class="form-section-title">Attributes</p>
-      <div id="mo-attrs" class="text-[13px] text-ink-faint">Select a product to see its attributes.</div>
-      <p class="form-section-title">Materials from the product recipe</p>
-      <p id="mo-summary" class="text-[12.5px] font-mono text-ink-muted"></p>
-      <table class="lines-table">
-        <thead>
-          <tr>
-            <th>Material</th><th>Name</th><th>Type</th><th>Ratio</th><th>Required</th>
-          </tr>
-        </thead>
-        <tbody id="mo-lines">
-          <tr><td colspan="5" class="text-ink-faint">Select a product.</td></tr>
-        </tbody>
-      </table>
-      <div class="flex items-center justify-between gap-2">
-        <p class="form-section-title mb-0">Other materials</p>
-        <button type="button" id="btn-add-extra" class="text-[13px] font-semibold text-copper hover:underline">+ Add material</button>
-      </div>
-      <p class="text-[12.5px] text-ink-faint">Add packaging or any other raw material that is not in the recipe. Type the quantity yourself.</p>
-      <table class="lines-table">
-        <thead>
-          <tr>
-            <th>Material</th><th>Unit</th><th>Quantity</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="mo-extra-lines">
-          <tr id="mo-extra-empty"><td colspan="4" class="text-ink-faint">No extra materials yet.</td></tr>
-        </tbody>
-      </table>
+    <form id="mo-form" method="post" action="{{ url_for('production_orders.production_orders_add') }}" class="flex-1 overflow-y-auto">
+      <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div class="space-y-4 min-w-0">
 
-      <p class="form-section-title">Production plan</p>
-      <p class="text-[12.5px] text-ink-faint">The stages this product goes through, the machines to use at each stage, and how long it will take. The order joins the end of the queue; its exact start and finish dates are worked out from the queue after saving.</p>
-      <div class="max-w-xs">
-        <label for="mo-start" class="block text-[12.5px] font-semibold text-ink mb-1">Earliest start date</label>
-        <input type="date" id="mo-start" name="start_date" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
-        <p class="text-[11.5px] text-ink-faint mt-1">Not before this day. The real start comes from the queue.</p>
+          <section class="po-step">
+            <div class="po-step-h"><span class="po-step-n">1</span><div><h3>Product</h3><p>Choose the category, then each attribute one by one. Only options that exist are shown.</p></div></div>
+            <div class="space-y-3">
+              <div>
+                <label for="mo-category" class="po-label">Product category *</label>
+                <select id="mo-category" required class="po-input bg-white">
+                  <option value="">Select category</option>
+                  {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+                </select>
+              </div>
+              <div id="mo-cascade-wrap" class="hidden">
+                <div id="mo-cascade" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                <p id="mo-cascade-note" class="text-[12px] text-ink-faint mt-1.5"></p>
+              </div>
+              <div>
+                <label for="mo-product" class="po-label">Product *</label>
+                <select id="mo-product" name="product_id" required disabled class="po-input bg-white disabled:bg-mist">
+                  <option value="">Select a category first</option>
+                </select>
+              </div>
+              <div id="mo-attrs" class="text-[13px] text-ink-faint">Select a product to see its attributes.</div>
+            </div>
+          </section>
+
+          <section class="po-step">
+            <div class="po-step-h"><span class="po-step-n">2</span><div><h3>Quantity and dates</h3><p>How much to make, and the dates the queue should respect.</p></div></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label id="mo-qty-label" for="mo-qty" class="po-label">Quantity to make *</label>
+                <input type="number" id="mo-qty" name="planned_qty" min="0" step="0.01" value="500" required class="po-input" />
+              </div>
+              <div>
+                <label for="mo-date" class="po-label">Order date *</label>
+                <input type="date" id="mo-date" name="order_date" required class="po-input" />
+              </div>
+              <div>
+                <label for="mo-start" class="po-label">Earliest start date</label>
+                <input type="date" id="mo-start" name="start_date" class="po-input" />
+                <p class="text-[11.5px] text-ink-faint mt-1">Not before this day. The real start comes from the queue.</p>
+              </div>
+              <div>
+                <label for="mo-needed" class="po-label">Needed by (optional)</label>
+                <input type="date" id="mo-needed" name="needed_by" class="po-input" />
+                <p class="text-[11.5px] text-ink-faint mt-1">The queue warns you if the order will finish after this date.</p>
+              </div>
+            </div>
+            <div id="mo-weight-box" class="hidden rounded-lg border border-copper-border bg-copper-soft px-3 py-2.5 mt-3">
+              <p id="mo-weight-note" class="text-[13px] text-ink mb-2"></p>
+              <label id="mo-weight-label" for="mo-weight" class="po-label">Kilograms in one unit *</label>
+              <input type="number" id="mo-weight" name="unit_weight" min="0" step="0.01" value="0.5" class="po-input max-w-xs" />
+            </div>
+            <div class="mt-3">
+              <label for="mo-remarks" class="po-label">Remarks</label>
+              <input type="text" id="mo-remarks" name="remarks" maxlength="255" class="po-input" />
+            </div>
+          </section>
+
+          <section class="po-step">
+            <div class="po-step-h"><span class="po-step-n">3</span><div><h3>Stages and machines</h3><p>Tick the machines to use at each stage. More machines means less time. Timings come from each machine's KG per hour.</p></div></div>
+            <div id="mo-plan" class="text-[13px] text-ink-faint">Select a product to see its stages.</div>
+          </section>
+
+          <section class="po-step">
+            <div class="po-step-h"><span class="po-step-n">4</span><div><h3>Raw material</h3><p>From the product recipe. <span id="mo-summary" class="font-mono"></span></p></div></div>
+            <div class="overflow-x-auto rounded-lg">
+              <table class="lines-table">
+                <thead><tr><th>Material</th><th style="text-align:right">Required</th><th style="text-align:right">In store</th><th>Status</th></tr></thead>
+                <tbody id="mo-lines"><tr><td colspan="4" class="text-ink-faint">Select a product.</td></tr></tbody>
+              </table>
+            </div>
+            <div class="flex items-center justify-between gap-2 mt-4">
+              <p class="form-section-title mb-0">Other materials</p>
+              <button type="button" id="btn-add-extra" class="text-[13px] font-semibold text-copper hover:underline">+ Add material</button>
+            </div>
+            <p class="text-[12.5px] text-ink-faint mb-2">Add packaging or any other raw material that is not in the recipe. Type the quantity yourself.</p>
+            <div class="overflow-x-auto rounded-lg">
+              <table class="lines-table">
+                <thead><tr><th>Material</th><th>Unit</th><th>Quantity</th><th></th></tr></thead>
+                <tbody id="mo-extra-lines"><tr id="mo-extra-empty"><td colspan="4" class="text-ink-faint">No extra materials yet.</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <aside class="po-side">
+          <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint mb-2">Order summary</div>
+          <div id="sum-empty" class="text-[13px] text-ink-faint py-6 text-center">Choose a product to see the time, capacity and raw material check.</div>
+          <div id="sum-body" class="hidden">
+            <div class="pb-3 border-b border-slate-200">
+              <div id="sum-product" class="text-[15px] font-bold text-ink leading-snug"></div>
+              <div id="sum-code" class="font-mono text-[12px] text-ink-faint"></div>
+            </div>
+            <div class="row"><div class="lab">Quantity</div><div id="sum-qty" class="font-semibold"></div></div>
+            <div class="row"><div class="lab">Production time</div><div id="sum-time"></div></div>
+            <div class="row"><div class="lab">Most per day</div><div id="sum-perday"></div><div class="text-[12px] text-ink-faint">Slowest stage: <span id="sum-slow"></span></div></div>
+            <div class="row"><div class="lab">Raw material</div><div id="sum-material"></div></div>
+            <div class="row"><div class="lab">Queue</div><div class="text-[13px]">Joins the <b>end of the queue</b>. Start and finish dates are set from the queue after saving; move it up with the arrows.</div></div>
+          </div>
+        </aside>
       </div>
-      <div class="max-w-xs">
-        <label for="mo-needed" class="block text-[12.5px] font-semibold text-ink mb-1">Needed by (optional)</label>
-        <input type="date" id="mo-needed" name="needed_by" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
-        <p class="text-[11.5px] text-ink-faint mt-1">The list warns if the order will finish after this date.</p>
-      </div>
-      <div id="mo-plan" class="text-[13px] text-ink-faint">Select a product to see its stages.</div>
     </form>
-    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
-      <button type="button" id="btn-cancel-mo" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="mo-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save order</button>
+    <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-mo" class="po-btn ghost">Cancel</button>
+      <button type="submit" form="mo-form" class="po-btn primary" style="padding:8px 20px">Save to queue</button>
     </div>
   </div>
 </div>
 
-{# ---- Reschedule: start date aur machines badlo ---- #}
+{# ---- Reschedule: earliest start, needed by aur machines badlo ---- #}
 <div id="rs-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true" style="display:none">
   <div id="rs-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
-      <div><h2 class="text-[16px] font-bold text-ink">Reschedule <span id="rs-no"></span></h2>
-        <p class="text-[12.5px] text-ink-faint">Change the earliest start, the needed-by date or the machines. Quantity and materials stay as they are. To change priority use the arrows in the queue.</p></div>
-      <button type="button" id="rs-close" class="w-8 h-8 text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
+      <div><h2 class="text-[17px] font-bold text-ink">Reschedule <span id="rs-no" class="font-mono"></span></h2>
+        <p class="text-[12.5px] text-ink-faint">Change the earliest start, the needed-by date or the machines. Quantity and materials stay the same. To change priority use the arrows in the queue.</p></div>
+      <button type="button" id="rs-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
-    <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-      <div class="max-w-xs">
-        <label for="rs-start" class="block text-[12.5px] font-semibold text-ink mb-1">Earliest start date</label>
-        <input type="date" id="rs-start" name="start_date" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+    <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-mist">
+      <div class="po-step grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div><label for="rs-start" class="po-label">Earliest start date</label><input type="date" id="rs-start" name="start_date" class="po-input" /></div>
+        <div><label for="rs-needed" class="po-label">Needed by (optional)</label><input type="date" id="rs-needed" name="needed_by" class="po-input" /></div>
       </div>
-      <div class="max-w-xs">
-        <label for="rs-needed" class="block text-[12.5px] font-semibold text-ink mb-1">Needed by (optional)</label>
-        <input type="date" id="rs-needed" name="needed_by" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
-      </div>
-      <div id="rs-plan" class="text-[13px] text-ink-faint"></div>
+      <div class="po-step"><div id="rs-plan" class="text-[13px] text-ink-faint"></div></div>
     </form>
-    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
-      <button type="button" id="rs-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
-      <button type="submit" form="rs-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save plan</button>
+    <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="rs-cancel" class="po-btn ghost">Close</button>
+      <button type="submit" form="rs-form" class="po-btn primary" style="padding:8px 20px">Save plan</button>
     </div>
   </div>
 </div>
 
 {# ---- Cancel order: wajah zaroori ---- #}
-<div id="co-modal" class="hidden fixed inset-0 z-50 items-center justify-center" aria-hidden="true" style="display:none">
+<div id="co-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4" aria-hidden="true" style="display:none">
   <div id="co-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" class="relative w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200"><h2 class="text-[16px] font-bold text-ink">Cancel <span id="co-no"></span></h2>
-      <p class="text-[12.5px] text-ink-faint">The order stays in the Cancelled tab. Its machines become free for other orders. If material was already issued, cancel those issues first.</p></div>
-    <form id="co-form" method="post" class="px-4 py-4 space-y-3">
+  <div role="dialog" class="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl">
+    <div class="px-5 py-4 border-b border-slate-200"><h2 class="text-[17px] font-bold text-ink">Cancel <span id="co-no" class="font-mono"></span>?</h2>
+      <p class="text-[12.5px] text-ink-faint mt-1">The order moves to the Cancelled tab and its place in the queue and its machines become free. If material was already issued, cancel those issues first.</p></div>
+    <form id="co-form" method="post" class="px-5 py-4 space-y-3">
       <div>
-        <label for="co-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason *</label>
-        <input type="text" id="co-reason" name="reason" maxlength="255" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        <label for="co-reason" class="po-label">Reason *</label>
+        <input type="text" id="co-reason" name="reason" maxlength="255" required class="po-input" />
       </div>
       <div class="flex justify-end gap-2">
-        <button type="button" id="co-close" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Keep order</button>
-        <button type="submit" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-stop border border-stop rounded hover:opacity-90">Cancel order</button>
+        <button type="button" id="co-close" class="po-btn ghost">Keep order</button>
+        <button type="submit" class="po-btn" style="background:#B42318;color:#fff;border-color:#8F1B12">Cancel order</button>
       </div>
     </form>
   </div>
@@ -359,6 +516,7 @@
 <script>
   var planner = {{ planner | tojson }};
   var materialOptions = {{ material_options | tojson }};
+  var STORE = {{ store_stock | tojson }};   // {raw_material_id: store me available qty} — form me 'In store' dikhane ke liye
   var CATEGORY_FIELDS = {{ category_fields | tojson }};   // {category_id: ["Alloy grade", "Thickness", ...]} (order me)
   var byId = {};
   planner.forEach(function (p) { byId[String(p.id)] = p; });
@@ -632,9 +790,9 @@
 
   // Ek jagah ka planner widget: box ke andar stage table + summary banata hai. key badle to naye sire se render.
   function makePlanWidget(box, startEl) {
-    var w = { key: null, clash: false };
+    var w = { key: null, clash: false, plan: null };
     w.reset = function (text) {
-      w.key = null; w.clash = false;
+      w.key = null; w.clash = false; w.plan = null;
       box.className = 'text-[13px] text-ink-faint';
       box.textContent = text;
     };
@@ -680,6 +838,7 @@
       if (!routing.length) return;
       var chosen = w.chosen(routing);
       var plan = planFor(batchKg, chosen, startEl.value);
+      w.plan = plan;
       box.querySelectorAll('.plan-time').forEach(function (cell, i) {
         var row = plan.stages[i];
         cell.textContent = row.perHour > 0 ? row.hours + ' h' : 'pick a machine';
@@ -700,6 +859,30 @@
     return w;
   }
   var mainPlan = makePlanWidget(planBox, startInput);
+
+  // ---------- Form ka right side "Order summary" card ----------
+  function renderSide(product, batchKg) {
+    var empty = document.getElementById('sum-empty'), body = document.getElementById('sum-body');
+    if (!product) { empty.classList.remove('hidden'); body.classList.add('hidden'); return; }
+    empty.classList.add('hidden'); body.classList.remove('hidden');
+    document.getElementById('sum-product').textContent = product.name;
+    document.getElementById('sum-code').textContent = product.code;
+    document.getElementById('sum-qty').textContent = (parseFloat(qtyInput.value) || 0) + ' ' + (product.unit || 'KG') + (product.unit && product.unit.toUpperCase() !== 'KG' ? ' (' + batchKg.toFixed(2) + ' KG)' : '');
+    var plan = mainPlan.plan;
+    var ready = plan && plan.stages.length && plan.stages.every(function (r) { return r.perHour > 0; });
+    document.getElementById('sum-time').innerHTML = ready
+      ? '<strong>' + plan.totalHours + ' h</strong> · ' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's')
+      : '<span class="text-ink-faint">' + (product.routing && product.routing.length ? 'Pick a machine for every stage' : 'No production stages set') + '</span>';
+    document.getElementById('sum-perday').innerHTML = ready ? '<strong>' + plan.dailyCapacity + ' KG</strong> per day' : '—';
+    document.getElementById('sum-slow').textContent = ready ? plan.bottleneck : '—';
+    var lines = product.recipe || [];
+    var short = lines.filter(function (l) { return batchKg * (l.ratio || 0) / 100 - (STORE[String(l.rm_id)] || 0) > 0.0001; });
+    document.getElementById('sum-material').innerHTML = !lines.length
+      ? '<span class="text-ink-faint">No recipe</span>'
+      : (short.length
+        ? '<span class="po-chip bad"><i></i>' + short.length + ' short</span><div class="text-[12px] text-ink-faint mt-1">' + short.map(function (l) { return esc(l.name); }).join(', ') + '. Orders ahead in the queue may use stock first.</div>'
+        : '<span class="po-chip ok"><i></i>All in store</span><div class="text-[12px] text-ink-faint mt-1">Before orders ahead in the queue take their share.</div>');
+  }
   var rsBox = document.getElementById('rs-plan');
   var rsStart = document.getElementById('rs-start');
   var rsPlan = makePlanWidget(rsBox, rsStart);
@@ -734,7 +917,8 @@
       qtyLabel.textContent = 'Quantity to make *';
       weightBox.classList.add('hidden');
       summary.textContent = '';
-      linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">Select a product.</td></tr>';
+      linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint">Select a product.</td></tr>';
+      renderSide(null, 0);
       return;
     }
     var unitName = product.unit || 'KG';
@@ -754,20 +938,25 @@
       ? 'Making ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.'
       : (qty + ' ' + unitName + ' × ' + weight + ' KG each = ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.');
     if (!product.recipe.length) {
-      linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">This product has no recipe.</td></tr>';
+      linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint">This product has no recipe.</td></tr>';
+      renderSide(product, batchKg);
       return;
     }
     linesBody.innerHTML = product.recipe.map(function (line) {
       var need = batchKg * (line.ratio || 0) / 100;
-      var type = line.is_flux ? 'Core flux' : 'Base metal';
+      var have = STORE[String(line.rm_id)] || 0;
+      var short = need - have;
+      var status = short <= 0.0001
+        ? '<span class="po-chip ok"><i></i>In stock</span>'
+        : '<span class="po-chip bad"><i></i>Short ' + short.toFixed(2) + '</span>';
       return '<tr>' +
-        '<td class="font-mono font-semibold">' + line.code + '</td>' +
-        '<td>' + line.name + '</td>' +
-        '<td>' + type + '</td>' +
-        '<td class="font-mono">' + Number(line.ratio).toFixed(1) + '%</td>' +
-        '<td class="font-mono font-semibold">' + need.toFixed(2) + ' ' + (line.unit || '') + '</td>' +
+        '<td><div class="font-semibold text-ink">' + esc(line.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(line.code) + ' · ' + Number(line.ratio).toFixed(1) + '% · ' + (line.is_flux ? 'core flux' : 'base metal') + '</div></td>' +
+        '<td class="font-mono font-semibold text-right">' + need.toFixed(2) + ' ' + esc(line.unit || '') + '</td>' +
+        '<td class="font-mono text-right text-ink-muted">' + have.toFixed(2) + '</td>' +
+        '<td>' + status + '</td>' +
         '</tr>';
     }).join('');
+    renderSide(product, batchKg);
   }
 
   document.getElementById('btn-add-mo').addEventListener('click', openModal);
@@ -837,6 +1026,31 @@
       return;
     }
 
+  });
+
+  // ---------- List interactions: card expand, ⋯ menu ----------
+  document.querySelectorAll('.po-card').forEach(function (card) {
+    card.querySelector('.po-row').addEventListener('click', function (event) {
+      if (event.target.closest('a, button, form, summary, .po-menu')) return;
+      card.classList.toggle('is-open');
+    });
+    var chevron = card.querySelector('.po-chev');
+    if (chevron) chevron.addEventListener('click', function () { card.classList.toggle('is-open'); });
+  });
+  document.addEventListener('click', function (event) {
+    document.querySelectorAll('details.po-menu[open]').forEach(function (menu) { if (!menu.contains(event.target)) menu.removeAttribute('open'); });
+  });
+  var tl = document.getElementById('po-tl-scroll');
+  if (tl) {
+    var marker = document.getElementById('po-tl-today');
+    if (marker) tl.scrollLeft = Math.max(0, marker.offsetLeft - 260);
+  }
+  var expandAll = document.getElementById('po-expand-all');
+  if (expandAll) expandAll.addEventListener('click', function () {
+    var cards = document.querySelectorAll('.po-card');
+    var openAny = Array.prototype.some.call(cards, function (c) { return !c.classList.contains('is-open'); });
+    cards.forEach(function (c) { c.classList.toggle('is-open', openAny); });
+    expandAll.textContent = openAny ? 'Collapse all' : 'Expand all';
   });
 </script>
 {% endblock %}
