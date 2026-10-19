@@ -6,6 +6,11 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### Decision: Auth / user / role (Phase 0) Sales ke BAAD; BOM / Recipe alag module nahi (2026-10-19)
+**Kya:** user ne kaha "abhi hum auth aur user / role module nahi bana rahe, pehle sales tak saare module bana dete hain, phir jayenge." Isliye Phase 0 (login, RBAC, audit trail) jaanbujhkar Sales (Phase 6) ke baad. Tab tak portal par login nahi hai (jiske paas link hai wo sab dekh sakta hai); PO print par sirf blank "Prepared by / Approved by" lines. **BOM / Recipe:** sidebar se link hata diya — recipe Product Master me hi hai aur Production Order use copy karta hai (2026-10-02 ka decision "Alag BOM nahi" hi chal raha hai). **Kyun:** pehle poora business flow (kharid → stock → production → bikri) chale, phir permissions us flow par lagayein — warna har naye module par do baar kaam. **Dhyan (jab Phase 0 aaye):** `created_by` / `approved_by` har document me, approvals (Adjustment approve, PO confirm), audit trail, E-Way / print par naam. Abhi sirf `created_at` hai. **Roadmap Sales tak** aur phase-wise sachi sthiti: `tracker.md` Current Focus aur `development.md` §13.
+
+---
+
 ### Decision: `created_at` (F1) — UTC store, IST dikhao, purani rows khaali (2026-10-16)
 **Kya:** `CreatedAtMixin` (models.py) har model me `created_at = DateTime, default=utc_now, nullable=True`. Dikhane ke liye `app/timeutil.py` ka `format_ist` (Jinja filter `|ist`). **Kyun UTC:** server (VPS) ka clock UTC hai, local PC ka IST — DB me ek hi standard rakhna warna do jagah ke times mix ho jaate. India me DST nahi, isliye +5:30 fixed offset (zoneinfo/tzdata Windows par extra dependency hoti). **Kyun nullable:** purani rows ka asli time kisi ko nahi pata; jhoothi value (migration ke time ka timestamp) bharne se galat audit trail banta. UI me purani rows par "Entered" line hi nahi dikhti. **Seekh:** `Column` mixin se har subclass ko apni copy milti hai (FK ke bina); `flask db migrate` ne SQLite par bhi seedha `add_column` banaya (table recreate nahi). Bulk edit ke liye regex se `(db.Model)` → `(CreatedAtMixin, db.Model)`. Test-lesson: Pending tabs me alag type ki rows hoti hain (PO / lot), isliye har tab par sahi row-type ka check likho.
 

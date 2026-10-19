@@ -98,24 +98,9 @@ We will create the `app/` folder (and everything inside it) only when **Part 2 (
 ### Part 1 (Mockups) — original learning order (unchanged)
 Mockups is order me ban/approve hue: Unit → Machine → Vendor → Customer → Raw Material → Product (+ later Warehouse / category mocks).
 
-### Part 2 (Backend) — dependency order (locked 2026-09-21)
+### Part 2 (Backend) — build order: DONE
 
-User ne decide: parties (Vendor) se pehle materials/products + unki categories, taaki FK dropdown real data se aaye.
-
-| # | Module | Status / why |
-|---|---|---|
-| 1 | **Unit Master** | Done — base for RM / Product units |
-| 2 | **Work Stage** | Done — Machine FK |
-| 3 | **Machine Master** | Done — Work Stage FK |
-| 4 | **RM Category** | **Next** — Raw Material category dropdown |
-| 5 | **Raw Material** | Unit FK + RM Category FK |
-| 6 | **Product Category** | Product category dropdown |
-| 7 | **Product Master** | Category FK; variants later |
-| 8 | **Vendor Master** | Rich form + Auto-Ledger; after materials exist |
-| 9 | **Customer Master** | Vendor pattern + Debtors |
-| 10 | **Warehouse** | Stock / inventory pages |
-
-*(Old Part 2 table put Vendor right after Machine — superseded by this dependency order.)*
+Masters (Unit → Work Stage → Machine → RM Category → Raw Material → Product Category → Product → Vendor → Customer → Warehouse + Charges / State / Vendor Type / Payment Terms) sab bane. Uske baad Procurement → Inventory → Manufacturing (aadha). **Live status aur aage ka roadmap: neeche §13 aur `tracker.md` Current Focus.**
 
 ---
 
@@ -342,6 +327,8 @@ All 6 modules built and approved (2026-09-16): Unit, Machine, Vendor, Customer, 
 
 ## 8. Phase 2 — Procurement, GRN & Inward QC (Mockups)
 
+> **Backend status (2026-10-19):** mockups ke baad backend poora ban chuka hai: PO (charges, confirm par vendor invoice upload + edit, short close, print), GRN, Inward QC (parameters, drafts, rejection memo, report file), Purchase Invoice (ek GRN = ek bill, GST items + charges par), Purchase Return (Passed / Rejected), Docket. Live. Baaki: TDS 194Q, direct invoice bina PO, accounting vouchers.
+
 **Status: 5 mockups built, cross-verified against spec Section 5, minor fixes applied — awaiting final user walkthrough.**
 
 **Why this jumped ahead of Phase 1's backend:** the user wanted to see a full **transaction flow** (not just master-data lists) before committing to any backend, to understand how documents connect to each other. This is a deliberate, discussed deviation from the original "Phase 2 only after Phase 1 backend" plan (see `memory.md`).
@@ -383,6 +370,8 @@ Not yet decided — per the earlier discussion, the user will decide after walki
 
 ## 9. Phase 3 — Inventory, Warehouse & Stock Valuation (Mockups)
 
+> **Backend status (2026-10-19):** backend ban chuka hai: stock ledger (lot + append-only movements), Stock Transfer, Stock Adjustment, Stock Valuation, **Opening stock** aur **reorder alerts** (mockup me nahi the). Live. Baaki: final QC / GRN reverse, invoice cost true-up, asli FIFO / WAVG, expiry alerts.
+
 **Status: 4/4 stock mockups + Warehouse Master mock (`warehouse_master.html`, §4.1) — stock screens verified 2026-09-17; warehouse master awaiting user approve.**
 
 **Why ahead of Phase 1 backend:** same as Phase 2 — user wants full visual flow of inventory before backend.
@@ -421,6 +410,8 @@ All 4 cross-reference the exact Phase 2 document IDs already built (e.g. ledger 
 
 ## 10. Phase 4 — Manufacturing Engine, BOM, Routing & WIP (Mockups)
 
+> **Backend status (2026-10-19):** Production Order (+ Release) aur Material Issue bane. **Alag BOM nahi banega** (recipe Product par hi hai; sidebar se "BOM / Recipe" hata diya). Baaki: production output + batch, scrap, routing, consumption variance.
+
 **Status: 6/6 mockups built (2026-09-17). Phase 4 manufacturing chain complete.**
 
 | # | File | Spec | What | Status |
@@ -456,18 +447,7 @@ All 4 built files cross-link back into Production Order by real `<a href>` (Rout
 
 ## 11. Immediate Next Action
 
-> **Stale note (2026-10-06):** this was the plan as of 2026-09-17 (mockup walkthrough). Backend work has moved far past it — the live "next step" is always `tracker.md` → Current Focus.
-
-Phase 1 (now 7 masters, including the gap-fill Warehouse Master) + Phase 2, 3, and 4 mockups (16 screens: 5+4+6) are all built and verified (2026-09-17). Walkthrough / next phase with user —
-
-```
-Masters:        (existing 6) + Warehouse Master
-Procurement:    Purchase Order → Gate Inward/GRN → Inward QC → Purchase Invoice → Purchase Return
-Inventory:      Stock Ledger → Stock Transfer → Stock Adjustment → Stock Valuation
-Manufacturing:  BOM/Recipe → Production Order → Material Issue → Routing → Scrap → Consumption variance
-```
-
-— so every screen's fields and buttons are understood in terms of *why*, not just *what*, before any backend work starts. **Do not assume the direction — ask.**
+> **Stale (2026-10-19):** yeh section 2026-09-17 ka tha. Asli "agla kaam" hamesha `tracker.md` → Current Focus me hai, aur roadmap neeche §13 me.
 
 ---
 
@@ -512,3 +492,28 @@ This wasn't just the 12 client-meeting items — real scope grew along the way. 
 - **Sidebar reorganized** into sub-groups (Common / Production / Raw material / Products / Storage / Partners) — navigation-only, no route changes.
 
 **Claude's review pass (2026-10-03) found no live-breaking bugs.** Four low-severity items worth knowing about (all detailed in `tracker.md` Current Focus and `memory.md`): a migration backfill gap for old recipe rows (harmless today, only 1 product exists), one leftover dead code branch in `warehouses_add`, the `PurchaseOrder.freight` field being quietly dead for new POs now that Charges replaced it (old POs still display correctly), and no duplicate-raw-material guard between a Production Order's recipe lines and its "extra material" lines.
+
+
+---
+
+## 13. Build Status & Roadmap to Sales (2026-10-19)
+
+### Kya bana hai (2026-10-19) — sach ki sthiti
+| Phase | Kya bana (backend + UI, live: portal.ivinfotech.com) | Kya baaki |
+|---|---|---|
+| 1 Masters | Unit, Work Stage, Machine, RM Category, Raw Material (+QC parameters, reorder / min / max), Product Category, Product (recipe product par hi, alag BOM nahi), Vendor + Customer (auto-ledger, documents upload), Warehouse (+Branch), Charges, State, Vendor Type, Payment Terms. Sab me auto-code. | Unit conversion (alag unit me kharid / issue), Company Master, Department |
+| 2 Procurement | PO (Charges, GST items + charges par, Confirm par vendor invoice upload + edit, Short close, Print, **Docket**), GRN, Inward QC (parameters, drafts, Rejection memo, report file), **Purchase Invoice (ek GRN = ek bill)**, **Purchase Return (Passed / Rejected)**. Pending / Completed tabs, PO-wise grouping, created_at (IST). | TDS 194Q, direct invoice bina PO, real accounting vouchers (abhi sirf vendor ledger ka balance badalta hai) |
+| 3 Inventory | **Stock ledger** (lot + append-only movements), Stock page + lot history, **Transfer** (transit, E-Way), **Adjustment** (reason + approval + audit), **Valuation** (lot-wise cost layers), **Opening stock**, **Reorder / min / max alerts** | Final QC / GRN reverse, invoice cost true-up (freight), asli FIFO / WAVG engine, expiry / dormancy alerts, physical count freeze |
+| 4 Manufacturing | **Production Order** (+ Release), **Material Issue** (store -> WIP, FIFO lot, traceability) | **Production output + batch, FG recognition, Scrap logging, Routing / stages, Consumption variance** |
+| 5 FG QC | — | Batch (FG) QC + clearance, FG recognition, QR / traceability (§10.9 deferred) |
+| 6 Sales | — (Customer master hi hai) | Quotation, Sales Order (credit limit), Delivery Challan (FG batch allocation), E-Way Bill, Sales Invoice (+COGS), Sales Return / Credit Note, Scrap sales (+TCS), E-Invoicing (IRN, bahar ki API) |
+| 0 Foundation | — | **Login / user / role / audit trail — user ne decide kiya: Sales tak ke modules ke BAAD** (2026-10-19). Tab tak portal par login nahi hai. |
+
+### ROADMAP: Sales tak (user ka decision 2026-10-19: pehle saare modules Sales tak, auth / user-role baad me)
+1. **Manufacturing poora (Phase 4):** Production output + batch (Good / Rework / Scrap) -> WIP se FG -> Scrap logging (Scrap warehouse) -> Routing / stages tracker -> Consumption variance (planned vs actual). Mockups maujood: `production_routing`, `scrap_waste`, `consumption_variance`.
+2. **FG QC + FG recognition (Phase 5):** batch ka QC (pass / fail / rework), pass par hi saleable FG stock. QR / barcode traceability (§10.9) abhi deferred.
+3. **Sales (Phase 6):** Quotation -> Sales Order (customer credit limit check) -> Delivery Challan (FG batch allocation, E-Way) -> Sales Invoice (Dr Customer | Cr Sales | Cr GST) + COGS -> Sales Return / Credit Note -> Scrap sales (+1% TCS). E-Invoicing (IRN, NIC API) = bahar ki integration, alag decision. Sales ke mockups abhi nahi hain (sirf Customer master) — mock pehle.
+4. **Beech beech me, agar client maange:** TDS 194Q, stock module ke baaki hisse (final QC reverse, cost true-up, FIFO / WAVG).
+**Production output ke 3 faisle abhi khule** (user ne jawab nahi diya): (a) FG kab aaye — output post karte hi (recommended) ya pehle batch QC; (b) output me kya — Good / Scrap / Rework / machine + operator; (c) FG ki cost — issue hue RM ki value Good maal par baant do (recommended) ya scrap ko bhi value.
+
+**Kaam ka tareeka ab:** user ke kehne par Claude seedha module banata hai (Manual Learning Mode ka scoped exception, `CLAUDE.md` §0A) — har module: models + migration → stock / paisa ke rules ek jagah (`app/inventory/posting.py`, `app/purchase_invoices/posting.py`) → routes + page → test (DB ki copy par) → `tracker.md` → GitHub push → server update (`update_live.sh`: backup + staging + migrate + health + auto-rollback).

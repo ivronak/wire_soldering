@@ -8,6 +8,27 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 ## Current Focus
 
+> **2026-10-19 — PROJECT KI SACHI STHITI + ROADMAP (user: "tracker, memory, development md check karo, update na ho to update karo").** Neeche ka phase-wise table aur roadmap ab sahi hai; iske neeche ke purane dated notes history hain. **Decision: auth / user-role (Phase 0) Sales tak ke modules ke baad.** BOM / Recipe ka sidebar link hata diya (recipe Product par hi hai).
+
+### Kya bana hai (2026-10-19) — sach ki sthiti
+| Phase | Kya bana (backend + UI, live: portal.ivinfotech.com) | Kya baaki |
+|---|---|---|
+| 1 Masters | Unit, Work Stage, Machine, RM Category, Raw Material (+QC parameters, reorder / min / max), Product Category, Product (recipe product par hi, alag BOM nahi), Vendor + Customer (auto-ledger, documents upload), Warehouse (+Branch), Charges, State, Vendor Type, Payment Terms. Sab me auto-code. | Unit conversion (alag unit me kharid / issue), Company Master, Department |
+| 2 Procurement | PO (Charges, GST items + charges par, Confirm par vendor invoice upload + edit, Short close, Print, **Docket**), GRN, Inward QC (parameters, drafts, Rejection memo, report file), **Purchase Invoice (ek GRN = ek bill)**, **Purchase Return (Passed / Rejected)**. Pending / Completed tabs, PO-wise grouping, created_at (IST). | TDS 194Q, direct invoice bina PO, real accounting vouchers (abhi sirf vendor ledger ka balance badalta hai) |
+| 3 Inventory | **Stock ledger** (lot + append-only movements), Stock page + lot history, **Transfer** (transit, E-Way), **Adjustment** (reason + approval + audit), **Valuation** (lot-wise cost layers), **Opening stock**, **Reorder / min / max alerts** | Final QC / GRN reverse, invoice cost true-up (freight), asli FIFO / WAVG engine, expiry / dormancy alerts, physical count freeze |
+| 4 Manufacturing | **Production Order** (+ Release), **Material Issue** (store -> WIP, FIFO lot, traceability) | **Production output + batch, FG recognition, Scrap logging, Routing / stages, Consumption variance** |
+| 5 FG QC | — | Batch (FG) QC + clearance, FG recognition, QR / traceability (§10.9 deferred) |
+| 6 Sales | — (Customer master hi hai) | Quotation, Sales Order (credit limit), Delivery Challan (FG batch allocation), E-Way Bill, Sales Invoice (+COGS), Sales Return / Credit Note, Scrap sales (+TCS), E-Invoicing (IRN, bahar ki API) |
+| 0 Foundation | — | **Login / user / role / audit trail — user ne decide kiya: Sales tak ke modules ke BAAD** (2026-10-19). Tab tak portal par login nahi hai. |
+
+### ROADMAP: Sales tak (user ka decision 2026-10-19: pehle saare modules Sales tak, auth / user-role baad me)
+1. **Manufacturing poora (Phase 4):** Production output + batch (Good / Rework / Scrap) -> WIP se FG -> Scrap logging (Scrap warehouse) -> Routing / stages tracker -> Consumption variance (planned vs actual). Mockups maujood: `production_routing`, `scrap_waste`, `consumption_variance`.
+2. **FG QC + FG recognition (Phase 5):** batch ka QC (pass / fail / rework), pass par hi saleable FG stock. QR / barcode traceability (§10.9) abhi deferred.
+3. **Sales (Phase 6):** Quotation -> Sales Order (customer credit limit check) -> Delivery Challan (FG batch allocation, E-Way) -> Sales Invoice (Dr Customer | Cr Sales | Cr GST) + COGS -> Sales Return / Credit Note -> Scrap sales (+1% TCS). E-Invoicing (IRN, NIC API) = bahar ki integration, alag decision. Sales ke mockups abhi nahi hain (sirf Customer master) — mock pehle.
+4. **Beech beech me, agar client maange:** TDS 194Q, stock module ke baaki hisse (final QC reverse, cost true-up, FIFO / WAVG).
+**Production output ke 3 faisle abhi khule** (user ne jawab nahi diya): (a) FG kab aaye — output post karte hi (recommended) ya pehle batch QC; (b) output me kya — Good / Scrap / Rework / machine + operator; (c) FG ki cost — issue hue RM ki value Good maal par baant do (recommended) ya scrap ko bhi value.
+
+
 > ⭐ **MOST IMPORTANT (2026-09-17): Manual Learning Mode** — Part 2 Flask backend me **user khud type karega**, AI sirf step-by-step sikhayega. Poora playbook: **`learning.md`**. Cursor rule: `.cursor/rules/manual-learning.mdc`. Claude: `CLAUDE.md` §0A.
 
 > Workflow: Sab mockups pehle (Part 1 mostly done) → phir backend micro-steps. UI text English, comments Hinglish.
@@ -182,13 +203,13 @@ Teaching style: direction + checklist; user types Flask; HTML/JS AI likhe jab us
 
 | Phase | Name | Status |
 |---|---|---|
-| 0 | Foundation, Auth & Multi-Tenancy | ⬜ Not Started |
-| 1 | Master Data Management & Dynamic Attributes | 🟡 In Progress (11 masters backend-complete; **Charges Master** added 2026-09-30 per client meeting §10.2, in progress) |
-| 2 | Procurement, GRN & Inward QC | 🟡 In Progress (mockups 5/5 built + verified; backend: PO List+Add+Confirm done 2026-09-29, GRN List+Add(draft/post) done 2026-09-29, **Inward QC List+Add+GRN-status-sync done 2026-09-29/30** — corrected from "not started", see Phase 2 tracker below) |
-| 3 | Inventory, Warehouse & Stock Valuation | 🟡 In Progress (stock mockups 4/4 + Warehouse Master mock added) |
-| 4 | Manufacturing Engine, BOM, Routing & WIP | 🟡 In Progress (mockups 6/6 built) |
-| 5 | Lab/QC & Finished Goods Traceability | ⬜ Not Started |
-| 6 | Sales, E-Way Bill & Mandatory E-Invoicing | ⬜ Not Started |
+| 0 | Foundation, Auth & Multi-Tenancy | ⬜ Not Started — **jaanbujhkar Sales ke baad** (user, 2026-10-19). Login nahi hai; PO print par sirf blank sign lines |
+| 1 | Master Data Management & Dynamic Attributes | ✅ Masters backend-complete (14 masters). Baaki: Unit conversion, Company Master, Department |
+| 2 | Procurement, GRN & Inward QC | ✅ Core complete (PO, GRN, QC, Invoice per GRN, Return, Docket); live. Baaki: TDS 194Q, direct invoice bina PO, accounting vouchers |
+| 3 | Inventory, Warehouse & Stock Valuation | ✅ Core complete (ledger, transfer, adjustment, valuation, opening stock, alerts); live. Baaki: final QC / GRN reverse, cost true-up, FIFO / WAVG engine, expiry alerts |
+| 4 | Manufacturing Engine, BOM, Routing & WIP | 🟡 Production Order + Release + Material Issue done. **Baaki: output + batch, scrap, routing, variance** (agla kaam) |
+| 5 | Lab/QC & Finished Goods Traceability | ⬜ Not Started (FG QC + FG recognition + QR) |
+| 6 | Sales, E-Way Bill & Mandatory E-Invoicing | ⬜ Not Started (Customer master hi hai) |
 | 7 | Tally-Grade Accounting & Bill-by-Bill | ⬜ Not Started |
 | 8 | Financial Reporting, GST & March Baki | ⬜ Not Started |
 | 9 | Expenses & Fixed Asset Management | ⬜ Not Started |
