@@ -10,6 +10,14 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **2026-10-19 — PROJECT KI SACHI STHITI + ROADMAP (user: "tracker, memory, development md check karo, update na ho to update karo").** Neeche ka phase-wise table aur roadmap ab sahi hai; iske neeche ke purane dated notes history hain. **Decision: auth / user-role (Phase 0) Sales tak ke modules ke baad.** BOM / Recipe ka sidebar link hata diya (recipe Product par hi hai).
 
+### 2026-10-19 — Production Order ka baaki hissa bana: machine clash, reschedule, cancel, planned vs issued
+- **Machine clash:** har stage ka din-wise window (`ProductionOrderStage.start_date / end_date`, planning.py). Order banate / reschedule karte waqt form me live warning ("PROD-xxx already uses Flux Mixer 1 ... (19 Oct to 22 Oct)"); server bhi rokta hai jab tak **"Save anyway"** tick na ho. Sirf Draft / Released orders ki booking ginti hai (Cancelled free). Hisaab day-level hai (aadha din bhi busy ginta hai) — conservative. Stage-level: order ke dusre stages ki alag machines hon to overlap hone par bhi clash nahi.
+- **Reschedule:** Draft / Released order ki start date + machines badlo (qty / recipe nahi). Plan-less order ko bhi plan mil sakta hai. Plan ka snapshot naye sire se likhta hai.
+- **Cancel:** reason zaroori, status "Cancelled" (delete nahi). Material issue (Draft / Posted) maujood ho to cancel nahi — pehle issue cancel karo. Naya tab: **Open | Cancelled**.
+- **Planned vs issued:** Released order ki material line me "issued x" (hara = poora issue).
+- **Tests:** `order_rest_test.py` 38/38 (clash decision brute-force se 12 start dates par match, JS widget), `plan_test.py` 38/38 (JS == Python stage windows bhi), purane suites pass. Migration `144f76f79068`.
+- **Abhi bhi baaki:** order ki quantity / product edit (abhi Cancel + naya order), machine ka real din-wise load (abhi day-level), actual vs plan (Routing tracker). Agla bada kaam: Production output + FG (3 khule sawal).
+
 ### 2026-10-19 — Production Order PLAN (stages + machines + time) bana (local, deploy ke saath live)
 - **User ne kaha:** order me hi dikhe ki per day kitna ban sakta hai, order me kitna time lagega, kaun se work stages aur machines. Aur soldering wire ke **asli** stages lo (purane Cutting / Crimping / lead-tin melting galat the).
 - **Kya bana:** (1) **Machine me numeric capacity** (KG/hr + hours/day, default 8). (2) **Product ka default routing** — Product Master me "Production stages" button. (3) **Production Order me "Production plan"** — start date, har stage ki machines (default sab usable tick), live: har stage ke ghante, kul ghante, kaam ke din (Mon–Sat, Sunday off), finish date, roz ka max (slowest stage = bottleneck). Order save par plan ka **snapshot** (stages + machines + capacity ki copy) — master baad me badle to purana order nahi badalta. Server khud hisaab karta hai (JS sirf dikhata hai; parity 300 random cases pass).

@@ -684,6 +684,10 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     daily_capacity = db.Column(db.Float, nullable=True)          # roz ka maximum, KG (sabse dheeme stage se)
     bottleneck_stage = db.Column(db.String(100), nullable=True)  # kaunsa stage sabse dheema hai
 
+    # Cancel: order delete nahi hota, status "Cancelled" + wajah (audit trail ke liye)
+    cancel_reason = db.Column(db.String(255), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+
     @property
     def issue_status(self):
         # Material issue ka haal, quantity se nikala (status column me store nahi): Not issued / Partly issued / Fully issued
@@ -1578,6 +1582,9 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     daily_capacity = db.Column(db.Float, nullable=True)          # KG / din
     planned_hours = db.Column(db.Float, nullable=True)
     planned_days = db.Column(db.Float, nullable=True)
+    # Is stage ka din-wise window (Sunday chhod ke). Machine clash isi se pakda jaata hai.
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
 
 
 class ProductionOrderStageMachine(CreatedAtMixin, db.Model):

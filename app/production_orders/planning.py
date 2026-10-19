@@ -29,10 +29,16 @@ def add_working_days(start, count):
     return day
 
 
+def windows_overlap(a_start, a_end, b_start, b_end):
+    # Do date-windows (dono taraf inclusive) ek doosre se takraate hain ya nahi
+    return a_start <= b_end and b_start <= a_end
+
+
 def plan_stages(batch_kg, stages, start_date):
     """batch_kg: kitne KG banana hai. stages: [{"stage_id", "name", "machines": [{"id", "name", "per_hour", "hours_per_day"}]}] (order me).
     Wapas: dict — har stage ka hisaab, total ghante, kaam ke din, start / end date, roz ka maximum (KG) aur kaunsa stage dheema hai."""
     rows = []
+    raw_days = []           # bina round kiye din (window ka hisaab inhi se, taaki rounding se din na khisake)
     total_hours = 0.0
     total_days = 0.0
     bottleneck = None
@@ -46,9 +52,19 @@ def plan_stages(batch_kg, stages, start_date):
         row = {"stage_id": stage["stage_id"], "name": stage["name"], "machines": stage["machines"],
                "per_hour": round(per_hour, 4), "per_day": round(per_day, 4), "hours": round(hours, 2), "days": round(days, 2)}
         rows.append(row)
+        raw_days.append(days)
         if per_day > 0 and (bottleneck is None or per_day < bottleneck["per_day"]):
             bottleneck = row
     working_days = max(int(math.ceil(total_days - 1e-9)), 1) if rows else 0
+    # Har stage ka din-wise window: pichhle stages ke din jod ke us stage ka pehla / aakhri kaam ka din.
+    # Aadha din bhi us din ko "busy" ginta hai (day-level hisaab, conservative) — machine clash isi se dekhte hain.
+    passed = 0.0
+    for row, days in zip(rows, raw_days):
+        first = int(math.floor(passed + 1e-9))
+        passed += days
+        last = max(int(math.ceil(passed - 1e-9)) - 1, first)
+        row["start_date"] = add_working_days(start_date, first + 1)
+        row["end_date"] = add_working_days(start_date, last + 1)
     start = next_working_day(start_date) if rows else None
     end = add_working_days(start_date, working_days) if rows else None
     return {

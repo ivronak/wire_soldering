@@ -57,14 +57,24 @@
 </div>
 
 <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+    <a href="{{ url_for('production_orders.production_orders_list', tab='open') }}"
+      class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'open' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+      Open <span class="tabular-nums">({{ open_count }})</span>
+    </a>
+    <a href="{{ url_for('production_orders.production_orders_list', tab='cancelled') }}"
+      class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'cancelled' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+      Cancelled <span class="tabular-nums">({{ cancelled_count }})</span>
+    </a>
+  </div>
   <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
-    Showing {{ result_count }} of {{ total_count }} orders · Material lines are copied from the product recipe when you save
+    Showing {{ result_count }} {{ 'cancelled' if tab == 'cancelled' else 'open' }} orders · Material lines are copied from the product recipe when you save
   </div>
   <div class="flex-1 overflow-auto min-h-0">
     <table class="po-table">
       <colgroup>
-        <col style="width:13%" /><col style="width:11%" /><col style="width:27%" />
-        <col style="width:11%" /><col style="width:9%" /><col style="width:15%" /><col style="width:14%" />
+        <col style="width:12%" /><col style="width:10%" /><col style="width:23%" />
+        <col style="width:12%" /><col style="width:8%" /><col style="width:12%" /><col style="width:23%" />
       </colgroup>
       <thead>
         <tr>
@@ -79,7 +89,7 @@
           <td style="text-align:left">{{ o.product.code if o.product else '—' }} — {{ o.product.name if o.product else '—' }}</td>
           <td class="font-mono">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.planned_end_date %}<div class="font-sans text-[11.5px] text-ink-faint">~{{ o.planned_hours|round(1) }} h · {{ o.planned_days }} working day{{ '' if o.planned_days == 1 else 's' }}<br>done by {{ o.planned_end_date.strftime('%d %b %Y') }}</div>{% endif %}</td>
           <td>{{ o.lines|length }}</td>
-          <td><span class="status-pill">{{ o.status }}</span>{% if o.status == 'Released' %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.issue_status }}</div>{% endif %}</td>
+          <td><span class="status-pill">{{ o.status }}</span>{% if o.status == 'Cancelled' and o.cancelled_at %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.cancelled_at.strftime('%d %b %Y') }}</div>{% endif %}{% if o.status == 'Released' %}<div class="text-[11.5px] text-ink-faint mt-0.5">{{ o.issue_status }}</div>{% endif %}</td>
           <td>
             {% if o.status == 'Draft' %}
             <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="inline js-confirm-submit"
@@ -90,13 +100,22 @@
             {% elif o.status == 'Released' %}
             <a href="{{ url_for('material_issues.material_issues_list') }}" class="px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">Material issue</a>
             {% endif %}
+            {% if o.status in ('Draft', 'Released') %}
+            <button type="button" class="btn-resched px-2 py-1 text-[12px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist" data-id="{{ o.id }}">Reschedule</button>
+            <button type="button" class="btn-cancel-order px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel</button>
+            {% endif %}
           </td>
         </tr>
+        {% if o.status == 'Cancelled' and o.cancel_reason %}
+        <tr>
+          <td colspan="7" style="text-align:left; background:#FEF2F2; font-size:12.5px; color:#B91C1C;"><strong>Cancelled:</strong> {{ o.cancel_reason }}</td>
+        </tr>
+        {% endif %}
         {% if o.stages %}
         <tr>
           <td colspan="7" style="text-align:left; background:#F4F8FE; font-size:12.5px; color:#2B5FA8;">
             <strong>Plan:</strong>
-            {% for st in o.stages %}{{ st.stage_name }} ({{ st.machines | map(attribute='machine_name') | join(', ') }}) {{ st.planned_hours|round(1) }} h{% if not loop.last %} → {% endif %}{% endfor %}
+            {% for st in o.stages %}{{ st.stage_name }} ({{ st.machines | map(attribute='machine_name') | join(', ') }}) {{ st.planned_hours|round(1) }} h{% if st.start_date %}, {{ st.start_date.strftime('%d %b') }}{% if st.end_date != st.start_date %}–{{ st.end_date.strftime('%d %b') }}{% endif %}{% endif %}{% if not loop.last %} → {% endif %}{% endfor %}
             · slowest stage {{ o.bottleneck_stage }}, up to {{ '%.0f'|format(o.daily_capacity or 0) }} KG per day
           </td>
         </tr>
@@ -107,7 +126,7 @@
             {% for line in o.lines %}
               {{ line.raw_material.code if line.raw_material else '—' }}
               {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}
-              {% if line.is_extra %}(added){% else %}({{ '%.1f'|format(line.ratio_percent) }}%){% endif %}{% if not loop.last %} · {% endif %}
+              {% if line.is_extra %}(added){% else %}({{ '%.1f'|format(line.ratio_percent) }}%){% endif %}{% if o.status == 'Released' %} <span style="color:{{ '#15803D' if line.remaining_qty <= 0 else '#8A4A1C' }};">issued {{ '%.2f'|format(line.issued_qty) }}</span>{% endif %}{% if not loop.last %} · {% endif %}
             {% endfor %}
           </td>
         </tr>
@@ -217,6 +236,48 @@
       <button type="button" id="btn-cancel-mo" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
       <button type="submit" form="mo-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save order</button>
     </div>
+  </div>
+</div>
+
+{# ---- Reschedule: start date aur machines badlo ---- #}
+<div id="rs-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true" style="display:none">
+  <div id="rs-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 class="text-[16px] font-bold text-ink">Reschedule <span id="rs-no"></span></h2>
+        <p class="text-[12.5px] text-ink-faint">Change the start date or the machines. Quantity and materials stay as they are.</p></div>
+      <button type="button" id="rs-close" class="w-8 h-8 text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div class="max-w-xs">
+        <label for="rs-start" class="block text-[12.5px] font-semibold text-ink mb-1">Planned start date</label>
+        <input type="date" id="rs-start" name="start_date" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      </div>
+      <div id="rs-plan" class="text-[13px] text-ink-faint"></div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="rs-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Close</button>
+      <button type="submit" form="rs-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save plan</button>
+    </div>
+  </div>
+</div>
+
+{# ---- Cancel order: wajah zaroori ---- #}
+<div id="co-modal" class="hidden fixed inset-0 z-50 items-center justify-center" aria-hidden="true" style="display:none">
+  <div id="co-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200"><h2 class="text-[16px] font-bold text-ink">Cancel <span id="co-no"></span></h2>
+      <p class="text-[12.5px] text-ink-faint">The order stays in the Cancelled tab. Its machines become free for other orders. If material was already issued, cancel those issues first.</p></div>
+    <form id="co-form" method="post" class="px-4 py-4 space-y-3">
+      <div>
+        <label for="co-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason *</label>
+        <input type="text" id="co-reason" name="reason" maxlength="255" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="co-close" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Keep order</button>
+        <button type="submit" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-stop border border-stop rounded hover:opacity-90">Cancel order</button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}
@@ -428,12 +489,13 @@
     }).join('');
   }
 
-  // ---------- Production plan (kitne ghante / din, kab tak) ----------
+  // ---------- Production plan (kitne ghante / din, kab tak, machine clash) ----------
   // Formula app/production_orders/planning.py ka JS mirror: stage ek ke baad ek, stage ki capacity = chuni machines ka jod,
-  // kaam ke din Monday-Saturday (Sunday off).
+  // kaam ke din Monday-Saturday (Sunday off). Ek hi widget naye order form aur Reschedule dono me chalta hai.
+  var BOOKINGS = {{ bookings | tojson }};   // {machine_id: [{order, stage, start, end}]} — Draft / Released orders ki booking
+  var RESCHED = {{ resched | tojson }};     // {order_id: {prod_no, batch_kg, routing, chosen, start}}
   var planBox = document.getElementById('mo-plan');
   var startInput = document.getElementById('mo-start');
-  var planProductId = null;
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   function parseIso(text) {
@@ -456,24 +518,38 @@
     }
     return d;
   }
+  function isoOf(d) { return d.toISOString().slice(0, 10); }
   function fmtDate(d) { return String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+  function fmtShort(iso) { var d = parseIso(iso); return String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()]; }
   function round2(x) { return Math.round((x + 1e-9) * 100) / 100; }
 
-  // stages: [{machines: [{per_hour, hours_per_day}]}] (sirf chuni hui machines). Wapas: stage-wise ghante / din + total
+  // stages: [{machines: [{per_hour, hours_per_day}]}] (sirf chuni hui machines). Wapas: stage-wise ghante / din / window + total
   function planFor(batchKg, stages, startIso) {
-    var rows = [], totalHours = 0, totalDays = 0, bottleneck = null;
+    var rows = [], rawDays = [], totalHours = 0, totalDays = 0, bottleneck = null;
     stages.forEach(function (stage) {
       var perHour = 0, perDay = 0;
       stage.machines.forEach(function (m) { perHour += m.per_hour; perDay += m.per_hour * m.hours_per_day; });
       var hours = perHour > 0 ? batchKg / perHour : 0;
       var days = perDay > 0 ? batchKg / perDay : 0;
       totalHours += hours; totalDays += days;
-      var row = { name: stage.name, perHour: perHour, perDay: perDay, hours: round2(hours), days: round2(days) };
+      var row = { name: stage.name, perHour: perHour, perDay: perDay, hours: round2(hours), days: round2(days), startIso: null, endIso: null };
       rows.push(row);
+      rawDays.push(days);
       if (perDay > 0 && (bottleneck === null || perDay < bottleneck.perDay)) bottleneck = row;
     });
     var start = parseIso(startIso);
     var workingDays = rows.length ? Math.max(Math.ceil(totalDays - 1e-9), 1) : 0;
+    if (start && rows.length) {
+      // Har stage ka window (planning.py jaisa): pichhle stages ke din jod ke
+      var passed = 0;
+      rows.forEach(function (row, i) {
+        var first = Math.floor(passed + 1e-9);
+        passed += rawDays[i];
+        var last = Math.max(Math.ceil(passed - 1e-9) - 1, first);
+        row.startIso = isoOf(addWorkingDays(start, first + 1));
+        row.endIso = isoOf(addWorkingDays(start, last + 1));
+      });
+    }
     return {
       stages: rows, totalHours: round2(totalHours), workingDays: workingDays,
       start: (start && rows.length) ? nextWorkingDay(start) : null,
@@ -482,57 +558,113 @@
     };
   }
 
-  function chosenStages(product) {
-    return product.routing.map(function (stage) {
-      var machines = [];
-      planBox.querySelectorAll('input[data-stage="' + stage.stage_id + '"]:checked').forEach(function (box) {
-        machines.push({ per_hour: parseFloat(box.getAttribute('data-per-hour')), hours_per_day: parseFloat(box.getAttribute('data-hours')) });
+  // Ek jagah ka planner widget: box ke andar stage table + summary banata hai. key badle to naye sire se render.
+  function makePlanWidget(box, startEl) {
+    var w = { key: null, clash: false };
+    w.reset = function (text) {
+      w.key = null; w.clash = false;
+      box.className = 'text-[13px] text-ink-faint';
+      box.textContent = text;
+    };
+    w.render = function (routing, chosen) {
+      // chosen: {stage_id: [machine ids]} ya null (sab usable machines tick)
+      box.className = 'space-y-2';
+      var html = '<div class="overflow-x-auto border border-slate-200 rounded"><table class="lines-table"><thead><tr><th style="width:4%">#</th><th style="width:22%">Stage</th><th>Machines to use</th><th style="width:12%">Time</th></tr></thead><tbody>';
+      routing.forEach(function (stage, index) {
+        var picked = chosen && chosen[String(stage.stage_id)];
+        var boxes = stage.machines.length ? stage.machines.map(function (m) {
+          var on = m.ok && (!picked || picked.indexOf(m.id) !== -1);
+          return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (m.ok ? 'text-ink' : 'text-ink-faint') + '">' +
+            '<input type="checkbox" class="plan-machine" name="machines_' + stage.stage_id + '" value="' + m.id + '" data-stage="' + stage.stage_id + '" data-name="' + esc(m.name) + '" data-per-hour="' + m.per_hour + '" data-hours="' + m.hours_per_day + '"' +
+            (on ? ' checked' : '') + (m.ok ? '' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + (m.ok ? m.per_hour + ' KG/hr' : 'set output per hour in Machines') + '</span></label>';
+        }).join('') : '<span class="text-ink-faint">No active machine for this stage. Add one in Machines.</span>';
+        html += '<tr><td class="text-ink-faint tabular-nums">' + (index + 1) + '</td><td class="font-semibold">' + esc(stage.name) + '</td><td>' + boxes + '</td>' +
+          '<td class="plan-time tabular-nums text-right">—</td></tr>';
       });
-      return { stage_id: stage.stage_id, name: stage.name, machines: machines };
-    });
+      html += '</tbody></table></div><div class="plan-summary rounded border border-brand-border bg-brand-soft px-3 py-2.5 text-[13px] text-ink space-y-0.5"></div>';
+      box.innerHTML = html;
+    };
+    w.chosen = function (routing) {
+      return routing.map(function (stage) {
+        var machines = [];
+        box.querySelectorAll('input.plan-machine[data-stage="' + stage.stage_id + '"]:checked').forEach(function (input) {
+          machines.push({ id: parseInt(input.value, 10), name: input.getAttribute('data-name'),
+            per_hour: parseFloat(input.getAttribute('data-per-hour')), hours_per_day: parseFloat(input.getAttribute('data-hours')) });
+        });
+        return { stage_id: stage.stage_id, name: stage.name, machines: machines };
+      });
+    };
+    // Dusre active orders ki booking se takrao (ownOrder = reschedule wale order ka no., use chhod do)
+    w.clashesFor = function (plan, chosen, ownOrder) {
+      var perOrder = {}, order = [];
+      plan.stages.forEach(function (row, i) {
+        if (!row.startIso) return;
+        chosen[i].machines.forEach(function (m) {
+          (BOOKINGS[String(m.id)] || []).forEach(function (b) {
+            if (b.order === ownOrder) return;
+            if (row.startIso <= b.end && b.start <= row.endIso) {
+              if (!perOrder[b.order]) { perOrder[b.order] = { machines: [], start: b.start, end: b.end }; order.push(b.order); }
+              var info = perOrder[b.order];
+              if (info.machines.indexOf(m.name) === -1) info.machines.push(m.name);
+              if (b.start < info.start) info.start = b.start;
+              if (b.end > info.end) info.end = b.end;
+            }
+          });
+        });
+      });
+      return order.map(function (no) {
+        var info = perOrder[no];
+        return esc(no) + ' already uses ' + info.machines.map(esc).join(', ') + ' (' + fmtShort(info.start) + ' to ' + fmtShort(info.end) + ').';
+      });
+    };
+    w.sync = function (key, routing, chosenMap, batchKg, ownOrder) {
+      if (String(w.key) !== String(key)) {
+        w.key = key;
+        if (!routing.length) {
+          w.clash = false;
+          box.className = 'text-[13px] text-ink-faint';
+          box.textContent = 'No production stages are set for this product, so there is no time plan. Set them with the Production stages button in Product Master.';
+          return;
+        }
+        w.render(routing, chosenMap);
+      }
+      if (!routing.length) return;
+      var chosen = w.chosen(routing);
+      var plan = planFor(batchKg, chosen, startEl.value);
+      box.querySelectorAll('.plan-time').forEach(function (cell, i) {
+        var row = plan.stages[i];
+        cell.textContent = row.perHour > 0 ? row.hours + ' h' : 'pick a machine';
+      });
+      var summaryEl = box.querySelector('.plan-summary');
+      var allowBox = box.querySelector('.plan-allow');
+      var wasAllowed = !!(allowBox && allowBox.checked);
+      var missing = plan.stages.filter(function (r) { return r.perHour <= 0; });
+      if (missing.length) {
+        w.clash = false;
+        summaryEl.innerHTML = '<span class="text-stop">Choose at least one machine for: ' + missing.map(function (r) { return esc(r.name); }).join(', ') + '.</span>';
+        return;
+      }
+      var clashes = w.clashesFor(plan, chosen, ownOrder);
+      w.clash = clashes.length > 0;
+      summaryEl.innerHTML =
+        '<div>Total time: <strong>' + plan.totalHours + ' hours</strong> (' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's') + ', Sunday off)</div>' +
+        (plan.start && plan.end ? '<div>Starts <strong>' + fmtDate(plan.start) + '</strong> · ready by <strong>' + fmtDate(plan.end) + '</strong></div>' : '') +
+        '<div>Most you can make per day: <strong>' + plan.dailyCapacity + ' KG</strong> <span class="text-ink-faint">(slowest stage: ' + esc(plan.bottleneck) + ')</span></div>' +
+        (clashes.length ? '<div class="mt-2 rounded px-2.5 py-2 text-[12.5px]" style="background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;"><strong>Machine clash</strong><br>' + clashes.join('<br>') +
+          '<label class="mt-1.5 flex items-center gap-1.5 text-ink"><input type="checkbox" name="allow_clash" value="1" class="plan-allow"' + (wasAllowed ? ' checked' : '') + '> Save anyway (both orders will use the machine on the same day)</label></div>' : '');
+    };
+    // Submit se pehle: clash hai aur "Save anyway" tick nahi to rok do
+    w.blocked = function () {
+      if (!w.clash) return false;
+      var allowBox = box.querySelector('.plan-allow');
+      return !(allowBox && allowBox.checked);
+    };
+    return w;
   }
-  function renderPlan(product) {
-    // Stages aur machines ke checkbox (sab usable machines pehle se tick). Sirf product badalne par naye sire se.
-    var routing = (product && product.routing) || [];
-    if (!product) { planBox.className = 'text-[13px] text-ink-faint'; planBox.textContent = 'Select a product to see its stages.'; return; }
-    if (!routing.length) {
-      planBox.className = 'text-[13px] text-ink-faint';
-      planBox.textContent = 'No production stages are set for this product, so there is no time plan. Set them with the Production stages button in Product Master.';
-      return;
-    }
-    planBox.className = 'space-y-2';
-    var html = '<div class="overflow-x-auto border border-slate-200 rounded"><table class="lines-table"><thead><tr><th style="width:4%">#</th><th style="width:22%">Stage</th><th>Machines to use</th><th style="width:12%">Time</th></tr></thead><tbody>';
-    routing.forEach(function (stage, index) {
-      var boxes = stage.machines.length ? stage.machines.map(function (m) {
-        return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (m.ok ? 'text-ink' : 'text-ink-faint') + '">' +
-          '<input type="checkbox" class="plan-machine" name="machines_' + stage.stage_id + '" value="' + m.id + '" data-stage="' + stage.stage_id + '" data-per-hour="' + m.per_hour + '" data-hours="' + m.hours_per_day + '"' +
-          (m.ok ? ' checked' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + (m.ok ? m.per_hour + ' KG/hr' : 'set output per hour in Machines') + '</span></label>';
-      }).join('') : '<span class="text-ink-faint">No active machine for this stage. Add one in Machines.</span>';
-      html += '<tr><td class="text-ink-faint tabular-nums">' + (index + 1) + '</td><td class="font-semibold">' + esc(stage.name) + '</td><td>' + boxes + '</td>' +
-        '<td class="plan-time tabular-nums text-right" data-stage="' + stage.stage_id + '">—</td></tr>';
-    });
-    html += '</tbody></table></div><div id="mo-plan-summary" class="rounded border border-brand-border bg-brand-soft px-3 py-2.5 text-[13px] text-ink space-y-0.5"></div>';
-    planBox.innerHTML = html;
-  }
-  function updatePlan(product, batchKg) {
-    if (String(planProductId) !== String(product.id)) { planProductId = product.id; renderPlan(product); }
-    if (!(product.routing && product.routing.length)) return;
-    var plan = planFor(batchKg, chosenStages(product), startInput.value);
-    planBox.querySelectorAll('.plan-time').forEach(function (cell, i) {
-      var row = plan.stages[i];
-      cell.textContent = row.perHour > 0 ? row.hours + ' h' : 'pick a machine';
-    });
-    var summary = document.getElementById('mo-plan-summary');
-    var missing = plan.stages.filter(function (r) { return r.perHour <= 0; });
-    if (missing.length) {
-      summary.innerHTML = '<span class="text-stop">Choose at least one machine for: ' + missing.map(function (r) { return esc(r.name); }).join(', ') + '.</span>';
-      return;
-    }
-    summary.innerHTML =
-      '<div>Total time: <strong>' + plan.totalHours + ' hours</strong> (' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's') + ', Sunday off)</div>' +
-      (plan.start && plan.end ? '<div>Starts <strong>' + fmtDate(plan.start) + '</strong> · ready by <strong>' + fmtDate(plan.end) + '</strong></div>' : '') +
-      '<div>Most you can make per day: <strong>' + plan.dailyCapacity + ' KG</strong> <span class="text-ink-faint">(slowest stage: ' + esc(plan.bottleneck) + ')</span></div>';
-  }
+  var mainPlan = makePlanWidget(planBox, startInput);
+  var rsBox = document.getElementById('rs-plan');
+  var rsStart = document.getElementById('rs-start');
+  var rsPlan = makePlanWidget(rsBox, rsStart);
 
   function todayIso() {
     var d = new Date();
@@ -543,7 +675,7 @@
   function openModal() {
     document.getElementById('mo-date').value = todayIso();
     startInput.value = todayIso();
-    planProductId = null;
+    mainPlan.reset('Select a product to see its stages.');
     categorySel.value = '';
     fillProducts();
     clearExtraLines();
@@ -559,8 +691,7 @@
     var product = byId[productSel.value];
     renderAttrs(product);
     if (!product) {
-      planProductId = null;
-      renderPlan(null);
+      mainPlan.reset('Select a product to see its stages.');
       qtyLabel.textContent = 'Quantity to make *';
       weightBox.classList.add('hidden');
       summary.textContent = '';
@@ -579,7 +710,7 @@
     var qty = parseFloat(qtyInput.value) || 0;
     var weight = isKg ? 1 : (parseFloat(weightInput.value) || 0);
     var batchKg = qty * weight;
-    updatePlan(product, batchKg);
+    mainPlan.sync(product.id, product.routing || [], null, batchKg, null);
     summary.textContent = isKg
       ? 'Making ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.'
       : (qty + ' ' + unitName + ' × ' + weight + ' KG each = ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.');
@@ -616,10 +747,64 @@
   planBox.addEventListener('change', function (event) {
     if (event.target.classList.contains('plan-machine')) refreshPlan();
   });
+
+  // ---------- Reschedule ----------
+  var rsModal = document.getElementById('rs-modal');
+  var rsForm = document.getElementById('rs-form');
+  var rsCurrent = null;
+  function rsRefresh() {
+    if (!rsCurrent) return;
+    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, rsCurrent.data.chosen, rsCurrent.data.batch_kg, rsCurrent.data.prod_no);
+  }
+  function rsClose() { rsModal.style.display = 'none'; rsModal.setAttribute('aria-hidden', 'true'); rsCurrent = null; }
+  document.querySelectorAll('.btn-resched').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-id');
+      var data = RESCHED[id];
+      if (!data) return;
+      rsCurrent = { id: id, data: data };
+      rsForm.action = '/production_orders/reschedule/' + id;
+      document.getElementById('rs-no').textContent = data.prod_no;
+      rsStart.value = data.start;
+      rsPlan.reset('');
+      rsModal.style.display = 'flex'; rsModal.setAttribute('aria-hidden', 'false');
+      rsRefresh();
+    });
+  });
+  rsStart.addEventListener('input', rsRefresh);
+  rsBox.addEventListener('change', function (event) {
+    if (event.target.classList.contains('plan-machine')) rsRefresh();
+  });
+  ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', rsClose); });
+  rsForm.addEventListener('submit', function (event) {
+    if (rsPlan.blocked()) {
+      event.preventDefault();
+      showToast('A machine is already booked on those days. Change the machines or the date, or tick "Save anyway".', 'error');
+    }
+  });
+
+  // ---------- Cancel order ----------
+  var coModal = document.getElementById('co-modal');
+  function coClose() { coModal.style.display = 'none'; coModal.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.btn-cancel-order').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.getElementById('co-form').action = '/production_orders/cancel/' + btn.getAttribute('data-id');
+      document.getElementById('co-no').textContent = btn.getAttribute('data-no');
+      document.getElementById('co-reason').value = '';
+      coModal.style.display = 'flex'; coModal.setAttribute('aria-hidden', 'false');
+      document.getElementById('co-reason').focus();
+    });
+  });
+  ['co-close', 'co-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', coClose); });
   document.getElementById('mo-form').addEventListener('submit', function (event) {
     if (!productSel.value) {
       event.preventDefault();
       showToast('Choose the product first: pick the category and then every attribute.', 'error');
+      return;
+    }
+    if (mainPlan.blocked()) {
+      event.preventDefault();
+      showToast('A machine is already booked on those days. Change the machines or the date, or tick "Save anyway".', 'error');
     }
   });
 </script>

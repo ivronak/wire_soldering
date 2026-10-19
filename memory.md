@@ -436,6 +436,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ko order banate waqt hi clarity chahiye (kitna time, kaun si machine, roz kitna). Stages sequential maane (time = jod); working week Mon–Sat (`WEEKLY_OFF` ek jagah, baad me calendar setting). Capacity numbers estimates hain — plant se confirm.
 **How to apply:** Plan ka formula sirf `app/production_orders/planning.py` me; form ka JS `planFor` uska mirror hai (dono badlo to parity test chalao). Machine / routing master badalne se purane orders na badlen (snapshot). Actual vs plan baad me Routing tracker se; machine-clash check baaki.
 
+### Decision: Production Order — machine clash, cancel, reschedule rules (2026-10-19)
+**Date:** 2026-10-19
+**Kya:** Clash = ek machine do active (Draft / Released) orders ke stage-windows me overlap (day-level). Server block karta hai jab tak "Save anyway". Cancel sirf Draft / Released par, reason mandatory, material issue (Draft / Posted) ho to block; order delete nahi hota (status Cancelled). Reschedule sirf start date + machines (qty / recipe nahi).
+**Kyun:** User ko order me hi clarity chahiye; machine double-booking chupke na ho. Cancel par WIP me issue hua maal bhoolna nahi chahiye (CLAUDE.md §5: no hard delete).
+**How to apply:** Naya status (jaise Completed) aaye to `ACTIVE_STATUSES` (routes.py) me tay karo ki booking ginni hai ya nahi. Clash logic `_clashes` + JS `makePlanWidget.clashesFor` dono badlo (aur `order_rest_test.py` chalao).
+
 ---
 
 ## Session Log

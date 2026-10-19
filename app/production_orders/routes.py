@@ -7,7 +7,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
-from app.production_orders.planning import plan_stages
+from app.production_orders.planning import plan_stages, windows_overlap
 
 production_orders_bp = Blueprint("production_orders", __name__, template_folder="templates")
 
@@ -38,10 +38,11 @@ def _routing_for(product):
     return stages
 
 
-def read_plan(product, batch_kg, order_date):
+def read_plan(product, batch_kg, order_date, routing=None):
     """Form se production plan padho: har stage ki chuni hui machines aur start date. (plan, error) wapas deta hai.
     Product ka routing na ho to (None, None): order bina plan ke ban jaata hai. Server khud hisaab lagata hai (JS ke dikhaye par bharosa nahi)."""
-    routing = _routing_for(product)
+    if routing is None:
+        routing = _routing_for(product)
     if not routing:
         return None, None
     start_raw = (request.form.get("start_date") or "").strip()
@@ -67,6 +68,76 @@ def read_plan(product, batch_kg, order_date):
             return None, f"Choose at least one machine for {stage['name']}."
         chosen.append({"stage_id": stage["stage_id"], "name": stage["name"], "machines": machines})
     return plan_stages(batch_kg, chosen, start_date), None
+
+
+ACTIVE_STATUSES = ("Draft", "Released")
+
+
+def _bookings(exclude_order_id=None):
+    """Kaun si machine kis din busy hai: {machine_id: [{order, stage, start, end}]} — sirf Draft / Released orders (Cancelled free).
+    Form ka JS isi se live warning dikhata hai, server bhi isi se save rokta hai."""
+    rows = (ProductionOrderStageMachine.query.join(ProductionOrderStage, ProductionOrderStageMachine.stage_id == ProductionOrderStage.id)
+            .join(ProductionOrder, ProductionOrderStage.production_order_id == ProductionOrder.id)
+            .filter(ProductionOrder.is_deleted == False, ProductionOrder.status.in_(ACTIVE_STATUSES),
+                    ProductionOrderStage.start_date.isnot(None)))
+    if exclude_order_id:
+        rows = rows.filter(ProductionOrder.id != exclude_order_id)
+    booked = {}
+    for row in rows.all():
+        stage = row.stage
+        booked.setdefault(row.machine_id, []).append({
+            "order": stage.production_order.prod_no, "stage": stage.stage_name,
+            "start": stage.start_date.isoformat(), "end": stage.end_date.isoformat()})
+    return booked
+
+
+def _clashes(plan, exclude_order_id=None):
+    # Plan ki har chuni machine ko doosre active orders ki booking se milao. Message order-wise ek line me
+    # ("PROD-2026-001: Flux Mixer 1, Melting Furnace 1 (19 Oct to 22 Oct)") — machine-wise 11 line ka message padhna mushkil hota hai.
+    booked = _bookings(exclude_order_id)
+    per_order = {}
+    for stage in plan["stages"]:
+        for machine in stage["machines"]:
+            for other in booked.get(machine["id"], []):
+                other_start = datetime.strptime(other["start"], "%Y-%m-%d").date()
+                other_end = datetime.strptime(other["end"], "%Y-%m-%d").date()
+                if windows_overlap(stage["start_date"], stage["end_date"], other_start, other_end):
+                    entry = per_order.setdefault(other["order"], {"machines": [], "start": other_start, "end": other_end})
+                    if machine["name"] not in entry["machines"]:
+                        entry["machines"].append(machine["name"])
+                    entry["start"] = min(entry["start"], other_start)
+                    entry["end"] = max(entry["end"], other_end)
+    return [f"{order_no} already uses {', '.join(info['machines'])} "
+            f"({info['start'].strftime('%d %b')} to {info['end'].strftime('%d %b %Y')})."
+            for order_no, info in per_order.items()]
+
+
+def _save_plan(order, plan):
+    # Order par plan ka snapshot likho (naya order aur reschedule dono). Purane stage rows pehle hata dete hain —
+    # ye plan ki copy hai (business document nahi), asli record order hi hai.
+    for old in list(order.stages):
+        for machine in list(old.machines):
+            db.session.delete(machine)
+        db.session.delete(old)
+    db.session.flush()
+    order.planned_start_date = plan["start_date"]
+    order.planned_end_date = plan["end_date"]
+    order.planned_hours = plan["total_hours"]
+    order.planned_days = plan["working_days"]
+    order.daily_capacity = plan["daily_capacity"]
+    order.bottleneck_stage = plan["bottleneck"]
+    for index, row in enumerate(plan["stages"]):
+        stage_row = ProductionOrderStage(
+            production_order_id=order.id, work_stage_id=row["stage_id"], stage_name=row["name"], sort_order=(index + 1) * 10,
+            capacity_per_hour=row["per_hour"], daily_capacity=row["per_day"], planned_hours=row["hours"], planned_days=row["days"],
+            start_date=row["start_date"], end_date=row["end_date"])
+        db.session.add(stage_row)
+        db.session.flush()
+        for machine in row["machines"]:
+            db.session.add(ProductionOrderStageMachine(
+                stage_id=stage_row.id, machine_id=machine["id"], machine_name=machine["name"],
+                capacity_per_hour=machine["per_hour"], hours_per_day=machine["hours_per_day"]))
+    db.session.flush()
 
 
 def _planner_products():
@@ -103,12 +174,35 @@ def _planner_products():
 
 @production_orders_bp.route("/production_orders")
 def production_orders_list():
-    orders = (
-        ProductionOrder.query.filter(ProductionOrder.is_deleted == False)
-        .order_by(ProductionOrder.id.desc())
-        .all()
-    )
+    # Open = Draft + Released (kaam chalu), Cancelled = alag tab (aage Completed bhi yahin judega)
+    tab = request.args.get("tab", "open")
+    if tab not in ("open", "cancelled"):
+        tab = "open"
+    base = ProductionOrder.query.filter(ProductionOrder.is_deleted == False)
+    open_count = base.filter(ProductionOrder.status.in_(ACTIVE_STATUSES)).count()
+    cancelled_count = base.filter(ProductionOrder.status == "Cancelled").count()
+    shown = base.filter(ProductionOrder.status == "Cancelled") if tab == "cancelled" else base.filter(ProductionOrder.status.in_(ACTIVE_STATUSES))
+    orders = shown.order_by(ProductionOrder.id.desc()).all()
     products, planner = _planner_products()
+    # Reschedule ke liye har open order ka data: kaun se stages, kaun si machines chuni hain, batch KG
+    resched = {}
+    for o in orders:
+        if o.status not in ACTIVE_STATUSES:
+            continue
+        if o.stages:
+            routing = []
+            for st in o.stages:
+                machines = Machines.query.filter(Machines.work_stage_id == st.work_stage_id, Machines.is_deleted == False,
+                                                 Machines.status == "active").order_by(Machines.code).all()
+                routing.append({"stage_id": st.work_stage_id, "name": st.stage_name, "machines": [{
+                    "id": m.id, "name": m.name, "per_hour": m.capacity_per_hour or 0, "hours_per_day": m.hours_per_day or 8,
+                    "ok": _is_kg(m)} for m in machines]})
+            chosen = {str(st.work_stage_id): [m.machine_id for m in st.machines] for st in o.stages}
+        else:
+            routing = _routing_for(o.product) if o.product else []
+            chosen = {}
+        resched[str(o.id)] = {"prod_no": o.prod_no, "batch_kg": o.planned_qty * o.unit_weight, "routing": routing, "chosen": chosen,
+                              "start": o.planned_start_date.isoformat() if o.planned_start_date else o.order_date.isoformat()}
     categories = (
         ProductCategories.query.filter(
             ProductCategories.is_deleted == False,
@@ -132,8 +226,13 @@ def production_orders_list():
         "production_orders.html",
         active_nav="production_orders",
         orders=orders,
+        tab=tab,
+        open_count=open_count,
+        cancelled_count=cancelled_count,
         total_count=len(orders),
         result_count=len(orders),
+        bookings=_bookings(),
+        resched=resched,
         products=products,
         categories=categories,
         planner=planner,
@@ -190,6 +289,11 @@ def production_orders_add():
     if plan_error:
         flash(plan_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
+    if plan and not request.form.get("allow_clash"):
+        clashes = _clashes(plan)
+        if clashes:
+            flash("Machine clash: " + " ".join(clashes) + " Change the machines or the start date, or tick \"Save anyway\".", "error")
+            return redirect(url_for("production_orders.production_orders_list"))
     year = order_date.year
     count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
     prod_no = f"PROD-{year}-{count + 1:03d}"
@@ -204,28 +308,12 @@ def production_orders_add():
         remarks=remarks,
         is_deleted=False,
     )
-    if plan:
-        order.planned_start_date = plan["start_date"]
-        order.planned_end_date = plan["end_date"]
-        order.planned_hours = plan["total_hours"]
-        order.planned_days = plan["working_days"]
-        order.daily_capacity = plan["daily_capacity"]
-        order.bottleneck_stage = plan["bottleneck"]
     db.session.add(order)
     db.session.flush()
 
     # Plan ke stages aur machines ki copy (master badle to purana order na badle)
     if plan:
-        for index, row in enumerate(plan["stages"]):
-            stage_row = ProductionOrderStage(
-                production_order_id=order.id, work_stage_id=row["stage_id"], stage_name=row["name"], sort_order=(index + 1) * 10,
-                capacity_per_hour=row["per_hour"], daily_capacity=row["per_day"], planned_hours=row["hours"], planned_days=row["days"])
-            db.session.add(stage_row)
-            db.session.flush()
-            for machine in row["machines"]:
-                db.session.add(ProductionOrderStageMachine(
-                    stage_id=stage_row.id, machine_id=machine["id"], machine_name=machine["name"],
-                    capacity_per_hour=machine["per_hour"], hours_per_day=machine["hours_per_day"]))
+        _save_plan(order, plan)
 
     # Master recipe ki id save nahi karte. Ratio aur qty is order pe copy.
     for r in product.recipe_items:
@@ -306,4 +394,55 @@ def production_orders_release(order_id):
     order.status = "Released"
     db.session.commit()
     flash(f"Production order {order.prod_no} released. Its material can now be issued from the Material issue page.", "success")
+    return redirect(url_for("production_orders.production_orders_list"))
+
+
+@production_orders_bp.route("/production_orders/cancel/<int:order_id>", methods=["POST"])
+def production_orders_cancel(order_id):
+    # Order delete nahi hota, status "Cancelled" + wajah (audit). Material issue ho chuka (ya draft issue pada) ho to cancel nahi:
+    # pehle wo issues cancel karo taaki stock wapas store me aaye — warna WIP me phansa maal bhool jaayega.
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    if order.status not in ACTIVE_STATUSES:
+        flash("Only a draft or released production order can be cancelled.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    reason = (request.form.get("reason") or "").strip()
+    if not reason:
+        flash("Enter the reason for cancelling.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    live_issues = [i.issue_no for i in order.issues if not i.is_deleted and i.status != "Cancelled"]
+    if live_issues:
+        flash(f"{order.prod_no} has material issues ({', '.join(live_issues)}). Cancel those in Material issue first, then cancel the order.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    order.status = "Cancelled"
+    order.cancel_reason = reason[:255]
+    order.cancelled_at = datetime.utcnow()
+    db.session.commit()
+    flash(f"Production order {order.prod_no} cancelled. Its machine booking is free again.", "success")
+    return redirect(url_for("production_orders.production_orders_list"))
+
+
+@production_orders_bp.route("/production_orders/reschedule/<int:order_id>", methods=["POST"])
+def production_orders_reschedule(order_id):
+    # Draft / Released order ki start date aur machines badlo; plan naye sire se hisaab hota hai. Qty / recipe yahan nahi badalte.
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    if order.status not in ACTIVE_STATUSES:
+        flash("Only a draft or released production order can be rescheduled.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    routing = ([{"stage_id": st.work_stage_id, "name": st.stage_name} for st in order.stages]
+               if order.stages else _routing_for(order.product))
+    if not routing:
+        flash("This product has no production stages. Set them in Product Master first.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    plan, plan_error = read_plan(order.product, order.planned_qty * order.unit_weight, order.order_date, routing)
+    if plan_error:
+        flash(plan_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if not request.form.get("allow_clash"):
+        clashes = _clashes(plan, exclude_order_id=order.id)
+        if clashes:
+            flash("Machine clash: " + " ".join(clashes) + " Change the machines or the start date, or tick \"Save anyway\".", "error")
+            return redirect(url_for("production_orders.production_orders_list"))
+    _save_plan(order, plan)
+    db.session.commit()
+    flash(f"Plan updated for {order.prod_no}: ready by {plan['end_date'].strftime('%d %b %Y')}.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
