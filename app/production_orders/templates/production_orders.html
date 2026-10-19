@@ -345,20 +345,19 @@
       cascadeNote.textContent = 'No product has this combination.';
       return;
     }
-    if (matches.length === 1 || chosen.length >= fields.length) {
+    if (chosen.length >= fields.length) {
+      // Saare attributes chun liye gaye (chahe ek hi product ho, har attribute ka step dikhta hai)
       setProductChoices(matches, matches.length === 1 ? '' : 'Select product');
-      if (matches.length === 1) {
-        cascadeNote.textContent = chosen.length < fields.length ? 'Only one product matches, so the rest is decided: ' + matches[0].name : 'Product found: ' + matches[0].name;
-      }
+      if (matches.length === 1) cascadeNote.textContent = 'Product found: ' + matches[0].name;
       return;
     }
-    // Abhi kai products bache hain aur attributes baaki: agla step banao
+    // Attributes baaki hain: agla step banao (chahe ab ek hi product bacha ho — saare steps dikhte hain)
     var next = chosen.length;
     var values = optionValues(fields, chosen, next);
     cascadeBox.insertAdjacentHTML('beforeend', stepSelectHtml(next, fields[next], values));
     setProductChoices([], 'Choose the attributes above');
     if (values.length === 1) {
-      // Sirf ek hi option hai to khud chun do aur aage badho
+      // Sirf ek hi option hai to pehle se chuna hua dikhta hai (badal sakte ho), aur agla step khulta hai
       var select = cascadeBox.querySelector('.cascade-step[data-index="' + next + '"] .cascade-select');
       select.value = values[0];
       updateCascade(next);
