@@ -10,6 +10,15 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **2026-10-19 — PROJECT KI SACHI STHITI + ROADMAP (user: "tracker, memory, development md check karo, update na ho to update karo").** Neeche ka phase-wise table aur roadmap ab sahi hai; iske neeche ke purane dated notes history hain. **Decision: auth / user-role (Phase 0) Sales tak ke modules ke baad.** BOM / Recipe ka sidebar link hata diya (recipe Product par hi hai).
 
+### 2026-10-19 — ROUTING / STAGES TRACKER bana (user: "abhi to routing ka karna he na")
+- **Kya:** `/routing` (sidebar "Routing / stages" ab asli): In production orders ke har stage ka **asli kaam** plan ke saath. Stage ek ke baad ek: **Pending -> In progress (Start) -> Done (Complete)**. Start: operator (naam, pichhle naamon ka suggestion) + start time (default abhi, backdate ho sakta). Complete: finish time, **machines jo asli me chali** (plan wali tick; unticked = use nahi hui; usi stage ki doosri active machine bhi tick ho sakti — "added"), **qty out (KG)**, **scrap (KG)**, notes. Pichhle stage ka out = agle ka in (pehle stage me batch KG); out + scrap in se zyada nahi.
+- **Plan vs actual:** har stage ke ghante (planned vs actual, +/- h), qty in -> out, yield %; order par progress bar, "On track / Behind N days / Ahead", **forecast finish** (planned end + delay, working day), scrap total, final yield. Sab stage ho jaye to "All stages done" tab — agla kaam Production output (FG).
+- **Reopen:** sirf aakhri Done stage (agla stage shuru na hua ho) — galti sudharne ke liye; chalte waqt jodi machine hat jaati hai. Stage kabhi delete nahi.
+- **Production queue se jod:** In production card par "x/8 stages done · <stage> running" (link), progress bar asli stages se; ⋯ menu me "Routing / stages".
+- Models: `ProductionOrderStage` me status / started_at / completed_at / operator / qty_in / qty_out / scrap_qty / notes; `ProductionOrderStageMachine` me is_planned / used (migration `a47b73bb7331`). Code `app/routing/`. Time IST (naive).
+- Tests: `rt_test.py` 50/50 (validations, order rules, machines, reopen, delay / forecast math, pages), queue 73, mret 66, mi 31, plan 38.
+- **Baaki:** machine-wise busy hours / downtime, forecast se queue ki dates khisakna (abhi sirf dikhta hai), stage-wise scrap ko Scrap module se jodna, Production output + FG.
+
 ### 2026-10-19 — PRINTS: Nrupex letterhead (PO print jaisa) — Material issue slip, Material return slip, **Production order print**
 - User: "print slip wo nrupex ki print hi honi chahiye jese PO me thi, aur same production order ki bhi print". Shared base `app/templates/print_base.html` (Nrupex logo + Nrupex Solder LLP address / GSTIN / PAN, A4, Back + Print toolbar, "Stronger Together" footer, same colours / fonts as PO print). Naye prints isi ko extend karte hain.
 - **Production order print** (`/production_orders/<id>/print`; queue card ke ⋯ menu me "Print order"): dates (order / needed by / starts / ready by), product + attributes, Raw material (ratio, required, issued), Production plan (stage, machines, ghante, dates), totals (batch size, time, working days, most per day, Ready by), Prepared by / Approved by.

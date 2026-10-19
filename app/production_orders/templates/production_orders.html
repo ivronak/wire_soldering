@@ -166,7 +166,11 @@
         {% elif sc %}
         <div class="po-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
         <div class="po-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · ~{{ (o.planned_hours or 0)|round(0)|int }} h</div>
-        {% if o.status == 'In production' %}<div class="po-bar" title="{{ progress.get(o.id, 0) }}% of the planned time has passed"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>{% endif %}
+        {% if o.status == 'In production' %}
+        {% set sn = stage_now.get(o.id) %}
+        <div class="po-bar" title="{{ progress.get(o.id, 0) }}%"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>
+        {% if sn %}<div class="po-meta mt-1"><a href="{{ url_for('routing.routing_list') }}" style="color:#8A4A1C;font-weight:600;text-decoration:none">{{ sn.done }}/{{ sn.total }} stages done{% if sn.name %} · {{ sn.name }} {{ 'running' if sn.state == 'In progress' else 'next' }}{% endif %}</a></div>{% endif %}
+        {% endif %}
         <div class="flex flex-wrap gap-1 mt-1.5">
           {% if late_days %}<span class="po-chip bad"><i></i>Late {{ late_days }}d · needed {{ dshort(o.needed_by_date) }}</span>
           {% elif o.needed_by_date %}<span class="po-chip ok"><i></i>On time · needed {{ dshort(o.needed_by_date) }}</span>{% endif %}
@@ -191,6 +195,7 @@
         <details class="po-menu"><summary aria-label="More actions">⋯</summary>
           <div class="items">
             <a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank">Print order</a>
+            {% if o.status == 'In production' %}<a href="{{ url_for('routing.routing_list') }}">Routing / stages</a>{% endif %}
             {% if o.status in ('Draft', 'Released') %}
             {% if o.status == 'Released' %}<a href="{{ url_for('material_issues.material_issues_list') }}">Issue material</a>{% endif %}
             <button type="button" class="btn-resched" data-id="{{ o.id }}">Reschedule / change machines</button>

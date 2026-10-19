@@ -190,6 +190,15 @@ def production_orders_list():
         if o.status == "In production" and info:
             total = max((info["end"] - info["start"]).days + 1, 1)
             progress[o.id] = int(min(max((today - info["start"]).days + 1, 0) / total, 1) * 100)
+    # Routing tracker ka haal (kitne stage ho chuke, abhi kaun sa) — progress bar ab asli stages se, jab kaam shuru ho chuka ho
+    stage_now = {}
+    for o in queue:
+        if o.status == "In production" and o.stages:
+            done = len([st for st in o.stages if st.status == "Done"])
+            current = next((st for st in o.stages if st.status != "Done"), None)
+            stage_now[o.id] = {"done": done, "total": len(o.stages), "name": current.stage_name if current else None, "state": current.status if current else "Done"}
+            if any(st.status != "Pending" for st in o.stages):
+                progress[o.id] = int(100 * done / len(o.stages))
     timeline = build_timeline(queue, schedule, today, by) if tab == "timeline" else None
     products, planner = _planner_products()
     # Reschedule ke liye har open order ka data: kaun se stages, kaun si machines chuni hain, batch KG
@@ -245,6 +254,7 @@ def production_orders_list():
         today=today,
         kpi=kpi,
         progress=progress,
+        stage_now=stage_now,
         timeline=timeline,
         by=by,
         store_stock={str(k): v for k, v in store_stock_by_material().items()},

@@ -454,6 +454,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** Production me bacha / galat maal store me wapas aana chahiye (traceability aur sahi stock); Draft issue stock nahi hilata isliye start ke liye kaafi nahi.
 **How to apply:** Naye stock movement types `MRET_OUT` / `MRET_IN`, ref type `MRETURN`. Production output module aaye to WIP consumption par return / issue-cancel guards dobara dekhne honge. `posting.py` me `return_to_stock` / `return_cancelled` purchase return ke hain — material return ke naam `material_return_post` / `material_return_cancel` (naam mat takrao).
 
+### Decision: Routing tracker — sequential stages, actuals on the order's stage rows (2026-10-19)
+**Date:** 2026-10-19
+**Kya:** Routing ka asli record `ProductionOrderStage` par hi (status / start / end / operator / qty in-out / scrap / machines used). Stages strictly ek ke baad ek. Reopen sirf aakhri Done stage. Forecast = planned end + delay (display only; scheduler / queue dates nahi badalte).
+**Kyun:** Plan (stages, machines, ghante) pehle se order par snapshot hai; actual usi ke saath rakhne se plan vs actual seedha dikhta hai, alag table ki zaroorat nahi.
+**How to apply:** Production output / Scrap module banate waqt stage ka `scrap_qty` aur `qty_out` (aakhri stage) input maano. Overlapping stages (pipeline) chahiye to start rule `_previous_stages` (routing/routes.py) me badlo.
+
 ---
 
 ## Session Log

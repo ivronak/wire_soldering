@@ -1,0 +1,266 @@
+# Routing / stages tracker: In production order ke har stage ka ASLI kaam — kisne, kaun si machine, kab se kab tak, kitna maal nikla — plan ke saath.
+# Stage ek ke baad ek chalte hain (Pending -> In progress -> Done). Stage kabhi delete nahi hota; galti ho to sirf aakhri Done stage "Reopen" hota hai.
+# Plan (stages / machines / dates) production_orders me bana hai; yahan sirf asli record aur plan se farak (late / early) dikhta hai.
+from datetime import datetime, timedelta
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+
+from app.extensions import db
+from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine
+from app.production_orders.planning import next_working_day
+from app.production_orders.scheduler import now_ist, today_ist
+
+routing_bp = Blueprint("routing", __name__, template_folder="templates")
+
+EPS = 0.0001
+
+
+def _back(tab="running"):
+    return redirect(url_for("routing.routing_list", tab=tab))
+
+
+def order_batch_kg(order):
+    return round(order.planned_qty * order.unit_weight, 4)
+
+
+def order_summary(order, today):
+    """Ek order ka routing haal: stage-wise asli vs plan, progress, kitna late / early, forecast finish.
+    delay_days: + = plan se late, - = jaldi. Plan ki dates order ke frozen stage windows se (start_date / end_date)."""
+    stages = list(order.stages)
+    done = [s for s in stages if s.status == "Done"]
+    current = next((s for s in stages if s.status != "Done"), None)
+    delay = 0
+    last_done = done[-1] if done else None
+    if last_done and last_done.completed_at and last_done.end_date:
+        delay = (last_done.completed_at.date() - last_done.end_date).days
+    if current is not None and current.end_date and today > current.end_date:
+        delay = max(delay, (today - current.end_date).days)          # abhi ka stage plan ki aakhri date nikal chuka
+    elif current is not None and current.status == "Pending" and current.start_date and today > current.start_date and not done:
+        delay = max(delay, (today - current.start_date).days)        # pehla stage start hi nahi hua
+    planned_end = order.planned_end_date
+    forecast = None
+    if planned_end:
+        forecast = planned_end + timedelta(days=max(delay, 0))
+        forecast = next_working_day(forecast)
+    planned_h = sum(s.planned_hours or 0 for s in done)
+    actual_h = sum(s.actual_hours or 0 for s in done)
+    in_progress = next((s for s in stages if s.status == "In progress"), None)
+    return {
+        "stages": stages, "done": len(done), "total": len(stages), "current": current, "in_progress": in_progress,
+        "all_done": bool(stages) and len(done) == len(stages),
+        "pct": int(round(100 * len(done) / len(stages))) if stages else 0,
+        "delay": delay, "forecast": forecast, "planned_end": planned_end,
+        "planned_h": round(planned_h, 1), "actual_h": round(actual_h, 1),
+        "scrap": round(sum(s.scrap_qty or 0 for s in done), 2),
+        "yield_pct": round(100 * done[-1].qty_out / order_batch_kg(order), 1) if done and done[-1].qty_out and order_batch_kg(order) else None,
+    }
+
+
+def _machine_choices(stage):
+    # Is stage ke liye machines: plan wali + usi work stage ki baaki active machines (kharab ho to doosri chalani pade)
+    planned_ids = {m.machine_id for m in stage.machines}
+    choices = []
+    for m in stage.machines:
+        choices.append({"id": m.machine_id, "name": m.machine_name, "planned": m.is_planned, "used": m.used})
+    others = Machines.query.filter(Machines.work_stage_id == stage.work_stage_id, Machines.is_deleted == False,
+                                   Machines.status == "active").order_by(Machines.code).all()
+    for m in others:
+        if m.id not in planned_ids:
+            choices.append({"id": m.id, "name": m.name, "planned": False, "used": False})
+    return choices
+
+
+@routing_bp.route("/routing")
+def routing_list():
+    tab = request.args.get("tab", "running")
+    if tab not in ("running", "done"):
+        tab = "running"
+    today = today_ist()
+    orders = (ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status == "In production")
+              .order_by(ProductionOrder.queue_position, ProductionOrder.id).all())
+    summaries = {o.id: order_summary(o, today) for o in orders}
+    running = [o for o in orders if summaries[o.id]["stages"] and not summaries[o.id]["all_done"]]
+    finished = [o for o in orders if summaries[o.id]["all_done"]]
+    shown = running if tab == "running" else finished
+    kpi = {"orders": len(running), "active": len([o for o in running if summaries[o.id]["in_progress"]]),
+           "late": len([o for o in running if summaries[o.id]["delay"] > 0]), "ready": len(finished)}
+    # Drawers ke liye: har stage ka data (JS) — sirf jo abhi kuch kar sakte hain (current stage)
+    actions = {}
+    for o in shown:
+        sm = summaries[o.id]
+        cur = sm["current"]
+        if cur is None:
+            continue
+        prev = [s for s in sm["stages"] if s.sort_order < cur.sort_order]
+        qty_in = (prev[-1].qty_out if prev else order_batch_kg(o))
+        actions[str(cur.id)] = {
+            "stage_id": cur.id, "order": o.prod_no, "stage": cur.stage_name, "status": cur.status,
+            "operator": cur.operator or "", "qty_in": cur.qty_in if cur.qty_in is not None else qty_in,
+            "planned_hours": cur.planned_hours, "machines": _machine_choices(cur),
+            "started_at": cur.started_at.strftime("%d %b %H:%M") if cur.started_at else "",
+        }
+    operators = [r[0] for r in db.session.query(ProductionOrderStage.operator).filter(ProductionOrderStage.operator.isnot(None)).distinct().order_by(ProductionOrderStage.operator).all()]
+    return render_template(
+        "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
+        operators=operators, running_count=len(running), done_count=len(finished), today=today,
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"),
+    )
+
+
+def _read_when(field):
+    # <input type="datetime-local"> ki value -> naive IST datetime; khaali ho to abhi. (value, error)
+    raw = (request.form.get(field) or "").strip()
+    if not raw:
+        return now_ist().replace(second=0, microsecond=0), None
+    try:
+        value = datetime.strptime(raw, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return None, "Enter a valid date and time."
+    if value > now_ist() + timedelta(minutes=5):
+        return None, "The time cannot be in the future."
+    return value, None
+
+
+def _stage_for_action(stage_id):
+    stage = db.session.get(ProductionOrderStage, stage_id)
+    if stage is None:
+        return None, None, "Stage not found."
+    order = stage.production_order
+    if order is None or order.is_deleted or order.status != "In production":
+        return None, None, "Routing can be updated only for an order that is in production."
+    return stage, order, None
+
+
+def _previous_stages(order, stage):
+    return [s for s in order.stages if s.sort_order < stage.sort_order]
+
+
+@routing_bp.route("/routing/start/<int:stage_id>", methods=["POST"])
+def routing_start(stage_id):
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if stage.status != "Pending":
+        flash(f"{stage.stage_name} has already been started.", "error")
+        return _back()
+    previous = _previous_stages(order, stage)
+    not_done = [s.stage_name for s in previous if s.status != "Done"]
+    if not_done:
+        flash(f"Finish {not_done[0]} first. Stages run one after another.", "error")
+        return _back()
+    operator = (request.form.get("operator") or "").strip()[:60]
+    if not operator:
+        flash("Enter the operator's name.", "error")
+        return _back()
+    started_at, error = _read_when("started_at")
+    if error:
+        flash(error, "error")
+        return _back()
+    if previous and previous[-1].completed_at and started_at < previous[-1].completed_at:
+        flash(f"{stage.stage_name} cannot start before {previous[-1].stage_name} finished ({previous[-1].completed_at.strftime('%d %b %H:%M')}).", "error")
+        return _back()
+    stage.status = "In progress"
+    stage.started_at = started_at
+    stage.operator = operator
+    stage.qty_in = previous[-1].qty_out if previous else order_batch_kg(order)
+    stage.notes = (request.form.get("notes") or "").strip()[:255] or None
+    db.session.commit()
+    flash(f"{stage.stage_name} started for {order.prod_no}.", "success")
+    return _back()
+
+
+@routing_bp.route("/routing/complete/<int:stage_id>", methods=["POST"])
+def routing_complete(stage_id):
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if stage.status != "In progress":
+        flash(f"{stage.stage_name} is not running. Start it first.", "error")
+        return _back()
+    completed_at, error = _read_when("completed_at")
+    if error:
+        flash(error, "error")
+        return _back()
+    if completed_at < stage.started_at:
+        flash("The finish time cannot be before the start time.", "error")
+        return _back()
+    qty_out = request.form.get("qty_out", type=float)
+    scrap = request.form.get("scrap_qty", type=float) or 0.0
+    if qty_out is None or qty_out <= 0:
+        flash("Enter the quantity (KG) that came out of this stage.", "error")
+        return _back()
+    if scrap < 0:
+        flash("Scrap cannot be negative.", "error")
+        return _back()
+    qty_in = stage.qty_in or 0
+    if qty_out + scrap > qty_in + EPS:
+        flash(f"Output ({qty_out:g}) plus scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} KG).", "error")
+        return _back()
+    # Machines jo asli me chali: plan wali + usi work stage ki koi bhi active machine
+    ids = {int(x) for x in request.form.getlist("machine_ids") if x.isdigit()}
+    if not ids:
+        flash("Tick at least one machine that was used.", "error")
+        return _back()
+    planned = {m.machine_id: m for m in stage.machines}
+    extra = []
+    for machine_id in ids:
+        if machine_id in planned:
+            continue
+        machine = db.session.get(Machines, machine_id)
+        if machine is None or machine.is_deleted or machine.status != "active" or machine.work_stage_id != stage.work_stage_id:
+            flash("A chosen machine does not belong to this stage.", "error")
+            return _back()
+        extra.append(machine)
+    for machine_id, row in planned.items():
+        row.used = machine_id in ids
+    for machine in extra:
+        db.session.add(ProductionOrderStageMachine(stage_id=stage.id, machine_id=machine.id, machine_name=machine.name,
+                                                   capacity_per_hour=machine.capacity_per_hour or 0, hours_per_day=machine.hours_per_day or 8,
+                                                   is_planned=False, used=True))
+    operator = (request.form.get("operator") or "").strip()[:60]
+    if operator:
+        stage.operator = operator
+    stage.status = "Done"
+    stage.completed_at = completed_at
+    stage.qty_out = round(qty_out, 4)
+    stage.scrap_qty = round(scrap, 4)
+    note = (request.form.get("notes") or "").strip()[:255]
+    if note:
+        stage.notes = note
+    db.session.commit()
+    summary = order_summary(order, today_ist())
+    if summary["all_done"]:
+        flash(f"{stage.stage_name} done. All stages of {order.prod_no} are complete.", "success")
+        return _back("done")
+    flash(f"{stage.stage_name} done for {order.prod_no}. Next: {summary['current'].stage_name}.", "success")
+    return _back()
+
+
+@routing_bp.route("/routing/reopen/<int:stage_id>", methods=["POST"])
+def routing_reopen(stage_id):
+    # Galti sudharne ke liye: sirf aakhri Done stage, aur tab jab agla stage shuru na hua ho
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if stage.status != "Done":
+        flash("Only a finished stage can be reopened.", "error")
+        return _back()
+    later = [s for s in order.stages if s.sort_order > stage.sort_order and s.status != "Pending"]
+    if later:
+        flash(f"{later[0].stage_name} has already started, so {stage.stage_name} cannot be reopened.", "error")
+        return _back()
+    for row in list(stage.machines):
+        if not row.is_planned:
+            db.session.delete(row)          # chalte waqt jodi gayi machine hata do; plan wali rehti hain
+        else:
+            row.used = False
+    stage.status = "In progress"
+    stage.completed_at = None
+    stage.qty_out = None
+    stage.scrap_qty = None
+    db.session.commit()
+    flash(f"{stage.stage_name} reopened. Enter the finish details again.", "success")
+    return _back()

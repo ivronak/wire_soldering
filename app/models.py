@@ -1656,6 +1656,23 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     start_date = db.Column(db.Date, nullable=True)
     end_date = db.Column(db.Date, nullable=True)
 
+    # Routing tracker: asli kaam ka record (Pending -> In progress -> Done). Stage kabhi delete nahi hota; history yahin rehti hai.
+    status = db.Column(db.String(12), default="Pending", server_default="Pending", nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)       # IST (naive)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    operator = db.Column(db.String(60), nullable=True)
+    qty_in = db.Column(db.Float, nullable=True)              # KG jo is stage me aaya (pichhle stage ka out; pehle stage me batch KG)
+    qty_out = db.Column(db.Float, nullable=True)             # KG jo ye stage poora karke aage gaya
+    scrap_qty = db.Column(db.Float, nullable=True)           # KG jo is stage me kharab hua
+    notes = db.Column(db.String(255), nullable=True)
+
+    @property
+    def actual_hours(self):
+        # Asli lage ghante (start se end tak wall-clock). Abhi chal raha ho to start se ab tak nahi — sirf poora hone par
+        if self.started_at and self.completed_at:
+            return round((self.completed_at - self.started_at).total_seconds() / 3600, 2)
+        return None
+
 
 class ProductionOrderStageMachine(CreatedAtMixin, db.Model):
     # Is stage ke liye chuni hui machine (naam aur capacity ki copy, machine master badle to plan na badle)
@@ -1669,3 +1686,6 @@ class ProductionOrderStageMachine(CreatedAtMixin, db.Model):
     machine_name = db.Column(db.String(100), nullable=False)
     capacity_per_hour = db.Column(db.Float, nullable=False)
     hours_per_day = db.Column(db.Float, nullable=False)
+    # Routing tracker: plan me thi (True) ya stage chalate waqt kisi doosri machine ko jod diya (False); aur asli me use hui ya nahi
+    is_planned = db.Column(db.Boolean, default=True, server_default="1", nullable=False)
+    used = db.Column(db.Boolean, default=False, server_default="0", nullable=False)

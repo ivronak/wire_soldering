@@ -18,6 +18,11 @@ from app.production_orders.planning import add_working_days, next_working_day
 OPEN_STATUSES = ("Draft", "Released", "In production")
 
 
+def now_ist():
+    # Abhi ka IST waqt (naive datetime) — stage start / end ke timestamp ke liye
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+
+
 def today_ist():
     # Server UTC me chalta hai; ghar ka din India (IST) ka chahiye
     return (datetime.utcnow() + timedelta(hours=5, minutes=30)).date()

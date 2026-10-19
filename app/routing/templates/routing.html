@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Routing / stages{% endblock %}
+
+{% block page_css %}
+<style>
+  /* Routing tracker UI — Production queue / Material issue jaisa card look (copper-teal theme) */
+  .rt-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .rt-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .rt-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .rt-kpi .h { font-size: 12px; color: #6B7F82; }
+  .rt-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .rt-kpi.warn .v { color: #8A4A1C; }
+  .rt-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .rt-kpi.bad .v { color: #B42318; }
+  .rt-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .rt-kpi.good .v { color: #1F7A4D; }
+  .rt-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .rt-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .rt-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .rt-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
+  .rt-card { background: #fff; border: 1px solid #D1D9D8; border-left: 4px solid #C46B2D; border-radius: 12px; margin-bottom: 10px; }
+  .rt-card.is-done { border-left-color: #1F7A4D; }
+  .rt-head { display: grid; grid-template-columns: minmax(200px, 1.3fr) minmax(190px, 1.2fr) minmax(190px, 1.2fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px 8px; cursor: pointer; }
+  .rt-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .rt-prod { font-size: 13.5px; color: #1C2B2D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rt-meta { font-size: 12px; color: #6B7F82; }
+  .rt-bar { height: 7px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 6px; }
+  .rt-bar div { height: 100%; background: #1F7A4D; border-radius: 999px; }
+  .rt-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .rt-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .rt-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .rt-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .rt-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .rt-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  .rt-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .rt-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .rt-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .rt-btn.primary:hover { background: #A35522; }
+  .rt-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .rt-btn.teal:hover { background: #1F5558; }
+  .rt-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .rt-btn.ghost:hover { background: #F4F6F5; }
+  .rt-chev { border: 0; background: transparent; color: #98A5A4; font-size: 13px; transition: transform .15s; cursor: pointer; }
+  .rt-card.is-open .rt-chev { transform: rotate(180deg); }
+  .rt-pipe { display: flex; gap: 0; padding: 4px 14px 14px; overflow-x: auto; }
+  .rt-step { flex: 1 0 118px; position: relative; padding: 8px 10px 8px 12px; border: 1px solid #D1D9D8; border-right: 0; background: #F8FAF9; min-width: 118px; }
+  .rt-step:first-child { border-radius: 9px 0 0 9px; }
+  .rt-step:last-child { border-right: 1px solid #D1D9D8; border-radius: 0 9px 9px 0; }
+  .rt-step .n { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: #98A5A4; text-transform: uppercase; }
+  .rt-step .t { font-size: 13px; font-weight: 700; color: #1C2B2D; line-height: 1.2; margin-top: 1px; }
+  .rt-step .s { font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
+  .rt-step.done { background: #EAF7EF; border-color: #B7E0C7; } .rt-step.done .n { color: #1F7A4D; } .rt-step.done + .rt-step { border-left-color: #B7E0C7; }
+  .rt-step.cur { background: #FFF4E5; border-color: #E8B97A; box-shadow: inset 0 -3px 0 #C46B2D; } .rt-step.cur .n { color: #8A4A1C; }
+  .rt-detail { display: none; border-top: 1px solid #E4EAE9; background: #F8FAF9; border-radius: 0 0 12px 12px; padding: 12px 16px 14px; }
+  .rt-card.is-open .rt-detail { display: block; }
+  .rt-dl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rt-dl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; padding: 4px 8px 6px; }
+  .rt-dl td { padding: 9px 8px; border-top: 1px dashed #DDE5E4; vertical-align: top; }
+  .rt-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .rt-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) { .rt-head { grid-template-columns: 1fr auto 28px; } .rt-head > :nth-child(2), .rt-head > :nth-child(3) { grid-column: 1 / 3; } }
+  .rt-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .rt-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .rt-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
+  .rt-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  #rt-modal.hidden { display: none; } #rt-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro dshort(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
+{% macro tshort(t) %}{{ t.strftime('%d %b %H:%M') }}{% endmacro %}
+
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Routing / stages</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Routing / stages</h1>
+  <p class="text-[13px] text-ink-faint">Track the real work stage by stage for orders in production: who did it, on which machine, how long it took, and how much came out. Stages run one after another.</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="rt-kpi"><span class="k">Orders running</span><span class="v">{{ kpi.orders }}</span><span class="h">stages still to do</span></div>
+  <div class="rt-kpi {{ 'warn' if kpi.active else '' }}"><span class="k">Stage in progress</span><span class="v">{{ kpi.active }}</span><span class="h">being worked on now</span></div>
+  <div class="rt-kpi {{ 'bad' if kpi.late else '' }}"><span class="k">Behind plan</span><span class="v">{{ kpi.late }}</span><span class="h">later than the planned dates</span></div>
+  <div class="rt-kpi {{ 'good' if kpi.ready else '' }}"><span class="k">All stages done</span><span class="v">{{ kpi.ready }}</span><span class="h">ready for production output</span></div>
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="rt-tabs">
+    <a href="{{ url_for('routing.routing_list', tab='running') }}" class="{{ 'on' if tab == 'running' else '' }}">Running<span>{{ running_count }}</span></a>
+    <a href="{{ url_for('routing.routing_list', tab='done') }}" class="{{ 'on' if tab == 'done' else '' }}">All stages done<span>{{ done_count }}</span></a>
+  </div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {% for o in orders %}
+  {% set sm = summaries[o.id] %}
+  {% set cur = sm.current %}
+  <article class="rt-card {{ 'is-done' if sm.all_done else '' }}">
+    <div class="rt-head">
+      <div style="min-width:0">
+        <div class="flex items-center gap-2 flex-wrap"><span class="rt-no">{{ o.prod_no }}</span>
+          {% if sm.all_done %}<span class="rt-chip ok"><i></i>All stages done</span>
+          {% elif sm.in_progress %}<span class="rt-chip run"><i></i>{{ sm.in_progress.stage_name }} running</span>
+          {% else %}<span class="rt-chip gone"><i></i>Waiting to start {{ cur.stage_name }}</span>{% endif %}</div>
+        <div class="rt-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
+        <div class="rt-meta">{{ '%g'|format(o.planned_qty * o.unit_weight) }} KG batch{% if o.started_date %} · started {{ dshort(o.started_date) }}{% endif %}</div>
+      </div>
+      <div>
+        <div class="text-[13px]"><b>{{ sm.done }}</b> of {{ sm.total }} stages done</div>
+        <div class="rt-bar"><div style="width:{{ sm.pct }}%"></div></div>
+        <div class="rt-meta mt-1">{% if sm.done %}{{ sm.actual_h }} h worked (plan {{ sm.planned_h }} h){% else %}Nothing done yet{% endif %}</div>
+      </div>
+      <div>
+        {% if sm.all_done %}
+          <span class="rt-chip ok"><i></i>{{ 'Finished ' ~ (-sm.delay) ~ 'd early' if sm.delay < 0 else ('Finished ' ~ sm.delay ~ 'd late' if sm.delay > 0 else 'Finished on plan') }}</span>
+        {% elif sm.delay > 0 %}<span class="rt-chip bad"><i></i>Behind {{ sm.delay }} day{{ '' if sm.delay == 1 else 's' }}</span>
+        {% elif sm.delay < 0 %}<span class="rt-chip ok"><i></i>Ahead {{ -sm.delay }} day{{ '' if sm.delay == -1 else 's' }}</span>
+        {% else %}<span class="rt-chip ok"><i></i>On track</span>{% endif %}
+        <div class="rt-meta mt-1">{% if sm.planned_end %}Planned {{ dshort(sm.planned_end) }}{% if sm.forecast and not sm.all_done %} · forecast <b>{{ dshort(sm.forecast) }}</b>{% endif %}{% endif %}</div>
+        {% if sm.scrap %}<div class="rt-meta">Scrap so far {{ sm.scrap }} KG</div>{% endif %}
+      </div>
+      <div class="flex gap-2 justify-end flex-wrap">
+        {% if cur %}
+          {% if cur.status == 'Pending' %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>
+          {% else %}<button type="button" class="rt-act rt-btn teal" data-mode="complete" data-stage="{{ cur.id }}">Complete {{ cur.stage_name }}</button>{% endif %}
+        {% else %}
+          <span class="rt-meta" style="max-width:190px;text-align:right">Next: record the production output</span>
+        {% endif %}
+      </div>
+      <button type="button" class="rt-chev" aria-label="Show stage details">▾</button>
+    </div>
+
+    <div class="rt-pipe">
+      {% for st in sm.stages %}
+      <div class="rt-step {{ 'done' if st.status == 'Done' else ('cur' if st.status == 'In progress' or st.id == (cur.id if cur else 0) else '') }}">
+        <div class="n">{{ '✓' if st.status == 'Done' else loop.index }} · {{ st.status }}</div>
+        <div class="t">{{ st.stage_name }}</div>
+        <div class="s">{% if st.status == 'Done' %}{{ st.actual_hours }} h <span style="opacity:.7">(plan {{ '%.1f'|format(st.planned_hours or 0) }})</span>
+          {% elif st.status == 'In progress' %}since {{ tshort(st.started_at) }}
+          {% else %}plan {{ '%.1f'|format(st.planned_hours or 0) }} h{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="rt-detail">
+      <table class="rt-dl">
+        <thead><tr><th>Stage</th><th>Plan</th><th>Actual</th><th>Quantity (KG)</th><th></th></tr></thead>
+        <tbody>
+          {% for st in sm.stages %}
+          <tr>
+            <td><b>{{ loop.index }}. {{ st.stage_name }}</b></td>
+            <td><div>{{ '%.1f'|format(st.planned_hours or 0) }} h{% if st.start_date %} · {{ dshort(st.start_date) }}{% if st.end_date != st.start_date %}–{{ dshort(st.end_date) }}{% endif %}{% endif %}</div>
+              <div class="rt-meta">{% for m in st.machines if m.is_planned %}{{ m.machine_name }}{% if not loop.last %}, {% endif %}{% endfor %}</div></td>
+            <td>
+              {% if st.status == 'Pending' %}<span class="rt-meta">Not started</span>
+              {% else %}
+              <div><b>{{ st.operator }}</b> · {{ tshort(st.started_at) }}{% if st.completed_at %} → {{ tshort(st.completed_at) }}{% endif %}</div>
+              {% if st.completed_at %}
+                {% set diff = st.actual_hours - (st.planned_hours or 0) %}
+                <div class="rt-meta"><span style="color:{{ '#B42318' if diff > 0.05 else '#1F7A4D' }}; font-weight:600">{{ st.actual_hours }} h ({{ '%+.1f'|format(diff) }} h vs plan)</span></div>
+              {% else %}<div class="rt-meta">In progress</div>{% endif %}
+              <div class="rt-meta">Machines: {% for m in st.machines if m.used %}{{ m.machine_name }}{% if not m.is_planned %} <i>(added)</i>{% endif %}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</div>
+              {% if st.notes %}<div class="rt-meta">Note: {{ st.notes }}</div>{% endif %}
+              {% endif %}
+            </td>
+            <td>{% if st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}
+              {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(st.scrap_qty) }}</div>{% endif %}
+              {% if st.qty_out is not none and st.qty_in %}<div class="rt-meta">Yield {{ '%.1f'|format(100 * st.qty_out / st.qty_in) }}%</div>{% endif %}
+              {% else %}<span class="rt-meta">—</span>{% endif %}</td>
+            <td style="text-align:right">
+              {% if st.status == 'Done' and loop.last or (st.status == 'Done' and sm.stages[loop.index0 + 1].status == 'Pending') %}
+              <form method="post" action="{{ url_for('routing.routing_reopen', stage_id=st.id) }}" class="js-confirm-submit" data-confirm-title="Reopen stage" data-confirm-ok="Reopen" data-confirm-message="Reopen {{ st.stage_name }} for {{ o.prod_no }}? Use this only to correct a mistake.">
+                <button type="submit" class="rt-btn ghost" style="padding:4px 10px">Reopen</button></form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if sm.all_done %}
+      <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-[13px]" style="border-color:#B7E0C7;background:#F3FAF6">
+        <b>All stages are complete.</b> Total {{ sm.actual_h }} h worked against {{ sm.planned_h }} h planned{% if sm.yield_pct %} · final yield {{ sm.yield_pct }}% of the batch{% endif %}{% if sm.scrap %} · scrap {{ sm.scrap }} KG{% endif %}. The next step is recording the production output.
+      </div>
+      {% endif %}
+    </div>
+  </article>
+  {% else %}
+  <div class="rt-empty">
+    {% if tab == 'running' %}
+    <h3>No order is in production</h3>
+    <p>Start an order from the Production queue (Release, issue material, then Start) and its stages appear here.</p>
+    {% else %}
+    <h3>No order has finished all its stages yet</h3>
+    <p>When the last stage of an order is completed it moves here.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block modals %}
+<div id="rt-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="rt-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-lg bg-mist border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+      <div><h2 id="rt-title" class="text-[17px] font-bold text-ink">Stage</h2><p id="rt-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="rt-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
+    </div>
+    <form id="rt-form" method="post" class="flex-1 overflow-y-auto p-4 space-y-4">
+      <div class="rt-box space-y-3">
+        <div id="rt-start-fields">
+          <label class="rt-label">Operator *</label>
+          <input type="text" name="operator" id="rt-operator" maxlength="60" list="rt-operators" class="rt-input" placeholder="Who is doing this stage?" autocomplete="off" />
+          <datalist id="rt-operators">{% for name in operators %}<option value="{{ name }}">{% endfor %}</datalist>
+        </div>
+        <div>
+          <label class="rt-label" id="rt-when-label">Started at</label>
+          <input type="datetime-local" id="rt-when" class="rt-input" />
+          <p class="text-[11.5px] text-ink-faint mt-1">Defaults to now. Change it if you are entering this later.</p>
+        </div>
+      </div>
+      <div id="rt-complete-fields" class="space-y-4">
+        <div class="rt-box">
+          <label class="rt-label">Machines used *</label>
+          <div id="rt-machines" class="space-y-1.5"></div>
+          <p class="text-[11.5px] text-ink-faint mt-2">Planned machines are ticked. Untick one that was not used, or tick another machine of this stage if it was used instead.</p>
+        </div>
+        <div class="rt-box grid grid-cols-2 gap-3">
+          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> KG</div>
+          <div><label class="rt-label">Quantity out (KG) *</label><input type="number" step="any" min="0" name="qty_out" id="rt-qty-out" class="rt-input" /></div>
+          <div><label class="rt-label">Scrap (KG)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
+        </div>
+      </div>
+      <div class="rt-box">
+        <label class="rt-label">Notes</label>
+        <input type="text" name="notes" maxlength="255" id="rt-notes" class="rt-input" placeholder="Optional floor notes" />
+      </div>
+    </form>
+    <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+      <button type="button" id="rt-cancel" class="rt-btn ghost">Cancel</button>
+      <button type="submit" form="rt-form" id="rt-submit" class="rt-btn primary" style="padding:8px 20px">Start stage</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var ACTIONS = {{ actions | tojson }};
+  var NOW = {{ now | tojson }};
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  var modal = document.getElementById('rt-modal');
+  var form = document.getElementById('rt-form');
+  var when = document.getElementById('rt-when');
+
+  function openStage(btn) {
+    var a = ACTIONS[btn.getAttribute('data-stage')];
+    if (!a) return;
+    var start = btn.getAttribute('data-mode') === 'start';
+    form.action = (start ? '/routing/start/' : '/routing/complete/') + a.stage_id;
+    document.getElementById('rt-title').textContent = (start ? 'Start ' : 'Complete ') + a.stage;
+    document.getElementById('rt-sub').textContent = a.order + (a.planned_hours ? ' · planned ' + a.planned_hours.toFixed(1) + ' h' : '');
+    document.getElementById('rt-submit').textContent = start ? 'Start stage' : 'Complete stage';
+    document.getElementById('rt-submit').className = 'rt-btn ' + (start ? 'primary' : 'teal');
+    document.getElementById('rt-complete-fields').style.display = start ? 'none' : 'block';
+    document.getElementById('rt-operator').value = a.operator || '';
+    document.getElementById('rt-operator').required = start;
+    when.name = start ? 'started_at' : 'completed_at';
+    when.value = NOW;
+    document.getElementById('rt-when-label').textContent = start ? 'Started at' : 'Finished at';
+    document.getElementById('rt-notes').value = '';
+    if (!start) {
+      document.getElementById('rt-qty-in').textContent = a.qty_in;
+      document.getElementById('rt-qty-out').value = a.qty_in;
+      document.getElementById('rt-scrap').value = 0;
+      document.getElementById('rt-machines').innerHTML = a.machines.map(function (m) {
+        return '<label class="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="machine_ids" value="' + m.id + '"' + (m.planned ? ' checked' : '') + '> ' + esc(m.name) +
+          (m.planned ? '' : ' <span class="text-[11.5px] text-ink-faint">(not in plan)</span>') + '</label>';
+      }).join('');
+    }
+    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
+  }
+  function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });
+  ['rt-close', 'rt-cancel', 'rt-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeStage); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeStage(); });
+
+  document.querySelectorAll('.rt-card').forEach(function (card) {
+    card.querySelector('.rt-head').addEventListener('click', function (event) {
+      if (event.target.closest('a, button, form')) return;
+      card.classList.toggle('is-open');
+    });
+    card.querySelector('.rt-chev').addEventListener('click', function () { card.classList.toggle('is-open'); });
+  });
+</script>
+{% endblock %}
