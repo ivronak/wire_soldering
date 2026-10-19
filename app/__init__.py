@@ -27,6 +27,8 @@ from app.inventory.routes import inventory_bp
 from app.material_issues.routes import material_issues_bp
 from app.stock_transfers.routes import stock_transfers_bp
 from app.stock_adjustments.routes import stock_adjustments_bp
+from app.opening_stock.routes import opening_stock_bp
+from app.inventory.alerts import alert_count
 from app.extensions import db, migrate
 from app.timeutil import format_ist
 
@@ -88,6 +90,12 @@ def create_app():
     app.register_blueprint(material_issues_bp)
     app.register_blueprint(stock_transfers_bp)
     app.register_blueprint(stock_adjustments_bp)
+    app.register_blueprint(opening_stock_bp)
+
+    # Sidebar me Stock ledger ke saamne lal ginti: kitne materials ka reorder / minimum level aa gaya (app/inventory/alerts.py)
+    @app.context_processor
+    def inject_stock_alert_count():
+        return {"stock_alert_count": alert_count()}
 
     # "flask inventory-backfill": inventory banne se pehle ke GRN / QC / Return ki stock rows banata hai (dobara chalao to double nahi hoga)
     @app.cli.command("inventory-backfill")

@@ -19,8 +19,7 @@ MOVEMENT_LABELS = {
 
 
 def lot_unit(lot):
-    po_line = lot.grn_line.po_line if lot.grn_line else None
-    return po_line.unit.code if po_line and po_line.unit else ""
+    return lot.unit_code
 
 
 @inventory_bp.route("/inventory/stock")
@@ -81,7 +80,8 @@ def stock_list():
             item[name] += row[name]
     summary_rows = sorted(summary.values(), key=lambda item: item["material"].name if item["material"] else "")
 
-    return render_template("stock.html", active_nav="stock", lot_rows=lot_rows, summary_rows=summary_rows)
+    from app.inventory.alerts import stock_alerts
+    return render_template("stock.html", active_nav="stock", lot_rows=lot_rows, summary_rows=summary_rows, alerts=stock_alerts())
 
 
 # Lot history ki ek "event" = ek kaam (jaise QC pass). Ek kaam ki do rows (ek godown se minus, doosre me plus) ek line me dikhti hain.
@@ -92,6 +92,7 @@ EVENT_TITLES = {
     "RETURN": "Returned to vendor",
     "TRANSFER": "Stock transfer",
     "ADJUST": "Stock adjustment",
+    "OPENING": "Opening stock",
 }
 
 
@@ -194,7 +195,7 @@ def stock_lot(lot_id):
                               "qty": round(t_line.qty, 4), "value": round(t_line.value or 0, 2)})
     where_now.sort(key=lambda w: {"good": 0, "wip": 1, "wait": 2, "bad": 3}[w["tone"]])
 
-    received = sum(m.qty for m in movements if m.movement_type == "GRN_RECEIPT" and m.reverses_movement_id is None)
+    received = sum(m.qty for m in movements if m.movement_type in ("GRN_RECEIPT", "OPENING") and m.reverses_movement_id is None)
     return render_template("stock_lot.html", active_nav="stock", lot=lot, unit=unit,
                            events=build_events(movements, unit), where_now=where_now, received=received)
 

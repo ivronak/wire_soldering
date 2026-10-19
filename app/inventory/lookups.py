@@ -13,8 +13,7 @@ def lot_label(lot):
 
 
 def lot_unit_code(lot):
-    po_line = lot.grn_line.po_line if lot.grn_line else None
-    return po_line.unit.code if po_line and po_line.unit else ""
+    return lot.unit_code
 
 
 def warehouse_lot_options(include_empty=False):

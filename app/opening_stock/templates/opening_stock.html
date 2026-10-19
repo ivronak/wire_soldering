@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Opening stock{% endblock %}
+
+{% block page_css %}
+<style>
+  .os-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .os-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .os-table thead th:first-child, .os-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .os-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
+  .os-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .os-table td.left, .os-table th.left { text-align: left; }
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
+  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; }
+  .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
+  .st-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .st-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .st-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  #os-modal.hidden, #os-view-modal.hidden { display: none; }
+  #os-modal, #os-view-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Opening stock</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Opening stock</h1>
+          <p class="text-[12.5px] text-ink-faint">The raw material already lying in your store before you started using this system.</p>
+        </div>
+        <button type="button" id="btn-new-os" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New opening stock</button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('opening_stock.opening_stock_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
+          <a href="{{ url_for('opening_stock.opening_stock_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
+        </div>
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+          Enter what is physically in the store as of a date, with the cost per unit · every line becomes its own lot (LOT-…) in that warehouse · <strong>only for stock that was never received through a GRN</strong>, otherwise it is counted twice · a posted opening stock can be cancelled only while its goods are untouched; after that, correct with a Stock adjustment.
+        </div>
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="os-table">
+            <colgroup><col style="width:14%"><col style="width:13%"><col style="width:24%"><col style="width:10%"><col style="width:17%"><col style="width:10%"><col style="width:12%"></colgroup>
+            <thead><tr><th>Opening no.</th><th>As of</th><th class="left">Warehouse</th><th>Lines</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for s in sheets %}
+              {% set total = namespace(v=0) %}{% for l in s.lines %}{% set total.v = total.v + l.qty * l.unit_cost %}{% endfor %}
+              <tr{% if s.status == 'Cancelled' %} class="opacity-70"{% endif %}>
+                <td class="font-mono font-semibold text-ink">{{ s.opening_no }}</td>
+                <td class="tabular-nums">{{ s.as_of_date.strftime('%d %b %Y') }}{% if s.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ s.created_at|ist }}</div>{% endif %}</td>
+                <td class="left">{{ s.warehouse.name }}</td>
+                <td class="tabular-nums">{{ s.lines|length }}</td>
+                <td class="tabular-nums">₹{{ total.v|inr }}</td>
+                <td><span class="status-pill {{ 'st-draft' if s.status == 'Draft' else ('st-posted' if s.status == 'Posted' else 'st-cancelled') }}">{{ s.status }}</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view-os px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-sheet='{{ {"no": s.opening_no, "status": s.status, "date": s.as_of_date.strftime("%d %b %Y"), "warehouse": s.warehouse.name, "remarks": s.remarks or "", "lines": (s.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    {% if s.status == 'Draft' %}
+                    <form method="post" action="{{ url_for('opening_stock.opening_stock_post', sheet_id=s.id) }}" class="inline js-confirm-submit" data-confirm-title="Post opening stock" data-confirm-ok="Post" data-confirm-message="Post {{ s.opening_no }}? The stock will be added to {{ s.warehouse.name }}.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post</button>
+                    </form>
+                    {% endif %}
+                    {% if s.status != 'Cancelled' %}
+                    <form method="post" action="{{ url_for('opening_stock.opening_stock_cancel', sheet_id=s.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel opening stock" data-confirm-ok="Cancel" data-confirm-message="Cancel {{ s.opening_no }}?{% if s.status == 'Posted' %} The stock will be taken out again, if it has not been used.{% endif %}">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-ink-faint" style="padding:28px;">{{ 'Nothing pending. Use “New opening stock” to enter what is already in your store.' if tab == 'pending' else 'No posted opening stock yet.' }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="os-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="os-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 class="text-[16px] font-bold text-ink">New opening stock</h2><p class="text-[12.5px] text-ink-faint">Stock that is already in your store, not received through a GRN</p></div>
+      <button type="button" id="os-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="os-form" method="post" action="{{ url_for('opening_stock.opening_stock_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Stock counted as of *</label>
+          <input type="date" id="os-date" name="as_of_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Store warehouse *</label>
+          <select name="warehouse_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="">Select…</option>
+            {% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}{% if w.branch %} — {{ w.branch.name }}{% endif %}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="flex items-center justify-between"><p class="text-[13px] font-semibold text-ink">Materials</p><button type="button" id="os-add-line" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add material</button></div>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead><tr><th style="width:34%">Material *</th><th style="width:14%">Quantity *</th><th style="width:16%">Cost per unit (₹) *</th><th style="width:14%">Batch no.</th><th style="width:18%">Value</th><th style="width:4%"></th></tr></thead>
+          <tbody id="os-lines"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-end text-[14px] font-bold text-ink">Total value&nbsp; <span id="os-total" class="tabular-nums">₹0.00</span></div>
+      <div><label class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label><input type="text" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" placeholder="e.g. Physical count on 1 April" /></div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="os-form" name="opening_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+      <button type="button" id="os-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="os-form" name="opening_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post opening stock</button>
+    </div>
+  </div>
+</div>
+
+<div id="os-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="os-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 id="os-view-title" class="text-[16px] font-bold text-ink">Opening stock</h2><p id="os-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="os-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="os-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; });
+  }
+  function fmt(x) { return String(Math.round(Number(x) * 10000) / 10000); }
+  function money(x) { return '₹' + (Math.round(x * 100) / 100).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  var MATERIALS = {{ material_options|tojson }};
+  var TODAY = {{ today|tojson }};
+  var osModal = document.getElementById('os-modal');
+  var osView = document.getElementById('os-view-modal');
+  var linesBody = document.getElementById('os-lines');
+
+  function materialOptionsHtml() {
+    return '<option value="">Select material…</option>' + MATERIALS.map(function (m) {
+      return '<option value="' + m.id + '" data-unit="' + esc(m.unit) + '">' + esc(m.label) + '</option>';
+    }).join('');
+  }
+  function renumber() {
+    linesBody.querySelectorAll('tr.os-line').forEach(function (row, i) {
+      row.querySelector('.os-material').name = 'material_id_' + i;
+      row.querySelector('.os-qty').name = 'qty_' + i;
+      row.querySelector('.os-cost').name = 'cost_' + i;
+      row.querySelector('.os-batch').name = 'batch_' + i;
+    });
+  }
+  function recalc() {
+    var total = 0;
+    linesBody.querySelectorAll('tr.os-line').forEach(function (row) {
+      var value = (parseFloat(row.querySelector('.os-qty').value) || 0) * (parseFloat(row.querySelector('.os-cost').value) || 0);
+      row.querySelector('.os-value').textContent = money(value);
+      total += value;
+    });
+    document.getElementById('os-total').textContent = money(total);
+  }
+  function addLine() {
+    var tr = document.createElement('tr');
+    tr.className = 'os-line';
+    tr.innerHTML = '<td><select class="os-material">' + materialOptionsHtml() + '</select></td>' +
+      '<td><input type="number" class="os-qty text-right" min="0" step="any" placeholder="0" /><div class="os-unit text-[11px] text-ink-faint text-right"></div></td>' +
+      '<td><input type="number" class="os-cost text-right" min="0" step="any" placeholder="0.00" /></td>' +
+      '<td><input type="text" class="os-batch" maxlength="30" /></td><td class="os-value text-right tabular-nums">₹0.00</td>' +
+      '<td class="text-center"><button type="button" class="os-remove text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove">&times;</button></td>';
+    linesBody.appendChild(tr);
+    renumber();
+  }
+  linesBody.addEventListener('change', function (e) {
+    if (e.target.classList.contains('os-material')) {
+      var opt = e.target.selectedOptions[0];
+      e.target.closest('tr').querySelector('.os-unit').textContent = opt && opt.value ? 'in ' + opt.getAttribute('data-unit') : '';
+    }
+  });
+  linesBody.addEventListener('input', recalc);
+  linesBody.addEventListener('click', function (e) {
+    var btn = e.target.closest('.os-remove');
+    if (!btn) return;
+    btn.closest('tr').remove();
+    if (!linesBody.querySelector('tr.os-line')) addLine();
+    renumber(); recalc();
+  });
+  document.getElementById('os-add-line').addEventListener('click', addLine);
+
+  function openNew() {
+    document.getElementById('os-form').reset();
+    document.getElementById('os-date').value = TODAY;
+    document.getElementById('os-date').max = TODAY;
+    linesBody.innerHTML = '';
+    addLine(); recalc();
+    osModal.classList.remove('hidden'); osModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeNew() { osModal.classList.add('hidden'); osModal.setAttribute('aria-hidden', 'true'); }
+  document.getElementById('btn-new-os').addEventListener('click', openNew);
+  document.getElementById('os-close').addEventListener('click', closeNew);
+  document.getElementById('os-cancel').addEventListener('click', closeNew);
+  document.getElementById('os-backdrop').addEventListener('click', closeNew);
+
+  function openView(btn) {
+    var d = JSON.parse(btn.getAttribute('data-sheet') || '{}');
+    document.getElementById('os-view-title').textContent = d.no + ' · ' + d.status;
+    document.getElementById('os-view-sub').textContent = d.date + ' · ' + d.warehouse;
+    var total = 0;
+    var rows = (d.lines || []).map(function (l) {
+      total += l.qty * l.cost;
+      return '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + (l.lot ? '<div class="text-[11px] text-ink-faint font-mono">' + esc(l.lot) + (l.batch ? ' · batch ' + esc(l.batch) : '') + '</div>' : (l.batch ? '<div class="text-[11px] text-ink-faint">batch ' + esc(l.batch) + '</div>' : '')) +
+        '</td><td class="p-2 text-right tabular-nums">' + fmt(l.qty) + ' ' + esc(l.unit) + '</td><td class="p-2 text-right tabular-nums">' + money(l.cost) + '</td><td class="p-2 text-right tabular-nums">' + money(l.qty * l.cost) + '</td></tr>';
+    }).join('');
+    document.getElementById('os-view-body').innerHTML = (d.remarks ? '<p class="text-[13px] text-ink-muted">' + esc(d.remarks) + '</p>' : '') +
+      '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted"><th class="p-2 text-left">Material</th><th class="p-2 text-right">Qty</th><th class="p-2 text-right">Cost / unit</th><th class="p-2 text-right">Value</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="flex justify-end font-bold text-ink">Total ' + money(total) + '</div>';
+    osView.classList.remove('hidden'); osView.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() { osView.classList.add('hidden'); osView.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.btn-view-os').forEach(function (b) { b.addEventListener('click', function () { openView(b); }); });
+  document.getElementById('os-view-close').addEventListener('click', closeView);
+  document.getElementById('os-view-backdrop').addEventListener('click', closeView);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!osModal.classList.contains('hidden')) closeNew(); else if (!osView.classList.contains('hidden')) closeView();
+  });
+</script>
+{% endblock %}

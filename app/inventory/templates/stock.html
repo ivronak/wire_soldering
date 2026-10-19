@@ -48,6 +48,28 @@
           <div class="sc-card" {% if rejected_lots %}style="border-color:#F8CFCB;background:#FFF6F5"{% endif %}><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots with rejected goods</div><div class="sc-big mt-1 {{ 'text-stop' if rejected_lots else 'text-ink' }}">{{ rejected_lots }}</div>{% if rejected_lots %}<div class="text-[11.5px] text-ink-muted mt-0.5">Send back with a Purchase Return</div>{% endif %}</div>
         </div>
 
+        {% if alerts.rows %}
+        <section class="sc-card" style="border-color:#F8CFCB;background:#FFF9F8">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h2 class="text-[15px] font-semibold text-ink">Needs attention <span class="text-[12.5px] font-normal text-ink-faint">· based on the levels set in Raw materials</span></h2>
+          </div>
+          <div class="space-y-2">
+            {% for a in alerts.rows %}
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 bg-white border border-slate-200 rounded-lg px-3 py-2.5">
+              <span class="sc-chip {{ 'bad' if a.status in ('out', 'critical') else ('wait' if a.status == 'low' else 'wip') }}">{{ a.label }}</span>
+              <div class="min-w-[150px]"><div class="text-[14px] font-semibold text-ink">{{ a.material.name }}</div><div class="text-[11.5px] text-ink-faint font-mono">{{ a.material.code }}</div></div>
+              <div class="text-[13px] text-ink-muted"><span class="font-semibold text-ink tabular-nums">{{ a.available|qty }} {{ a.unit }}</span> in store{% if a.reorder %} · reorder at {{ a.reorder }}{% endif %}{% if a.minimum %} · minimum {{ a.minimum }}{% endif %}{% if a.maximum %} · maximum {{ a.maximum }}{% endif %}</div>
+              <div class="text-[12.5px] text-ink-faint ml-auto text-right">
+                {% if a.on_order > 0 %}<span class="text-brand-teal font-medium">{{ a.on_order|qty }} {{ a.unit }} already on order</span>{% elif a.status != 'over' %}<span class="text-stop font-medium">Nothing on order</span>{% endif %}
+                {% if a.suggest %} · suggested order {{ a.suggest|qty }} {{ a.unit }}{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+        {% if alerts.unset %}<p class="text-[12px] text-ink-faint">{{ alerts.unset }} material{{ '' if alerts.unset == 1 else 's' }} have no reorder / minimum / maximum level set, so they cannot raise alerts. Set them in Raw materials.</p>{% endif %}
+
         <section>
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h2 class="text-[15px] font-semibold text-ink">By material</h2>
@@ -95,7 +117,7 @@
               <tr class="lot-row" data-search="{{ ((lot.raw_material.name if lot.raw_material else '') ~ ' ' ~ lot.lot_code ~ ' ' ~ (lot.vendor_batch_no or '') ~ ' ' ~ (lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else ''))|lower }}">
                 <td class="font-mono font-semibold text-ink">{{ lot.lot_code }}</td>
                 <td>{{ lot.raw_material.name if lot.raw_material else '—' }}</td>
-                <td><div class="font-mono text-[12px]">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else '—' }}</div><div class="text-[11px] text-ink-faint">Batch {{ lot.vendor_batch_no or '—' }}</div></td>
+                <td><div class="font-mono text-[12px]">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else 'Opening stock' }}</div><div class="text-[11px] text-ink-faint">Batch {{ lot.vendor_batch_no or '—' }}</div></td>
                 <td>
                   <div class="flex flex-wrap gap-1.5">
                     {% if row.available > 0 %}<span class="sc-chip good">Available {{ row.available|qty }} {{ row.unit }}</span>{% endif %}

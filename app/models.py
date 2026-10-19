@@ -1235,13 +1235,27 @@ class StockLot(CreatedAtMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lot_code = db.Column(db.String(20), unique=True, nullable=False)
 
-    grn_line_id = db.Column(db.Integer, db.ForeignKey("grn_lines.id"), unique=True, nullable=False)
+    # GRN wale lot ki GRN line. Opening stock (software shuru hone se pehle ka maal) ka koi GRN nahi hota, isliye khaali.
+    grn_line_id = db.Column(db.Integer, db.ForeignKey("grn_lines.id"), unique=True, nullable=True)
     grn_line = db.relationship("GRNLine", foreign_keys=[grn_line_id], backref=db.backref("stock_lot", uselist=False))
+
+    # "GRN" ya "OPENING". Opening lot me unit yahin likhi hoti hai (GRN lot me PO line ki unit se aati hai)
+    source = db.Column(db.String(10), default="GRN", server_default="GRN", nullable=False)
+    unit_id = db.Column(db.Integer, db.ForeignKey("units.id"), nullable=True)
+    unit = db.relationship("Unit", foreign_keys=[unit_id])
 
     raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
     raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
 
     vendor_batch_no = db.Column(db.String(30), nullable=True)
+
+    @property
+    def unit_code(self):
+        # Is lot ki unit ka code: opening lot me apni, GRN lot me PO line se
+        if self.unit is not None:
+            return self.unit.code
+        po_line = self.grn_line.po_line if self.grn_line else None
+        return po_line.unit.code if po_line and po_line.unit else ""
 
 
 class StockMovement(CreatedAtMixin, db.Model):
@@ -1385,9 +1399,7 @@ class StockTransferLine(CreatedAtMixin, db.Model):
     def summary(self):
         lot = self.lot
         material = lot.raw_material if lot else None
-        unit = ""
-        if lot and lot.grn_line and lot.grn_line.po_line and lot.grn_line.po_line.unit:
-            unit = lot.grn_line.po_line.unit.code
+        unit = lot.unit_code if lot else ""
         return {"material": material.name if material else "", "lot": lot.lot_code if lot else "",
                 "batch": lot.vendor_batch_no if lot else "", "qty": self.qty, "unit": unit}
 
@@ -1451,8 +1463,48 @@ class StockAdjustmentLine(CreatedAtMixin, db.Model):
     def summary(self):
         lot = self.lot
         material = lot.raw_material if lot else None
-        unit = ""
-        if lot and lot.grn_line and lot.grn_line.po_line and lot.grn_line.po_line.unit:
-            unit = lot.grn_line.po_line.unit.code
+        unit = lot.unit_code if lot else ""
         return {"material": material.name if material else "", "lot": lot.lot_code if lot else "",
                 "entered": self.entered_qty, "book": self.book_qty, "delta": self.delta, "unit": unit}
+
+
+
+# ======================= Opening stock (software shuru hone se pehle ka maal) =======================
+class OpeningStock(CreatedAtMixin, db.Model):
+    # Ek warehouse ka shuruaati stock: Draft -> Posted (stock ledger me OPENING rows) -> Cancelled (sirf jab maal chheda na gaya ho)
+    __tablename__ = "opening_stocks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    opening_no = db.Column(db.String(20), unique=True, nullable=False)
+    as_of_date = db.Column(db.Date, nullable=False)              # kis tareekh ka stock
+
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
+
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class OpeningStockLine(CreatedAtMixin, db.Model):
+    __tablename__ = "opening_stock_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    opening_id = db.Column(db.Integer, db.ForeignKey("opening_stocks.id"), nullable=False)
+    opening = db.relationship("OpeningStock", foreign_keys=[opening_id], backref="lines")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+    qty = db.Column(db.Float, nullable=False)
+    unit_cost = db.Column(db.Float, nullable=False)               # per unit bhaav (value = qty x unit_cost)
+    batch_no = db.Column(db.String(30), nullable=True)
+    # Post hone par banaya gaya lot
+    lot_id = db.Column(db.Integer, db.ForeignKey("stock_lots.id"), nullable=True)
+    lot = db.relationship("StockLot", foreign_keys=[lot_id])
+
+    @property
+    def summary(self):
+        material = self.raw_material
+        return {"material": (material.code + " " + material.name) if material else "", "qty": self.qty,
+                "unit": material.base_unit.code if material and material.base_unit else "",
+                "cost": self.unit_cost, "batch": self.batch_no or "", "lot": self.lot.lot_code if self.lot else ""}

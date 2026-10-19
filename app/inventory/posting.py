@@ -94,7 +94,8 @@ def store_warehouse_for(po):
 
 def rm_warehouse_of(lot):
     # Passed maal jahan gaya: us lot ki QC_IN row ka warehouse (QC Hold nahi); nahi mila to PO ke hisaab se store
-    rows = StockMovement.query.filter_by(lot_id=lot.id, movement_type="QC_IN").filter(StockMovement.reverses_movement_id.is_(None)).order_by(StockMovement.id.desc()).all()
+    rows = StockMovement.query.filter(StockMovement.lot_id == lot.id, StockMovement.movement_type.in_(["QC_IN", "OPENING"])).filter(
+        StockMovement.reverses_movement_id.is_(None)).order_by(StockMovement.id.desc()).all()
     for row in rows:
         if row.warehouse is not None and row.warehouse.warehouse_type != "QC_HOLD":
             return row.warehouse
@@ -166,7 +167,8 @@ def available_lots(raw_material_id):
     # Is material ke wo lots jinka maal store (RM) me hai, purana lot pehle (FIFO). [(lot, warehouse, qty, value)]
     result = []
     for lot in StockLot.query.filter_by(raw_material_id=raw_material_id).order_by(StockLot.id).all():
-        store = rm_warehouse_of(lot) if StockMovement.query.filter_by(lot_id=lot.id, movement_type="QC_IN").first() else None
+        has_store = StockMovement.query.filter(StockMovement.lot_id == lot.id, StockMovement.movement_type.in_(["QC_IN", "OPENING"])).first()
+        store = rm_warehouse_of(lot) if has_store else None
         if store is None:
             continue
         qty, value = balance(lot.id, store.id)
@@ -322,3 +324,30 @@ def post_adjustment(adjustment):
             out_value = value_for_out(book_qty, book_value, -delta)
             add_movement(lot, warehouse, adjustment.adj_date, "ADJUST_OUT", delta, -out_value, "ADJUST", adjustment.id, adjustment.adj_no, line.id,
                          note=adjustment.reason.name if adjustment.reason else None)
+
+
+# ---------------- 7. Opening stock (software shuru hone se pehle ka maal) ----------------
+def post_opening(opening):
+    # Har line ka naya lot (source OPENING, GRN nahi) aur warehouse me OPENING row. Value = qty x unit cost.
+    db.session.flush()                 # nayi lines ki id chahiye (line_key)
+    for line in opening.lines:
+        material = line.raw_material
+        lot = StockLot(lot_code=_next_lot_code(), grn_line_id=None, source="OPENING", raw_material_id=line.raw_material_id,
+                       unit_id=material.base_unit_id if material else None, vendor_batch_no=line.batch_no)
+        db.session.add(lot)
+        db.session.flush()
+        line.lot_id = lot.id
+        value = q2(q4(line.qty) * (line.unit_cost or 0))
+        add_movement(lot, opening.warehouse, opening.as_of_date, "OPENING", line.qty, value, "OPENING", opening.id, opening.opening_no, line.id)
+
+
+def cancel_opening(opening):
+    # Cancel tabhi jab opening ka maal chheda nahi gaya (na issue, na transfer, na adjustment, na return). Warna Adjustment se theek karo.
+    for line in opening.lines:
+        if line.lot_id is None:
+            continue
+        rows = StockMovement.query.filter_by(lot_id=line.lot_id).all()
+        qty, _value = balance(line.lot_id, opening.warehouse_id)
+        if len(rows) != 1 or abs(qty - line.qty) > 0.00005:
+            raise InventoryError(f"{line.lot.lot_code} has already been used or moved, so this opening stock cannot be cancelled. Correct it with a Stock adjustment.")
+    reverse_document("OPENING", opening.id, "Reversal: opening stock cancelled")
