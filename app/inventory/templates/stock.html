@@ -69,6 +69,8 @@
                 <span class="sc-chip {{ 'wait' if item.waiting > 0 else 'zero' }}">Waiting for QC {{ item.waiting|qty }} {{ item.unit }}</span>
                 <span class="sc-chip {{ 'bad' if item.rejected > 0 else 'zero' }}">Rejected {{ item.rejected|qty }} {{ item.unit }}</span>
                 <span class="sc-chip {{ 'wip' if item.wip > 0 else 'zero' }}">In production {{ item.wip|qty }} {{ item.unit }}</span>
+                {% if item.transit > 0 %}<span class="sc-chip wip">In transit {{ item.transit|qty }} {{ item.unit }}</span>{% endif %}
+                {% if item.scrap > 0 %}<span class="sc-chip bad">Scrap {{ item.scrap|qty }} {{ item.unit }}</span>{% endif %}
               </div>
               <div class="text-[12px] text-ink-faint mt-2.5">Value ₹{{ item.value|inr }} (estimated)</div>
             </div>
@@ -100,7 +102,9 @@
                     {% if row.waiting > 0 %}<span class="sc-chip wait">Waiting for QC {{ row.waiting|qty }} {{ row.unit }}</span>{% endif %}
                     {% if row.rejected > 0 %}<span class="sc-chip bad">Rejected {{ row.rejected|qty }} {{ row.unit }}</span>{% endif %}
                     {% if row.wip > 0 %}<span class="sc-chip wip">In production {{ row.wip|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if not (row.available > 0 or row.waiting > 0 or row.rejected > 0 or row.wip > 0) %}<span class="sc-chip zero">Empty</span>{% endif %}
+                    {% if row.transit > 0 %}<span class="sc-chip wip">In transit {{ row.transit|qty }} {{ row.unit }}</span>{% endif %}
+                    {% if row.scrap > 0 %}<span class="sc-chip bad">Scrap {{ row.scrap|qty }} {{ row.unit }}</span>{% endif %}
+                    {% if not (row.available > 0 or row.waiting > 0 or row.rejected > 0 or row.wip > 0 or row.transit > 0 or row.scrap > 0) %}<span class="sc-chip zero">Empty</span>{% endif %}
                   </div>
                 </td>
                 <td class="tabular-nums">₹{{ row.value|inr }}</td>

@@ -1335,3 +1335,124 @@ class MaterialIssueLine(CreatedAtMixin, db.Model):
                 "batch": self.lot.vendor_batch_no if self.lot else "",
                 "qty": self.qty,
                 "unit": material.base_unit.code if material and material.base_unit else ""}
+
+
+
+# ======================= Stock transfer (warehouse se warehouse) =======================
+class StockTransfer(CreatedAtMixin, db.Model):
+    # Draft -> In transit (Dispatch: maal source se nikla) -> Received (destination me aaya). Cancel sirf Draft / In transit par.
+    __tablename__ = "stock_transfers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_no = db.Column(db.String(20), unique=True, nullable=False)
+    transfer_date = db.Column(db.Date, nullable=False)
+
+    from_warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    from_warehouse = db.relationship("Warehouse", foreign_keys=[from_warehouse_id])
+    to_warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    to_warehouse = db.relationship("Warehouse", foreign_keys=[to_warehouse_id])
+
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    vehicle_no = db.Column(db.String(30), nullable=True)
+    eway_bill_no = db.Column(db.String(30), nullable=True)      # alag GSTIN ki branch ke beech zaroori
+    remarks = db.Column(db.String(255), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def needs_eway(self):
+        # Dono branch ke GSTIN alag hon to E-Way Bill chahiye (spec 6.2). Same branch / same GSTIN = nahi.
+        a = self.from_warehouse.branch if self.from_warehouse else None
+        b = self.to_warehouse.branch if self.to_warehouse else None
+        if a is None or b is None or a.id == b.id:
+            return False
+        return (a.gstin or "") != (b.gstin or "")
+
+
+class StockTransferLine(CreatedAtMixin, db.Model):
+    __tablename__ = "stock_transfer_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey("stock_transfers.id"), nullable=False)
+    transfer = db.relationship("StockTransfer", foreign_keys=[transfer_id], backref="lines")
+
+    lot_id = db.Column(db.Integer, db.ForeignKey("stock_lots.id"), nullable=False)
+    lot = db.relationship("StockLot", foreign_keys=[lot_id])
+    qty = db.Column(db.Float, nullable=False)
+    # Dispatch ke waqt lot ki value (transit me bhi value dikhe, aur Receive par wahi value destination me jaye)
+    value = db.Column(db.Float, nullable=True)
+
+    @property
+    def summary(self):
+        lot = self.lot
+        material = lot.raw_material if lot else None
+        unit = ""
+        if lot and lot.grn_line and lot.grn_line.po_line and lot.grn_line.po_line.unit:
+            unit = lot.grn_line.po_line.unit.code
+        return {"material": material.name if material else "", "lot": lot.lot_code if lot else "",
+                "batch": lot.vendor_batch_no if lot else "", "qty": self.qty, "unit": unit}
+
+
+# ======================= Stock adjustment (gina hua vs system; found / damaged) =======================
+class AdjustmentReason(CreatedAtMixin, db.Model):
+    # Adjustment ki wajah ki list (code me fixed nahi, database se)
+    __tablename__ = "adjustment_reasons"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class StockAdjustment(CreatedAtMixin, db.Model):
+    # Draft -> Pending approval -> Posted (approve karte hi stock badalta hai) ; Cancel sirf Draft / Pending par.
+    __tablename__ = "stock_adjustments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    adj_no = db.Column(db.String(20), unique=True, nullable=False)
+    adj_date = db.Column(db.Date, nullable=False)
+    adj_type = db.Column(db.String(20), nullable=False)          # increase / decrease / audit
+
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
+    reason_id = db.Column(db.Integer, db.ForeignKey("adjustment_reasons.id"), nullable=False)
+    reason = db.relationship("AdjustmentReason", foreign_keys=[reason_id])
+
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+    approval_note = db.Column(db.String(255), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def net_qty(self):
+        # Post ke baad asli farak; pehle sirf likhi hui qty (increase +, decrease -, audit me abhi pata nahi)
+        total = 0
+        for line in self.lines:
+            total += line.delta if line.delta is not None else 0
+        return round(total, 4)
+
+
+class StockAdjustmentLine(CreatedAtMixin, db.Model):
+    __tablename__ = "stock_adjustment_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    adjustment_id = db.Column(db.Integer, db.ForeignKey("stock_adjustments.id"), nullable=False)
+    adjustment = db.relationship("StockAdjustment", foreign_keys=[adjustment_id], backref="lines")
+
+    lot_id = db.Column(db.Integer, db.ForeignKey("stock_lots.id"), nullable=False)
+    lot = db.relationship("StockLot", foreign_keys=[lot_id])
+
+    # increase / decrease me: kitna jodna / ghatana (positive). audit me: gina hua qty (counted).
+    entered_qty = db.Column(db.Float, nullable=False)
+    # Post ke waqt nikalta hai: +jod / -ghata. Audit me counted - book.
+    delta = db.Column(db.Float, nullable=True)
+    book_qty = db.Column(db.Float, nullable=True)                # post ke waqt system me kitna tha
+
+    @property
+    def summary(self):
+        lot = self.lot
+        material = lot.raw_material if lot else None
+        unit = ""
+        if lot and lot.grn_line and lot.grn_line.po_line and lot.grn_line.po_line.unit:
+            unit = lot.grn_line.po_line.unit.code
+        return {"material": material.name if material else "", "lot": lot.lot_code if lot else "",
+                "entered": self.entered_qty, "book": self.book_qty, "delta": self.delta, "unit": unit}

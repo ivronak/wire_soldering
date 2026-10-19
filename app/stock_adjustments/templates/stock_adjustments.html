@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Stock adjustment{% endblock %}
+
+{% block page_css %}
+<style>
+  .sa-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .sa-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .sa-table thead th:first-child, .sa-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .sa-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
+  .sa-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .sa-table td.left, .sa-table th.left { text-align: left; }
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
+  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; }
+  .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
+  .st-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .st-pending { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .st-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .st-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  #sa-modal.hidden, #sa-view-modal.hidden { display: none; }
+  #sa-modal, #sa-view-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock adjustment</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Stock adjustment</h1>
+        </div>
+        <button type="button" id="btn-new-sa" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New adjustment</button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('stock_adjustments.stock_adjustments_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
+          <a href="{{ url_for('stock_adjustments.stock_adjustments_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
+        </div>
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+          Fix the stock when the real count is different from the system · <strong>Increase / Decrease</strong> add or remove a quantity · <strong>Physical audit</strong>: type what you counted and the system posts the difference · a reason is required · stock changes only when the adjustment is <strong>approved</strong> · a posted adjustment cannot be edited, correct it with another one.
+        </div>
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="sa-table">
+            <colgroup><col style="width:12%"><col style="width:11%"><col style="width:14%"><col style="width:18%"><col style="width:17%"><col style="width:12%"><col style="width:16%"></colgroup>
+            <thead><tr><th>Adjustment</th><th>Date</th><th>Type</th><th class="left">Warehouse</th><th class="left">Reason</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for a in adjustments %}
+              <tr{% if a.status == 'Cancelled' %} class="opacity-70"{% endif %}>
+                <td class="font-mono font-semibold text-ink">{{ a.adj_no }}</td>
+                <td class="tabular-nums">{{ a.adj_date.strftime('%d %b %Y') }}{% if a.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ a.created_at|ist }}</div>{% endif %}</td>
+                <td>{{ type_labels[a.adj_type] }}{% if a.status == 'Posted' %}<div class="text-[11.5px] tabular-nums {{ 'text-success' if a.net_qty >= 0 else 'text-stop' }}">Net {{ '+' if a.net_qty > 0 else '' }}{{ a.net_qty|qty }}</div>{% endif %}</td>
+                <td class="left">{{ a.warehouse.name }}</td>
+                <td class="left">{{ a.reason.name }}</td>
+                <td><span class="status-pill {{ 'st-draft' if a.status == 'Draft' else ('st-pending' if a.status == 'Pending approval' else ('st-posted' if a.status == 'Posted' else 'st-cancelled')) }}">{{ a.status }}</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view-sa px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-adj='{{ {"no": a.adj_no, "status": a.status, "date": a.adj_date.strftime("%d %b %Y"), "type": type_labels[a.adj_type], "kind": a.adj_type, "warehouse": a.warehouse.name, "reason": a.reason.name, "remarks": a.remarks or "", "note": a.approval_note or "", "lines": (a.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    {% if a.status == 'Draft' %}
+                    <form method="post" action="{{ url_for('stock_adjustments.stock_adjustments_submit', adj_id=a.id) }}" class="inline"><button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Submit</button></form>
+                    {% elif a.status == 'Pending approval' %}
+                    <form method="post" action="{{ url_for('stock_adjustments.stock_adjustments_approve', adj_id=a.id) }}" class="inline js-confirm-submit" data-confirm-title="Approve adjustment" data-confirm-ok="Approve and post" data-confirm-message="Approve {{ a.adj_no }}? The stock will change now and this cannot be edited later.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Approve</button>
+                    </form>
+                    {% endif %}
+                    {% if a.status in ('Draft', 'Pending approval') %}
+                    <form method="post" action="{{ url_for('stock_adjustments.stock_adjustments_cancel', adj_id=a.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel adjustment" data-confirm-ok="Cancel adjustment" data-confirm-message="Cancel {{ a.adj_no }}? The stock will not change.">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-ink-faint" style="padding:28px;">{{ 'Nothing waiting. Use “New adjustment” when the real count differs from the system.' if tab == 'pending' else 'No completed adjustments yet.' }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="sa-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="sa-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 class="text-[16px] font-bold text-ink">New stock adjustment</h2><p class="text-[12.5px] text-ink-faint">Reason is required · stock changes only after approval</p></div>
+      <button type="button" id="sa-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="sa-form" method="post" action="{{ url_for('stock_adjustments.stock_adjustments_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Date *</label>
+          <input type="date" id="sa-date" name="adj_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Type *</label>
+          <select id="sa-type" name="adj_type" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="decrease">Decrease (−): goods lost, damaged</option>
+            <option value="increase">Increase (+): goods found</option>
+            <option value="audit">Physical audit: I counted</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Warehouse *</label>
+          <select id="sa-wh" name="warehouse_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="">Select…</option>
+            {% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}{% if w.branch %} — {{ w.branch.name }}{% endif %}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Reason *</label>
+          <select name="reason_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="">Select reason…</option>
+            {% for r in reasons %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <p id="sa-hint" class="text-[12.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-3 py-2"></p>
+      <div class="flex items-center justify-between"><p class="text-[13px] font-semibold text-ink">Lots</p><button type="button" id="sa-add-line" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add lot</button></div>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead><tr><th style="width:50%">Lot (material · lot · batch)</th><th style="width:18%">System qty</th><th id="sa-qty-head" style="width:20%">Decrease by *</th><th style="width:4%"></th></tr></thead>
+          <tbody id="sa-lines"><tr><td colspan="4" class="text-ink-faint" style="padding:10px;">Choose the warehouse first.</td></tr></tbody>
+        </table>
+      </div>
+      <div><label class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label><input type="text" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" placeholder="Required when the reason is Other" /></div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="sa-form" name="adj_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+      <button type="button" id="sa-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="sa-form" name="adj_action" value="submit" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Submit for approval</button>
+    </div>
+  </div>
+</div>
+
+<div id="sa-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="sa-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 id="sa-view-title" class="text-[16px] font-bold text-ink">Adjustment</h2><p id="sa-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="sa-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="sa-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; });
+  }
+  function fmt(x) { return String(Math.round(Number(x) * 10000) / 10000); }
+  var LOTS = {{ lot_options|tojson }};            // {warehouse_id: [{lot_id, label, unit, qty}]} (qty 0 wale lots bhi)
+  var TODAY = {{ today|tojson }};
+  var saModal = document.getElementById('sa-modal');
+  var saView = document.getElementById('sa-view-modal');
+  var linesBody = document.getElementById('sa-lines');
+  var typeSel = document.getElementById('sa-type');
+  var whSel = document.getElementById('sa-wh');
+  var HINTS = {
+    decrease: 'Decrease: type how much to take OFF the system stock (it cannot be more than what is in the warehouse).',
+    increase: 'Increase: type how much to ADD to the system stock (for goods found that were not recorded).',
+    audit: 'Physical audit: type what you COUNTED. When approved, the system posts the difference between your count and its own quantity.'
+  };
+  var HEADS = { decrease: 'Decrease by *', increase: 'Increase by *', audit: 'Counted qty *' };
+
+  function emptyRow(text) { linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint" style="padding:10px;">' + text + '</td></tr>'; }
+  function refreshType() {
+    document.getElementById('sa-hint').textContent = HINTS[typeSel.value];
+    document.getElementById('sa-qty-head').textContent = HEADS[typeSel.value];
+    linesBody.innerHTML = '';
+    if (whSel.value) addLine(); else emptyRow('Choose the warehouse first.');
+  }
+  function lotOptionsHtml() {
+    var options = (LOTS[whSel.value] || []).filter(function (o) { return typeSel.value === 'decrease' ? o.qty > 0 : true; });
+    return '<option value="">Select lot…</option>' + options.map(function (o) {
+      return '<option value="' + o.lot_id + '" data-qty="' + o.qty + '" data-unit="' + esc(o.unit) + '">' + esc(o.label) + '</option>';
+    }).join('');
+  }
+  function renumber() {
+    linesBody.querySelectorAll('tr.sa-line').forEach(function (row, i) {
+      row.querySelector('.sa-lot').name = 'lot_id_' + i;
+      row.querySelector('.sa-qty').name = 'qty_' + i;
+    });
+  }
+  function addLine() {
+    if (!whSel.value) { emptyRow('Choose the warehouse first.'); return; }
+    if (!linesBody.querySelector('tr.sa-line')) linesBody.innerHTML = '';
+    var tr = document.createElement('tr');
+    tr.className = 'sa-line';
+    tr.innerHTML = '<td><select class="sa-lot">' + lotOptionsHtml() + '</select></td><td class="sa-have text-right tabular-nums text-ink-muted">—</td>' +
+      '<td><input type="number" class="sa-qty text-right" min="0" step="any" placeholder="0" /></td><td class="text-center"><button type="button" class="sa-remove text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove">&times;</button></td>';
+    linesBody.appendChild(tr);
+    renumber();
+  }
+  linesBody.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('sa-lot')) return;
+    var opt = e.target.selectedOptions[0];
+    var row = e.target.closest('tr');
+    var have = opt && opt.value ? parseFloat(opt.getAttribute('data-qty')) : 0;
+    row.querySelector('.sa-have').textContent = opt && opt.value ? fmt(have) + ' ' + opt.getAttribute('data-unit') : '—';
+    var input = row.querySelector('.sa-qty');
+    input.max = typeSel.value === 'decrease' ? have : '';
+  });
+  linesBody.addEventListener('click', function (e) {
+    var btn = e.target.closest('.sa-remove');
+    if (!btn) return;
+    btn.closest('tr').remove();
+    if (!linesBody.querySelector('tr.sa-line')) emptyRow('Click “+ Add lot”.');
+    renumber();
+  });
+  typeSel.addEventListener('change', refreshType);
+  whSel.addEventListener('change', refreshType);
+  document.getElementById('sa-add-line').addEventListener('click', addLine);
+
+  function openNew() {
+    document.getElementById('sa-form').reset();
+    document.getElementById('sa-date').value = TODAY;
+    refreshType();
+    saModal.classList.remove('hidden'); saModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeNew() { saModal.classList.add('hidden'); saModal.setAttribute('aria-hidden', 'true'); }
+  document.getElementById('btn-new-sa').addEventListener('click', openNew);
+  document.getElementById('sa-close').addEventListener('click', closeNew);
+  document.getElementById('sa-cancel').addEventListener('click', closeNew);
+  document.getElementById('sa-backdrop').addEventListener('click', closeNew);
+
+  function openView(btn) {
+    var d = JSON.parse(btn.getAttribute('data-adj') || '{}');
+    document.getElementById('sa-view-title').textContent = d.no + ' · ' + d.status;
+    document.getElementById('sa-view-sub').textContent = d.date + ' · ' + d.type + ' · ' + d.warehouse;
+    var posted = d.status === 'Posted';
+    var rows = (d.lines || []).map(function (l) {
+      var right = posted ? ('<td class="p-2 text-right tabular-nums">' + fmt(l.book) + '</td><td class="p-2 text-right tabular-nums font-semibold ' + (l.delta < 0 ? 'text-stop' : 'text-success') + '">' + (l.delta > 0 ? '+' : '') + fmt(l.delta) + '</td>')
+                           : ('<td class="p-2 text-right tabular-nums" colspan="2">' + (d.kind === 'audit' ? 'Counted ' : (d.kind === 'increase' ? '+' : '−')) + fmt(l.entered) + ' ' + esc(l.unit) + '</td>');
+      return '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '<div class="text-[11px] text-ink-faint font-mono">' + esc(l.lot) + '</div></td>' + right + '</tr>';
+    }).join('');
+    var head = posted ? '<th class="p-2 text-right">System had</th><th class="p-2 text-right">Change</th>' : '<th class="p-2 text-right" colspan="2">To post</th>';
+    document.getElementById('sa-view-body').innerHTML =
+      '<p class="text-[13px]"><span class="text-ink-faint">Reason:</span> ' + esc(d.reason) + (d.remarks ? ' · ' + esc(d.remarks) : '') + (d.note ? ' · Approval note: ' + esc(d.note) : '') + '</p>' +
+      '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted"><th class="p-2 text-left">Material / lot</th>' + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    saView.classList.remove('hidden'); saView.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() { saView.classList.add('hidden'); saView.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.btn-view-sa').forEach(function (b) { b.addEventListener('click', function () { openView(b); }); });
+  document.getElementById('sa-view-close').addEventListener('click', closeView);
+  document.getElementById('sa-view-backdrop').addEventListener('click', closeView);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!saModal.classList.contains('hidden')) closeNew(); else if (!saView.classList.contains('hidden')) closeView();
+  });
+</script>
+{% endblock %}

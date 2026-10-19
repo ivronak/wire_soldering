@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Stock transfer{% endblock %}
+
+{% block page_css %}
+<style>
+  .tr-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .tr-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .tr-table thead th:first-child, .tr-table tbody td:first-child { text-align: left; padding-left: 16px; }
+  .tr-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
+  .tr-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .tr-table td.left, .tr-table th.left { text-align: left; }
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
+  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; }
+  .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
+  .st-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .st-transit { background: #EAF1FB; color: #2B5FA8; border-color: #C9D8F0; }
+  .st-received { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .st-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  #tr-modal.hidden, #tr-view-modal.hidden { display: none; }
+  #tr-modal, #tr-view-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock transfer</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Stock transfer</h1>
+        </div>
+        <button type="button" id="btn-new-tr" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New transfer</button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          <a href="{{ url_for('stock_transfers.stock_transfers_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
+          <a href="{{ url_for('stock_transfers.stock_transfers_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
+        </div>
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
+          Move goods from one warehouse to another · <strong>Dispatch</strong> takes the goods out of the From warehouse (they show as <em>In transit</em> on the Stock page) · <strong>Receive</strong> puts them into the To warehouse · a different-GSTIN branch needs an E-Way Bill number · to scrap rejected goods, transfer them from QC Hold to the Scrap warehouse.
+        </div>
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="tr-table">
+            <colgroup><col style="width:13%"><col style="width:11%"><col style="width:21%"><col style="width:21%"><col style="width:9%"><col style="width:11%"><col style="width:14%"></colgroup>
+            <thead><tr><th>Transfer</th><th>Date</th><th class="left">From</th><th class="left">To</th><th>Lots</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for t in transfers %}
+              <tr{% if t.status == 'Cancelled' %} class="opacity-70"{% endif %}>
+                <td class="font-mono font-semibold text-ink">{{ t.transfer_no }}</td>
+                <td class="tabular-nums">{{ t.transfer_date.strftime('%d %b %Y') }}{% if t.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ t.created_at|ist }}</div>{% endif %}</td>
+                <td class="left">{{ t.from_warehouse.name }}<div class="text-[11.5px] text-ink-faint">{{ t.from_warehouse.branch.name if t.from_warehouse.branch else '' }}</div></td>
+                <td class="left">{{ t.to_warehouse.name }}<div class="text-[11.5px] text-ink-faint">{{ t.to_warehouse.branch.name if t.to_warehouse.branch else '' }}{% if t.needs_eway %} · E-Way needed{% endif %}</div></td>
+                <td class="tabular-nums">{{ t.lines|length }}</td>
+                <td><span class="status-pill {{ 'st-draft' if t.status == 'Draft' else ('st-transit' if t.status == 'In transit' else ('st-received' if t.status == 'Received' else 'st-cancelled')) }}">{{ t.status }}</span></td>
+                <td>
+                  <div class="flex flex-wrap justify-center gap-1">
+                    <button type="button" class="btn-view-tr px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-transfer='{{ {"no": t.transfer_no, "status": t.status, "date": t.transfer_date.strftime("%d %b %Y"), "from": t.from_warehouse.name, "to": t.to_warehouse.name, "vehicle": t.vehicle_no or "", "eway": t.eway_bill_no or "", "remarks": t.remarks or "", "lines": (t.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    {% if t.status == 'Draft' %}
+                    <form method="post" action="{{ url_for('stock_transfers.stock_transfers_dispatch', transfer_id=t.id) }}" class="inline js-confirm-submit" data-confirm-title="Dispatch transfer" data-confirm-ok="Dispatch" data-confirm-message="Dispatch {{ t.transfer_no }}? The goods will leave {{ t.from_warehouse.name }}.">
+                      {% if t.needs_eway and not t.eway_bill_no %}<input type="text" name="eway_bill_no" placeholder="E-Way Bill no." class="w-28 px-1.5 py-1 text-[12px] border border-slate-300 rounded" required />{% endif %}
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Dispatch</button>
+                    </form>
+                    {% elif t.status == 'In transit' %}
+                    <form method="post" action="{{ url_for('stock_transfers.stock_transfers_receive', transfer_id=t.id) }}" class="inline js-confirm-submit" data-confirm-title="Receive transfer" data-confirm-ok="Receive" data-confirm-message="Receive {{ t.transfer_no }} into {{ t.to_warehouse.name }}?">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Receive</button>
+                    </form>
+                    {% endif %}
+                    {% if t.status in ('Draft', 'In transit') %}
+                    <form method="post" action="{{ url_for('stock_transfers.stock_transfers_cancel', transfer_id=t.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel transfer" data-confirm-ok="Cancel transfer" data-confirm-message="Cancel {{ t.transfer_no }}?{% if t.status == 'In transit' %} The goods will go back to {{ t.from_warehouse.name }}.{% endif %}">
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-ink-faint" style="padding:28px;">{{ 'Nothing waiting. Create a transfer with “New transfer”.' if tab == 'pending' else 'No completed transfers yet.' }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="tr-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="tr-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 class="text-[16px] font-bold text-ink">New stock transfer</h2><p class="text-[12.5px] text-ink-faint">Move goods from one warehouse to another</p></div>
+      <button type="button" id="tr-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="tr-form" method="post" action="{{ url_for('stock_transfers.stock_transfers_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">Transfer date *</label>
+          <input type="date" id="tr-date" name="transfer_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">From warehouse *</label>
+          <select id="tr-from" name="from_warehouse_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="">Select…</option>
+            {% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}{% if w.branch %} — {{ w.branch.name }}{% endif %}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-[12.5px] font-semibold text-ink mb-1">To warehouse *</label>
+          <select id="tr-to" name="to_warehouse_id" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white">
+            <option value="">Select…</option>
+            {% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}{% if w.branch %} — {{ w.branch.name }}{% endif %}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div id="tr-eway-note" class="hidden text-[12.5px] text-copper-text bg-copper-soft border border-copper-border rounded px-3 py-2">These warehouses belong to branches with different GSTIN, so an <strong>E-Way Bill number</strong> is required before dispatch.</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label class="block text-[12.5px] font-semibold text-ink mb-1">Vehicle no.</label><input type="text" name="vehicle_no" maxlength="30" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" /></div>
+        <div><label class="block text-[12.5px] font-semibold text-ink mb-1">E-Way Bill no.</label><input type="text" name="eway_bill_no" maxlength="30" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" /></div>
+      </div>
+      <div class="flex items-center justify-between">
+        <p class="text-[13px] font-semibold text-ink">Lots to move</p>
+        <button type="button" id="tr-add-line" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add lot</button>
+      </div>
+      <div class="overflow-x-auto border border-slate-200 rounded">
+        <table class="lines-table">
+          <thead><tr><th style="width:62%">Lot (material · lot · batch)</th><th style="width:18%">In stock here</th><th style="width:16%">Move qty *</th><th style="width:4%"></th></tr></thead>
+          <tbody id="tr-lines"><tr><td colspan="4" class="text-ink-faint" style="padding:10px;">Choose the From warehouse first.</td></tr></tbody>
+        </table>
+      </div>
+      <div><label class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label><input type="text" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" /></div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="tr-form" name="transfer_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
+      <button type="button" id="tr-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="tr-form" name="transfer_action" value="dispatch" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Dispatch now</button>
+    </div>
+  </div>
+</div>
+
+<div id="tr-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="tr-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 id="tr-view-title" class="text-[16px] font-bold text-ink">Transfer</h2><p id="tr-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="tr-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <div id="tr-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; });
+  }
+  function fmt(x) { return String(Math.round(Number(x) * 10000) / 10000); }
+  var LOTS = {{ lot_options|tojson }};            // {warehouse_id: [{lot_id, label, unit, qty}]}
+  var WH = {{ (warehouses | map(attribute='id') | list) | tojson }};
+  var WH_GSTIN = {};
+  {% for w in warehouses %}WH_GSTIN[{{ w.id }}] = {branch: {{ (w.branch_id or 0) }}, gstin: {{ (w.branch.gstin if w.branch and w.branch.gstin else '')|tojson }}};
+  {% endfor %}
+  var TODAY = {{ today|tojson }};
+  var trModal = document.getElementById('tr-modal');
+  var trView = document.getElementById('tr-view-modal');
+  var linesBody = document.getElementById('tr-lines');
+  var fromSel = document.getElementById('tr-from');
+  var toSel = document.getElementById('tr-to');
+
+  function updateEway() {
+    var a = WH_GSTIN[fromSel.value], b = WH_GSTIN[toSel.value];
+    var need = a && b && a.branch !== b.branch && a.gstin !== b.gstin;
+    document.getElementById('tr-eway-note').classList.toggle('hidden', !need);
+  }
+  function lotOptionsHtml() {
+    var options = LOTS[fromSel.value] || [];
+    return '<option value="">Select lot…</option>' + options.map(function (o) {
+      return '<option value="' + o.lot_id + '" data-qty="' + o.qty + '" data-unit="' + esc(o.unit) + '">' + esc(o.label) + '</option>';
+    }).join('');
+  }
+  function renumber() {
+    linesBody.querySelectorAll('tr.tr-line').forEach(function (row, i) {
+      row.querySelector('.tr-lot').name = 'lot_id_' + i;
+      row.querySelector('.tr-qty').name = 'qty_' + i;
+    });
+  }
+  function addLine() {
+    if (!fromSel.value) { linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint" style="padding:10px;">Choose the From warehouse first.</td></tr>'; return; }
+    if (!linesBody.querySelector('tr.tr-line')) linesBody.innerHTML = '';
+    var tr = document.createElement('tr');
+    tr.className = 'tr-line';
+    tr.innerHTML = '<td><select class="tr-lot">' + lotOptionsHtml() + '</select></td><td class="tr-have text-right tabular-nums text-ink-muted">—</td>' +
+      '<td><input type="number" class="tr-qty text-right" min="0" step="any" placeholder="0" /></td><td class="text-center"><button type="button" class="tr-remove text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove">&times;</button></td>';
+    linesBody.appendChild(tr);
+    renumber();
+  }
+  linesBody.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('tr-lot')) return;
+    var opt = e.target.selectedOptions[0];
+    var row = e.target.closest('tr');
+    var qty = opt && opt.value ? parseFloat(opt.getAttribute('data-qty')) : 0;
+    row.querySelector('.tr-have').textContent = opt && opt.value ? fmt(qty) + ' ' + opt.getAttribute('data-unit') : '—';
+    var input = row.querySelector('.tr-qty');
+    input.max = qty;
+    if (opt && opt.value) input.value = qty;
+  });
+  linesBody.addEventListener('click', function (e) {
+    var btn = e.target.closest('.tr-remove');
+    if (!btn) return;
+    btn.closest('tr').remove();
+    if (!linesBody.querySelector('tr.tr-line')) linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint" style="padding:10px;">Choose the From warehouse first.</td></tr>';
+    renumber();
+  });
+  fromSel.addEventListener('change', function () { linesBody.innerHTML = ''; updateEway(); if (fromSel.value) addLine(); else addLine(); });
+  toSel.addEventListener('change', updateEway);
+  document.getElementById('tr-add-line').addEventListener('click', addLine);
+
+  function openNew() {
+    document.getElementById('tr-form').reset();
+    document.getElementById('tr-date').value = TODAY;
+    linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint" style="padding:10px;">Choose the From warehouse first.</td></tr>';
+    updateEway();
+    trModal.classList.remove('hidden'); trModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeNew() { trModal.classList.add('hidden'); trModal.setAttribute('aria-hidden', 'true'); }
+  document.getElementById('btn-new-tr').addEventListener('click', openNew);
+  document.getElementById('tr-close').addEventListener('click', closeNew);
+  document.getElementById('tr-cancel').addEventListener('click', closeNew);
+  document.getElementById('tr-backdrop').addEventListener('click', closeNew);
+
+  function openView(btn) {
+    var d = JSON.parse(btn.getAttribute('data-transfer') || '{}');
+    document.getElementById('tr-view-title').textContent = d.no + ' · ' + d.status;
+    document.getElementById('tr-view-sub').textContent = d.date + ' · ' + d.from + ' → ' + d.to;
+    var rows = (d.lines || []).map(function (l) {
+      return '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '</td><td class="p-2 font-mono text-[12px]">' + esc(l.lot) + (l.batch ? ' · ' + esc(l.batch) : '') +
+        '</td><td class="p-2 text-right tabular-nums">' + fmt(l.qty) + ' ' + esc(l.unit) + '</td></tr>';
+    }).join('');
+    var info = [];
+    if (d.vehicle) info.push('Vehicle: ' + esc(d.vehicle));
+    if (d.eway) info.push('E-Way Bill: ' + esc(d.eway));
+    if (d.remarks) info.push('Remarks: ' + esc(d.remarks));
+    document.getElementById('tr-view-body').innerHTML = (info.length ? '<p class="text-[13px] text-ink-muted">' + info.join(' · ') + '</p>' : '') +
+      '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted"><th class="p-2 text-left">Material</th><th class="p-2 text-left">Lot</th><th class="p-2 text-right">Qty</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    trView.classList.remove('hidden'); trView.setAttribute('aria-hidden', 'false');
+  }
+  function closeView() { trView.classList.add('hidden'); trView.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.btn-view-tr').forEach(function (b) { b.addEventListener('click', function () { openView(b); }); });
+  document.getElementById('tr-view-close').addEventListener('click', closeView);
+  document.getElementById('tr-view-backdrop').addEventListener('click', closeView);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!trModal.classList.contains('hidden')) closeNew(); else if (!trView.classList.contains('hidden')) closeView();
+  });
+</script>
+{% endblock %}

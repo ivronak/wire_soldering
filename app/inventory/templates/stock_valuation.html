@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Stock valuation{% endblock %}
+
+{% block page_css %}
+<style>
+  .sv-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 14px 16px; }
+  .sv-big { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .sv-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .sv-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 11px 10px; text-align: right; border-bottom: 1px solid #D1D9D8; }
+  .sv-table thead th.left, .sv-table tbody td.left { text-align: left; }
+  .sv-table tbody td { padding: 11px 10px; font-size: 13.5px; border-bottom: 1px solid #E2E8E7; text-align: right; vertical-align: middle; }
+  .sv-table tbody tr.main:hover { background: #FBF4EE; }
+  .sv-layers td { background: #F8FAF9; font-size: 12.5px; padding: 6px 10px; }
+  .sv-pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; border: 1px solid #D1D9D8; background: #fff; color: #3D5A5D; }
+  .sv-pill.on { background: #B5672C; border-color: #B5672C; color: #fff; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock valuation</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Stock valuation</h1>
+          <p class="text-[12.5px] text-ink-faint">What your stock is worth, material by material and place by place.</p>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto min-h-0 space-y-4">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Total stock value</div><div class="sv-big text-ink mt-1">₹{{ total_value|inr }}</div></div>
+          <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Materials valued</div><div class="sv-big text-ink mt-1">{{ item_count }}</div></div>
+          <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">In transit</div><div class="sv-big text-ink mt-1">₹{{ transit_value|inr }}</div></div>
+          <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">How it is valued</div><div class="text-[13px] text-ink-muted mt-1 leading-snug">Each lot keeps its own purchase cost (PO rate). The unit cost below is the average of the lots in that place.</div></div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-[12.5px] text-ink-faint mr-1">Show:</span>
+          <a href="{{ url_for('inventory.stock_valuation') }}" class="sv-pill {{ 'on' if wanted == 'all' else '' }}">All</a>
+          {% for t in types %}
+          <a href="{{ url_for('inventory.stock_valuation', type=t) }}" class="sv-pill {{ 'on' if wanted == t else '' }}">{{ {'RM': 'Store (RM)', 'QC_HOLD': 'QC Hold', 'WIP': 'In production (WIP)', 'FG': 'Finished goods', 'SCRAP': 'Scrap', 'TRANSIT': 'In transit'}.get(t, t) }}</a>
+          {% endfor %}
+        </div>
+
+        <section class="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+          <table class="sv-table">
+            <colgroup><col style="width:26%"><col style="width:20%"><col style="width:15%"><col style="width:17%"><col style="width:22%"></colgroup>
+            <thead><tr><th class="left">Material</th><th class="left">Where</th><th>Quantity</th><th>Unit cost (avg)</th><th>Value</th></tr></thead>
+            <tbody>
+              {% for row in rows %}
+              <tr class="main">
+                <td class="left"><div class="font-medium text-ink">{{ row.material.name if row.material else '—' }}</div>
+                  <details class="text-[12px]"><summary class="cursor-pointer text-copper-text hover:underline">Cost layers ({{ row.layers|length }} lot{{ '' if row.layers|length == 1 else 's' }})</summary></details></td>
+                <td class="left">{{ row.place }}</td>
+                <td class="tabular-nums">{{ row.qty|qty }} {{ row.unit }}</td>
+                <td class="tabular-nums">₹{{ (row.value / row.qty if row.qty else 0)|inr }}</td>
+                <td class="tabular-nums font-semibold text-ink">₹{{ row.value|inr }}</td>
+              </tr>
+              {% for layer in row.layers %}
+              <tr class="sv-layers layer-row hidden-layer" style="display:none">
+                <td class="left" style="padding-left:28px">{{ layer.lot }}{% if layer.batch %} · batch {{ layer.batch }}{% endif %}</td>
+                <td class="left">{{ layer.date.strftime('%d %b %Y') if layer.date else '' }}</td>
+                <td class="tabular-nums">{{ layer.qty|qty }} {{ row.unit }}</td>
+                <td class="tabular-nums">₹{{ layer.cost|inr }}</td>
+                <td class="tabular-nums">₹{{ layer.value|inr }}</td>
+              </tr>
+              {% endfor %}
+              {% else %}
+              <tr><td colspan="5" class="text-ink-faint" style="text-align:center;padding:26px;">No stock to value{{ ' in this view' if wanted != 'all' else ' yet' }}.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      </div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  // "Cost layers" kholne par us row ke neeche ke lot-wise bhaav dikhte hain
+  document.querySelectorAll('tr.main details').forEach(function (d) {
+    d.addEventListener('toggle', function () {
+      var row = d.closest('tr');
+      var next = row.nextElementSibling;
+      while (next && next.classList.contains('layer-row')) {
+        next.style.display = d.open ? '' : 'none';
+        next = next.nextElementSibling;
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -258,3 +258,67 @@ def backfill():
     for ref_no in repair_wrong_store():
         problems.append(f"{ref_no}: passed goods were in QC Hold, corrected to the store")
     return problems
+
+
+# ---------------- 5. Stock transfer (warehouse se warehouse) ----------------
+def dispatch_transfer(transfer):
+    # Dispatch: maal source warehouse se nikal jata hai (value ke saath). Value line par yaad rakhte hain,
+    # taaki transit me bhi dikhe aur Receive par destination me wahi value jaye.
+    db.session.flush()
+    for line in transfer.lines:
+        lot = line.lot
+        qty = q4(line.qty)
+        rem_qty, rem_value = balance(lot.id, transfer.from_warehouse_id)
+        out_value = value_for_out(rem_qty, rem_value, qty)
+        line.value = out_value
+        add_movement(lot, transfer.from_warehouse, transfer.transfer_date, "TRANSFER_OUT", -qty, -out_value,
+                     "TRANSFER", transfer.id, transfer.transfer_no, line.id)
+
+
+def receive_transfer(transfer, received_date):
+    # Receive: transit wala maal destination warehouse me aata hai
+    for line in transfer.lines:
+        add_movement(line.lot, transfer.to_warehouse, received_date, "TRANSFER_IN", q4(line.qty), line.value or 0,
+                     "TRANSFER", transfer.id, transfer.transfer_no, f"{line.id}:in")
+
+
+def transfer_cancelled(transfer):
+    # Sirf In transit par: dispatch ki ulti row, maal wapas source me
+    reverse_document("TRANSFER", transfer.id, "Reversal: transfer cancelled")
+
+
+# ---------------- 6. Stock adjustment ----------------
+def lot_unit_cost(lot, warehouse_id):
+    # Maal jodte waqt kis bhaav par: us lot ka warehouse me abhi ka average bhaav; khaali ho to PO rate
+    qty, value = balance(lot.id, warehouse_id)
+    if qty > 0.00005:
+        return value / qty
+    return (lot.grn_line.po_line.rate or 0) if lot.grn_line and lot.grn_line.po_line else 0
+
+
+def post_adjustment(adjustment):
+    # Approve hote hi: har line ka farak (delta) nikalo aur stock me likho.
+    #   increase: entered qty jodo | decrease: entered qty ghatao | audit: counted - system ka qty
+    db.session.flush()
+    warehouse = adjustment.warehouse
+    for line in adjustment.lines:
+        lot = line.lot
+        book_qty, book_value = balance(lot.id, warehouse.id)
+        line.book_qty = book_qty
+        if adjustment.adj_type == "audit":
+            delta = q4(line.entered_qty - book_qty)
+        elif adjustment.adj_type == "increase":
+            delta = q4(line.entered_qty)
+        else:
+            delta = -q4(line.entered_qty)
+        line.delta = delta
+        if delta == 0:
+            continue
+        if delta > 0:
+            value = q2(delta * lot_unit_cost(lot, warehouse.id))
+            add_movement(lot, warehouse, adjustment.adj_date, "ADJUST_IN", delta, value, "ADJUST", adjustment.id, adjustment.adj_no, line.id,
+                         note=adjustment.reason.name if adjustment.reason else None)
+        else:
+            out_value = value_for_out(book_qty, book_value, -delta)
+            add_movement(lot, warehouse, adjustment.adj_date, "ADJUST_OUT", delta, -out_value, "ADJUST", adjustment.id, adjustment.adj_no, line.id,
+                         note=adjustment.reason.name if adjustment.reason else None)
