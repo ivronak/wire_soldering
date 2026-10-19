@@ -357,6 +357,13 @@
                       data-tax-rate="{{ (p.tax_rate.code ~ ' — ' ~ p.tax_rate.rate_percent ~ '%') if p.tax_rate else '' }}">
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
+                    <button type="button" title="Production stages (routing)" aria-label="Production stages"
+                      class="btn-routing act-btn"
+                      data-id="{{ p.id }}"
+                      data-name="{{ p.name }}"
+                      data-stages='{{ p.routing_stage_ids | tojson }}'>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h6"/></svg>
+                    </button>
                     <button type="button" title="Edit product" aria-label="Edit product"
                       class="btn-edit-product act-btn act-edit"
                       data-id="{{ p.id }}"
@@ -1565,5 +1572,50 @@
   });
   updateFilterCounts();
   restoreListState();
+</script>
+
+{# ---- Production stages (routing): is product kaun-kaun se work stages se guzarta hai ---- #}
+<div id="routing-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="routing-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div><h2 class="text-[16px] font-bold text-ink">Production stages</h2><p id="routing-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="routing-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="routing-form" method="post" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <p class="text-[12.5px] text-ink-faint">Tick every stage this product goes through. The order is fixed by the Work stages master. A production order for this product copies this list, and you can change machines there.</p>
+      <div class="space-y-1.5">
+        {% for st in routing_stages %}
+        <label class="flex items-center gap-2.5 px-3 py-2 border border-slate-200 rounded hover:bg-mist cursor-pointer">
+          <input type="checkbox" name="stage_id" value="{{ st.id }}" class="routing-check" />
+          <span class="text-[13.5px] text-ink"><span class="text-ink-faint tabular-nums">{{ loop.index }}.</span> {{ st.name }}</span>
+        </label>
+        {% else %}
+        <p class="text-ink-faint text-[13px]">No work stages yet. Add them in Work stages first.</p>
+        {% endfor %}
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="routing-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="routing-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save stages</button>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var modal = document.getElementById('routing-modal');
+    var form = document.getElementById('routing-form');
+    function close() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+    document.querySelectorAll('.btn-routing').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var chosen = JSON.parse(btn.getAttribute('data-stages') || '[]');
+        form.action = '/products/routing/' + btn.getAttribute('data-id');
+        document.getElementById('routing-sub').textContent = btn.getAttribute('data-name');
+        form.querySelectorAll('.routing-check').forEach(function (box) { box.checked = chosen.indexOf(parseInt(box.value, 10)) !== -1; });
+        modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
+      });
+    });
+    ['routing-close', 'routing-cancel', 'routing-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', close); });
+  })();
 </script>
 {% endblock %}

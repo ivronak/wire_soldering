@@ -222,7 +222,7 @@
                 <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ m.code }}</span></td>
                 <td><span class="font-medium text-ink">{{ m.name }}</span></td>
                 <td class="text-[13px] text-ink-muted">{{ m.work_stage.name if m.work_stage else "_" }}</td>
-                <td class="text-[13px] text-ink-muted tabular-nums">{{ m.capacity }}</td>
+                <td class="text-[13px] text-ink-muted tabular-nums">{{ m.capacity_text }}</td>
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ m.installed_date or '_' }}</td>
                 <td class="text-center">
                   {% if m.status == 'active' %}
@@ -252,6 +252,9 @@
                       data-name="{{ m.name }}"
                       data-work-stage-id="{{ m.work_stage_id or '' }}"
                       data-capacity="{{ m.capacity or '' }}"
+                      data-per-hour="{{ m.capacity_per_hour if m.capacity_per_hour else '' }}"
+                      data-unit-id="{{ m.capacity_unit_id or '' }}"
+                      data-hours="{{ m.hours_per_day if m.hours_per_day else 8 }}"
                       data-installed="{{ m.installed_date or '' }}"
                       data-status="{{ m.status }}">
                       Edit
@@ -363,8 +366,20 @@
           </select>
         </div>
         <div>
-          <label for="machine-capacity" class="block text-[12.5px] font-semibold text-ink mb-1">Capacity / rated output</label>
-          <input type="text" id="machine-capacity" name="capacity" placeholder="e.g. 500 units/hr" autocomplete="off"
+          <label for="machine-per-hour" class="block text-[12.5px] font-semibold text-ink mb-1">Output per hour</label>
+          <div class="flex gap-2">
+            <input type="number" id="machine-per-hour" name="capacity_per_hour" min="0" step="any" placeholder="e.g. 120" autocomplete="off"
+              class="w-1/2 px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <select id="machine-unit" name="capacity_unit_id" class="w-1/2 px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              <option value="">Unit</option>
+              {% for u in units %}<option value="{{ u.id }}">{{ u.code }}</option>{% endfor %}
+            </select>
+          </div>
+          <p class="text-[11.5px] text-ink-faint mt-1">How much this machine can make in one hour. Used to plan production time.</p>
+        </div>
+        <div>
+          <label for="machine-hours" class="block text-[12.5px] font-semibold text-ink mb-1">Working hours per day</label>
+          <input type="number" id="machine-hours" name="hours_per_day" min="1" max="24" step="any" value="8" autocomplete="off"
             class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
         <div>
@@ -486,7 +501,9 @@
     document.getElementById('machine-code').value = btn.getAttribute('data-code') || '';
     document.getElementById('machine-name').value = btn.getAttribute('data-name') || '';
     document.getElementById('machine-stage').value = btn.getAttribute('data-work-stage-id') || '';
-    document.getElementById('machine-capacity').value = btn.getAttribute('data-capacity') || '';
+    document.getElementById('machine-per-hour').value = btn.getAttribute('data-per-hour') || '';
+    document.getElementById('machine-unit').value = btn.getAttribute('data-unit-id') || '';
+    document.getElementById('machine-hours').value = btn.getAttribute('data-hours') || '8';
     document.getElementById('machine-installed').value = btn.getAttribute('data-installed') || '';
     document.getElementById('machine-status').value = btn.getAttribute('data-status') || 'active';
     openModal();

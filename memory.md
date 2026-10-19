@@ -430,6 +430,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ne bola "payment terms ka bhi master banade", phir "teeno (Vendor + Customer + PO) connect karo". User ne explicitly **form default blank** ("Select terms…") chaha — pehle Vendor form me "Net 30" apne aap select ho jaata tha, wo auto-default hata diya. Nullable isliye ki terms optional field hai.
 **How to apply:** Same "Dropdown → master + nullable FK" rule (upar wala decision) — ek hi baar me teeno consumers connect kiye, ek hi migration me (add → `payment_terms.name` se backfill → purana text drop). **Auto-fill ko id par shift karo:** PO form pe vendor select karne par terms auto-fill pehle name/text se hota tha; ab vendor option pe `data-terms="{{ v.payment_terms_id or '' }}"` aur JS seedha `#po-terms` select ki `value` (id) set karta hai — isliye dropdown option values aur auto-fill dono consistent (id) rehte hain.
 
+### Decision: Production Order plan — product routing + machine capacity + planner (2026-10-19)
+**Date:** 2026-10-19
+**Kya:** Production Order me plan hota hai: stages (product ke default routing se), har stage ki machines, start date -> ghante / kaam ke din / finish date / roz ka max. Machine ki capacity numeric (KG/hr, hours/day=8). Product par default routing (`ProductRoutingStage`). Order par snapshot (`ProductionOrderStage`, `ProductionOrderStageMachine`). Soldering wire ke **asli stages** master me: Flux Preparation, Melting & Alloying, Ingot Casting, Extrusion, Wire Drawing, Spooling, Testing & QC, Packing (purane galat stages / machines soft-delete).
+**Kyun:** User ko order banate waqt hi clarity chahiye (kitna time, kaun si machine, roz kitna). Stages sequential maane (time = jod); working week Mon–Sat (`WEEKLY_OFF` ek jagah, baad me calendar setting). Capacity numbers estimates hain — plant se confirm.
+**How to apply:** Plan ka formula sirf `app/production_orders/planning.py` me; form ka JS `planFor` uska mirror hai (dono badlo to parity test chalao). Machine / routing master badalne se purane orders na badlen (snapshot). Actual vs plan baad me Routing tracker se; machine-clash check baaki.
+
 ---
 
 ## Session Log

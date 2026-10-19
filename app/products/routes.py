@@ -2,7 +2,7 @@ import os
 from werkzeug.utils import secure_filename
 from flask import render_template, Blueprint, redirect, url_for, request, flash
 from sqlalchemy import or_
-from app.models import Product, ProductCategories, Unit, TaxRate, RawMaterial, VariantRecipeItem
+from app.models import Product, ProductCategories, Unit, TaxRate, RawMaterial, VariantRecipeItem, WorkStage, ProductRoutingStage
 from app.extensions import db
 from datetime import datetime
 
@@ -43,7 +43,30 @@ def products_list():
         units=units,
         tax_rates=tax_rates,
         recipe_materials=recipe_materials,
+        routing_stages=WorkStage.query.filter(WorkStage.is_deleted == False, WorkStage.is_active == True).order_by(WorkStage.sort_order, WorkStage.id).all(),
     )
+
+
+@products_bp.route("/products/routing/<int:p_id>", methods=["POST"])
+def products_routing(p_id):
+    # Product ke default production stages save karo. Ye configuration hai (business document nahi), isliye purani list badal di jaati hai.
+    product = Product.query.filter_by(id=p_id, is_deleted=False).first_or_404()
+    wanted = []
+    for stage_id in request.form.getlist("stage_id", type=int):
+        stage = db.session.get(WorkStage, stage_id)
+        if stage is None or stage.is_deleted or not stage.is_active:
+            flash("One of the chosen stages is not available.", "error")
+            return redirect(url_for("products.products_list"))
+        if stage_id not in wanted:
+            wanted.append(stage_id)
+    for row in list(product.routing_stages):
+        db.session.delete(row)
+    db.session.flush()
+    for stage_id in wanted:
+        db.session.add(ProductRoutingStage(product_id=product.id, work_stage_id=stage_id))
+    db.session.commit()
+    flash(f"Production stages saved for {product.name}: {len(wanted)} stage{'' if len(wanted) == 1 else 's'}.", "success")
+    return redirect(url_for("products.products_list"))
 
 @products_bp.route("/products/add", methods=['POST'])
 def products_add():

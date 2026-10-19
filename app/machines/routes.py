@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
-from app.models import Machines, WorkStage
+from app.models import Machines, WorkStage, Unit
 from app.extensions import db
 from datetime import datetime
 
@@ -34,7 +34,26 @@ def machines_list():
         active_nav="machines",
         result_count=total_count,
         stages=stages,
+        units=Unit.query.filter(Unit.is_active == True, Unit.is_deleted == False).order_by(Unit.code).all(),
     )
+
+
+def read_capacity():
+    # Capacity ke teen number padho: ek ghante me kitna, kis unit me, din me kitne ghante. (values, error) wapas deta hai.
+    per_hour = request.form.get('capacity_per_hour', type=float)
+    unit_id = request.form.get('capacity_unit_id', type=int)
+    hours = request.form.get('hours_per_day', type=float)
+    if hours is None:
+        hours = 8
+    if per_hour is not None and per_hour <= 0:
+        return None, "Output per hour must be more than 0."
+    if per_hour is not None and not unit_id:
+        return None, "Choose the unit of the output (for example KG)."
+    if per_hour is not None and db.session.get(Unit, unit_id) is None:
+        return None, "Choose a valid unit."
+    if not (0 < hours <= 24):
+        return None, "Working hours per day must be between 0 and 24."
+    return {"per_hour": per_hour, "unit_id": unit_id if per_hour is not None else None, "hours": hours}, None
 
 
 @machines_bp.route("/machines/add", methods=['POST'])
@@ -53,6 +72,10 @@ def machines_add():
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
+    cap, cap_error = read_capacity()
+    if cap_error:
+        flash(cap_error, "error")
+        return redirect(url_for('machines.machines_list'))
 
     existing = Machines.query.filter_by(code=code).first()
     if existing:
@@ -61,6 +84,7 @@ def machines_add():
             existing.name = name
             existing.work_stage_id = work_stage_id
             existing.capacity =  capacity
+            existing.capacity_per_hour, existing.capacity_unit_id, existing.hours_per_day = cap["per_hour"], cap["unit_id"], cap["hours"]
             existing.installed_date = installed_date
             existing.status =  status
             db.session.commit()
@@ -74,6 +98,9 @@ def machines_add():
         name=name,
         work_stage_id=work_stage_id,
         capacity=capacity,
+        capacity_per_hour=cap["per_hour"],
+        capacity_unit_id=cap["unit_id"],
+        hours_per_day=cap["hours"],
         installed_date=installed_date,
         status=status,
         is_deleted=False,
@@ -111,10 +138,15 @@ def machines_edit(machine_id):
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
+    cap, cap_error = read_capacity()
+    if cap_error:
+        flash(cap_error, "error")
+        return redirect(url_for('machines.machines_list'))
 
     m.name = name
     m.work_stage_id = work_stage_id
     m.capacity = capacity
+    m.capacity_per_hour, m.capacity_unit_id, m.hours_per_day = cap["per_hour"], cap["unit_id"], cap["hours"]
     m.status = status
     m.installed_date = installed_date
     db.session.commit()

@@ -5,9 +5,68 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from app.extensions import db
-from app.models import Product, ProductCategories, ProductionOrder, ProductionOrderLine, RawMaterial
+from app.models import (Machines, Product, ProductCategories, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
+                        ProductionOrderStageMachine, RawMaterial)
+from app.production_orders.planning import plan_stages
 
 production_orders_bp = Blueprint("production_orders", __name__, template_folder="templates")
+
+
+def _is_kg(machine):
+    # Plan KG me banta hai, isliye sirf wahi machine ginti hai jiski numeric capacity KG / hr me likhi ho
+    unit = machine.capacity_unit.code.upper() if machine.capacity_unit else ""
+    return bool(machine.capacity_per_hour) and unit in ("KG", "KGS")
+
+
+def _routing_for(product):
+    # Product ke default stages (Work Stage ke order me) aur har stage ki active machines — form ke plan section ke liye
+    stages = []
+    for row in sorted(product.routing_stages, key=lambda x: (x.work_stage.sort_order, x.work_stage.id)):
+        stage = row.work_stage
+        if stage is None or stage.is_deleted or not stage.is_active:
+            continue
+        machines = Machines.query.filter(Machines.work_stage_id == stage.id, Machines.is_deleted == False,
+                                         Machines.status == "active").order_by(Machines.code).all()
+        stages.append({
+            "stage_id": stage.id,
+            "name": stage.name,
+            "machines": [{
+                "id": m.id, "name": m.name, "per_hour": m.capacity_per_hour or 0, "hours_per_day": m.hours_per_day or 8,
+                "ok": _is_kg(m),
+            } for m in machines],
+        })
+    return stages
+
+
+def read_plan(product, batch_kg, order_date):
+    """Form se production plan padho: har stage ki chuni hui machines aur start date. (plan, error) wapas deta hai.
+    Product ka routing na ho to (None, None): order bina plan ke ban jaata hai. Server khud hisaab lagata hai (JS ke dikhaye par bharosa nahi)."""
+    routing = _routing_for(product)
+    if not routing:
+        return None, None
+    start_raw = (request.form.get("start_date") or "").strip()
+    try:
+        start_date = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else order_date
+    except ValueError:
+        return None, "Enter a valid start date."
+    chosen = []
+    for stage in routing:
+        ids = request.form.getlist(f"machines_{stage['stage_id']}", type=int)
+        machines = []
+        for machine_id in ids:
+            machine = db.session.get(Machines, machine_id)
+            if machine is None or machine.is_deleted or machine.status != "active" or machine.work_stage_id != stage["stage_id"]:
+                return None, f"A chosen machine is not available for {stage['name']}."
+            if not _is_kg(machine):
+                return None, f"{machine.name} has no output per hour in KG. Set it in Machines first."
+            if machine.id in [x["id"] for x in machines]:
+                continue
+            machines.append({"id": machine.id, "name": machine.name, "per_hour": machine.capacity_per_hour,
+                             "hours_per_day": machine.hours_per_day or 8})
+        if not machines:
+            return None, f"Choose at least one machine for {stage['name']}."
+        chosen.append({"stage_id": stage["stage_id"], "name": stage["name"], "machines": machines})
+    return plan_stages(batch_kg, chosen, start_date), None
 
 
 def _planner_products():
@@ -36,6 +95,7 @@ def _planner_products():
             "category_id": p.category_id,
             "unit": p.base_unit.code if p.base_unit else "KG",
             "attributes": p.attributes or {},
+            "routing": _routing_for(p),
             "recipe": lines,
         })
     return products, planner
@@ -126,6 +186,10 @@ def production_orders_add():
             return redirect(url_for("production_orders.production_orders_list"))
 
     batch_kg = planned_qty * unit_weight
+    plan, plan_error = read_plan(product, batch_kg, order_date)
+    if plan_error:
+        flash(plan_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
     year = order_date.year
     count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
     prod_no = f"PROD-{year}-{count + 1:03d}"
@@ -140,8 +204,28 @@ def production_orders_add():
         remarks=remarks,
         is_deleted=False,
     )
+    if plan:
+        order.planned_start_date = plan["start_date"]
+        order.planned_end_date = plan["end_date"]
+        order.planned_hours = plan["total_hours"]
+        order.planned_days = plan["working_days"]
+        order.daily_capacity = plan["daily_capacity"]
+        order.bottleneck_stage = plan["bottleneck"]
     db.session.add(order)
     db.session.flush()
+
+    # Plan ke stages aur machines ki copy (master badle to purana order na badle)
+    if plan:
+        for index, row in enumerate(plan["stages"]):
+            stage_row = ProductionOrderStage(
+                production_order_id=order.id, work_stage_id=row["stage_id"], stage_name=row["name"], sort_order=(index + 1) * 10,
+                capacity_per_hour=row["per_hour"], daily_capacity=row["per_day"], planned_hours=row["hours"], planned_days=row["days"])
+            db.session.add(stage_row)
+            db.session.flush()
+            for machine in row["machines"]:
+                db.session.add(ProductionOrderStageMachine(
+                    stage_id=stage_row.id, machine_id=machine["id"], machine_name=machine["name"],
+                    capacity_per_hour=machine["per_hour"], hours_per_day=machine["hours_per_day"]))
 
     # Master recipe ki id save nahi karte. Ratio aur qty is order pe copy.
     for r in product.recipe_items:

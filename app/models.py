@@ -30,10 +30,32 @@ class Machines(CreatedAtMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=False)
     work_stage = db.relationship("WorkStage")
+    # Purana text capacity ("500 units/hr") — dikhane ke liye bacha hai. Hisaab ab neeche ke numbers se hota hai.
     capacity = db.Column(db.String(50), nullable=True)
+    # Numeric capacity: ek ghante me kitna bana sakti hai (unit Unit Master se, jaise KG) aur din me kitne ghante chalti hai.
+    # Production Order ka plan (kitne ghante / din lagenge) isi se nikalta hai.
+    capacity_per_hour = db.Column(db.Float, nullable=True)
+    capacity_unit_id = db.Column(db.Integer, db.ForeignKey("units.id"), nullable=True)
+    capacity_unit = db.relationship("Unit", foreign_keys=[capacity_unit_id])
+    hours_per_day = db.Column(db.Float, default=8, server_default="8", nullable=False)
     installed_date = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(20), default="active", nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def capacity_text(self):
+        # Screen par: "120 KG/hr · 8 h/day". Numeric nahi bhara to purana text.
+        if self.capacity_per_hour:
+            unit = self.capacity_unit.code if self.capacity_unit else ""
+            return f"{self.capacity_per_hour:g} {unit}/hr · {self.hours_per_day:g} h/day"
+        return self.capacity or "—"
+
+    @property
+    def daily_capacity(self):
+        # Ek din me kitna (capacity per hour x ghante); numeric na ho to None
+        if not self.capacity_per_hour:
+            return None
+        return round(self.capacity_per_hour * (self.hours_per_day or 0), 4)
 
 class WorkStage(CreatedAtMixin, db.Model):
     __tablename__="work_stage"
@@ -138,6 +160,11 @@ class Product(CreatedAtMixin, db.Model):
     @property
     def active_variants(self):
         return [v for v in self.variants if not v.is_deleted]
+
+    @property
+    def routing_stage_ids(self):
+        # Is product ke default production stages (ids). Order stage master ke sort_order se aata hai.
+        return [row.work_stage_id for row in self.routing_stages]
 
 class ProductVariant(CreatedAtMixin, db.Model):
     __tablename__ = "product_variants" 
@@ -648,6 +675,14 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     status = db.Column(db.String(20), default="Draft", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    # Plan (order banate waqt ka andaza; asli time baad me Routing tracker se milaya jayega)
+    planned_start_date = db.Column(db.Date, nullable=True)
+    planned_end_date = db.Column(db.Date, nullable=True)
+    planned_hours = db.Column(db.Float, nullable=True)           # saare stages ke ghante ka jod
+    planned_days = db.Column(db.Integer, nullable=True)          # kaam ke din (Sunday off)
+    daily_capacity = db.Column(db.Float, nullable=True)          # roz ka maximum, KG (sabse dheeme stage se)
+    bottleneck_stage = db.Column(db.String(100), nullable=True)  # kaunsa stage sabse dheema hai
 
     @property
     def issue_status(self):
@@ -1508,3 +1543,52 @@ class OpeningStockLine(CreatedAtMixin, db.Model):
         return {"material": (material.code + " " + material.name) if material else "", "qty": self.qty,
                 "unit": material.base_unit.code if material and material.base_unit else "",
                 "cost": self.unit_cost, "batch": self.batch_no or "", "lot": self.lot.lot_code if self.lot else ""}
+
+
+
+class ProductRoutingStage(CreatedAtMixin, db.Model):
+    # Product ka default routing: ye product kaun-kaun se work stages se guzarta hai (jaise Soldering wire: Flux prep -> Melting -> ... -> Packing).
+    # Stage ka order Work Stage master ke sort_order se tay hota hai. Production Order ye list copy kar leta hai (recipe ki tarah).
+    __tablename__ = "product_routing_stages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product = db.relationship("Product", foreign_keys=[product_id], backref="routing_stages")
+    work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=False)
+    work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
+
+    __table_args__ = (db.UniqueConstraint("product_id", "work_stage_id", name="uq_product_routing_stage"),)
+
+
+
+class ProductionOrderStage(CreatedAtMixin, db.Model):
+    # Order ka routing: us din ke stages ki copy (product ka routing badle to purana order nahi badlega) + unka planned time
+    __tablename__ = "production_order_stages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=False)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id],
+                                       backref=db.backref("stages", order_by="ProductionOrderStage.sort_order"))
+    work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=False)
+    work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
+    stage_name = db.Column(db.String(100), nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+
+    capacity_per_hour = db.Column(db.Float, nullable=True)       # chune hue machines ka jod, KG / hr
+    daily_capacity = db.Column(db.Float, nullable=True)          # KG / din
+    planned_hours = db.Column(db.Float, nullable=True)
+    planned_days = db.Column(db.Float, nullable=True)
+
+
+class ProductionOrderStageMachine(CreatedAtMixin, db.Model):
+    # Is stage ke liye chuni hui machine (naam aur capacity ki copy, machine master badle to plan na badle)
+    __tablename__ = "production_order_stage_machines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    stage_id = db.Column(db.Integer, db.ForeignKey("production_order_stages.id"), nullable=False)
+    stage = db.relationship("ProductionOrderStage", foreign_keys=[stage_id], backref="machines")
+    machine_id = db.Column(db.Integer, db.ForeignKey("machines.id"), nullable=False)
+    machine = db.relationship("Machines", foreign_keys=[machine_id])
+    machine_name = db.Column(db.String(100), nullable=False)
+    capacity_per_hour = db.Column(db.Float, nullable=False)
+    hours_per_day = db.Column(db.Float, nullable=False)
