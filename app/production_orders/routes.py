@@ -79,6 +79,16 @@ def read_plan(product, batch_kg, order_date, routing=None):
 ACTIVE_STATUSES = ("Draft", "Released")
 
 
+def posted_issued_qty(order):
+    # Production ke paas abhi kitna maal hai: Posted issues (Draft nahi) minus wapas kiya hua
+    total = 0.0
+    for issue in order.issues:
+        if issue.is_deleted or issue.status != "Posted":
+            continue
+        total += sum(line.qty - line.returned_qty for line in issue.lines)
+    return round(total, 4)
+
+
 def _read_needed_by():
     # "Needed by" optional date. (date, None) ya (None, "error"); khaali ho to (None, None)
     raw = (request.form.get("needed_by") or "").strip()
@@ -418,9 +428,12 @@ def production_orders_cancel(order_id):
     if not reason:
         flash("Enter the reason for cancelling.", "error")
         return redirect(url_for("production_orders.production_orders_list"))
-    live_issues = [i.issue_no for i in order.issues if not i.is_deleted and i.status != "Cancelled"]
-    if live_issues:
-        flash(f"{order.prod_no} has material issues ({', '.join(live_issues)}). Cancel those in Material issue first, then cancel the order.", "error")
+    # Draft issue pada ho, ya production me abhi maal (issue - return) bacha ho to cancel nahi: pehle wo store me wapas karo
+    drafts = [i.issue_no for i in order.issues if not i.is_deleted and i.status == "Draft"]
+    in_wip = [l for l in order.lines if l.issued_qty > 0.00005]
+    if drafts or in_wip:
+        flash(f"{order.prod_no} still has material issued to production" + (f" ({', '.join(drafts)} draft)" if drafts else "") +
+              ". Return the unused material to the store (Material issue, Return) or cancel the issues first, then cancel the order.", "error")
         return redirect(url_for("production_orders.production_orders_list"))
     order.status = "Cancelled"
     order.cancel_reason = reason[:255]
@@ -497,6 +510,10 @@ def production_orders_start(order_id):
         return redirect(url_for("production_orders.production_orders_list"))
     if order.issue_status == "Not issued":
         flash(f"Issue material for {order.prod_no} first (Material issue page), then start production.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if posted_issued_qty(order) <= 0.00005:
+        # Draft issue stock nahi hilata — production ke paas maal tab hi hai jab issue Post ho chuka ho
+        flash(f"{order.prod_no} only has a draft material issue. Post it (Material issue page) so the material reaches production, then start.", "error")
         return redirect(url_for("production_orders.production_orders_list"))
     if not order.stages:
         flash("This order has no production plan (stages and machines). Add one with Reschedule first.", "error")

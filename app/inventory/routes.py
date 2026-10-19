@@ -15,6 +15,8 @@ MOVEMENT_LABELS = {
     "PURCHASE_RETURN": "Returned to vendor",
     "ISSUE_OUT": "Issued to production: left store",
     "ISSUE_IN": "Issued to production: into WIP",
+    "MRET_OUT": "Returned from production: left WIP",
+    "MRET_IN": "Returned from production: back into store",
 }
 
 
@@ -89,6 +91,7 @@ EVENT_TITLES = {
     "GRN": "Goods received",
     "QC": "Quality check passed",
     "ISSUE": "Issued to production",
+    "MRETURN": "Returned from production",
     "RETURN": "Returned to vendor",
     "TRANSFER": "Stock transfer",
     "ADJUST": "Stock adjustment",

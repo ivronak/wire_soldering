@@ -3,174 +3,359 @@
 
 {% block page_css %}
 <style>
-  .mi-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .mi-table thead th {
-    position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 8px; text-align: center;
-    border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9;
+  /* Material issue UI — Production queue jaisa card-row look (Linear / Asana pattern), copper-teal theme */
+  .mi-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .mi-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .mi-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .mi-kpi .h { font-size: 12px; color: #6B7F82; }
+  .mi-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .mi-kpi.warn .v { color: #8A4A1C; }
+  .mi-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .mi-kpi.bad .v { color: #B42318; }
+  .mi-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .mi-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .mi-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .mi-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
+  .mi-group { display: flex; align-items: center; gap: 8px; padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; }
+  .mi-group b { background: #E9EEED; color: #3D5A5D; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  .mi-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; transition: box-shadow .15s, border-color .15s; }
+  .mi-card:hover { border-color: #BFC9C8; box-shadow: 0 2px 8px rgba(15,47,50,.07); }
+  .mi-card.is-run { border-left: 4px solid #C46B2D; }
+  .mi-card.is-dim { opacity: .72; }
+  .mi-row { display: grid; grid-template-columns: 54px minmax(210px, 1.5fr) minmax(190px, 1.3fr) minmax(150px, 1fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px; cursor: pointer; }
+  .mi-row.plain { grid-template-columns: minmax(210px, 1.5fr) minmax(220px, 1.6fr) minmax(150px, 1fr) auto 28px; }
+  .mi-pos { text-align: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #8A4A1C; }
+  .mi-pos small { display: block; font-family: inherit; font-size: 10.5px; font-weight: 600; color: #98A5A4; letter-spacing: .04em; text-transform: uppercase; }
+  .mi-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .mi-prod { font-size: 13.5px; color: #1C2B2D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mi-meta { font-size: 12px; color: #6B7F82; }
+  .mi-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .mi-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .mi-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .mi-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .mi-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .mi-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  .mi-chip.rel { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .mi-chip.draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .mi-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .mi-bar { height: 6px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 6px; }
+  .mi-bar div { height: 100%; background: #2A6B6E; border-radius: 999px; }
+  .mi-act { display: flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .mi-btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .mi-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .mi-btn.primary:hover { background: #A35522; }
+  .mi-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .mi-btn.teal:hover { background: #1F5558; }
+  .mi-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .mi-btn.ghost:hover { background: #F4F6F5; }
+  .mi-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .mi-btn.danger:hover { background: #FDECEC; }
+  .mi-menu { position: relative; }
+  .mi-menu summary { list-style: none; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #D1D9D8; color: #3D5A5D; background: #fff; font-size: 18px; line-height: 1; }
+  .mi-menu summary::-webkit-details-marker { display: none; }
+  .mi-menu .items { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 190px; background: #fff; border: 1px solid #D1D9D8; border-radius: 10px; box-shadow: 0 8px 24px rgba(15,47,50,.15); padding: 5px; }
+  .mi-menu .items button, .mi-menu .items a { display: block; width: 100%; text-align: left; padding: 8px 10px; font-size: 13.5px; color: #1C2B2D; border: 0; background: transparent; border-radius: 6px; cursor: pointer; text-decoration: none; }
+  .mi-menu .items button:hover, .mi-menu .items a:hover { background: #F4F6F5; }
+  .mi-menu .items .danger { color: #B42318; }
+  .mi-chev { border: 0; background: transparent; color: #98A5A4; font-size: 13px; transition: transform .15s; cursor: pointer; }
+  .mi-card.is-open .mi-chev { transform: rotate(180deg); }
+  .mi-detail { display: none; border-top: 1px solid #E4EAE9; background: #F8FAF9; border-radius: 0 0 12px 12px; padding: 12px 16px 14px; }
+  .mi-card.is-open .mi-detail { display: block; }
+  .mi-dl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .mi-dl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; padding: 4px 8px 6px; }
+  .mi-dl td { padding: 8px; border-top: 1px dashed #DDE5E4; vertical-align: middle; }
+  .mi-dl .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .mi-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .mi-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) {
+    .mi-row, .mi-row.plain { grid-template-columns: 1fr auto 28px; }
+    .mi-row > :nth-child(n+3):not(.mi-act):not(.mi-chev) { grid-column: 1 / 3; }
   }
-  .mi-table thead th:first-child, .mi-table tbody td:first-child { text-align: left; padding-left: 16px; }
-  .mi-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
-  .mi-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .mi-table td.left, .mi-table th.left { text-align: left; }
+  /* Drawers */
+  .mi-step { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .mi-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .mi-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .mi-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
-  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
-  .lines-table input { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; text-align: right; }
-  .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
-  .status-tobill { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
-  .status-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .status-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  #mi-modal.hidden, #mi-view-modal.hidden { display: none; }
-  #mi-modal, #mi-view-modal { display: flex; }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 8px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 7px 8px; border: 1px solid #E2E8E7; }
+  .lines-table input[type=number] { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 6px; text-align: right; }
+  #mi-modal.hidden, #mi-view-modal.hidden, #mr-modal.hidden { display: none; }
+  #mi-modal, #mi-view-modal, #mr-modal { display: flex; }
 </style>
 {% endblock %}
 
 {% block content %}
-      <div class="flex items-center justify-between gap-3 shrink-0">
-        <div>
-          <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Material issue</div>
-          <h1 class="text-[20px] font-bold text-ink leading-tight">Material issue</h1>
-        </div>
-      </div>
+{% macro dshort(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
 
-      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
-        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
-          <a href="{{ url_for('material_issues.material_issues_list', tab='pending') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
-            Pending action <span class="tabular-nums">({{ pending_count }})</span>
-          </a>
-          <a href="{{ url_for('material_issues.material_issues_list', tab='completed') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
-            Completed <span class="tabular-nums">({{ completed_count }})</span>
-          </a>
-        </div>
-        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
-          Raw material is issued against a <strong>released production order</strong> · the lot is picked automatically, oldest lot first · posting moves the stock from the store to <strong>WIP</strong> · only what is still needed can be issued · a posted issue can be cancelled and the material goes back to the store.
-        </div>
+<div class="flex flex-wrap items-end justify-between gap-3 shrink-0">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Material issue</div>
+    <h1 class="text-[22px] font-bold text-ink leading-tight">Material issue</h1>
+    <p class="text-[13px] text-ink-faint">Give raw material from the store to production, and take back what is not used. Stock moves store → WIP by itself when you post.</p>
+  </div>
+</div>
 
-        <div class="flex-1 overflow-auto min-h-0">
-          {% if tab == 'pending' %}
-          <table class="mi-table">
-            <colgroup><col style="width:15%"><col style="width:30%"><col style="width:17%"><col style="width:14%"><col style="width:24%"></colgroup>
-            <thead><tr><th>Document</th><th class="left">Product / details</th><th>Materials</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-              {% for order in to_issue %}
-              <tr>
-                <td><div class="font-mono font-semibold text-ink">{{ order.prod_no }}</div><div class="text-[11.5px] text-ink-faint">Production order</div></td>
-                <td class="left"><div class="font-medium text-ink">{{ order.product.code if order.product else '—' }} {{ order.product.name if order.product else '' }}</div>
-                  <div class="text-[11.5px] text-ink-faint">{{ '%g'|format(order.planned_qty) }} {{ order.product.base_unit.code if order.product and order.product.base_unit else '' }} planned</div></td>
-                <td class="tabular-nums">{{ order.lines|length }} item{{ '' if order.lines|length == 1 else 's' }}</td>
-                <td><span class="status-pill status-tobill">{{ order.issue_status }}</span></td>
-                <td><button type="button" class="btn-issue px-2 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-plan='{{ plans[order.id]|tojson }}'>Issue material</button></td>
-              </tr>
-              {% endfor %}
-              {% for issue in draft_issues %}
-              <tr>
-                <td><div class="font-mono font-semibold text-ink">{{ issue.issue_no }}</div><div class="text-[11.5px] text-ink-faint">Draft issue · {{ issue.production_order.prod_no }}</div></td>
-                <td class="left"><div class="font-medium text-ink">{{ issue.issue_date.strftime('%d %b %Y') }}</div>{% if issue.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ issue.created_at|ist }}</div>{% endif %}</td>
-                <td class="tabular-nums">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</td>
-                <td><span class="status-pill status-draft">Draft</span></td>
-                <td>
-                  <div class="flex flex-wrap justify-center gap-1">
-                    <button type="button" class="btn-view-mi px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-issue='{{ {"no": issue.issue_no, "order": issue.production_order.prod_no, "date": issue.issue_date.strftime("%d %b %Y"), "status": issue.status, "remarks": issue.remarks or "", "lines": (issue.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
-                    <form method="post" action="{{ url_for('material_issues.material_issues_post', issue_id=issue.id) }}" class="inline js-confirm-submit" data-confirm-title="Post issue" data-confirm-ok="Post" data-confirm-message="Post {{ issue.issue_no }}? The material will move from the store to WIP.">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post</button>
-                    </form>
-                    <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel draft" data-confirm-ok="Cancel issue" data-confirm-message="Cancel draft {{ issue.issue_no }}?">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-              {% endfor %}
-              {% if not to_issue and not draft_issues %}
-              <tr><td colspan="5" class="text-ink-faint" style="padding:28px;">Nothing to issue. Release a production order and it appears here.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
-          {% else %}
-          <table class="mi-table">
-            <colgroup><col style="width:14%"><col style="width:14%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:26%"></colgroup>
-            <thead><tr><th>Issue no.</th><th>Date</th><th>Production order</th><th>Lot lines</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-              {% for issue in issues %}
-              <tr{% if issue.status == 'Cancelled' %} class="opacity-70"{% endif %}>
-                <td class="font-mono font-semibold text-ink">{{ issue.issue_no }}</td>
-                <td class="tabular-nums">{{ issue.issue_date.strftime('%d %b %Y') }}{% if issue.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ issue.created_at|ist }}</div>{% endif %}</td>
-                <td class="font-mono">{{ issue.production_order.prod_no }}</td>
-                <td class="tabular-nums">{{ issue.lines|length }}</td>
-                <td><span class="status-pill {{ 'status-cancelled' if issue.status == 'Cancelled' else 'status-posted' }}">{{ issue.status }}</span></td>
-                <td>
-                  <div class="flex flex-wrap justify-center gap-1">
-                    <button type="button" class="btn-view-mi px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-issue='{{ {"no": issue.issue_no, "order": issue.production_order.prod_no, "date": issue.issue_date.strftime("%d %b %Y"), "status": issue.status, "remarks": issue.remarks or "", "lines": (issue.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
-                    {% if issue.status == 'Posted' %}
-                    <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel issue" data-confirm-ok="Cancel issue" data-confirm-message="Cancel {{ issue.issue_no }}? The material will go back from WIP to the store.">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
-                    </form>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="6" class="text-ink-faint" style="padding:28px;">No posted material issues yet.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          {% endif %}
-        </div>
-        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">Showing {{ result_count }} {{ 'pending items' if tab == 'pending' else 'issues' }}</div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="mi-kpi"><span class="k">Orders to issue</span><span class="v">{{ kpi.orders }}</span><span class="h">in queue order</span></div>
+  <div class="mi-kpi {{ 'bad' if kpi.short else '' }}"><span class="k">Short of stock</span><span class="v">{{ kpi.short }}</span><span class="h">PO coming or need to buy</span></div>
+  <div class="mi-kpi {{ 'warn' if kpi.drafts else '' }}"><span class="k">Draft issues</span><span class="v">{{ kpi.drafts }}</span><span class="h">not posted yet</span></div>
+  <div class="mi-kpi"><span class="k">Can return</span><span class="v">{{ kpi.returnable }}</span><span class="h">orders with material in WIP</span></div>
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="mi-tabs">
+    <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" class="{{ 'on' if tab == 'issue' else '' }}">To issue<span>{{ counts.issue }}</span></a>
+    <a href="{{ url_for('material_issues.material_issues_list', tab='issued') }}" class="{{ 'on' if tab == 'issued' else '' }}">Issued<span>{{ counts.issued }}</span></a>
+    <a href="{{ url_for('material_issues.material_issues_list', tab='returns') }}" class="{{ 'on' if tab == 'returns' else '' }}">Returns<span>{{ counts.returns }}</span></a>
+  </div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+
+{# =============================== TO ISSUE =============================== #}
+{% if tab == 'issue' %}
+  {% if draft_issues %}
+  <div class="mi-group">Draft issues, not posted <b>{{ draft_issues|length }}</b></div>
+  {% for issue in draft_issues %}
+  <article class="mi-card">
+    <div class="mi-row plain" style="cursor:default">
+      <div><div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ issue.issue_no }}</span><span class="mi-chip draft"><i></i>Draft</span></div>
+        <div class="mi-meta">{{ issue.issue_date.strftime('%d %b %Y') }}{% if issue.created_at %} · entered {{ issue.created_at|ist }}{% endif %}</div></div>
+      <div><div class="mi-prod">For <b class="font-mono">{{ issue.production_order.prod_no }}</b></div>
+        <div class="mi-meta">{{ issue_text[issue.id] }}</div></div>
+      <div class="mi-meta">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</div>
+      <div class="mi-act">
+        <form method="post" action="{{ url_for('material_issues.material_issues_post', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Post issue" data-confirm-ok="Post" data-confirm-message="Post {{ issue.issue_no }}? The material will move from the store to WIP.">
+          <button type="submit" class="mi-btn teal">Post</button></form>
+        <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ view_data[issue.id] | tojson }}'>View</button>
+        <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Cancel draft" data-confirm-ok="Cancel issue" data-confirm-message="Cancel draft {{ issue.issue_no }}?">
+          <button type="submit" class="mi-btn danger">Cancel</button></form>
       </div>
+      <span></span>
+    </div>
+  </article>
+  {% endfor %}
+  {% endif %}
+
+  {% if to_issue %}
+  <div class="mi-group">Orders waiting for material <b>{{ to_issue|length }}</b></div>
+  {% for order in to_issue %}
+  {% set plan = plans[order.id] %}
+  {% set mat = materials.get(order.id) %}
+  {% set done_lines = plan.lines | selectattr('remaining', 'le', 0) | list | length %}
+  {% set frac = (plan.lines | sum(attribute='frac')) / (plan.lines|length) if plan.lines else 0 %}
+  <article class="mi-card {{ 'is-run' if order.status == 'In production' else '' }}">
+    <div class="mi-row">
+      <div class="mi-pos">{{ order.queue_position }}<small>queue</small></div>
+      <div style="min-width:0">
+        <div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ order.prod_no }}</span>
+          {% if order.status == 'In production' %}<span class="mi-chip run"><i></i>In production</span>{% else %}<span class="mi-chip rel"><i></i>Released</span>{% endif %}</div>
+        <div class="mi-prod mt-0.5">{{ order.product.name if order.product else '—' }}</div>
+        <div class="mi-meta">{{ '%g'|format(order.planned_qty) }} {{ order.product.base_unit.code if order.product and order.product.base_unit else '' }} planned{% if schedule.get(order.id) %} · starts {{ dshort(schedule[order.id].start) }}{% endif %}</div>
+      </div>
+      <div>
+        <div class="text-[13px]"><b>{{ done_lines }}</b> of {{ plan.lines|length }} materials fully issued</div>
+        <div class="mi-bar"><div style="width:{{ (frac * 100)|round|int }}%"></div></div>
+        <div class="mi-meta mt-1">{{ order.issue_status }}</div>
+      </div>
+      <div>
+        {% if mat and mat.status == 'buy' %}<span class="mi-chip bad"><i></i>Need to buy</span>
+        {% elif mat and mat.status == 'coming' %}<span class="mi-chip warn"><i></i>PO coming</span>
+        {% else %}<span class="mi-chip ok"><i></i>Stock OK</span>{% endif %}
+        {% set short_names = plan.lines | selectattr('short') | map(attribute='name') | list %}
+        {% if short_names %}<div class="mi-meta mt-1">{{ short_names | join(', ') }}</div>{% endif %}
+      </div>
+      <div class="mi-act">
+        <button type="button" class="btn-issue mi-btn primary" data-plan='{{ plan|tojson }}'>Issue material</button>
+        {% if plan.lines | selectattr('can_all') | list %}
+        <form method="post" action="{{ url_for('material_issues.material_issues_add') }}" class="js-confirm-submit" data-confirm-title="Issue all available" data-confirm-ok="Issue now"
+              data-confirm-message="Issue everything that is still needed and in the store for {{ order.prod_no }}? The material moves from the store to WIP right away.">
+          <input type="hidden" name="production_order_id" value="{{ order.id }}"><input type="hidden" name="issue_date" value="{{ today }}"><input type="hidden" name="issue_action" value="post">
+          {% for l in plan.lines %}{% if l.suggest > 0 %}<input type="hidden" name="line_id_{{ loop.index0 }}" value="{{ l.id }}"><input type="hidden" name="qty_{{ loop.index0 }}" value="{{ l.suggest }}">{% endif %}{% endfor %}
+          <button type="submit" class="mi-btn ghost">Issue all available</button></form>
+        {% endif %}
+        {% if return_plans.get(order.id) %}
+        <details class="mi-menu"><summary aria-label="More">⋯</summary><div class="items">
+          <button type="button" class="btn-return" data-plan='{{ return_plans[order.id]|tojson }}'>Return material to store</button>
+          <a href="{{ url_for('production_orders.production_orders_list') }}">Open production queue</a>
+        </div></details>
+        {% endif %}
+      </div>
+      <button type="button" class="mi-chev" aria-label="Show materials">▾</button>
+    </div>
+    <div class="mi-detail">
+      <table class="mi-dl">
+        <thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th><th class="r">Still needed</th><th class="r">In store</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for l in plan.lines %}
+          <tr>
+            <td class="font-semibold text-ink">{{ l.name }}<div class="mi-meta font-normal">{{ l.code }}</div></td>
+            <td class="r">{{ '%g'|format(l.required) }} {{ l.unit }}</td>
+            <td class="r">{{ '%g'|format(l.issued) }}</td>
+            <td class="r font-semibold">{{ '%g'|format(l.remaining) }}</td>
+            <td class="r {{ 'text-stop' if l.short else '' }}">{{ '%g'|format(l.available) }}</td>
+            <td>{% if l.remaining <= 0 %}<span class="mi-chip ok"><i></i>Fully issued</span>
+              {% elif l.available <= 0 %}<span class="mi-chip bad"><i></i>No stock</span>
+              {% elif l.short %}<span class="mi-chip warn"><i></i>Only {{ '%g'|format(l.available) }} in store</span>
+              {% else %}<span class="mi-chip ok"><i></i>Ready to issue</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+  {% endfor %}
+  {% endif %}
+
+  {% if not to_issue and not draft_issues %}
+  <div class="mi-empty"><h3>Nothing to issue</h3><p>Release a production order and it will appear here, in queue order.</p></div>
+  {% endif %}
+
+{# =============================== ISSUED =============================== #}
+{% elif tab == 'issued' %}
+  {% for issue in issues %}
+  {% set rs = issue.lines | sum(attribute='returned_qty') %}
+  <article class="mi-card {{ 'is-dim' if issue.status == 'Cancelled' else '' }}">
+    <div class="mi-row plain">
+      <div><div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ issue.issue_no }}</span>
+          {% if issue.status == 'Cancelled' %}<span class="mi-chip gone"><i></i>Cancelled</span>{% else %}<span class="mi-chip ok"><i></i>Posted</span>{% endif %}</div>
+        <div class="mi-meta">{{ issue.issue_date.strftime('%d %b %Y') }}{% if issue.created_at %} · entered {{ issue.created_at|ist }}{% endif %}</div></div>
+      <div><div class="mi-prod">For <b class="font-mono">{{ issue.production_order.prod_no }}</b> · {{ issue.production_order.product.name if issue.production_order.product else '' }}</div>
+        <div class="mi-meta">{{ issue_text[issue.id] }}</div></div>
+      <div>
+        <div class="mi-meta">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</div>
+        {% if rs > 0 and issue.status == 'Posted' %}<span class="mi-chip warn mt-1"><i></i>{{ '%g'|format(rs) }} returned</span>{% endif %}
+        {% if issue.issued_by or issue.received_by %}<div class="mi-meta mt-1">{% if issue.issued_by %}by {{ issue.issued_by }}{% endif %}{% if issue.received_by %} → {{ issue.received_by }}{% endif %}</div>{% endif %}
+      </div>
+      <div class="mi-act">
+        <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ view_data[issue.id] | tojson }}'>View</button>
+        {% if issue.status == 'Posted' %}
+        <a href="{{ url_for('material_issues.material_issues_print', issue_id=issue.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
+        <details class="mi-menu"><summary aria-label="More">⋯</summary><div class="items">
+          {% if return_plans.get(issue.production_order_id) %}<button type="button" class="btn-return" data-plan='{{ return_plans[issue.production_order_id]|tojson }}'>Return material to store</button>{% endif %}
+          <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Cancel issue" data-confirm-ok="Cancel issue" data-confirm-message="Cancel {{ issue.issue_no }}? The material will go back from WIP to the store.">
+            <button type="submit" class="danger">Cancel issue</button></form>
+        </div></details>
+        {% endif %}
+      </div>
+      <span></span>
+    </div>
+  </article>
+  {% else %}
+  <div class="mi-empty"><h3>No material issued yet</h3><p>Posted issues are listed here.</p></div>
+  {% endfor %}
+
+{# =============================== RETURNS =============================== #}
+{% else %}
+  {% for ret in returns %}
+  <article class="mi-card {{ 'is-dim' if ret.status == 'Cancelled' else '' }}">
+    <div class="mi-row plain">
+      <div><div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ ret.return_no }}</span>
+          {% if ret.status == 'Cancelled' %}<span class="mi-chip gone"><i></i>Cancelled</span>{% else %}<span class="mi-chip ok"><i></i>Posted</span>{% endif %}</div>
+        <div class="mi-meta">{{ ret.return_date.strftime('%d %b %Y') }}{% if ret.created_at %} · entered {{ ret.created_at|ist }}{% endif %}</div></div>
+      <div><div class="mi-prod">From <b class="font-mono">{{ ret.production_order.prod_no }}</b> · {{ ret.production_order.product.name if ret.production_order.product else '' }}</div>
+        <div class="mi-meta">{{ return_text[ret.id] }}</div></div>
+      <div><span class="mi-chip warn"><i></i>{{ ret.reason }}</span>{% if ret.returned_by %}<div class="mi-meta mt-1">by {{ ret.returned_by }}</div>{% endif %}</div>
+      <div class="mi-act">
+        <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ return_view[ret.id] | tojson }}'>View</button>
+        {% if ret.status == 'Posted' %}
+        <form method="post" action="{{ url_for('material_issues.material_returns_cancel', return_id=ret.id) }}" class="js-confirm-submit" data-confirm-title="Cancel return" data-confirm-ok="Cancel return" data-confirm-message="Cancel {{ ret.return_no }}? The material goes back from the store to WIP.">
+          <button type="submit" class="mi-btn danger">Cancel</button></form>
+        {% endif %}
+      </div>
+      <span></span>
+    </div>
+  </article>
+  {% else %}
+  <div class="mi-empty"><h3>No returns yet</h3><p>When production has material left over, return it to the store from the "To issue" or "Issued" tab (the ⋯ menu).</p></div>
+  {% endfor %}
+{% endif %}
+</div>
 {% endblock %}
 
 {% block modals %}
+{# ---- Issue drawer ---- #}
 <div id="mi-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="mi-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
-      <div>
-        <h2 class="text-[16px] font-bold text-ink">Issue material to production</h2>
-        <p id="mi-sub" class="text-[12.5px] text-ink-faint">—</p>
-      </div>
-      <button type="button" id="mi-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-3xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+      <div><h2 class="text-[17px] font-bold text-ink">Issue material to production</h2><p id="mi-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="mi-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
-    <form id="mi-form" method="post" action="{{ url_for('material_issues.material_issues_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <form id="mi-form" method="post" action="{{ url_for('material_issues.material_issues_add') }}" class="flex-1 overflow-y-auto p-4 space-y-4">
       <input type="hidden" name="production_order_id" id="mi-order-id" value="" />
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-[12.5px] font-semibold text-ink mb-1">Issue date *</label>
-          <input type="date" id="mi-date" name="issue_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      <section class="mi-step">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><label class="mi-label">Issue date *</label><input type="date" id="mi-date" name="issue_date" required class="mi-input" /></div>
+          <div><label class="mi-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="mi-input" /></div>
+          <div><label class="mi-label">Issued by (store)</label><input type="text" name="issued_by" maxlength="60" class="mi-input" /></div>
+          <div><label class="mi-label">Received by (production)</label><input type="text" name="received_by" maxlength="60" class="mi-input" /></div>
         </div>
-        <div>
-          <label class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
-          <input type="text" name="remarks" maxlength="255" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" />
+      </section>
+      <section class="mi-step">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="text-[12.5px] text-ink-faint">Type how much of each material to issue now. It is taken from the store, oldest lot first. You cannot issue more than is still needed or more than the store has free.</p>
+          <button type="button" id="mi-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Fill all available</button>
         </div>
-      </div>
-      <p class="text-[12.5px] text-ink-faint">Type how much of each material to issue now. It is taken from the store, oldest lot first. You cannot issue more than is still needed or more than the store has free.</p>
-      <div class="overflow-x-auto border border-slate-200 rounded">
-        <table class="lines-table">
-          <thead><tr><th style="width:30%">Material</th><th style="width:14%">Needed</th><th style="width:14%">Already issued</th><th style="width:14%">Still needed</th><th style="width:14%">Free in store</th><th style="width:14%">Issue now</th></tr></thead>
-          <tbody id="mi-lines"></tbody>
-        </table>
-      </div>
+        <div class="overflow-x-auto rounded-lg">
+          <table class="lines-table">
+            <thead><tr><th style="width:30%">Material</th><th>Needed</th><th>Issued</th><th>Still needed</th><th>In store</th><th style="width:15%">Issue now</th></tr></thead>
+            <tbody id="mi-lines"></tbody>
+          </table>
+        </div>
+      </section>
     </form>
-    <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
-      <button type="submit" form="mi-form" name="issue_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
-      <button type="button" id="mi-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="mi-form" name="issue_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post issue</button>
+    <div class="px-5 py-3 border-t border-slate-200 bg-white flex flex-wrap justify-end gap-2 shrink-0">
+      <button type="submit" form="mi-form" name="issue_action" value="draft" class="mi-btn ghost">Save as draft</button>
+      <button type="button" id="mi-cancel" class="mi-btn ghost" style="border-color:transparent">Cancel</button>
+      <button type="submit" form="mi-form" name="issue_action" value="post" class="mi-btn primary" style="padding:8px 20px">Post issue</button>
     </div>
   </div>
 </div>
 
+{# ---- Return drawer ---- #}
+<div id="mr-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="mr-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-3xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+      <div><h2 class="text-[17px] font-bold text-ink">Return material to the store</h2><p id="mr-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="mr-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
+    </div>
+    <form id="mr-form" method="post" action="{{ url_for('material_issues.material_returns_add') }}" class="flex-1 overflow-y-auto p-4 space-y-4">
+      <input type="hidden" name="production_order_id" id="mr-order-id" value="" />
+      <section class="mi-step">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><label class="mi-label">Return date *</label><input type="date" id="mr-date" name="return_date" required class="mi-input" /></div>
+          <div><label class="mi-label">Why is it coming back? *</label>
+            <select name="reason" required class="mi-input">{% for r in reasons %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select></div>
+          <div><label class="mi-label">Returned by</label><input type="text" name="returned_by" maxlength="60" class="mi-input" /></div>
+          <div><label class="mi-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="mi-input" /></div>
+        </div>
+      </section>
+      <section class="mi-step">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="text-[12.5px] text-ink-faint">Return from the lot it was issued from. You can return at most what is still in production for that lot line. Returned material can be issued again.</p>
+          <button type="button" id="mr-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Return everything</button>
+        </div>
+        <div class="overflow-x-auto rounded-lg">
+          <table class="lines-table">
+            <thead><tr><th style="width:30%">Material</th><th>Lot</th><th>Issued</th><th>Returned</th><th>In production</th><th style="width:15%">Return now</th></tr></thead>
+            <tbody id="mr-lines"></tbody>
+          </table>
+        </div>
+      </section>
+    </form>
+    <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+      <button type="button" id="mr-cancel" class="mi-btn ghost">Cancel</button>
+      <button type="submit" form="mr-form" class="mi-btn primary" style="padding:8px 20px">Post return</button>
+    </div>
+  </div>
+</div>
+
+{# ---- View drawer (issue ya return) ---- #}
 <div id="mi-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="mi-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
-      <div><h2 id="mi-view-title" class="text-[16px] font-bold text-ink">Material issue</h2><p id="mi-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
-      <button type="button" id="mi-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
+      <div><h2 id="mi-view-title" class="text-[17px] font-bold text-ink">Material issue</h2><p id="mi-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="mi-view-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
-    <div id="mi-view-body" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-[14px]"></div>
+    <div id="mi-view-body" class="flex-1 overflow-y-auto px-5 py-4 space-y-3 text-[14px]"></div>
   </div>
 </div>
 {% endblock %}
@@ -181,10 +366,12 @@
     return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; });
   }
   function fmt(x) { return String(Math.round(Number(x) * 10000) / 10000); }
-  var miModal = document.getElementById('mi-modal');
-  var miView = document.getElementById('mi-view-modal');
   var TODAY = {{ today|tojson }};
+  var miModal = document.getElementById('mi-modal'), mrModal = document.getElementById('mr-modal'), miView = document.getElementById('mi-view-modal');
+  function show(el) { el.classList.remove('hidden'); el.setAttribute('aria-hidden', 'false'); }
+  function hide(el) { el.classList.add('hidden'); el.setAttribute('aria-hidden', 'true'); }
 
+  // ---------- Issue drawer ----------
   function openIssue(btn) {
     var plan = JSON.parse(btn.getAttribute('data-plan') || '{}');
     document.getElementById('mi-order-id').value = plan.order_id;
@@ -192,27 +379,49 @@
     document.getElementById('mi-date').value = TODAY;
     var html = '';
     (plan.lines || []).forEach(function (l, i) {
-      // Default = jitna baaki hai, par store me jitna free hai usse zyada nahi
-      var suggest = Math.min(l.remaining, l.available);
       var can = l.remaining > 0 && l.available > 0;
-      html += '<tr><td>' + esc(l.material) + '<input type="hidden" name="line_id_' + i + '" value="' + l.id + '"></td>' +
+      html += '<tr><td><div class="font-semibold">' + esc(l.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(l.code) + '</div><input type="hidden" name="line_id_' + i + '" value="' + l.id + '"></td>' +
         '<td class="text-right tabular-nums">' + fmt(l.required) + ' ' + esc(l.unit) + '</td>' +
         '<td class="text-right tabular-nums">' + fmt(l.issued) + '</td>' +
         '<td class="text-right tabular-nums">' + fmt(l.remaining) + '</td>' +
         '<td class="text-right tabular-nums' + (l.available < l.remaining ? ' text-stop' : '') + '">' + fmt(l.available) + '</td>' +
-        '<td>' + (can ? '<input type="number" name="qty_' + i + '" min="0" max="' + suggest + '" step="any" value="' + suggest + '">'
+        '<td>' + (can ? '<input type="number" class="mi-qty" data-max="' + l.suggest + '" name="qty_' + i + '" min="0" max="' + l.suggest + '" step="any" value="' + l.suggest + '">'
                       : '<span class="text-[12px] text-ink-faint">' + (l.remaining <= 0 ? 'Done' : 'No stock') + '</span>') + '</td></tr>';
     });
     document.getElementById('mi-lines').innerHTML = html;
-    miModal.classList.remove('hidden');
-    miModal.setAttribute('aria-hidden', 'false');
+    show(miModal);
   }
-  function closeIssue() { miModal.classList.add('hidden'); miModal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.btn-issue').forEach(function (b) { b.addEventListener('click', function () { openIssue(b); }); });
-  document.getElementById('mi-close').addEventListener('click', closeIssue);
-  document.getElementById('mi-cancel').addEventListener('click', closeIssue);
-  document.getElementById('mi-backdrop').addEventListener('click', closeIssue);
+  document.getElementById('mi-fill').addEventListener('click', function () {
+    document.querySelectorAll('#mi-lines .mi-qty').forEach(function (i) { i.value = i.getAttribute('data-max'); });
+  });
+  ['mi-close', 'mi-cancel', 'mi-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(miModal); }); });
 
+  // ---------- Return drawer ----------
+  function openReturn(btn) {
+    var plan = JSON.parse(btn.getAttribute('data-plan') || '{}');
+    document.getElementById('mr-order-id').value = plan.order_id;
+    document.getElementById('mr-sub').textContent = plan.prod_no + ' · ' + plan.product;
+    document.getElementById('mr-date').value = TODAY;
+    var html = '';
+    (plan.lines || []).forEach(function (l, i) {
+      html += '<tr><td><div class="font-semibold">' + esc(l.material) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(l.issue_no) + '</div><input type="hidden" name="issue_line_id_' + i + '" value="' + l.id + '"></td>' +
+        '<td class="font-mono text-[12px]">' + esc(l.lot) + (l.batch ? '<div class="text-ink-faint">' + esc(l.batch) + '</div>' : '') + '</td>' +
+        '<td class="text-right tabular-nums">' + fmt(l.issued) + ' ' + esc(l.unit) + '</td>' +
+        '<td class="text-right tabular-nums">' + fmt(l.returned) + '</td>' +
+        '<td class="text-right tabular-nums font-semibold">' + fmt(l.returnable) + '</td>' +
+        '<td><input type="number" class="mr-qty" data-max="' + l.returnable + '" name="qty_' + i + '" min="0" max="' + l.returnable + '" step="any" value=""></td></tr>';
+    });
+    document.getElementById('mr-lines').innerHTML = html;
+    show(mrModal);
+  }
+  document.querySelectorAll('.btn-return').forEach(function (b) { b.addEventListener('click', function () { openReturn(b); }); });
+  document.getElementById('mr-fill').addEventListener('click', function () {
+    document.querySelectorAll('#mr-lines .mr-qty').forEach(function (i) { i.value = i.getAttribute('data-max'); });
+  });
+  ['mr-close', 'mr-cancel', 'mr-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(mrModal); }); });
+
+  // ---------- View drawer ----------
   function openView(btn) {
     var d = JSON.parse(btn.getAttribute('data-issue') || '{}');
     document.getElementById('mi-view-title').textContent = d.no + ' · ' + d.status;
@@ -220,23 +429,38 @@
     var rows = '';
     (d.lines || []).forEach(function (l) {
       rows += '<tr class="border-t border-slate-100"><td class="p-2">' + esc(l.material) + '</td><td class="p-2 font-mono text-[12px]">' + esc(l.lot) + (l.batch ? ' · ' + esc(l.batch) : '') +
-        '</td><td class="p-2 text-right tabular-nums">' + fmt(l.qty) + ' ' + esc(l.unit) + '</td></tr>';
+        '</td><td class="p-2 text-right tabular-nums">' + fmt(l.qty) + ' ' + esc(l.unit) + (l.returned ? '<div class="text-[11.5px] text-ink-faint">' + fmt(l.returned) + ' returned</div>' : '') + '</td></tr>';
     });
+    var facts = [];
+    if (d.reason) facts.push('<span class="mi-chip warn"><i></i>' + esc(d.reason) + '</span>');
+    if (d.by) facts.push('<span class="text-[13px]"><span class="text-ink-faint">By:</span> ' + esc(d.by) + '</span>');
+    if (d.remarks) facts.push('<span class="text-[13px]"><span class="text-ink-faint">Remarks:</span> ' + esc(d.remarks) + '</span>');
     document.getElementById('mi-view-body').innerHTML =
-      (d.remarks ? '<p class="text-[13px]"><span class="text-ink-faint">Remarks:</span> ' + esc(d.remarks) + '</p>' : '') +
-      '<div class="overflow-x-auto border border-slate-200 rounded"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted"><th class="p-2 text-left">Material</th><th class="p-2 text-left">Lot</th><th class="p-2 text-right">Qty issued</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<p class="text-[12px] text-ink-faint">Each lot is listed separately so you can trace which lot went into this production order.</p>';
-    miView.classList.remove('hidden');
-    miView.setAttribute('aria-hidden', 'false');
+      (facts.length ? '<div class="flex flex-wrap gap-x-5 gap-y-1 items-center">' + facts.join('') + '</div>' : '') +
+      '<div class="overflow-x-auto border border-slate-200 rounded-lg"><table class="w-full text-[13px]"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted"><th class="p-2 text-left">Material</th><th class="p-2 text-left">Lot</th><th class="p-2 text-right">Qty</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="text-[12px] text-ink-faint">Each lot is listed separately so you can trace which lot is in this production order.</p>';
+    show(miView);
   }
-  function closeView() { miView.classList.add('hidden'); miView.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.btn-view-mi').forEach(function (b) { b.addEventListener('click', function () { openView(b); }); });
-  document.getElementById('mi-view-close').addEventListener('click', closeView);
-  document.getElementById('mi-view-backdrop').addEventListener('click', closeView);
+  ['mi-view-close', 'mi-view-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(miView); }); });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (!miModal.classList.contains('hidden')) closeIssue();
-    else if (!miView.classList.contains('hidden')) closeView();
+    [miModal, mrModal, miView].forEach(function (m) { if (!m.classList.contains('hidden')) hide(m); });
+  });
+
+  // ---------- cards: expand + menu ----------
+  document.querySelectorAll('.mi-card').forEach(function (card) {
+    var row = card.querySelector('.mi-row');
+    if (!card.querySelector('.mi-detail')) return;
+    row.addEventListener('click', function (event) {
+      if (event.target.closest('a, button, form, summary, .mi-menu')) return;
+      card.classList.toggle('is-open');
+    });
+    var chev = card.querySelector('.mi-chev');
+    if (chev) chev.addEventListener('click', function () { card.classList.toggle('is-open'); });
+  });
+  document.addEventListener('click', function (event) {
+    document.querySelectorAll('details.mi-menu[open]').forEach(function (m) { if (!m.contains(event.target)) m.removeAttribute('open'); });
   });
 </script>
 {% endblock %}

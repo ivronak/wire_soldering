@@ -737,7 +737,7 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
             issue = issue_line.issue
             if issue.is_deleted or issue.status == "Cancelled":
                 continue
-            total += issue_line.qty
+            total += issue_line.qty - issue_line.returned_qty        # Material return ka wapas aaya hissa ghata do
         return round(total, 4)
 
     @property
@@ -1363,6 +1363,8 @@ class MaterialIssue(CreatedAtMixin, db.Model):
     status = db.Column(db.String(20), default="Draft", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    issued_by = db.Column(db.String(60), nullable=True)      # store se kisne diya (slip par)
+    received_by = db.Column(db.String(60), nullable=True)    # production me kisne liya
 
 
 class MaterialIssueLine(CreatedAtMixin, db.Model):
@@ -1386,6 +1388,24 @@ class MaterialIssueLine(CreatedAtMixin, db.Model):
     qty = db.Column(db.Float, nullable=False)
 
     @property
+    def returned_qty(self):
+        # Is lot line ka jitna maal production se store me wapas aa chuka (sirf Posted returns)
+        total = 0
+        for return_line in self.return_lines:
+            ret = return_line.material_return
+            if ret.is_deleted or ret.status != "Posted":
+                continue
+            total += return_line.qty
+        return round(total, 4)
+
+    @property
+    def returnable_qty(self):
+        # Abhi bhi WIP me jo wapas ho sakta hai (issue Posted ho tabhi)
+        if self.issue.is_deleted or self.issue.status != "Posted":
+            return 0
+        return max(round(self.qty - self.returned_qty, 4), 0)
+
+    @property
     def summary(self):
         # View panel (JS) ke liye
         material = self.raw_material
@@ -1395,6 +1415,50 @@ class MaterialIssueLine(CreatedAtMixin, db.Model):
                 "qty": self.qty,
                 "unit": material.base_unit.code if material and material.base_unit else ""}
 
+
+
+class MaterialReturn(CreatedAtMixin, db.Model):
+    # Production (WIP) se bacha / galat material store me wapas. Ek return = ek production order, lot-wise lines.
+    # Posted (stock turant badalta hai) -> Cancelled (ulti rows, sirf tab jab maal store me abhi maujood ho).
+    __tablename__ = "material_returns"
+
+    id = db.Column(db.Integer, primary_key=True)
+    return_no = db.Column(db.String(20), unique=True, nullable=False)
+
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=False)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id], backref="returns")
+
+    return_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.String(60), nullable=False)
+    status = db.Column(db.String(20), default="Posted", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+    returned_by = db.Column(db.String(60), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class MaterialReturnLine(CreatedAtMixin, db.Model):
+    # Kis issue line (yaani kis lot) ka kitna hissa wapas aaya
+    __tablename__ = "material_return_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    return_id = db.Column(db.Integer, db.ForeignKey("material_returns.id"), nullable=False)
+    material_return = db.relationship("MaterialReturn", foreign_keys=[return_id], backref="lines")
+
+    issue_line_id = db.Column(db.Integer, db.ForeignKey("material_issue_lines.id"), nullable=False)
+    issue_line = db.relationship("MaterialIssueLine", foreign_keys=[issue_line_id], backref="return_lines")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+    lot_id = db.Column(db.Integer, db.ForeignKey("stock_lots.id"), nullable=False)
+    lot = db.relationship("StockLot", foreign_keys=[lot_id])
+    qty = db.Column(db.Float, nullable=False)
+
+    @property
+    def summary(self):
+        material = self.raw_material
+        return {"material": (material.code + " " + material.name) if material else "",
+                "lot": self.lot.lot_code if self.lot else "", "batch": self.lot.vendor_batch_no if self.lot else "",
+                "qty": self.qty, "unit": material.base_unit.code if material and material.base_unit else ""}
 
 
 # ======================= Stock transfer (warehouse se warehouse) =======================

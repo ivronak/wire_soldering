@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Material issue slip {{ issue.issue_no }}</title>
+  <style>
+    @page { size: A4; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9eeed; color: #0f2f32; font-family: "Segoe UI", Arial, sans-serif; font-size: 13px; }
+    .toolbar { max-width: 210mm; margin: 16px auto 0; display: flex; justify-content: flex-end; gap: 8px; }
+    .toolbar a, .toolbar button { font: 600 13px "Segoe UI", sans-serif; padding: 8px 16px; border-radius: 6px; cursor: pointer; text-decoration: none; }
+    .toolbar a { color: #3d5a5d; background: #fff; border: 1px solid #d1d9d8; }
+    .toolbar button { color: #fff; background: #c46b2d; border: 1px solid #a35522; }
+    .sheet { width: 210mm; min-height: 140mm; margin: 14px auto 28px; background: #fff; padding: 14mm 15mm; box-shadow: 0 10px 28px rgba(15, 47, 50, .1); }
+    .head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #c46b2d; padding-bottom: 10px; }
+    .head h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #8a4a1c; }
+    .no { font-family: Consolas, monospace; font-size: 20px; font-weight: 700; text-align: right; }
+    .status { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border: 1px solid #d1d9d8; border-radius: 999px; padding: 2px 10px; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin: 14px 0; border: 1px solid #e1e8e7; border-radius: 8px; overflow: hidden; }
+    .meta div { padding: 9px 12px; border-right: 1px solid #e1e8e7; }
+    .meta div:last-child { border-right: 0; }
+    .meta small { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6b7f82; margin-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #3d5a5d; background: #eef2f1; padding: 8px 10px; border: 1px solid #d1d9d8; }
+    td { padding: 9px 10px; border: 1px solid #e1e8e7; }
+    td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono { font-family: Consolas, monospace; font-size: 12px; }
+    .note { margin-top: 12px; font-size: 12px; color: #3d5a5d; }
+    .sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px; }
+    .sign div { border-top: 1px solid #0f2f32; padding-top: 6px; font-size: 12px; color: #3d5a5d; }
+    .sign b { display: block; color: #0f2f32; min-height: 16px; }
+    @media print { body { background: #fff; } .toolbar { display: none; } .sheet { margin: 0; box-shadow: none; width: auto; padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <a href="{{ url_for('material_issues.material_issues_list', tab='issued') }}">Back</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+  <div class="sheet">
+    <div class="head">
+      <div><div class="eyebrow">Wire Soldering · Stores</div><h1>Material issue slip</h1></div>
+      <div><div class="no">{{ issue.issue_no }}</div><div style="text-align:right"><span class="status">{{ issue.status }}</span></div></div>
+    </div>
+    <div class="meta">
+      <div><small>Issue date</small>{{ issue.issue_date.strftime('%d %b %Y') }}</div>
+      <div><small>Production order</small><span class="mono">{{ issue.production_order.prod_no }}</span></div>
+      <div><small>Product</small>{{ issue.production_order.product.name if issue.production_order.product else '—' }}</div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Material</th><th>Lot</th><th>Vendor batch</th><th class="r">Quantity</th></tr></thead>
+      <tbody>
+        {% for line in issue.lines %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><b>{{ line.raw_material.name if line.raw_material else '—' }}</b><div class="mono" style="color:#6b7f82">{{ line.raw_material.code if line.raw_material else '' }}</div></td>
+          <td class="mono">{{ line.lot.lot_code if line.lot else '' }}</td>
+          <td class="mono">{{ line.lot.vendor_batch_no if line.lot and line.lot.vendor_batch_no else '—' }}</td>
+          <td class="r"><b>{{ '%g'|format(line.qty) }}</b> {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if issue.remarks %}<p class="note"><b>Remarks:</b> {{ issue.remarks }}</p>{% endif %}
+    <p class="note">Stock moves from the store to WIP when this issue is posted. Return any unused material with a Material return.</p>
+    <div class="sign">
+      <div><b>{{ issue.issued_by or '' }}</b>Issued by (store)</div>
+      <div><b>{{ issue.received_by or '' }}</b>Received by (production)</div>
+      <div><b></b>Approved by</div>
+    </div>
+  </div>
+</body>
+</html>

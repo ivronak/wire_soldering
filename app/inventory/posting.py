@@ -191,6 +191,31 @@ def issue_to_wip(issue):
         add_movement(lot, wip, issue.issue_date, "ISSUE_IN", qty, out_value, "ISSUE", issue.id, issue.issue_no, line.id)
 
 
+def material_return_post(ret):
+    # Material return post: har lot line ka maal WIP se nikal ke wapas store (RM) me, value ke saath (WIP ka average value per unit).
+    db.session.flush()                 # nayi return lines ki id chahiye (line_key)
+    for line in ret.lines:
+        lot = line.lot
+        store = rm_warehouse_of(lot)
+        wip = wip_warehouse_for(store)
+        qty = q4(line.qty)
+        wip_qty, wip_value = balance(lot.id, wip.id)
+        out_value = value_for_out(wip_qty, wip_value, qty)
+        add_movement(lot, wip, ret.return_date, "MRET_OUT", -qty, -out_value, "MRETURN", ret.id, ret.return_no, line.id)
+        add_movement(lot, store, ret.return_date, "MRET_IN", qty, out_value, "MRETURN", ret.id, ret.return_no, line.id)
+
+
+def material_return_cancel(ret):
+    # Return cancel = maal wapas WIP me. Par agar wo maal store se pehle hi kisi aur issue me chala gaya to store me kam padega — tab rok do.
+    for line in ret.lines:
+        lot = line.lot
+        store = rm_warehouse_of(lot)
+        on_hand, _value = balance(lot.id, store.id)
+        if on_hand + 0.00005 < line.qty:
+            raise InventoryError(f"Cannot cancel: only {on_hand:g} of {lot.lot_code} is left in {store.name} (it has been used again), but {line.qty:g} must go back to WIP.")
+    reverse_document("MRETURN", ret.id, "Reversal: material return cancelled")
+
+
 def issue_cancelled(issue):
     reverse_document("ISSUE", issue.id, "Reversal: material issue cancelled")
 

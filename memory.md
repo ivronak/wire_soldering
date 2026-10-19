@@ -448,6 +448,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ne kaha order queue me hon, priority se chalen, har order par dikhe RM stock hai ya kharidna hai, aur estimated days list me dikhe. Recommended design user ne approve kiya (auto-dates, RM short par date PO tak khisake).
 **How to apply:** Naya status (jaise Completed) aaye to `OPEN_STATUSES` (scheduler.py) aur `ACTIVE_STATUSES` (routes.py) dono sochna. Scheduler / `materials.py` ka koi hisaab badlo to `queue_test.py` chalao. Material check abhi lock nahi karta (hard reservation baad me, agar zaroorat padi).
 
+### Decision: Material return + net issued + start needs posted issue (2026-10-19)
+**Date:** 2026-10-19
+**Kya:** Material return ek alag document (MR-YYYY-NNN, lot-line se). Order ki `issued_qty` = issue - return. Order cancel tab nahi jab WIP me maal; Start ke liye Posted issue zaroori (Draft nahi).
+**Kyun:** Production me bacha / galat maal store me wapas aana chahiye (traceability aur sahi stock); Draft issue stock nahi hilata isliye start ke liye kaafi nahi.
+**How to apply:** Naye stock movement types `MRET_OUT` / `MRET_IN`, ref type `MRETURN`. Production output module aaye to WIP consumption par return / issue-cancel guards dobara dekhne honge. `posting.py` me `return_to_stock` / `return_cancelled` purchase return ke hain — material return ke naam `material_return_post` / `material_return_cancel` (naam mat takrao).
+
 ---
 
 ## Session Log
