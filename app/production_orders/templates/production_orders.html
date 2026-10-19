@@ -187,13 +187,16 @@
         {% elif o.status == 'In production' %}
         <a href="{{ url_for('material_issues.material_issues_list') }}" class="po-btn ghost">Material issue</a>
         {% endif %}
-        {% if o.status in ('Draft', 'Released') %}
+        {% if o.status != 'Cancelled' %}
         <details class="po-menu"><summary aria-label="More actions">⋯</summary>
           <div class="items">
+            <a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank">Print order</a>
+            {% if o.status in ('Draft', 'Released') %}
             {% if o.status == 'Released' %}<a href="{{ url_for('material_issues.material_issues_list') }}">Issue material</a>{% endif %}
             <button type="button" class="btn-resched" data-id="{{ o.id }}">Reschedule / change machines</button>
             <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><button type="submit">Make first in queue</button></form>
             <button type="button" class="btn-cancel-order danger" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>
+            {% endif %}
           </div>
         </details>
         {% endif %}
@@ -205,6 +208,7 @@
       {% if o.status == 'Cancelled' and o.cancel_reason %}
       <div class="mb-3 text-[13px]" style="color:#B42318"><b>Cancelled:</b> {{ o.cancel_reason }}</div>
       {% endif %}
+      <div class="mb-3"><a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank" class="po-btn ghost" style="padding:5px 12px">Print order</a></div>
       <div class="grid gap-6 md:grid-cols-2">
         <div>
           <h4>Production plan</h4>

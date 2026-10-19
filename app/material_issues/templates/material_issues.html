@@ -123,6 +123,7 @@
         <form method="post" action="{{ url_for('material_issues.material_issues_post', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Post issue" data-confirm-ok="Post" data-confirm-message="Post {{ issue.issue_no }}? The material will move from the store to WIP.">
           <button type="submit" class="mi-btn teal">Post</button></form>
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ view_data[issue.id] | tojson }}'>View</button>
+        <a href="{{ url_for('material_issues.material_issues_print', issue_id=issue.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
         <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Cancel draft" data-confirm-ok="Cancel issue" data-confirm-message="Cancel draft {{ issue.issue_no }}?">
           <button type="submit" class="mi-btn danger">Cancel</button></form>
       </div>
@@ -253,6 +254,7 @@
       <div><span class="mi-chip warn"><i></i>{{ ret.reason }}</span>{% if ret.returned_by %}<div class="mi-meta mt-1">by {{ ret.returned_by }}</div>{% endif %}</div>
       <div class="mi-act">
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ return_view[ret.id] | tojson }}'>View</button>
+        <a href="{{ url_for('material_issues.material_returns_print', return_id=ret.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
         {% if ret.status == 'Posted' %}
         <form method="post" action="{{ url_for('material_issues.material_returns_cancel', return_id=ret.id) }}" class="js-confirm-submit" data-confirm-title="Cancel return" data-confirm-ok="Cancel return" data-confirm-message="Cancel {{ ret.return_no }}? The material goes back from the store to WIP.">
           <button type="submit" class="mi-btn danger">Cancel</button></form>

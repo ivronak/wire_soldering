@@ -1,0 +1,81 @@
+{% extends "print_base.html" %}
+{# Production order ka A4 print: Nrupex letterhead. Raw material, production plan (stages + machines + dates), sign #}
+{% set doc_title = 'Production order ' ~ order.prod_no %}
+{% set back_url = url_for('production_orders.production_orders_list') %}
+{% set eyebrow = 'Production order' %}
+{% set docno = order.prod_no %}
+{% set status = order.status %}
+{% block sheet_body %}
+    {% set unit = order.product.base_unit.code if order.product and order.product.base_unit else '' %}
+    <div class="meta">
+      <div><span class="lbl">Order date</span><span class="val">{{ order.order_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Needed by</span><span class="val">{{ order.needed_by_date.strftime('%d %b %Y') if order.needed_by_date else '—' }}</span></div>
+      <div><span class="lbl">Starts</span><span class="val">{{ sc.start.strftime('%d %b %Y') if sc else '—' }}</span></div>
+      <div><span class="lbl">Ready by</span><span class="val">{{ sc.end.strftime('%d %b %Y') if sc else '—' }}</span></div>
+    </div>
+    <div class="supplier">
+      <span class="lbl">Product</span>
+      <strong>{{ order.product.name if order.product else '—' }}</strong>
+      <p>{{ order.product.code if order.product else '' }} · {{ '%g'|format(order.planned_qty) }} {{ unit }}{% if order.unit_weight and order.unit_weight != 1 %} ({{ '%g'|format(order.planned_qty * order.unit_weight) }} KG){% endif %}{% if order.queue_position %} · Queue no. {{ order.queue_position }}{% endif %}</p>
+      {% if order.product and order.product.attributes %}
+      <div class="chips" style="margin-top:6px">{% for k, v in order.product.attributes.items() %}<span><b>{{ k }}</b><i>{{ v }}</i></span>{% endfor %}</div>
+      {% endif %}
+    </div>
+
+    <div class="sec">Raw material</div>
+    <table class="lines">
+      <thead><tr><th>Material</th><th>Type</th><th class="num">Ratio</th><th class="num">Required</th><th class="num">Issued</th></tr></thead>
+      <tbody>
+        {% for line in order.lines %}
+        {% set rm = line.raw_material %}
+        <tr>
+          <td><span class="mat-name">{{ rm.name if rm else '—' }}</span><span class="mat-sub">{{ rm.code if rm else '' }}</span></td>
+          <td>{{ 'Added' if line.is_extra else ('Core flux' if line.is_flux else 'Base metal') }}</td>
+          <td class="num">{{ '' if line.is_extra else ('%.1f'|format(line.ratio_percent) ~ '%') }}</td>
+          <td class="num amt">{{ '%g'|format(line.required_qty) }} {{ rm.base_unit.code if rm and rm.base_unit else '' }}</td>
+          <td class="num">{{ '%g'|format(line.issued_qty) }} {{ rm.base_unit.code if rm and rm.base_unit else '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No materials</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="sec">Production plan</div>
+    <table class="lines">
+      <thead><tr><th>#</th><th>Stage</th><th>Machines</th><th class="num">Time</th><th>Dates</th></tr></thead>
+      <tbody>
+        {% for st in order.stages %}
+        {% set w = sc.windows[loop.index0] if sc else None %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td class="mat-name">{{ st.stage_name }}</td>
+          <td>{{ st.machines | map(attribute='machine_name') | join(', ') }}</td>
+          <td class="num">{{ '%.1f'|format(st.planned_hours or 0) }} h</td>
+          <td>{% if w %}{{ w[0].strftime('%d %b') }}{% if w[1] != w[0] %} – {{ w[1].strftime('%d %b') }}{% endif %}{% else %}—{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No production plan (stages) for this order.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="close">
+      <div class="side">
+        {% if order.remarks %}<div class="remarks"><span class="lbl">Remarks</span><p>{{ order.remarks }}</p></div>{% endif %}
+        {% if order.status == 'Cancelled' and order.cancel_reason %}<div class="remarks"><span class="lbl">Cancelled</span><p>{{ order.cancel_reason }}</p></div>{% endif %}
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs">
+          <div class="sign"><div class="line">Prepared by</div></div>
+          <div class="sign"><div class="line">Approved by</div></div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Batch size</span><span>{{ '%g'|format(order.planned_qty * order.unit_weight) }} KG</span></div>
+        <div class="row"><span>Production time</span><span>{{ '%.1f'|format(order.planned_hours or 0) }} h</span></div>
+        <div class="row"><span>Working days</span><span>{{ sc.working_days if sc else (order.planned_days or '—') }}</span></div>
+        <div class="row"><span>Most per day</span><span>{{ ('%.0f'|format(order.daily_capacity) ~ ' KG') if order.daily_capacity else '—' }}</span></div>
+        <div class="grand"><span>Ready by</span><span>{{ sc.end.strftime('%d %b %Y') if sc else '—' }}</span></div>
+      </div>
+    </div>
+{% endblock %}

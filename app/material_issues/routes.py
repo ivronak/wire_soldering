@@ -9,7 +9,7 @@ from flask import render_template, Blueprint, request, redirect, url_for, flash,
 
 from app.extensions import db
 from app.inventory.money import q4
-from app.inventory.posting import available_lots, issue_to_wip, issue_cancelled, material_return_post, material_return_cancel, InventoryError
+from app.inventory.posting import rm_warehouse_of, wip_warehouse_for, available_lots, issue_to_wip, issue_cancelled, material_return_post, material_return_cancel, InventoryError
 from app.models import MaterialIssue, MaterialIssueLine, MaterialReturn, MaterialReturnLine, ProductionOrder, ProductionOrderLine
 from app.production_orders.scheduler import live_schedule
 
@@ -385,4 +385,23 @@ def material_issues_print(issue_id):
     issue = MaterialIssue.query.filter_by(id=issue_id, is_deleted=False).first_or_404()
     if issue.status == "Cancelled":
         abort(404)
-    return render_template("material_issue_print.html", issue=issue)
+    store, wip = _route_names(issue.lines)
+    return render_template("material_issue_print.html", issue=issue, route_from=store, route_to=wip)
+
+
+def _route_names(lines):
+    # Slip par "From / To": maal kis store warehouse se kis WIP warehouse me gaya (pehli lot line se)
+    for line in lines:
+        try:
+            store = rm_warehouse_of(line.lot)
+            return store.name, wip_warehouse_for(store).name
+        except Exception:
+            continue
+    return None, None
+
+
+@material_issues_bp.route("/material_issues/return/print/<int:return_id>")
+def material_returns_print(return_id):
+    ret = MaterialReturn.query.filter_by(id=return_id, is_deleted=False).first_or_404()
+    store, wip = _route_names(ret.lines)
+    return render_template("material_return_print.html", ret=ret, route_from=wip, route_to=store)

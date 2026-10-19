@@ -541,3 +541,11 @@ def production_orders_start(order_id):
     db.session.commit()
     flash(f"{order.prod_no} is now in production. Planned finish: {info['end'].strftime('%d %b %Y')}.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
+
+
+@production_orders_bp.route("/production_orders/<int:order_id>/print")
+def production_orders_print(order_id):
+    # Production order ka A4 print (Nrupex letterhead). Dates queue ke live hisaab se (cancelled order ki nahi).
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    _queue, _materials, schedule = live_schedule()
+    return render_template("production_order_print.html", order=order, sc=schedule.get(order.id) if order.status != "Cancelled" else None)

@@ -1,0 +1,49 @@
+{% extends "print_base.html" %}
+{# Material return slip (WIP se store me wapas): Nrupex letterhead #}
+{% set doc_title = 'Material return slip ' ~ ret.return_no %}
+{% set back_url = url_for('material_issues.material_issues_list', tab='returns') %}
+{% set eyebrow = 'Material return slip' %}
+{% set docno = ret.return_no %}
+{% set status = ret.status %}
+{% block sheet_body %}
+    <div class="meta">
+      <div><span class="lbl">Return date</span><span class="val">{{ ret.return_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Production order</span><span class="val">{{ ret.production_order.prod_no }}</span></div>
+      <div><span class="lbl">From</span><span class="val">{{ route_from or '—' }}</span></div>
+      <div><span class="lbl">To</span><span class="val">{{ route_to or '—' }}</span></div>
+    </div>
+    <div class="supplier">
+      <span class="lbl">Reason</span>
+      <strong>{{ ret.reason }}</strong>
+      <p>{{ ret.production_order.product.name if ret.production_order.product else '' }}</p>
+    </div>
+    <table class="lines">
+      <thead><tr><th>#</th><th>Material</th><th>Lot</th><th>Vendor batch</th><th>Issue</th><th class="num">Quantity</th></tr></thead>
+      <tbody>
+        {% for line in ret.lines %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><span class="mat-name">{{ line.raw_material.name if line.raw_material else '—' }}</span><span class="mat-sub">{{ line.raw_material.code if line.raw_material else '' }}</span></td>
+          <td>{{ line.lot.lot_code if line.lot else '' }}</td>
+          <td>{{ line.lot.vendor_batch_no if line.lot and line.lot.vendor_batch_no else '—' }}</td>
+          <td>{{ line.issue_line.issue.issue_no }}</td>
+          <td class="num amt">{{ '%g'|format(line.qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="close">
+      <div class="side">
+        {% if ret.remarks %}<div class="remarks"><span class="lbl">Remarks</span><p>{{ ret.remarks }}</p></div>{% endif %}
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs">
+          <div class="sign"><div class="name">{{ ret.returned_by or '' }}</div><div class="line">Returned by (production)</div></div>
+          <div class="sign"><div class="name"></div><div class="line">Received by (store)</div></div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Lot lines</span><span>{{ ret.lines|length }}</span></div>
+        <div class="grand"><span>Moves WIP → store</span><span>{{ ret.status }}</span></div>
+      </div>
+    </div>
+{% endblock %}
