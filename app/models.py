@@ -1664,6 +1664,10 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     qty_in = db.Column(db.Float, nullable=True)              # KG jo is stage me aaya (pichhle stage ka out; pehle stage me batch KG)
     qty_out = db.Column(db.Float, nullable=True)             # KG jo ye stage poora karke aage gaya
     scrap_qty = db.Column(db.Float, nullable=True)           # KG jo is stage me kharab hua
+    # Scrap kis tarah ka aur kaisa: "Saleable" = Scrap warehouse me jaayega (output par), "Process loss" = chhota nuksaan, stock nahi banta
+    scrap_type_id = db.Column(db.Integer, db.ForeignKey("scrap_types.id"), nullable=True)
+    scrap_type = db.relationship("ScrapType", foreign_keys=[scrap_type_id])
+    scrap_kind = db.Column(db.String(12), default="Saleable", server_default="Saleable", nullable=False)
     notes = db.Column(db.String(255), nullable=True)
 
     @property
@@ -1708,13 +1712,18 @@ class ProductionOutput(CreatedAtMixin, db.Model):
     output_date = db.Column(db.Date, nullable=False)
     good_qty = db.Column(db.Float, nullable=False)                               # order ki unit me (KG / roll ...)
     rework_qty = db.Column(db.Float, default=0, nullable=False)                  # abhi sirf record (dobara kaam ke liye); stock nahi banta
-    scrap_qty = db.Column(db.Float, default=0, nullable=False)
+    scrap_qty = db.Column(db.Float, default=0, nullable=False)                   # saleable scrap (Scrap warehouse me jaata hai)
+    loss_qty = db.Column(db.Float, default=0, server_default="0", nullable=False)  # process loss: sirf record, stock nahi
     total_value = db.Column(db.Float, default=0, nullable=False)                 # WIP se use hue RM ki kul value (Rs)
     unit_cost = db.Column(db.Float, default=0, nullable=False)                   # total_value / good_qty
     recorded_by = db.Column(db.String(60), nullable=True)
     remarks = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(12), default="Posted", nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    # Consumption variance ka review (kisne dekha, kab, kya note)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.String(60), nullable=True)
+    review_note = db.Column(db.String(255), nullable=True)
 
 
 class FGBatch(CreatedAtMixin, db.Model):
@@ -1772,3 +1781,14 @@ def _fg_movement_no_update(mapper, connection, target):
 @event.listens_for(FGMovement, "before_delete")
 def _fg_movement_no_delete(mapper, connection, target):
     raise RuntimeError("FG stock rows are never deleted. Add a reversing row instead.")
+
+
+
+class ScrapType(CreatedAtMixin, db.Model):
+    # Scrap ki kisme (Metal slag, Burnt flux ...) — dropdown database se (CLAUDE.md rule: koi hardcoded list nahi). Soft-delete / inactive.
+    __tablename__ = "scrap_types"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), unique=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)

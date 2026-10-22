@@ -29,6 +29,7 @@
         <tr><td class="mat-name">Good</td><td class="num amt">{{ '%g'|format(output.good_qty) }} {{ unit }}</td><td>Finished goods (batch {{ output.batch_no }})</td></tr>
         <tr><td class="mat-name">Rework</td><td class="num">{{ '%g'|format(output.rework_qty) }} {{ unit }}</td><td>Noted for rework</td></tr>
         <tr><td class="mat-name">Scrap</td><td class="num">{{ '%g'|format(output.scrap_qty) }} {{ unit }}</td><td>Scrap yard</td></tr>
+        <tr><td class="mat-name">Process loss</td><td class="num">{{ '%g'|format(output.loss_qty) }} {{ unit }}</td><td>Only recorded (not stocked)</td></tr>
       </tbody>
     </table>
 

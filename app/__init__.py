@@ -27,6 +27,8 @@ from app.inventory.routes import inventory_bp
 from app.material_issues.routes import material_issues_bp
 from app.routing.routes import routing_bp
 from app.production_output.routes import production_output_bp
+from app.scrap.routes import scrap_bp
+from app.variance.routes import variance_bp
 from app.stock_transfers.routes import stock_transfers_bp
 from app.stock_adjustments.routes import stock_adjustments_bp
 from app.opening_stock.routes import opening_stock_bp
@@ -92,6 +94,8 @@ def create_app():
     app.register_blueprint(material_issues_bp)
     app.register_blueprint(routing_bp)
     app.register_blueprint(production_output_bp)
+    app.register_blueprint(scrap_bp)
+    app.register_blueprint(variance_bp)
     app.register_blueprint(stock_transfers_bp)
     app.register_blueprint(stock_adjustments_bp)
     app.register_blueprint(opening_stock_bp)

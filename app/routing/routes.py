@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
-from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine
+from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, ScrapType
 from app.production_orders.planning import next_working_day
 from app.production_orders.scheduler import now_ist, today_ist
 
@@ -102,6 +102,7 @@ def routing_list():
     operators = [r[0] for r in db.session.query(ProductionOrderStage.operator).filter(ProductionOrderStage.operator.isnot(None)).distinct().order_by(ProductionOrderStage.operator).all()]
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
+        scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, running_count=len(running), done_count=len(finished), today=today,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"),
     )
@@ -194,6 +195,19 @@ def routing_complete(stage_id):
     if scrap < 0:
         flash("Scrap cannot be negative.", "error")
         return _back()
+    # Scrap hui to batao kis tarah ka aur kaisa (Saleable = Scrap warehouse me jaayega, Process loss = sirf record)
+    scrap_type = None
+    scrap_kind = "Saleable"
+    if scrap > 0:
+        scrap_kind = (request.form.get("scrap_kind") or "Saleable").strip()
+        if scrap_kind not in ("Saleable", "Process loss"):
+            flash("Choose whether the scrap is saleable or a process loss.", "error")
+            return _back()
+        type_id = request.form.get("scrap_type_id", type=int)
+        scrap_type = db.session.get(ScrapType, type_id) if type_id else None
+        if scrap_type is None or scrap_type.is_deleted or not scrap_type.is_active:
+            flash("Choose the scrap type.", "error")
+            return _back()
     qty_in = stage.qty_in or 0
     if qty_out + scrap > qty_in + EPS:
         flash(f"Output ({qty_out:g}) plus scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} KG).", "error")
@@ -226,6 +240,8 @@ def routing_complete(stage_id):
     stage.completed_at = completed_at
     stage.qty_out = round(qty_out, 4)
     stage.scrap_qty = round(scrap, 4)
+    stage.scrap_type_id = scrap_type.id if scrap_type else None
+    stage.scrap_kind = scrap_kind
     note = (request.form.get("notes") or "").strip()[:255]
     if note:
         stage.notes = note
@@ -261,6 +277,8 @@ def routing_reopen(stage_id):
     stage.completed_at = None
     stage.qty_out = None
     stage.scrap_qty = None
+    stage.scrap_type_id = None
+    stage.scrap_kind = "Saleable"
     db.session.commit()
     flash(f"{stage.stage_name} reopened. Enter the finish details again.", "success")
     return _back()

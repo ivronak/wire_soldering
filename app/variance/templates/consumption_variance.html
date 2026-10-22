@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Consumption variance{% endblock %}
+
+{% block page_css %}
+<style>
+  .cv-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .cv-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .cv-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .cv-kpi .h { font-size: 12px; color: #6B7F82; }
+  .cv-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .cv-kpi.bad .v { color: #B42318; }
+  .cv-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .cv-kpi.good .v { color: #1F7A4D; }
+  .cv-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .cv-kpi.warn .v { color: #8A4A1C; }
+  .cv-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .cv-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .cv-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .cv-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
+  .cv-filter a { font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid #D1D9D8; color: #3D5A5D; text-decoration: none; background: #fff; }
+  .cv-filter a.on { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  .cv-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 10px; }
+  .cv-row { display: grid; grid-template-columns: minmax(210px, 1.4fr) minmax(190px, 1.2fr) minmax(170px, 1fr) minmax(150px, .9fr) auto; gap: 16px; align-items: center; padding: 14px 16px; }
+  .cv-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .cv-prod { font-size: 13.5px; color: #1C2B2D; }
+  .cv-meta { font-size: 12px; color: #6B7F82; }
+  .cv-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .cv-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .cv-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .cv-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .cv-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .cv-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .cv-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; white-space: nowrap; }
+  .cv-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .cv-btn.primary:hover { background: #A35522; }
+  .cv-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .cv-btn.ghost:hover { background: #F4F6F5; }
+  .cv-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .cv-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) { .cv-row { grid-template-columns: 1fr 1fr; } }
+  .cv-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .cv-box h3 { font-size: 15px; font-weight: 700; color: #0F2F32; margin-bottom: 2px; }
+  .cv-box .sub { font-size: 12.5px; color: #6B7F82; margin-bottom: 10px; }
+  .cv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cv-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D1D9D8; text-align: left; }
+  .cv-table td { padding: 8px; border: 1px solid #E2E8E7; vertical-align: top; }
+  .cv-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .cv-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .cv-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  #cv-modal.hidden { display: none; } #cv-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Consumption variance</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Consumption variance</h1>
+  <p class="text-[13px] text-ink-faint">Did production use the raw material it was supposed to? <b>Planned</b> comes from the recipe, <b>actual</b> is what really went into the order. A difference of {{ '%g'|format(tolerance) }}% or less counts as "on plan".</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="cv-kpi"><span class="k">Orders checked</span><span class="v">{{ kpi.checked }}</span><span class="h">{{ kpi.review }} not reviewed yet</span></div>
+  <div class="cv-kpi {{ 'bad' if kpi.over else '' }}"><span class="k">Extra material cost</span><span class="v">₹{{ kpi.over|inr }}</span><span class="h">used more than planned</span></div>
+  <div class="cv-kpi {{ 'good' if kpi.under else '' }}"><span class="k">Material saved</span><span class="v">₹{{ (-kpi.under)|inr }}</span><span class="h">used less than planned</span></div>
+  <div class="cv-kpi"><span class="k">Average yield</span><span class="v">{{ kpi.yield if kpi.yield is not none else '—' }}{{ '%' if kpi.yield is not none else '' }}</span><span class="h">good output vs ordered</span></div>
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="cv-tabs">
+    <a href="{{ url_for('variance.variance_list', tab='done') }}" class="{{ 'on' if tab == 'done' else '' }}">Completed orders<span>{{ done_count }}</span></a>
+    <a href="{{ url_for('variance.variance_list', tab='running') }}" class="{{ 'on' if tab == 'running' else '' }}">In production, so far<span>{{ running_count }}</span></a>
+  </div>
+  <div class="cv-filter flex gap-1.5">
+    {% for key, label in (('all', 'All'), ('over', 'Used more'), ('under', 'Used less'), ('ok', 'On plan')) %}
+    <a href="{{ url_for('variance.variance_list', tab=tab, result=key) }}" class="{{ 'on' if result_filter == key else '' }}">{{ label }}</a>{% endfor %}
+  </div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {% for r in rows %}
+  {% set o = r.order %}{% set v = r.v %}{% set out = r.output %}
+  {% set detail = {'order': o.prod_no, 'product': (o.product.name if o.product else ''), 'final': v.final, 'v': v,
+                   'output_no': (out.output_no if out else ''), 'batch': (out.batch_no if out else ''), 'output_id': (out.id if out else 0),
+                   'date': (out.output_date.strftime('%d %b %Y') if out else ''),
+                   'reviewed': ({'by': out.reviewed_by, 'at': out.reviewed_at.strftime('%d %b %Y %H:%M'), 'note': out.review_note or ''} if out and out.reviewed_at else none)} %}
+  <article class="cv-card">
+    <div class="cv-row">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="cv-no">{{ o.prod_no }}</span>
+          {% if v.final %}<span class="cv-chip ok"><i></i>Completed</span>{% else %}<span class="cv-chip warn"><i></i>So far</span>{% endif %}</div>
+        <div class="cv-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
+        <div class="cv-meta">{% if out %}batch {{ out.batch_no }} · {{ out.output_date.strftime('%d %b %Y') }}{% else %}{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} ordered{% endif %}</div>
+      </div>
+      <div>
+        <div class="text-[13px]">{{ v.lines|length }} materials · <b style="color:{{ '#B42318' if v.over else '#6B7F82' }}">{{ v.over }} used more</b> · <b style="color:{{ '#1F7A4D' if v.under else '#6B7F82' }}">{{ v.under }} used less</b></div>
+        <div class="cv-meta mt-1">{{ v.insights[0] }}</div>
+      </div>
+      <div>
+        {% if v.status == 'over' %}<span class="cv-chip bad"><i></i>Used more</span>{% elif v.status == 'under' %}<span class="cv-chip warn"><i></i>Used less</span>{% else %}<span class="cv-chip ok"><i></i>On plan</span>{% endif %}
+        <div class="text-[13px] font-semibold mt-1">{{ '+' if v.impact > 0 else ('−' if v.impact < 0 else '') }}₹{{ (v.impact|abs)|inr }}</div>
+        <div class="cv-meta">cost difference</div>
+      </div>
+      <div>
+        {% if v.final %}<div class="cv-meta">Yield</div><div class="text-[15px] font-bold">{{ v.output.yield_pct }}%</div>
+          <div class="cv-meta">{{ '%g'|format(v.output.good) }} good of {{ '%g'|format(v.output.ordered) }}</div>
+        {% else %}<div class="cv-meta">Final figures come<br>after the output is recorded</div>{% endif %}
+      </div>
+      <div class="flex flex-col gap-1.5 items-end">
+        <button type="button" class="cv-view cv-btn ghost" data-detail='{{ detail | tojson }}'>View details</button>
+        {% if out %}{% if out.reviewed_at %}<span class="cv-chip ok"><i></i>Reviewed</span>{% else %}<span class="cv-chip gone"><i></i>Not reviewed</span>{% endif %}{% endif %}
+      </div>
+    </div>
+  </article>
+  {% else %}
+  <div class="cv-empty"><h3>{{ 'Nothing to compare yet' if tab == 'done' and not done_count else 'No orders in this view' }}</h3>
+    <p>{{ 'Once an order\'s production output is recorded, you can see here how its material use compared with the plan.' if tab == 'done' else 'Orders in production appear here with the material given to them so far.' }}</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block modals %}
+<div id="cv-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="cv-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-3xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+      <div><h2 id="cv-title" class="text-[17px] font-bold text-ink">Variance detail</h2><p id="cv-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="cv-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
+    </div>
+    <div id="cv-body" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  function n(x) { return String(Math.round(Number(x) * 10000) / 10000); }
+  function inr(x) { return '₹' + Math.abs(Number(x)).toLocaleString('en-IN', {maximumFractionDigits: 0}); }
+  var modal = document.getElementById('cv-modal');
+  function chip(status) {
+    return status === 'over' ? '<span class="cv-chip bad"><i></i>Used more</span>' : (status === 'under' ? '<span class="cv-chip warn"><i></i>Used less</span>' : '<span class="cv-chip ok"><i></i>On plan</span>');
+  }
+  function openDetail(btn) {
+    var d = JSON.parse(btn.getAttribute('data-detail'));
+    var v = d.v;
+    document.getElementById('cv-title').textContent = d.order + (d.final ? ' · completed' : ' · so far');
+    document.getElementById('cv-sub').textContent = d.product + (d.batch ? ' · batch ' + d.batch : '');
+    var html = '';
+    html += '<section class="cv-box"><h3>In short</h3><ul class="list-disc pl-5 text-[13.5px] space-y-1">' + v.insights.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' +
+      (d.final ? '' : '<p class="cv-meta mt-2">The order is still running, so these are the figures so far (material given to production). They become final when the output is recorded.</p>') + '</section>';
+    html += '<section class="cv-box"><h3>Material: planned vs actual</h3><p class="sub">Difference = actual − planned. A plus means more material was used than planned.</p><div class="overflow-x-auto"><table class="cv-table"><thead><tr><th>Material</th><th class="r">Planned</th><th class="r">Actual</th><th class="r">Difference</th><th class="r">Cost impact</th><th>Result</th></tr></thead><tbody>';
+    v.lines.forEach(function (ln) {
+      var lots = (ln.lots || []).map(function (l) { return esc(l.lot) + (l.batch ? ' (' + esc(l.batch) + ')' : '') + ': ' + n(l.qty); }).join(' · ');
+      html += '<tr><td><b>' + esc(ln.name) + '</b><div class="cv-meta">' + esc(ln.code) + (lots ? ' · ' + lots : '') + '</div></td>' +
+        '<td class="r">' + n(ln.planned) + ' ' + esc(ln.unit) + '</td><td class="r"><b>' + n(ln.actual) + '</b> ' + esc(ln.unit) + '</td>' +
+        '<td class="r" style="color:' + (ln.status === 'over' ? '#B42318' : (ln.status === 'under' ? '#8A4A1C' : '#1F7A4D')) + '">' + (ln.variance > 0 ? '+' : '') + n(ln.variance) + '<div class="cv-meta">' + (ln.pct > 0 ? '+' : '') + ln.pct + '%</div></td>' +
+        '<td class="r">' + (ln.impact > 0 ? '+' : (ln.impact < 0 ? '−' : '')) + inr(ln.impact) + '</td><td>' + chip(ln.status) + '</td></tr>';
+    });
+    html += '</tbody></table></div></section>';
+    if (d.final && v.output) {
+      var o = v.output;
+      html += '<section class="cv-box"><h3>What came out</h3><p class="sub">Ordered ' + n(o.ordered) + ' ' + esc(o.unit) + '. Yield = good ÷ ordered.</p>' +
+        '<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">' +
+        [['Good', o.good], ['Rework', o.rework], ['Scrap', o.scrap], ['Process loss', o.loss], ['Yield', o.yield_pct + '%']].map(function (p) { return '<div class="rounded-lg border border-slate-200 bg-white p-2"><div class="text-[18px] font-bold">' + (typeof p[1] === 'number' ? n(p[1]) : p[1]) + '</div><div class="cv-meta">' + p[0] + '</div></div>'; }).join('') +
+        '</div>' +
+        '<p class="text-[13px] mt-3">Material in (KG items only): <b>' + n(o.input_kg) + ' KG</b> · output (good + rework + scrap + loss): <b>' + n(o.output_kg) + ' KG</b> · ' +
+        (Math.abs(o.unaccounted_kg) < 0.05 ? '<span style="color:#1F7A4D">everything is accounted for</span>' : (o.unaccounted_kg > 0 ? '<span style="color:#B42318">' + n(o.unaccounted_kg) + ' KG is not accounted for (lost or not recorded)</span>' : '<span style="color:#8A4A1C">output is ' + n(-o.unaccounted_kg) + ' KG more than the material in — check the numbers</span>')) + '</p>' +
+        '<p class="text-[13px]">Cost: ₹' + Number(o.total_value).toLocaleString('en-IN') + ' of raw material → <b>₹' + Number(o.unit_cost).toLocaleString('en-IN', {maximumFractionDigits: 2}) + '</b> per ' + esc(o.unit) + ' of good goods.</p></section>';
+      if (d.reviewed) {
+        html += '<section class="cv-box"><h3>Reviewed</h3><p class="text-[13.5px]">By <b>' + esc(d.reviewed.by) + '</b> on ' + esc(d.reviewed.at) + (d.reviewed.note ? '<br>Note: ' + esc(d.reviewed.note) : '') + '</p></section>';
+      } else {
+        html += '<section class="cv-box"><h3>Mark as reviewed</h3><p class="sub">Once you have looked at this and understood any difference, mark it reviewed.</p>' +
+          '<form method="post" action="/consumption_variance/review/' + d.output_id + '" class="space-y-2"><input class="cv-input" name="reviewed_by" maxlength="60" placeholder="Your name" required>' +
+          '<input class="cv-input" name="review_note" maxlength="255" placeholder="Note, e.g. extra tin because of a spill (optional)"><button type="submit" class="cv-btn primary">Mark reviewed</button></form></section>';
+      }
+    }
+    document.getElementById('cv-body').innerHTML = html;
+    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
+  }
+  function closeDetail() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.cv-view').forEach(function (b) { b.addEventListener('click', function () { openDetail(b); }); });
+  ['cv-close', 'cv-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeDetail); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeDetail(); });
+</script>
+{% endblock %}

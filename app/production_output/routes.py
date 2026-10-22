@@ -28,11 +28,13 @@ def output_plan(order):
     last = stages[-1]
     weight = order.unit_weight or 1
     good = round((last.qty_out or 0) / weight, 4)
-    scrap = round(sum(s.scrap_qty or 0 for s in stages) / weight, 4)
+    # Scrap routing me stage-wise likhi hoti hai: Saleable -> Scrap yard, Process loss -> sirf record
+    scrap = round(sum(s.scrap_qty or 0 for s in stages if s.scrap_kind != "Process loss") / weight, 4)
+    loss = round(sum(s.scrap_qty or 0 for s in stages if s.scrap_kind == "Process loss") / weight, 4)
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": order.product.base_unit.code if order.product and order.product.base_unit else "",
-        "planned": order.planned_qty, "good": good, "scrap": scrap, "rework": 0,
+        "planned": order.planned_qty, "good": good, "scrap": scrap, "loss": loss, "rework": 0,
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
@@ -82,15 +84,16 @@ def _read_form():
     good = request.form.get("good_qty", type=float)
     rework = request.form.get("rework_qty", type=float) or 0.0
     scrap = request.form.get("scrap_qty", type=float) or 0.0
+    loss = request.form.get("loss_qty", type=float) or 0.0
     if good is None or good <= 0:
         return None, "Enter the good quantity (it must be more than zero)."
-    if rework < 0 or scrap < 0:
-        return None, "Rework and scrap cannot be negative."
-    if good + rework + scrap > order.planned_qty * OVER_TOLERANCE + 0.00005:
-        return None, f"Good + rework + scrap ({good + rework + scrap:g}) is more than 10% above the ordered quantity ({order.planned_qty:g}). Check the numbers."
+    if rework < 0 or scrap < 0 or loss < 0:
+        return None, "Rework, scrap and process loss cannot be negative."
+    if good + rework + scrap + loss > order.planned_qty * OVER_TOLERANCE + 0.00005:
+        return None, f"Good + rework + scrap + loss ({good + rework + scrap + loss:g}) is more than 10% above the ordered quantity ({order.planned_qty:g}). Check the numbers."
     if not wip_lines(order):
         return None, "No material is in production for this order. Issue material first."
-    return {"order": order, "output_date": output_date, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4),
+    return {"order": order, "output_date": output_date, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4), "loss": round(loss, 4),
             "recorded_by": (request.form.get("recorded_by") or "").strip()[:60], "remarks": (request.form.get("remarks") or "").strip()[:255]}, None
 
 
@@ -106,7 +109,7 @@ def production_output_add():
     prefix = f"BATCH-WS-{data['output_date'].strftime('%Y%m%d')}-"
     batches = ProductionOutput.query.filter(ProductionOutput.batch_no.like(prefix + "%")).count()
     output = ProductionOutput(output_no=f"OUT-{year}-{count + 1:03d}", batch_no=f"{prefix}{batches + 1:03d}", production_order=order,
-                              output_date=data["output_date"], good_qty=data["good"], rework_qty=data["rework"], scrap_qty=data["scrap"],
+                              output_date=data["output_date"], good_qty=data["good"], rework_qty=data["rework"], scrap_qty=data["scrap"], loss_qty=data["loss"],
                               recorded_by=data["recorded_by"], remarks=data["remarks"], status="Posted", is_deleted=False)
     db.session.add(output)
     try:

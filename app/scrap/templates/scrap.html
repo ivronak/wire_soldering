@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Scrap / waste{% endblock %}
+
+{% block page_css %}
+<style>
+  .sc-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .sc-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .sc-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .sc-kpi .h { font-size: 12px; color: #6B7F82; }
+  .sc-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .sc-kpi.warn .v { color: #8A4A1C; }
+  .sc-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .sc-kpi.good .v { color: #1F7A4D; }
+  .sc-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .sc-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .sc-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .sc-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .sc-box h3 { font-size: 14px; font-weight: 700; color: #0F2F32; margin-bottom: 2px; }
+  .sc-box .sub { font-size: 12px; color: #6B7F82; margin-bottom: 10px; }
+  .sc-bar { display: grid; grid-template-columns: 150px 1fr 70px; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; }
+  .sc-bar .track { height: 10px; background: #EEF2F1; border-radius: 999px; overflow: hidden; }
+  .sc-bar .track div { height: 100%; background: #C46B2D; border-radius: 999px; }
+  .sc-bar .q { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .sc-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; }
+  .sc-row { display: grid; grid-template-columns: minmax(190px, 1.3fr) minmax(150px, 1fr) minmax(190px, 1.2fr) minmax(110px, .6fr) minmax(150px, .9fr); gap: 14px; align-items: center; padding: 12px 16px; }
+  .sc-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .sc-meta { font-size: 12px; color: #6B7F82; }
+  .sc-prod { font-size: 13.5px; color: #1C2B2D; }
+  .sc-qty { font-size: 20px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .sc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .sc-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .sc-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .sc-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .sc-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .sc-chip.type { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .sc-btn { display: inline-flex; align-items: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid #D1D9D8; background: #fff; color: #0F2F32; text-decoration: none; }
+  .sc-btn:hover { background: #F4F6F5; }
+  .sc-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .sc-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .sc-filter a { font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid #D1D9D8; color: #3D5A5D; text-decoration: none; background: #fff; }
+  .sc-filter a.on { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  @media (max-width: 1100px) { .sc-row { grid-template-columns: 1fr 1fr; } .sc-bar { grid-template-columns: 110px 1fr 60px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-3 shrink-0">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Scrap / waste</div>
+    <h1 class="text-[22px] font-bold text-ink leading-tight">Scrap / waste</h1>
+    <p class="text-[13px] text-ink-faint">Scrap is noted when a stage is completed in Routing. Saleable scrap goes to the scrap yard when the order's output is recorded; a tiny process loss is only recorded.</p>
+  </div>
+  <a href="{{ url_for('scrap.scrap_types_list') }}" class="sc-btn">Manage scrap types</a>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="sc-kpi {{ 'good' if kpi.yard else '' }}"><span class="k">In scrap yard</span><span class="v">{{ '%g'|format(kpi.yard) }} <span class="text-[14px]">KG</span></span><span class="h">stock, can be sold later</span></div>
+  <div class="sc-kpi {{ 'warn' if kpi.floor else '' }}"><span class="k">On the floor</span><span class="v">{{ '%g'|format(kpi.floor) }} <span class="text-[14px]">KG</span></span><span class="h">from orders still running</span></div>
+  <div class="sc-kpi"><span class="k">Process loss</span><span class="v">{{ '%g'|format(kpi.loss) }} <span class="text-[14px]">KG</span></span><span class="h">recorded, not stocked</span></div>
+  <div class="sc-kpi"><span class="k">Scrap rate</span><span class="v">{{ kpi.rate }}%</span><span class="h">of the batch weight</span></div>
+</div>
+
+{% if by_type %}
+<div class="grid gap-3 lg:grid-cols-2 shrink-0">
+  <div class="sc-box"><h3>Which kind of scrap?</h3><p class="sub">Total scrap by type (KG)</p>
+    {% for b in by_type %}<div class="sc-bar"><span>{{ b.name }}</span><span class="track"><div style="width:{{ b.pct }}%"></div></span><span class="q">{{ '%g'|format(b.qty) }}</span></div>{% endfor %}</div>
+  <div class="sc-box"><h3>Which stage wastes the most?</h3><p class="sub">Total scrap by stage (KG)</p>
+    {% for b in by_stage %}<div class="sc-bar"><span>{{ b.name }}</span><span class="track"><div style="width:{{ b.pct }}%"></div></span><span class="q">{{ '%g'|format(b.qty) }}</span></div>{% endfor %}</div>
+</div>
+{% endif %}
+
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="sc-tabs">
+    <a href="{{ url_for('scrap.scrap_list', tab='register') }}" class="{{ 'on' if tab == 'register' else '' }}">Scrap register</a>
+    <a href="{{ url_for('scrap.scrap_list', tab='yard') }}" class="{{ 'on' if tab == 'yard' else '' }}">Scrap yard</a>
+  </div>
+  {% if tab == 'register' %}
+  <div class="sc-filter flex gap-1.5">
+    <a href="{{ url_for('scrap.scrap_list', tab='register', kind='all') }}" class="{{ 'on' if kind == 'all' else '' }}">All</a>
+    <a href="{{ url_for('scrap.scrap_list', tab='register', kind='Saleable') }}" class="{{ 'on' if kind == 'Saleable' else '' }}">Saleable</a>
+    <a href="{{ url_for('scrap.scrap_list', tab='register', kind='Process loss') }}" class="{{ 'on' if kind == 'Process loss' else '' }}">Process loss</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+{% if tab == 'register' %}
+  {% for e in events %}
+  <article class="sc-card"><div class="sc-row">
+    <div><span class="sc-no">{{ e.order.prod_no }}</span><div class="sc-prod">{{ e.order.product.name if e.order.product else '' }}</div>
+      <div class="sc-meta">{{ e.date.strftime('%d %b %Y, %H:%M') if e.date else '' }}</div></div>
+    <div><div class="text-[13.5px] font-semibold">{{ e.stage }}</div><div class="sc-meta">{% if e.operator %}by {{ e.operator }}{% endif %}</div></div>
+    <div class="flex flex-wrap gap-1.5"><span class="sc-chip type"><i></i>{{ e.type }}</span>
+      {% if e.kind == 'Process loss' %}<span class="sc-chip gone"><i></i>Process loss</span>{% else %}<span class="sc-chip ok"><i></i>Saleable</span>{% endif %}</div>
+    <div class="sc-qty">{{ '%g'|format(e.qty) }} <span class="text-[12px] font-semibold text-ink-faint">KG</span></div>
+    <div>{% if e.where == 'In scrap yard' %}<span class="sc-chip ok"><i></i>In scrap yard</span>
+      {% elif e.where == 'On the floor' %}<span class="sc-chip warn"><i></i>On the floor</span>
+      {% else %}<span class="sc-chip gone"><i></i>Not stocked</span>{% endif %}</div>
+  </div></article>
+  {% else %}
+  <div class="sc-empty"><h3>{{ 'No scrap in this view' if all_count else 'No scrap recorded yet' }}</h3>
+    <p>When a stage is completed in Routing with some scrap, it is listed here with its type and where it is now.</p></div>
+  {% endfor %}
+{% else %}
+  {% for r in yard %}
+  <article class="sc-card"><div class="sc-row">
+    <div><span class="sc-no">{{ r.batch.batch_no }}</span><div class="sc-prod">{{ r.batch.product.name if r.batch.product else '' }}</div>
+      <div class="sc-meta">From {{ r.order.prod_no }} · {{ r.batch.mfg_date.strftime('%d %b %Y') }}</div></div>
+    <div><div class="sc-qty">{{ '%g'|format(r.qty) }} <span class="text-[12px] font-semibold text-ink-faint">KG</span></div><div class="sc-meta">in the yard now</div></div>
+    <div class="flex flex-wrap gap-1.5">{% for name, q in r.types.items() %}<span class="sc-chip type"><i></i>{{ name }} · {{ '%g'|format(q) }}</span>{% endfor %}</div>
+    <div class="sc-meta">Kept in<div class="text-[13px] text-ink">{{ r.where }}</div></div>
+    <div>{% if r.qty > 0.00005 %}<span class="sc-chip ok"><i></i>In stock</span>{% else %}<span class="sc-chip gone"><i></i>Used up</span>{% endif %}</div>
+  </div></article>
+  {% else %}
+  <div class="sc-empty"><h3>The scrap yard is empty</h3><p>Saleable scrap arrives here when an order's production output is recorded. Selling scrap will come with Sales.</p></div>
+  {% endfor %}
+{% endif %}
+</div>
+{% endblock %}

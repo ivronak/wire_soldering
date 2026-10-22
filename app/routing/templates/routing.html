@@ -158,7 +158,7 @@
               {% endif %}
             </td>
             <td>{% if st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}
-              {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(st.scrap_qty) }}</div>{% endif %}
+              {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(st.scrap_qty) }}{% if st.scrap_type %} · {{ st.scrap_type.name }}{% endif %} · {{ st.scrap_kind }}</div>{% endif %}
               {% if st.qty_out is not none and st.qty_in %}<div class="rt-meta">Yield {{ '%.1f'|format(100 * st.qty_out / st.qty_in) }}%</div>{% endif %}
               {% else %}<span class="rt-meta">—</span>{% endif %}</td>
             <td style="text-align:right">
@@ -224,6 +224,14 @@
           <div><label class="rt-label">Quantity out (KG) *</label><input type="number" step="any" min="0" name="qty_out" id="rt-qty-out" class="rt-input" /></div>
           <div><label class="rt-label">Scrap (KG)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
         </div>
+        <div class="rt-box space-y-3" id="rt-scrap-box" style="display:none">
+          <div class="text-[12.5px] text-ink-muted"><b>About the scrap</b> — so it can be tracked and later sold.</div>
+          <div><label class="rt-label">Type of scrap *</label>
+            <select name="scrap_type_id" id="rt-scrap-type" class="rt-input"><option value="">Select type</option>{% for t in scrap_types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+          <div><label class="rt-label">Can it be sold? *</label>
+            <label class="flex items-start gap-2 text-[13.5px] mb-1"><input type="radio" name="scrap_kind" value="Saleable" checked class="mt-1"> <span><b>Saleable scrap</b> — goes to the scrap yard when the order's output is recorded.</span></label>
+            <label class="flex items-start gap-2 text-[13.5px]"><input type="radio" name="scrap_kind" value="Process loss" class="mt-1"> <span><b>Process loss</b> — tiny loss (fumes, trimming). Only recorded, not stocked.</span></label></div>
+        </div>
       </div>
       <div class="rt-box">
         <label class="rt-label">Notes</label>
@@ -267,6 +275,7 @@
       document.getElementById('rt-qty-in').textContent = a.qty_in;
       document.getElementById('rt-qty-out').value = a.qty_in;
       document.getElementById('rt-scrap').value = 0;
+      syncScrap();
       document.getElementById('rt-machines').innerHTML = a.machines.map(function (m) {
         return '<label class="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="machine_ids" value="' + m.id + '"' + (m.planned ? ' checked' : '') + '> ' + esc(m.name) +
           (m.planned ? '' : ' <span class="text-[11.5px] text-ink-faint">(not in plan)</span>') + '</label>';
@@ -274,6 +283,12 @@
     }
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
+  function syncScrap() {
+    var has = (parseFloat(document.getElementById('rt-scrap').value) || 0) > 0;
+    document.getElementById('rt-scrap-box').style.display = has ? 'block' : 'none';
+    document.getElementById('rt-scrap-type').required = has;
+  }
+  document.getElementById('rt-scrap').addEventListener('input', syncScrap);
   function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });
   ['rt-close', 'rt-cancel', 'rt-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeStage); });

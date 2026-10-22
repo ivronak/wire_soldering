@@ -134,6 +134,7 @@
         <div><b>{{ '%g'|format(x.good_qty) }}</b><small>Good</small></div>
         <div><b>{{ '%g'|format(x.rework_qty) }}</b><small>Rework</small></div>
         <div><b>{{ '%g'|format(x.scrap_qty) }}</b><small>Scrap</small></div>
+        <div><b>{{ '%g'|format(x.loss_qty) }}</b><small>Loss</small></div>
       </div>
       <div><div class="ou-meta">Cost</div><div class="text-[13px] font-semibold">₹{{ x.unit_cost|inr }} per {{ x.production_order.product.base_unit.code if x.production_order.product and x.production_order.product.base_unit else 'unit' }}</div>
         <div class="ou-meta">₹{{ x.total_value|inr }} in total</div></div>
@@ -169,13 +170,15 @@
           <section class="ou-box">
             <h3>1. What came out?</h3>
             <p class="sub">We filled this from the routing. Change it if the real count is different. Use the same unit as the order (<b id="ou-unit">KG</b>).</p>
-            <div class="grid gap-3 sm:grid-cols-3">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div><label class="ou-label">Good *</label><input type="number" step="any" min="0" name="good_qty" id="ou-good" class="ou-input big" required />
                 <p class="ou-help">Ready to sell. This becomes finished goods stock.</p></div>
               <div><label class="ou-label">Rework</label><input type="number" step="any" min="0" name="rework_qty" id="ou-rework" value="0" class="ou-input big" />
                 <p class="ou-help">Needs to be redone. Only noted for now.</p></div>
               <div><label class="ou-label">Scrap</label><input type="number" step="any" min="0" name="scrap_qty" id="ou-scrap" value="0" class="ou-input big" />
-                <p class="ou-help">Wasted. Goes to the scrap yard.</p></div>
+                <p class="ou-help">Saleable waste. Goes to the scrap yard.</p></div>
+              <div><label class="ou-label">Process loss</label><input type="number" step="any" min="0" name="loss_qty" id="ou-loss" value="0" class="ou-input big" />
+                <p class="ou-help">Tiny loss (fumes, trimming). Only noted.</p></div>
             </div>
             <div class="grid gap-3 sm:grid-cols-3 mt-3">
               <div><label class="ou-label">Output date *</label><input type="date" name="output_date" id="ou-date" class="ou-input" required /></div>
@@ -229,7 +232,8 @@
     var good = parseFloat(document.getElementById('ou-good').value) || 0;
     var rework = parseFloat(document.getElementById('ou-rework').value) || 0;
     var scrap = parseFloat(document.getElementById('ou-scrap').value) || 0;
-    var total = good + rework + scrap;
+    var loss = parseFloat(document.getElementById('ou-loss').value) || 0;
+    var total = good + rework + scrap + loss;
     var totalValue = current.materials.reduce(function (s, m) { return s + m.value; }, 0);
     document.getElementById('ou-s-good').textContent = fmt(good) + ' ' + current.unit;
     document.getElementById('ou-s-scrap').textContent = fmt(scrap) + ' ' + current.unit;
@@ -252,6 +256,7 @@
     document.getElementById('ou-good').value = current.good;
     document.getElementById('ou-rework').value = 0;
     document.getElementById('ou-scrap').value = current.scrap;
+    document.getElementById('ou-loss').value = current.loss || 0;
     document.getElementById('ou-by').value = current.operator || '';
     var date = document.getElementById('ou-date');
     date.value = {{ today|tojson }};
@@ -270,7 +275,7 @@
   function closeOutput() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.ou-act').forEach(function (b) { b.addEventListener('click', function () { openOutput(b); }); });
   ['ou-close', 'ou-cancel', 'ou-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeOutput); });
-  ['ou-good', 'ou-rework', 'ou-scrap'].forEach(function (id) { document.getElementById(id).addEventListener('input', refresh); });
+  ['ou-good', 'ou-rework', 'ou-scrap', 'ou-loss'].forEach(function (id) { document.getElementById(id).addEventListener('input', refresh); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeOutput(); });
 </script>
 {% endblock %}

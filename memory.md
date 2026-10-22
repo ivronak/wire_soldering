@@ -466,6 +466,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ne recommended defaults chune (FG output par, Good / Rework / Scrap, cost Good par, automatic consumption). Non-tech users ke liye kam fields aur routing se pre-fill.
 **How to apply:** FG / Scrap ke liye alag ledger (`fg_batches` / `fg_movements`) — RM ledger (`stock_lots` / `stock_movements`) me product mat daalo. Sales dispatch `FGMovement` (type DISPATCH) likhega; tab output cancel guard khud kaam karega. Variance module `CONSUME` rows se actual lega.
 
+### Decision: Scrap noted at routing stage; variance from CONSUME rows; process loss not stocked (2026-10-22)
+**Date:** 2026-10-22
+**Kya:** Scrap stage complete karte waqt (type + Saleable / Process loss). Saleable scrap output par Scrap warehouse me stock banta hai (value 0); Process loss sirf `ProductionOutput.loss_qty`. Variance = Actual - Planned, actual = `StockMovement` CONSUME rows (`ref_type OUTPUT`). Tolerance 2% constant.
+**Kyun:** Double entry se bachne ke liye scrap ek hi jagah likha jaata hai (jahan hota hai); non-tech users ke liye kam typing. Scrap types DB master (CLAUDE.md rule).
+**How to apply:** Scrap bechne wala Sales module `FGBatch(kind=SCRAP)` / `FGMovement` se dispatch kare. Naya scrap type dropdown me apne aap aayega. Variance ka tolerance badalna ho to `TOLERANCE_PCT` (ya master me laana).
+
 ---
 
 ## Session Log
