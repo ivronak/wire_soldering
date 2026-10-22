@@ -155,6 +155,13 @@
       }
       return b || form.querySelector('button[type=submit], input[type=submit]');
     }
+    // ERP ka confirm popup: dikhe to cursor le jaake OK dabao
+    function acceptConfirm() {
+      return poll(function () { var b = fdoc().querySelector('.erp-confirm__btn--ok'); return visible(b) ? b : null; }, 4000).then(function (b) {
+        if (!b) return null;
+        return moveCursor(b, 'center').then(function () { ripple(b); b.click(); return sleep(200); });
+      });
+    }
     function stepError(msg) { var e = new Error(msg); e.demo = true; return e; }
 
     function afterLoadChecks(st) {
@@ -234,7 +241,8 @@
               ripple(btn);
               navPromise = nextLoad(12000);
               btn.click();
-              return navPromise;
+              // Kuch forms (Post bill) "OK?" popup puchhte hain — wo aaye to player khud "OK" dabata hai
+              return (st.confirm ? acceptConfirm() : Promise.resolve()).then(function () { return navPromise; });
             }).then(function (loaded) {
               if (!loaded) throw stepError('પેજ બદલાયું નહિ — ફોર્મમાં કોઈ ભૂલ હોઈ શકે.');
               afterLoadChecks(st);

@@ -1,5 +1,5 @@
 # Demo tour ke helper endpoints (sirf tour use karta hai):
-#   GET  /tour/info                      -> tour ke "Demo value bharo" button ke liye: recipe wala pehla product, uske materials, store warehouse
+#   GET  /tour/info                      -> tour ke "Demo value bharo" button ke liye: recipe wala pehla product, uske materials, store warehouse, pehla vendor (PO ke liye)
 #   POST /tour/finish_stages/<order_id>  -> demo shortcut: In production order ke baaki routing stages (8 me se 6 jaise) ek click me poore
 # Shortcut wahi asli rules follow karta hai (stage ek ke baad ek, qty in -> out, machines used); sirf typing bachata hai.
 from datetime import timedelta
@@ -7,7 +7,7 @@ from datetime import timedelta
 from flask import Blueprint, jsonify, render_template, request
 
 from app.extensions import db
-from app.models import Product, ProductionOrder, Warehouse
+from app.models import Product, ProductionOrder, Vendor, Warehouse
 from app.production_orders.scheduler import now_ist
 from app.routing.routes import order_batch_kg
 
@@ -25,13 +25,16 @@ def tour_info():
     store = Warehouse.query.filter_by(warehouse_type="RM", is_active=True, is_deleted=False).order_by(Warehouse.id).first()
     if product is None:
         return jsonify({"ok": False, "message": "No product with a recipe and routing stages was found."})
+    # Procurement demo (PO) ke liye pehla active vendor
+    vendor = Vendor.query.filter_by(is_deleted=False, is_active=True).order_by(Vendor.id).first()
     recipe = []
     for item in product.recipe_items:
         rm = item.raw_material
         recipe.append({"rm_id": item.raw_material_id, "code": rm.code if rm else "", "name": rm.name if rm else "",
                        "unit": rm.base_unit.code if rm and rm.base_unit else "", "ratio": item.ratio_percent})
     return jsonify({"ok": True, "product": {"id": product.id, "name": product.name, "category_id": product.category_id, "recipe": recipe},
-                    "store_warehouse_id": store.id if store else None})
+                    "store_warehouse_id": store.id if store else None,
+                    "vendor_id": vendor.id if vendor else None})
 
 
 @tour_bp.route("/tour/finish_stages/<int:order_id>", methods=["POST"])

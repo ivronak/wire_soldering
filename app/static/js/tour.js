@@ -61,6 +61,13 @@
     return cards[0] || null;
   }
   function inCard(sel, inner) { return function () { var c = orderCard(sel); return c ? $(inner, c) : null; }; }
+  // Procurement pages (PO / GRN / QC / bill): wo hilaar jisme demo ka PO number (state.vars.po) likha ho
+  function rowOf(sel, key) {
+    var rows = $$(sel), v = state && state.vars && state.vars[key];
+    if (v) for (var i = 0; i < rows.length; i++) if (rows[i].textContent.indexOf(v) !== -1) return rows[i];
+    return rows[0] || null;
+  }
+  function inRow(sel, key, inner) { return function () { var r = rowOf(sel, key); return r ? $(inner, r) : null; }; }
 
   // ---------------------------------------------------------------- chapters (Gujarati)
   var CH = [];
@@ -69,32 +76,102 @@
     id: 'intro', title: 'ERP ની ઓળખ', desc: 'ટૂર કેવી રીતે ચાલે છે અને મેનુ કેવું છે — ૩ પગલાં.',
     steps: [
       { id: 'welcome', type: 'info', title: 'ડેમો ટૂરમાં સ્વાગત છે! 🎓',
-        text: 'આ ટૂરમાં તમે <b>સ્ટોકથી લઈને તૈયાર માલ, સ્ક્રેપ અને તફાવત (variance)</b> સુધી બધું <b>જાતે કરીને</b> શીખશો.<br>દરેક પગલું આ કાર્ડમાં સરળ ગુજરાતીમાં સમજાવ્યું છે. જ્યાં <b>નારંગી ચમકતી લાઇન</b> દેખાય, ત્યાં જ તમારે ક્લિક કરવાનું છે.',
+        text: 'આ ટૂરમાં તમે <b>ખરીદી (Purchase order) થી લઈને તૈયાર માલ, સ્ક્રેપ અને તફાવત (variance)</b> સુધી બધું <b>જાતે કરીને</b> શીખશો.<br>દરેક પગલું આ કાર્ડમાં સરળ ગુજરાતીમાં સમજાવ્યું છે. જ્યાં <b>નારંગી ચમકતી લાઇન</b> દેખાય, ત્યાં જ તમારે ક્લિક કરવાનું છે.',
         warn: 'ધ્યાન: ટૂર <b>સાચી એન્ટ્રીઓ</b> બનાવશે (સ્ટોક, ઓર્ડર વગેરે). તેથી ટ્રેનિંગ / ડેમો માટે જ ચલાવો.' },
       { id: 'sidebar', type: 'info', target: 'aside', title: 'ડાબી બાજુનું મેનુ',
-        text: 'આખું ERP આ મેનુમાંથી ચાલે છે. ત્રણ ભાગ છે:<ul><li><b>Procurement</b> — ખરીદી (PO, GRN, QC, બિલ)</li><li><b>Inventory</b> — સ્ટોક</li><li><b>Manufacturing</b> — ઉત્પાદન</li></ul>આપણે <b>Inventory (સ્ટોક)</b> થી શરૂ કરીશું.' },
+        text: 'આખું ERP આ મેનુમાંથી ચાલે છે. ત્રણ ભાગ છે:<ul><li><b>Procurement</b> — ખરીદી (PO, GRN, QC, બિલ)</li><li><b>Inventory</b> — સ્ટોક</li><li><b>Manufacturing</b> — ઉત્પાદન</li></ul>આપણે <b>Procurement (ખરીદી)</b> થી શરૂ કરીશું.' },
       { id: 'howto', type: 'info', title: 'ટૂર કેવી રીતે વાપરવી',
         text: '<ul><li><b>આગળ</b> — વાંચીને આગળ વધો</li><li>જ્યારે કહ્યું હોય કે <b>"ક્લિક કરો"</b>, ત્યારે ચમકતી જગ્યાએ જાતે ક્લિક કરો — પછી ટૂર આપોઆપ આગળ જશે</li><li><b>ડેમો વેલ્યુ ભરો</b> બટન ફોર્મ ઝડપથી ભરી આપે છે (તમે બદલી પણ શકો)</li><li>અટકી જાઓ તો <b>પગલું છોડો</b> કે <b>પાછળ</b> દબાવો; ગમે ત્યારે <b>બહાર નીકળો</b></li></ul>' }
     ]
   });
 
   CH.push({
-    id: 'stock', title: 'સ્ટોક (Inventory)', desc: 'Opening stock ચઢાવો, Stock ledger, લોટ, Valuation, Transfer, Adjustment.',
+    id: 'procure', title: 'ખરીદી (Procurement)', desc: 'Purchase order, GRN (માલ આવ્યો), Inward QC, Purchase bill, Purchase return — એક PO થી સ્ટોક સુધી.',
     steps: [
-      { id: 'os-link', type: 'click', target: navLink('/opening_stock'), title: 'Opening stock ખોલો',
-        text: 'ડાબા મેનુમાં <b>Inventory</b> હેઠળ <b>Opening stock</b> દેખાય છે.', todo: 'ક્લિક કરો: Opening stock' },
-      { id: 'os-what', type: 'info', path: '/opening_stock', target: 'main h1', title: 'Opening stock એટલે શું?',
-        text: 'સોફ્ટવેર શરૂ કરતાં પહેલાં તમારા ગોડાઉનમાં જે માલ પડ્યો હતો, તે પહેલી વાર અહીંથી સોફ્ટવેરમાં ચઢાવવાનો હોય છે. એ પછી ખરીદી (GRN) થી માલ આપોઆપ આવતો રહે છે.' },
-      { id: 'os-new', type: 'click', path: '/opening_stock', target: '#btn-new-os', title: 'નવો Opening stock',
-        text: 'ઉપર <b>+ New opening stock</b> બટન છે.', todo: 'ક્લિક કરો: + New opening stock' },
-      { id: 'os-fill', type: 'fill', path: '/opening_stock', target: '#os-form', title: 'માલની વિગત ભરો',
-        text: 'તારીખ, <b>ગોડાઉન (Store)</b>, અને દરેક material માટે <b>Quantity</b> તથા <b>Cost</b> (પ્રતિ યુનિટ ભાવ) ભરો.<br>નીચેનું બટન દબાવશો તો ડેમો ઓર્ડર માટે જોઈતો કાચો માલ (Tin, Lead, Flux) આપોઆપ ભરાઈ જશે.',
-        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillOpeningStock } },
-      { id: 'os-post', type: 'submit', path: '/opening_stock', target: '#os-form', submitter: 'post', retryTo: 'os-new', title: 'Post કરો',
-        text: 'બધું બરાબર ભર્યું હોય તો નીચે <b>Post</b> બટન દબાવો. <b>Post</b> કરતાં જ માલ તમારા સ્ટોકમાં ચઢી જાય છે. (<b>Save as draft</b> માં માત્ર સેવ થાય, સ્ટોક ન વધે.)', todo: 'ક્લિક કરો: Post' },
-      { id: 'os-done', type: 'info', path: '/opening_stock', target: 'main table tbody tr', title: 'સરસ! સ્ટોક ચઢી ગયો ✅',
-        text: 'તમારી એન્ટ્રી <b>Posted</b> થઈ. હવે આ માલ સ્ટોકમાં દેખાશે અને ઉત્પાદનમાં વાપરી શકાશે. (ભૂલ થાય તો અહીંથી <b>Cancel</b> થઈ શકે — જો માલ વપરાયો ન હોય તો.)' },
+      { id: 'pr-intro', type: 'info', title: 'આખી વાર્તા: ખરીદીથી તૈયાર માલ સુધી',
+        text: 'હવે આપણે <b>શરૂઆતથી</b> જોઈશું — એક <b>Purchase Order</b> થી. વાર્તા આ ક્રમમાં ચાલશે:<ul><li><b>૧. ખરીદી</b> — PO બનાવો → માલ આવે (GRN) → QC પાસ → vendor નું બિલ</li><li><b>૨. સ્ટોક</b> — પાસ થયેલો માલ સ્ટોરમાં</li><li><b>૩. ઉત્પાદન</b> — ઓર્ડર, માલ આપવો, સ્ટેજ</li><li><b>૪. તૈયાર માલ</b> — Output, FG, Scrap, Variance</li></ul>' },
+      { id: 'pr-po-link', type: 'click', target: navLink('/purchase_orders'), title: 'Purchase order ખોલો',
+        text: 'ડાબા મેનુમાં <b>Procurement</b> હેઠળ <b>Purchase order</b>.', todo: 'ક્લિક કરો: Purchase order' },
+      { id: 'pr-po-what', type: 'info', path: '/purchase_orders', target: 'main h1', title: 'Purchase order (PO) એટલે શું?',
+        text: 'Vendor પાસેથી માલ મંગાવવા માટે આપેલો <b>ઑર્ડર</b> = PO. તેમાં કયો માલ, કેટલો, કયા ભાવે અને GST કેટલો — બધું લખાય છે.<br>PO પહેલાં <b>Draft</b> બને છે; vendor નું બિલ મળે ત્યારે તેને <b>Confirm</b> કરવાનો હોય છે.' },
+      { id: 'pr-po-new', type: 'click', path: '/purchase_orders', target: '#btn-add-po', title: 'નવો Purchase order',
+        text: 'ઉપર જમણે <b>New purchase order</b> બટન.', todo: 'ક્લિક કરો: New purchase order' },
+      { id: 'pr-po-fill', type: 'fill', path: '/purchase_orders', target: '#po-form', title: 'ઑર્ડરની વિગત ભરો',
+        text: 'ઉપર <b>PO date</b>, <b>Vendor</b> અને <b>Warehouse</b> (માલ આખરે ક્યાં રહેશે) પસંદ કરો. નીચે દરેક માલની એક <b>લાઇન</b>: material, quantity, rate. <b>Unit અને GST</b> material પસંદ કરતાં જ આપોઆપ આવી જાય છે.<br>નીચેનું બટન દબાવશો તો ડેમો ઓર્ડર માટેનો કાચો માલ (Tin, Lead, Flux) ભરાઈ જશે.',
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillPO } },
+      { id: 'pr-po-save', type: 'submit', path: '/purchase_orders', target: '#po-form', retryTo: 'pr-po-new', capture: { re: 'PO-[0-9]{4}-[0-9]+', as: 'po' }, title: 'PO સેવ કરો',
+        text: 'બધું બરાબર હોય તો <b>Save purchase order</b> દબાવો. PO <b>Draft</b> તરીકે સેવ થાય છે.', todo: 'ક્લિક કરો: Save purchase order' },
+      { id: 'pr-po-draft', type: 'info', path: '/purchase_orders', target: function () { return rowOf('#po-tbody tr', 'po'); }, title: 'તમારો PO બની ગયો ✅',
+        text: 'નવો PO નંબર (<code>PO-…</code>) મળ્યો અને સ્થિતિ <b>Draft</b> છે. Draft માં હજી ફેરફાર થઈ શકે. હવે vendor નું બિલ મળે એટલે PO ને <b>Confirm</b> કરવો પડે.' },
+      { id: 'pr-po-confirm', type: 'click', path: '/purchase_orders', target: inRow('#po-tbody tr', 'po', '.btn-confirm-po'), title: 'PO Confirm કરો',
+        text: 'તમારા PO ની હરોળમાં <b>Confirm</b> બટન.', todo: 'ક્લિક કરો: Confirm' },
+      { id: 'pr-po-cfill', type: 'fill', path: '/purchase_orders', target: '#confirm-po-form', title: 'Vendor નું બિલ જોડો',
+        text: 'Confirm કરવા માટે vendor ના <b>બિલ / invoice ની કૉપી</b> (PDF કે ફોટો) જોડવી <b>ફરજિયાત</b> છે — એટલે ખાતરી રહે કે vendor એ ઑર્ડર સ્વીકાર્યો છે. બિલ નંબર અને તારીખ વૈકલ્પિક છે.<br>ડેમો માટે નમૂનાની ફાઇલ આપોઆપ જોડાઈ જશે.',
+        prefill: { label: 'ડેમો ફાઇલ જોડો', run: prefillConfirmPO } },
+      { id: 'pr-po-csubmit', type: 'submit', path: '/purchase_orders', target: '#confirm-po-form', retryTo: 'pr-po-confirm', title: 'Confirm દબાવો',
+        text: 'હવે નીચે <b>Confirm — move to Open</b> દબાવો. PO <b>Open</b> થઈ જશે અને માલ આવવાની રાહ જોશે.', todo: 'ક્લિક કરો: Confirm — move to Open' },
+      { id: 'pr-po-tab', type: 'click', path: '/purchase_orders', target: 'main a[href*="tab=completed"]', title: 'Completed ટૅબ',
+        text: 'Confirm થયેલા PO Draft યાદીમાંથી નીકળી <b>Completed</b> ટૅબમાં જાય છે.', todo: 'ક્લિક કરો: Completed' },
+      { id: 'pr-po-open', type: 'info', path: '/purchase_orders', target: function () { return rowOf('#po-tbody tr', 'po'); }, title: 'PO હવે Open છે ✅',
+        text: 'તમારો PO <b>Open</b> છે. હવે તેનો માલ <b>GRN</b> પેજ પર "આવવાનો બાકી" તરીકે દેખાશે. ધારો કે ટ્રક ગેટ પર આવી ગઈ!' },
+
+      { id: 'pr-grn-link', type: 'click', target: navLink('/grns'), title: 'Gate inward / GRN ખોલો',
+        text: 'માલ ગેટ પર આવે ત્યારે <b>Gate inward / GRN</b> માં નોંધ થાય.', todo: 'ક્લિક કરો: Gate inward / GRN' },
+      { id: 'pr-grn-what', type: 'info', path: '/grns', target: 'main h1', title: 'GRN એટલે શું?',
+        text: '<b>GRN (Goods Receipt Note)</b> = માલ ખરેખર ગેટ પર આવ્યો તેની રસીદ. PO માં ૧૦૦ લખ્યું હોય પણ ટ્રકમાં ૯૦ આવ્યો, તો GRN માં <b>૯૦</b> જ લખાય. નીચે <b>Pending</b> માં એ PO દેખાય છે જેનો માલ આવવાનો બાકી છે.' },
+      { id: 'pr-grn-recv', type: 'click', path: '/grns', target: inRow('tr.grn-row', 'po', '.btn-receive'), title: 'Receive goods',
+        text: 'તમારા PO ની હરોળમાં <b>Receive goods</b>.', todo: 'ક્લિક કરો: Receive goods' },
+      { id: 'pr-grn-fill', type: 'fill', path: '/grns', target: '#grn-form', title: 'શું આવ્યું તે ભરો',
+        text: 'તારીખ, vendor નો <b>challan નંબર</b>, ગાડી / ટ્રાન્સપોર્ટરની વિગત, અને દરેક material માટે <b>ખરેખર આવેલી quantity</b> તથા <b>Batch / Lot નંબર</b> ભરો. Lot નંબર vendor ના માલ પર લખેલો હોય છે — એનાથી પછી પણ ખબર પડે કે માલ ક્યાંથી આવ્યો.',
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillGRN } },
+      { id: 'pr-grn-post', type: 'submit', path: '/grns', target: '#grn-form', submitter: 'post', retryTo: 'pr-grn-recv', title: 'Post GRN',
+        text: 'હવે <b>Post GRN</b> દબાવો. માલ સ્ટોકમાં આવી જાય છે, પણ <b>QC Hold</b> ગોડાઉનમાં — એટલે ચકાસણી પૂરી ન થાય ત્યાં સુધી ઉત્પાદનમાં વાપરી શકાતો નથી.', todo: 'ક્લિક કરો: Post GRN' },
+      { id: 'pr-grn-done', type: 'info', path: '/grns', target: 'main h1', title: 'GRN પોસ્ટ થઈ ✅',
+        text: 'GRN બની ગઈ (Completed ટૅબમાં). માલ હવે <b>QC માટે રાહ જોતા</b> લોટ તરીકે સ્ટોકમાં છે. આગળનું પગલું: <b>Inward QC</b> — માલ સારો છે કે નહિ તે તપાસવું.' },
+
+      { id: 'pr-qc-link', type: 'click', target: navLink('/inward_qc'), title: 'Inward QC ખોલો',
+        text: 'આવેલા માલની ગુણવત્તા અહીં તપાસાય.', todo: 'ક્લિક કરો: Inward QC' },
+      { id: 'pr-qc-what', type: 'info', path: '/inward_qc', target: function () { return rowOf('tr.qc-row', 'po'); }, title: 'તપાસવા માટેના લોટ',
+        text: 'GRN ની <b>દરેક લાઇન (લોટ)</b> અલગ તપાસાય છે. "Not inspected" એટલે ચકાસણી બાકી. દરેક material ના <b>test</b> (જેમ કે purity, ભેજ) Raw material માસ્ટરમાં નક્કી કરેલા હોય છે.' },
+      { id: 'pr-qc-open', type: 'click', path: '/inward_qc', target: inRow('tr.qc-row', 'po', '.btn-inspect-line'), title: 'પહેલો લોટ Inspect કરો',
+        text: 'તમારા PO ના પહેલા લોટની હરોળમાં <b>Inspect</b>.', todo: 'ક્લિક કરો: Inspect' },
+      { id: 'pr-qc-fill', type: 'fill', path: '/inward_qc', target: '#inspect-form', title: 'QC નું પરિણામ ભરો',
+        text: 'ઇન્સ્પેક્ટરનું નામ, <b>Sample size</b>, અને <b>Passed / Rejected</b> quantity ભરો. નીચે દરેક <b>test</b> નું પરિણામ (માપ કે Pass/Fail) લખવું જરૂરી છે — માપ નક્કી હદ (Min–Max) ની બહાર હોય તો <b>Fail</b> દેખાય. ફક્ત <b>Passed</b> qty જ વાપરવા લાયક સ્ટોરમાં જાય છે; Rejected નહિ.',
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillQC } },
+      { id: 'pr-qc-submit', type: 'submit', path: '/inward_qc', target: '#inspect-form', submitter: 'submit', retryTo: 'pr-qc-open', title: 'Submit result',
+        text: 'બધા test ભરાયા પછી <b>Submit result</b> દબાવો. (<b>Save draft</b> માં માત્ર સેવ થાય, સ્ટોક ન ફરે.)', todo: 'ક્લિક કરો: Submit result' },
+      { id: 'pr-qc-rest', type: 'action', path: '/inward_qc', target: 'main h1', title: 'બાકીના લોટ (ડેમો શૉર્ટકટ)',
+        text: 'બાકીના લોટ પણ આ જ રીતે તપાસવાના છે. સમય બચાવવા નીચેનું બટન બાકીના લોટનું QC આ જ નિયમોથી એક ક્લિકમાં કરી આપશે (બધા test Pass).',
+        button: { label: 'બાકીના લોટ તપાસો', run: qcRestDemo } },
+      { id: 'pr-qc-done', type: 'info', path: '/inward_qc', target: 'main h1', title: 'QC પૂરું ✅',
+        text: 'બધા લોટ <b>Passed</b> થયા (Completed ટૅબમાં). માલ હવે QC Hold માંથી નીકળીને <b>Store</b> માં <b>Available</b> થઈ ગયો — ઉત્પાદનમાં વાપરી શકાય. કોઈ qty reject થાય તો <b>Rejection memo</b> આપોઆપ બને છે અને માલ vendor ને પાછો જઈ શકે.' },
+
+      { id: 'pr-pi-link', type: 'click', target: navLink('/purchase_invoices'), title: 'Purchase invoice ખોલો',
+        text: 'માલ પાસ થયો, હવે vendor નું બિલ નોંધીએ.', todo: 'ક્લિક કરો: Purchase invoice' },
+      { id: 'pr-pi-what', type: 'info', path: '/purchase_invoices', target: function () { return rowOf('tr.pi-row', 'po'); }, title: 'બિલ બનાવવાનું બાકી',
+        text: 'જે GRN નું બિલ બાકી છે તે <b>To bill</b> માં દેખાય છે. અહીં vendor નું બિલ નોંધી હિસાબમાં <b>vendor ને કેટલા ચૂકવવાના</b> (payable) તે નક્કી થાય છે.' },
+      { id: 'pr-pi-create', type: 'click', path: '/purchase_invoices', target: inRow('tr.pi-row', 'po', '.btn-create-bill'), title: 'Create bill',
+        text: 'તમારા GRN ની હરોળમાં <b>Create bill</b>.', todo: 'ક્લિક કરો: Create bill' },
+      { id: 'pr-pi-fill', type: 'fill', path: '/purchase_invoices', target: '#pi-form', title: 'બિલની વિગત',
+        text: 'બિલની લાઇનો GRN માંથી આપોઆપ આવી ગઈ છે — માલ, qty, PO નો ભાવ અને GST. તમારે ફક્ત <b>Vendor invoice no.</b> અને તારીખ લખવાની. ભાડું વગેરે વધારાનો ખર્ચ હોય તો <b>+ Add charge</b>. નીચે <b>Bill total</b> દેખાય છે.',
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillBill } },
+      { id: 'pr-pi-post', type: 'submit', path: '/purchase_invoices', target: '#pi-form', submitter: 'post', confirm: true, retryTo: 'pr-pi-create', title: 'Post bill',
+        text: 'હવે <b>Post bill</b> દબાવો અને પુષ્ટિમાં ફરી <b>Post bill</b>. પોસ્ટ કરતાં vendor નું <b>payable</b> (ચૂકવવાની રકમ) વધે છે.', todo: 'ક્લિક કરો: Post bill' },
+      { id: 'pr-pi-done', type: 'info', path: '/purchase_invoices', target: 'main h1', title: 'બિલ પોસ્ટ થયું ✅',
+        text: 'બિલ પોસ્ટ થયું અને GRN હવે "To bill" માંથી નીકળી ગઈ. Vendor નું ચૂકવવાનું (payable) નોંધાઈ ગયું. આમ <b>PO → GRN → QC → Bill</b> નું ચક્ર પૂરું.' },
+      { id: 'pr-ret-link', type: 'click', target: navLink('/purchase_returns'), title: 'Purchase return',
+        text: 'કોઈ વાર માલ vendor ને પાછો પણ મોકલવો પડે.', todo: 'ક્લિક કરો: Purchase return' },
+      { id: 'pr-ret-info', type: 'info', path: '/purchase_returns', target: 'main h1', title: 'Purchase return — માલ vendor ને પાછો',
+        text: 'માલ ખરાબ નીકળે કે વધારે આવી જાય તો <b>vendor ને પાછો</b> મોકલવા માટે. તે Purchase invoice પેજના <b>Return</b> બટનથી બનાવાય છે. પાછો ગયેલો માલ સ્ટોકમાંથી ઘટે છે અને vendor નું payable પણ ઘટે છે.<br>(આપણો માલ ઉત્પાદનમાં વાપરવો છે, એટલે ડેમોમાં return કરતા નથી.)' }
+    ]
+  });
+
+  CH.push({
+    id: 'stock', title: 'સ્ટોક (Inventory)', desc: 'Stock ledger, લોટ, Valuation, Transfer, Adjustment, Opening stock.',
+    steps: [
       { id: 'st-link', type: 'click', target: navLink('/inventory/stock'), title: 'Stock ledger ખોલો', text: 'હવે જોઈએ કે સ્ટોકમાં માલ ક્યાં કેટલો છે.', todo: 'ક્લિક કરો: Stock ledger' },
+      { id: 'st-from-po', type: 'info', path: '/inventory/stock', target: 'main h1', title: 'ખરીદીથી આવેલો માલ',
+        text: 'જુઓ — આપણે PO થી મંગાવેલો માલ હવે અહીં <b>Available</b> તરીકે સ્ટોકમાં છે. Opening stock કર્યો નથી, છતાં સ્ટોક છે — કારણ કે <b>GRN + QC પાસ</b> થતાં જ માલ આપોઆપ સ્ટોકમાં ચઢે છે.' },
       { id: 'st-kpi', type: 'info', path: '/inventory/stock', target: '.sc-card', title: 'ઉપરના ચાર કાર્ડ',
         text: 'આખા સ્ટોકનો એક નજરમાં હિસાબ: <b>કેટલા material</b>, <b>સ્ટોકની કિંમત</b>, <b>QC માટે રાહ જોતા લોટ</b> અને <b>રિજેક્ટ થયેલા લોટ</b>. જો કોઈ material ઓછો થઈ જાય તો નીચે <b>"Needs attention"</b> માં લાલ ચેતવણી પણ આવે છે.' },
       { id: 'st-card', type: 'info', path: '/inventory/stock', target: '.stock-card', title: 'Material પ્રમાણે સ્ટોક',
@@ -112,7 +189,11 @@
         text: 'Transfer ના ત્રણ તબક્કા: <b>Draft → In transit (માલ નીકળ્યો) → Received (સામે પહોંચ્યો)</b>. રસ્તામાં હોય ત્યારે પણ માલ સ્ટોકના હિસાબમાં રહે છે.' },
       { id: 'adj-link', type: 'click', target: navLink('/stock_adjustments'), title: 'Stock adjustment', text: 'ગણતરીમાં ફરક પડે ત્યારે સ્ટોક સુધારવા.', todo: 'ક્લિક કરો: Stock adjustment' },
       { id: 'adj-info', type: 'info', path: '/stock_adjustments', target: 'main h1', title: 'Adjustment — સ્ટોક સુધારો',
-        text: 'ગોડાઉનમાં ગણતરી કરતાં ફરક મળે (તૂટ-ફૂટ, ચોરી, ભૂલ) તો <b>કારણ લખીને</b> સ્ટોક વધારી/ઘટાડી શકાય. દરેક સુધારો <b>મંજૂરી અને ઓડિટ</b> સાથે નોંધાય છે.' }
+        text: 'ગોડાઉનમાં ગણતરી કરતાં ફરક મળે (તૂટ-ફૂટ, ચોરી, ભૂલ) તો <b>કારણ લખીને</b> સ્ટોક વધારી/ઘટાડી શકાય. દરેક સુધારો <b>મંજૂરી અને ઓડિટ</b> સાથે નોંધાય છે.' },
+      { id: 'os-link', type: 'click', target: navLink('/opening_stock'), title: 'Opening stock',
+        text: 'છેલ્લે એક જોવા જેવું: ડાબા મેનુમાં <b>Inventory</b> હેઠળ <b>Opening stock</b>.', todo: 'ક્લિક કરો: Opening stock' },
+      { id: 'os-what', type: 'info', path: '/opening_stock', target: 'main h1', title: 'Opening stock એટલે શું?',
+        text: 'સોફ્ટવેર શરૂ કરતાં પહેલાં ગોડાઉનમાં જે માલ પડ્યો હતો, તે <b>એક જ વાર</b> અહીંથી ચઢાવાય. એ પછી બધો માલ <b>ખરીદી (PO → GRN → QC)</b> થી જ આવે છે — જેમ આપણે હમણાં જોયું. આપણા ડેમોમાં અહીં કંઈ કરવાનું નથી.' }
     ]
   });
 
@@ -247,30 +328,166 @@
       { id: 'po-final', type: 'click', target: navLink('/production_orders'), title: 'છેલ્લું: Production order', text: 'ઓર્ડર હવે કતારમાં નથી — <b>Completed</b> ટૅબમાં છે.', todo: 'ક્લિક કરો: Production order' },
       { id: 'po-final-tab', type: 'click', path: '/production_orders', target: '.po-tabs a[href*="tab=completed"]', title: 'Completed ટૅબ', text: 'આ ટૅબ ખોલો.', todo: 'ક્લિક કરો: Completed' },
       { id: 'end', type: 'info', path: '/production_orders', target: function () { return orderCard('.po-card'); }, title: 'અભિનંદન! 🎉 ટૂર પૂરી',
-        text: 'તમે જાતે આખું ચક્ર કર્યું: <b>Opening stock → Production order → માલ આપવો/પાછો → Start → Routing → Output → તૈયાર માલ → Scrap → Variance</b>.<br>ઓર્ડર <b>Completed</b> છે અને તેનો <b>Batch નંબર, ખર્ચ</b> અહીં દેખાય છે.<br><br>આગળ આવશે: <b>Sales</b> (Quotation → Order → Delivery → Invoice) અને Login/Roles.' }
+        text: 'તમે જાતે આખું ચક્ર કર્યું: <b>Purchase order → GRN → QC → Bill → સ્ટોક → Production order → માલ આપવો/પાછો → Start → Routing → Output → તૈયાર માલ → Scrap → Variance</b>.<br>ઓર્ડર <b>Completed</b> છે અને તેનો <b>Batch નંબર, ખર્ચ</b> અહીં દેખાય છે.<br><br>આગળ આવશે: <b>Sales</b> (Quotation → Order → Delivery → Invoice) અને Login/Roles.' }
     ]
   });
 
   // ---------------------------------------------------------------- prefill / action helpers
-  function prefillOpeningStock() {
+  // ---- Procurement demo prefills (PO -> GRN -> QC -> Bill). Sab asli forms bharte hain; submit user / player karta hai.
+  var stamp = String(Date.now()).slice(-6);            // demo ke naam (challan, lot, bill no) alag-alag rakhne ke liye
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function waitFor(fn, ms) {
+    return new Promise(function (res) {
+      var t0 = Date.now();
+      (function t() {
+        var v = null; try { v = fn(); } catch (e) { v = null; }
+        if (v) return res(v);
+        if (Date.now() - t0 > ms) return res(null);
+        setTimeout(t, 120);
+      })();
+    });
+  }
+  function demoRate(item) { return item.unit === 'KG' ? 100 : 400; }     // KG material ka rate 100, baaki 400 (demo)
+
+  function prefillPO() {
     return getInfo().then(function (info) {
       if (!info.ok) throw new Error(info.message);
-      var form = $('#os-form');
-      setVal($('#os-date', form), ($('#os-date', form).max || new Date().toISOString().slice(0, 10)));
-      setVal($('[name=warehouse_id]', form), String(info.store_warehouse_id));
-      // lines
-      var rows = $$('#os-lines tr.os-line');
-      var need = info.product.recipe.length;
-      while (rows.length < need) { $('#os-add-line').click(); rows = $$('#os-lines tr.os-line'); }
+      if (!info.vendor_id) throw new Error('No active vendor found. Add a vendor first.');
+      var form = $('#po-form');
+      var d = $('#po-date', form); setVal(d, d.max || todayStr());
+      setVal($('#po-vendor', form), String(info.vendor_id));
+      setVal($('#po-warehouse', form), String(info.store_warehouse_id));
+      var rows = $$('#po-line-list tr.po-line-row');
+      while (rows.length < info.product.recipe.length) { $('#btn-add-line').click(); rows = $$('#po-line-list tr.po-line-row'); }
       info.product.recipe.forEach(function (item, i) {
         var row = rows[i];
-        var qty = Math.ceil(item.ratio * 5);          // 500 KG ke order jitna (ratio % x 5)
-        setVal($('.os-material', row), String(item.rm_id));
-        setVal($('.os-qty', row), String(qty));
-        setVal($('.os-cost', row), String(item.unit === 'KG' ? 100 : 400));
-        setVal($('.os-batch', row), 'DEMO-' + (i + 1));
+        setVal($('.line-material', row), String(item.rm_id));         // unit + GST material se aapoaap aate hain
+        var unit = $('.line-unit', row), tax = $('.line-tax', row);
+        if (!unit.value && unit.options.length > 1) setVal(unit, unit.options[1].value);
+        if (!tax.value && tax.options.length > 1) setVal(tax, tax.options[1].value);
+        setVal($('.line-qty', row), String(Math.ceil(item.ratio * 5)));   // 500 KG ke order jitna (ratio % x 5)
+        setVal($('.line-rate', row), String(demoRate(item)));
       });
-      setVal($('[name=remarks]', form), 'Demo tour');
+      setVal($('#po-remarks', form), 'Demo tour');
+    });
+  }
+
+  function prefillConfirmPO() {
+    // Vendor bill ki nakli (chhoti) PDF file banake file input me daalo — asli upload jaisa hi jaata hai
+    var win = ctx.win;
+    var pdf = '%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 120]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+    var dt = new win.DataTransfer();
+    dt.items.add(new win.File([pdf], 'demo-vendor-bill.pdf', { type: 'application/pdf' }));
+    var input = $('#confirm-po-file');
+    input.files = dt.files;
+    input.dispatchEvent(new win.Event('change', { bubbles: true }));
+    setVal($('#confirm-po-inv-no'), 'VB-' + stamp);
+    setVal($('#confirm-po-inv-date'), todayStr());
+    return Promise.resolve();
+  }
+
+  function prefillGRN() {
+    // "Receive goods" dabane ke baad PO ki lines server se aati hain — pehle unka intezaar
+    return waitFor(function () { return $$('#grn-form .line-recv').length > 0; }, 8000).then(function (ok) {
+      if (!ok) throw new Error('GRN lines did not load.');
+      var form = $('#grn-form');
+      var d = $('#grn-date', form); if (!d.value) setVal(d, d.max || todayStr());
+      var batches = $$('.line-batch', form);
+      $$('.line-recv', form).forEach(function (inp, i) {
+        var left = (parseFloat(inp.getAttribute('data-poqty')) || 0) - (parseFloat(inp.getAttribute('data-prev')) || 0);
+        setVal(inp, String(left));                                    // poora baaki maal aaya
+        setVal(batches[i], 'DEMO-LOT-' + stamp + '-' + (i + 1));
+      });
+      setVal($('#grn-challan', form), 'DC-' + stamp);
+      setVal($('#grn-transporter', form), 'Demo Transport');
+      setVal($('#grn-vehicle', form), 'GJ-01-AB-1234');
+    });
+  }
+
+  // QC parameter ki limit ke andar ka ek theek maap (demo me sab test pass)
+  function goodFromLimits(min, max) {
+    if (min !== null && max !== null) return Math.round((min + max) / 2 * 1000) / 1000;
+    if (min !== null) return min + 1;
+    if (max !== null) return max > 0 ? max / 2 : max - 1;
+    return 1;
+  }
+  function limitsFromText(std) {
+    var m = std.match(/(-?[0-9.]+)\s*to\s*(-?[0-9.]+)/);
+    if (m) return [parseFloat(m[1]), parseFloat(m[2])];
+    m = std.match(/Min\s+(-?[0-9.]+)/); if (m) return [parseFloat(m[1]), null];
+    m = std.match(/Max\s+(-?[0-9.]+)/); if (m) return [null, parseFloat(m[1])];
+    return [null, null];
+  }
+
+  function prefillQC() {
+    // Inspect dabane ke baad lot + uske test server se aate hain — pehle unka intezaar
+    return waitFor(function () {
+      var recv = $('#qc-recv');
+      return recv && /[0-9]/.test(recv.value) && $$('#param-tbody tr').length && !/Select a lot/.test($('#param-tbody').textContent);
+    }, 8000).then(function (ok) {
+      if (!ok) throw new Error('QC lot did not load.');
+      var d = $('#qc-date'); if (!d.value) setVal(d, d.max || todayStr());
+      setVal($('#qc-inspector'), 'QC Lab');
+      var recv = parseFloat($('#qc-recv').value) || 0;
+      setVal($('#qc-sample'), '1');
+      setVal($('#qc-pass'), String(recv));                              // poora lot pass
+      setVal($('#qc-reject'), '0');
+      $$('#param-tbody tr').forEach(function (tr) {
+        var inp = $('.qc-param-input', tr);
+        if (!inp) return;
+        if (inp.tagName === 'SELECT') { setVal(inp, 'pass'); return; }
+        var lim = limitsFromText((($$('td', tr)[1]) || {}).textContent || '');
+        setVal(inp, String(goodFromLimits(lim[0], lim[1])));
+      });
+    });
+  }
+
+  // Demo shortcut: is PO ke baaki lots ka QC (sab test pass). Wahi /inward_qc/add route — sirf typing bachti hai.
+  function qcRestDemo() {
+    var po = state.vars.po;
+    var jobs = $$('tr.qc-row').filter(function (r) { return !po || r.textContent.indexOf(po) !== -1; }).map(function (r) {
+      var b = $('.btn-inspect-line', r);
+      return b ? { grn: b.getAttribute('data-grn-id'), line: parseInt(b.getAttribute('data-line-id'), 10) } : null;
+    }).filter(Boolean);
+    var chain = Promise.resolve();
+    jobs.forEach(function (job) {
+      chain = chain.then(function () {
+        return fetch('/inward_qc/grn_lines/' + job.grn).then(function (r) { return r.json(); });
+      }).then(function (data) {
+        var line = data.lines.filter(function (l) { return l.id === job.line; })[0];
+        if (!line) return null;
+        var fd = new FormData();
+        fd.append('inspection_date', todayStr());
+        fd.append('inspector', 'QC Lab');
+        fd.append('grn_line_id', String(line.id));
+        fd.append('sample_size', '1');
+        fd.append('passed_qty', String(line.received_qty));
+        fd.append('rejected_qty', '0');
+        fd.append('remarks', 'Demo tour');
+        line.parameters.forEach(function (p, i) {
+          fd.append('param_id_' + i, String(p.id));
+          if (p.check_type === 'pass_fail') fd.append('result_' + i, 'pass');
+          else fd.append('actual_' + i, String(goodFromLimits(p.min_value, p.max_value)));
+        });
+        fd.append('qc_action', 'submit');
+        return fetch('/inward_qc/add', { method: 'POST', body: fd }).then(function (r) { return r.text(); }).then(function (html) {
+          // flash message page ke showToast(...) me aata hai; error ho to dikhao
+          var m = html.match(/showToast\(("(?:[^"\\]|\\.)*"),\s*"(error|warning)"\)/);
+          if (m) throw new Error(JSON.parse(m[1]));
+        });
+      });
+    });
+    return chain;
+  }
+
+  function prefillBill() {
+    // "Create bill" dabane par lines GRN ke data se JS banata hai
+    return waitFor(function () { return $$('#pi-line-body tr').length > 0; }, 5000).then(function () {
+      setVal($('#pi-vinv'), 'VINV-' + stamp);
+      var d = $('#pi-date'); if (!d.value) setVal(d, d.max || todayStr());
     });
   }
 
@@ -431,12 +648,14 @@
     if (state.pending) {
       var p = state.pending; state.pending = null;
       var err = toasts.filter(function (t) { return t.type === 'error' || t.type === 'warning'; })[0];
+      if (p.hold && !toasts.length) { save(state); return render(); }     // popup cancel hua / bas reload hua - step wahin
       if (err && p.retryTo) {
         var back = indexOfStep(p.retryTo);
         if (back >= 0) { state.si = back; state.notice = 'એન્ટ્રીમાં સમસ્યા: ' + err.msg + ' — ફરી પ્રયત્ન કરો.'; }
         save(state);
         return render();
       }
+      if (p.hold) advance();
       var okToast = toasts.filter(function (t) { return t.type === 'success'; });
       if (p.capture) {
         var txt = okToast.map(function (t) { return t.msg; }).join(' ');
@@ -626,8 +845,10 @@
     if (!el || e.target !== el) return;
     if (st.submitter && !(e.submitter && e.submitter.value === st.submitter)) return;
     if (e.target.classList && e.target.classList.contains('js-confirm-submit')) return;
-    state.pending = { retryTo: st.retryTo, capture: st.capture };
+    state.pending = { retryTo: st.retryTo, capture: st.capture, hold: !!st.confirm };
     state.notice = null;
+    // confirm popup wale form (Post bill) me asli submit popup "OK" ke baad aata hai — tab tak step wahin rakho
+    if (st.confirm) { save(state); return; }
     advance();                                    // page reload hoga; naye page par render() natija jaanchega
   }, true);
 
@@ -665,6 +886,8 @@
       p = (st.prefill ? st.prefill.run() : Promise.resolve()).then(function () {
         var sub = st.submitter ? $('[form="' + el.id + '"][value="' + st.submitter + '"], #' + el.id + ' [value="' + st.submitter + '"]') : null;
         if (sub) sub.click(); else if (el.requestSubmit) el.requestSubmit(); else el.submit();
+        // confirm popup wale form: autoplay khud "OK" dabata hai
+        if (st.confirm) return waitFor(function () { var b = $('.erp-confirm__btn--ok'); return visible(b) ? b : null; }, 4000).then(function (b) { if (b) b.click(); });
       });
     }
     p.then(done, function (e) { console.error('[tour auto]', st.id, e); window.__tourErrors = (window.__tourErrors || []).concat(st.id + ': ' + e); done(); });
@@ -678,8 +901,8 @@
     closeMenu();
     menuEl = mk('div', 'tour-menu-back tour-gu');
     var box = mk('div', 'tour-menu', menuEl);
-    box.innerHTML = '<div class="top"><h2>🎓 ડેમો ટૂર (ગુજરાતી)</h2><p>સ્ટોકથી લઈને તૈયાર માલ, Scrap અને Variance સુધીનું બધું <b>જાતે કરીને</b> શીખો. દરેક પગલું ગુજરાતીમાં સમજાવેલું છે.</p></div>' +
-      '<div class="alert">⚠️ ટૂર <b>સાચી એન્ટ્રીઓ</b> બનાવશે — સ્ટોક, પ્રોડક્શન ઓર્ડર, માલ આપવો/પાછો, રૂટિંગ, output વગેરે. ટ્રેનિંગ / ડેમો માટે જ ચલાવો.<label><input type="checkbox" id="tour-ok"> હું સમજું છું કે ટૂર સાચી એન્ટ્રીઓ બનાવશે.</label></div>';
+    box.innerHTML = '<div class="top"><h2>🎓 ડેમો ટૂર (ગુજરાતી)</h2><p>ખરીદીથી લઈને તૈયાર માલ, Scrap અને Variance સુધીનું બધું <b>જાતે કરીને</b> શીખો. દરેક પગલું ગુજરાતીમાં સમજાવેલું છે.</p></div>' +
+      '<div class="alert">⚠️ ટૂર <b>સાચી એન્ટ્રીઓ</b> બનાવશે — PO, GRN, QC, બિલ, પ્રોડક્શન ઓર્ડર, માલ આપવો/પાછો, રૂટિંગ, output વગેરે. ટ્રેનિંગ / ડેમો માટે જ ચલાવો.<label><input type="checkbox" id="tour-ok"> હું સમજું છું કે ટૂર સાચી એન્ટ્રીઓ બનાવશે.</label></div>';
     var auto = mk('div', 'tour-ch', box);
     auto.style.cssText += ';background:#FBF4EE;border-color:#E8C9A8';
     auto.innerHTML = '<div class="n">▶</div><div class="t"><b>1-ક્લિક ઓટો ડેમો (ગુજરાતી અવાજ સાથે)</b><span>તમારે કંઈ કરવાનું નથી — ડેમો પોતે બધું ક્લિક કરશે અને ગુજરાતીમાં સમજાવશે. થોભાવી શકાય, ઝડપ બદલી શકાય.</span></div>';

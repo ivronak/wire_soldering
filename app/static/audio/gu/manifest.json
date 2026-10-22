@@ -1,13 +1,13 @@
 {
  "welcome": {
-  "hash": "8363fb7fbdac",
-  "bytes": 138096,
-  "chars": 210
+  "hash": "09a46e5f02c9",
+  "bytes": 142848,
+  "chars": 216
  },
  "sidebar": {
-  "hash": "eab5f96e3329",
-  "bytes": 100224,
-  "chars": 151
+  "hash": "5f8c6a680787",
+  "bytes": 110880,
+  "chars": 172
  },
  "howto": {
   "hash": "3c3504f42b98",
@@ -15,34 +15,14 @@
   "chars": 168
  },
  "os-link": {
-  "hash": "1d62e78b2431",
-  "bytes": 31968,
-  "chars": 52
+  "hash": "75e8bdabbdf5",
+  "bytes": 45072,
+  "chars": 71
  },
  "os-what": {
-  "hash": "f67e31712052",
-  "bytes": 102096,
-  "chars": 158
- },
- "os-new": {
-  "hash": "55db13d65ad1",
-  "bytes": 54432,
-  "chars": 51
- },
- "os-fill": {
-  "hash": "9ab06289add5",
-  "bytes": 92448,
-  "chars": 110
- },
- "os-post": {
-  "hash": "cfdee1e3721b",
-  "bytes": 95328,
-  "chars": 115
- },
- "os-done": {
-  "hash": "6bf173932bcd",
-  "bytes": 54576,
-  "chars": 79
+  "hash": "cd111389b400",
+  "bytes": 120816,
+  "chars": 195
  },
  "st-link": {
   "hash": "60e102b451b5",
@@ -440,8 +420,178 @@
   "chars": 21
  },
  "end": {
-  "hash": "607efc295d8f",
-  "bytes": 114480,
-  "chars": 166
+  "hash": "3cedffd66a79",
+  "bytes": 133488,
+  "chars": 193
+ },
+ "pr-intro": {
+  "hash": "d3d5c450bc6d",
+  "bytes": 184032,
+  "chars": 274
+ },
+ "pr-po-link": {
+  "hash": "73e7a5c199e4",
+  "bytes": 41328,
+  "chars": 71
+ },
+ "pr-po-what": {
+  "hash": "7c32300474b3",
+  "bytes": 160992,
+  "chars": 216
+ },
+ "pr-po-new": {
+  "hash": "45c7ef3b33ae",
+  "bytes": 55152,
+  "chars": 50
+ },
+ "pr-po-fill": {
+  "hash": "8e092d05a165",
+  "bytes": 173088,
+  "chars": 219
+ },
+ "pr-po-save": {
+  "hash": "5a3bf0874d67",
+  "bytes": 55152,
+  "chars": 77
+ },
+ "pr-po-draft": {
+  "hash": "257bdc512bdf",
+  "bytes": 106272,
+  "chars": 131
+ },
+ "pr-po-confirm": {
+  "hash": "25dd2ad48729",
+  "bytes": 28224,
+  "chars": 39
+ },
+ "pr-po-cfill": {
+  "hash": "6b5ead7e2f84",
+  "bytes": 157824,
+  "chars": 201
+ },
+ "pr-po-csubmit": {
+  "hash": "85f883eafac8",
+  "bytes": 48960,
+  "chars": 67
+ },
+ "pr-po-tab": {
+  "hash": "6f6c4b9cfed0",
+  "bytes": 70272,
+  "chars": 91
+ },
+ "pr-po-open": {
+  "hash": "44b26a952f93",
+  "bytes": 93600,
+  "chars": 106
+ },
+ "pr-grn-link": {
+  "hash": "afb1f8659433",
+  "bytes": 55152,
+  "chars": 75
+ },
+ "pr-grn-what": {
+  "hash": "ef63a78a78f4",
+  "bytes": 123120,
+  "chars": 173
+ },
+ "pr-grn-recv": {
+  "hash": "68a925b17cb6",
+  "bytes": 29376,
+  "chars": 42
+ },
+ "pr-grn-fill": {
+  "hash": "a535d84003a5",
+  "bytes": 151776,
+  "chars": 210
+ },
+ "pr-grn-post": {
+  "hash": "3c5bdef89ebd",
+  "bytes": 93168,
+  "chars": 145
+ },
+ "pr-grn-done": {
+  "hash": "dbc17465abc1",
+  "bytes": 107280,
+  "chars": 135
+ },
+ "pr-qc-link": {
+  "hash": "e1f3cf060dd6",
+  "bytes": 60912,
+  "chars": 62
+ },
+ "pr-qc-what": {
+  "hash": "c6022eb3ea21",
+  "bytes": 142416,
+  "chars": 151
+ },
+ "pr-qc-open": {
+  "hash": "c352c8d40620",
+  "bytes": 27216,
+  "chars": 42
+ },
+ "pr-qc-fill": {
+  "hash": "c35f2a0dca90",
+  "bytes": 186336,
+  "chars": 239
+ },
+ "pr-qc-submit": {
+  "hash": "f729ff6add23",
+  "bytes": 63504,
+  "chars": 93
+ },
+ "pr-qc-rest": {
+  "hash": "9933c30a4e6a",
+  "bytes": 111888,
+  "chars": 136
+ },
+ "pr-qc-done": {
+  "hash": "c5ba1e7b4ec9",
+  "bytes": 121392,
+  "chars": 199
+ },
+ "pr-pi-link": {
+  "hash": "725cf402adf2",
+  "bytes": 50544,
+  "chars": 66
+ },
+ "pr-pi-what": {
+  "hash": "04b810a91051",
+  "bytes": 108288,
+  "chars": 135
+ },
+ "pr-pi-create": {
+  "hash": "ebc9cacac503",
+  "bytes": 30528,
+  "chars": 44
+ },
+ "pr-pi-fill": {
+  "hash": "7a5151a4eecf",
+  "bytes": 177696,
+  "chars": 209
+ },
+ "pr-pi-post": {
+  "hash": "8b6c93f1da41",
+  "bytes": 79920,
+  "chars": 109
+ },
+ "pr-pi-done": {
+  "hash": "d3fb34ca786f",
+  "bytes": 85680,
+  "chars": 134
+ },
+ "pr-ret-link": {
+  "hash": "6022c8bec76e",
+  "bytes": 46224,
+  "chars": 66
+ },
+ "pr-ret-info": {
+  "hash": "c4e84cc2f475",
+  "bytes": 206784,
+  "chars": 259
+ },
+ "st-from-po": {
+  "hash": "73868729811c",
+  "bytes": 167472,
+  "chars": 176
  }
 }

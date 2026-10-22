@@ -478,6 +478,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User chahta tha ki website par hi ek-ek cheez ka tour ho, steps asli me karke, Gujarati me, non-tech users ke liye.
 **How to apply:** Naya module aaye to uska chapter `tour.js` me jodo aur `tour_test.py` (paths / selectors check) chalao. Tour asli data banata hai — live par sirf training ke liye. Selectors / ids badlo (jaise `#mo-form`, `.po-chev`) to tour toot sakta hai — `tour_test.py` ki selector list update karo.
 
+### Decision: Demo ab Purchase Order se shuru hota hai, opening stock nahi (2026-10-22)
+**Date:** 2026-10-22
+**Kya:** Demo ka stock ab **PO -> GRN -> Inward QC -> Purchase bill** se aata hai (naya chapter `procure`, 34 steps); Opening stock demo me sirf end me samjhaya jaata hai. Inward QC me pehla lot poora manual, baaki lots ek shortcut button se (wahi route, sab test pass). Post bill ka confirm popup player khud accept karta hai.
+**Kyun:** User ne kaha demo ek purchase order se lekar FG good banane tak poora dikhna chahiye taaki saari process relatively samajh aaye; baaki demo "bilkul sahi" hai isliye uska flow nahi badla.
+**How to apply:** Procurement ke selectors (`#po-form`, `.btn-confirm-po`, `#confirm-po-form`, `tr.grn-row .btn-receive`, `#grn-form`, `tr.qc-row .btn-inspect-line`, `#inspect-form`, `tr.pi-row .btn-create-bill`, `#pi-form`) badlo to `tour_test.py` fail hoga aur demo toot sakta hai. Procurement page ki UI/rules badle (jaise bill me naya required field) to `prefill*` functions `tour.js` me update karo.
+
 ### Decision: 1-click auto demo with Gujarati voice, iframe player + pre-generated mp3 (2026-10-22)
 **Date:** 2026-10-22
 **Kya:** `/demo` player (iframe) tour ke steps khud chalata hai; awaaz pre-generated edge-tts mp3 (gu-IN-DhwaniNeural), parent page se play. Browser SpeechSynthesis use nahi kiya (Gujarati voice har device par nahi hoti) aur single-document audio isliye kyunki page-reload ke baad autoplay block hota hai.
