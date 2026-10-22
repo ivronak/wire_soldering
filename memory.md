@@ -472,6 +472,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** Double entry se bachne ke liye scrap ek hi jagah likha jaata hai (jahan hota hai); non-tech users ke liye kam typing. Scrap types DB master (CLAUDE.md rule).
 **How to apply:** Scrap bechne wala Sales module `FGBatch(kind=SCRAP)` / `FGMovement` se dispatch kare. Naya scrap type dropdown me apne aap aayega. Variance ka tolerance badalna ho to `TOLERANCE_PCT` (ya master me laana).
 
+### Decision: Demo tour in Gujarati, built into the ERP, user performs real steps (2026-10-22)
+**Date:** 2026-10-22
+**Kya:** `tour.js` guided tour (spotlight + Gujarati card), 6 chapters stock se variance tak; steps asli clicks / form submits se aage badhte hain; "Demo value bharo" buttons; demo shortcut sirf routing ke baaki stages ke liye.
+**Kyun:** User chahta tha ki website par hi ek-ek cheez ka tour ho, steps asli me karke, Gujarati me, non-tech users ke liye.
+**How to apply:** Naya module aaye to uska chapter `tour.js` me jodo aur `tour_test.py` (paths / selectors check) chalao. Tour asli data banata hai — live par sirf training ke liye. Selectors / ids badlo (jaise `#mo-form`, `.po-chev`) to tour toot sakta hai — `tour_test.py` ki selector list update karo.
+
 ---
 
 ## Session Log
