@@ -1,0 +1,447 @@
+{
+ "welcome": {
+  "hash": "8363fb7fbdac",
+  "bytes": 138096,
+  "chars": 210
+ },
+ "sidebar": {
+  "hash": "eab5f96e3329",
+  "bytes": 100224,
+  "chars": 151
+ },
+ "howto": {
+  "hash": "3c3504f42b98",
+  "bytes": 107424,
+  "chars": 168
+ },
+ "os-link": {
+  "hash": "1d62e78b2431",
+  "bytes": 31968,
+  "chars": 52
+ },
+ "os-what": {
+  "hash": "f67e31712052",
+  "bytes": 102096,
+  "chars": 158
+ },
+ "os-new": {
+  "hash": "55db13d65ad1",
+  "bytes": 54432,
+  "chars": 51
+ },
+ "os-fill": {
+  "hash": "9ab06289add5",
+  "bytes": 92448,
+  "chars": 110
+ },
+ "os-post": {
+  "hash": "cfdee1e3721b",
+  "bytes": 95328,
+  "chars": 115
+ },
+ "os-done": {
+  "hash": "6bf173932bcd",
+  "bytes": 54576,
+  "chars": 79
+ },
+ "st-link": {
+  "hash": "60e102b451b5",
+  "bytes": 51120,
+  "chars": 70
+ },
+ "st-kpi": {
+  "hash": "8da1e64fc216",
+  "bytes": 100512,
+  "chars": 150
+ },
+ "st-card": {
+  "hash": "4b63fa180a3c",
+  "bytes": 142704,
+  "chars": 177
+ },
+ "st-lot": {
+  "hash": "0377e0aba175",
+  "bytes": 109872,
+  "chars": 138
+ },
+ "st-hist": {
+  "hash": "99a8b10b8819",
+  "bytes": 22176,
+  "chars": 29
+ },
+ "st-hist-info": {
+  "hash": "08e93a7acc65",
+  "bytes": 132192,
+  "chars": 135
+ },
+ "val-link": {
+  "hash": "7d118ad56be2",
+  "bytes": 18432,
+  "chars": 25
+ },
+ "val-info": {
+  "hash": "40442b119761",
+  "bytes": 104256,
+  "chars": 106
+ },
+ "tr-link": {
+  "hash": "c212c1d8ae02",
+  "bytes": 43920,
+  "chars": 64
+ },
+ "tr-info": {
+  "hash": "1e2b783ba643",
+  "bytes": 104112,
+  "chars": 118
+ },
+ "adj-link": {
+  "hash": "f7d203e3024c",
+  "bytes": 16848,
+  "chars": 22
+ },
+ "adj-info": {
+  "hash": "24187e2625e7",
+  "bytes": 99648,
+  "chars": 130
+ },
+ "po-link": {
+  "hash": "29b6257e3300",
+  "bytes": 44928,
+  "chars": 71
+ },
+ "po-queue": {
+  "hash": "2922548ee3e5",
+  "bytes": 130320,
+  "chars": 170
+ },
+ "po-new": {
+  "hash": "eb28b6ab1326",
+  "bytes": 37296,
+  "chars": 58
+ },
+ "po-fill": {
+  "hash": "344476e37b0c",
+  "bytes": 81360,
+  "chars": 125
+ },
+ "po-plan": {
+  "hash": "7ed8ae424dac",
+  "bytes": 98640,
+  "chars": 147
+ },
+ "po-side": {
+  "hash": "fb2e8aedd1dc",
+  "bytes": 88416,
+  "chars": 131
+ },
+ "po-save": {
+  "hash": "ab402f057bd6",
+  "bytes": 41760,
+  "chars": 57
+ },
+ "po-card": {
+  "hash": "81549589fc5b",
+  "bytes": 120960,
+  "chars": 121
+ },
+ "po-open": {
+  "hash": "838d327382b6",
+  "bytes": 26928,
+  "chars": 41
+ },
+ "po-detail": {
+  "hash": "684d4e819734",
+  "bytes": 108288,
+  "chars": 137
+ },
+ "po-rel": {
+  "hash": "e460dc947057",
+  "bytes": 73584,
+  "chars": 72
+ },
+ "po-rel-ok": {
+  "hash": "fcda8910ba50",
+  "bytes": 35424,
+  "chars": 40
+ },
+ "po-rel-done": {
+  "hash": "a6a38ed536c7",
+  "bytes": 65664,
+  "chars": 69
+ },
+ "mi-link": {
+  "hash": "6570c8793f0a",
+  "bytes": 46080,
+  "chars": 68
+ },
+ "mi-kpi": {
+  "hash": "67085dc6bdb2",
+  "bytes": 97344,
+  "chars": 115
+ },
+ "mi-open": {
+  "hash": "1e327e92af64",
+  "bytes": 30528,
+  "chars": 47
+ },
+ "mi-fill": {
+  "hash": "6f52fd838b89",
+  "bytes": 95904,
+  "chars": 155
+ },
+ "mi-post": {
+  "hash": "f6758ca60c39",
+  "bytes": 113760,
+  "chars": 148
+ },
+ "mi-done": {
+  "hash": "335f14ed5618",
+  "bytes": 83664,
+  "chars": 90
+ },
+ "mi-print": {
+  "hash": "94b81eacf543",
+  "bytes": 66096,
+  "chars": 100
+ },
+ "mi-menu": {
+  "hash": "2ecc6cf1cc42",
+  "bytes": 51408,
+  "chars": 77
+ },
+ "mi-ret": {
+  "hash": "cb781dddb31a",
+  "bytes": 23040,
+  "chars": 34
+ },
+ "mi-ret-fill": {
+  "hash": "ec0357940912",
+  "bytes": 82368,
+  "chars": 116
+ },
+ "mi-ret-post": {
+  "hash": "d1e0ef4606d6",
+  "bytes": 45072,
+  "chars": 64
+ },
+ "mi-ret-done": {
+  "hash": "d7a3f6d4fc5a",
+  "bytes": 82800,
+  "chars": 88
+ },
+ "mi-to": {
+  "hash": "b20b688b3984",
+  "bytes": 35856,
+  "chars": 53
+ },
+ "mi-all": {
+  "hash": "ad8c64a71a28",
+  "bytes": 73296,
+  "chars": 82
+ },
+ "mi-all-ok": {
+  "hash": "fc6334bf9356",
+  "bytes": 34848,
+  "chars": 37
+ },
+ "mi-end": {
+  "hash": "822f61f6e389",
+  "bytes": 41184,
+  "chars": 55
+ },
+ "st-po": {
+  "hash": "64dead16809f",
+  "bytes": 49968,
+  "chars": 58
+ },
+ "st-start": {
+  "hash": "89143ad369dc",
+  "bytes": 105264,
+  "chars": 110
+ },
+ "st-start-ok": {
+  "hash": "fc72ba3dfdaf",
+  "bytes": 19296,
+  "chars": 27
+ },
+ "st-run": {
+  "hash": "e607c02caa19",
+  "bytes": 112464,
+  "chars": 103
+ },
+ "rt-link": {
+  "hash": "c38e3cd11c9b",
+  "bytes": 40608,
+  "chars": 61
+ },
+ "rt-pipe": {
+  "hash": "21591d36d7a0",
+  "bytes": 111024,
+  "chars": 134
+ },
+ "rt-start": {
+  "hash": "3ca0dbfc4d32",
+  "bytes": 27360,
+  "chars": 41
+ },
+ "rt-start-fill": {
+  "hash": "a71824057f4e",
+  "bytes": 96624,
+  "chars": 100
+ },
+ "rt-start-post": {
+  "hash": "fd511c7a67a1",
+  "bytes": 18432,
+  "chars": 25
+ },
+ "rt-comp": {
+  "hash": "64a7add16858",
+  "bytes": 57024,
+  "chars": 49
+ },
+ "rt-comp-fill": {
+  "hash": "0a4d0b701282",
+  "bytes": 117216,
+  "chars": 197
+ },
+ "rt-comp-post": {
+  "hash": "88894adf97bf",
+  "bytes": 18000,
+  "chars": 26
+ },
+ "rt-done1": {
+  "hash": "93466e7cc94d",
+  "bytes": 124560,
+  "chars": 164
+ },
+ "rt-shortcut": {
+  "hash": "bd09ddc15934",
+  "bytes": 67392,
+  "chars": 103
+ },
+ "rt-alldone": {
+  "hash": "f45193c9d664",
+  "bytes": 77904,
+  "chars": 114
+ },
+ "rt-tab": {
+  "hash": "3d819e2e0c27",
+  "bytes": 19008,
+  "chars": 24
+ },
+ "rt-rec": {
+  "hash": "1ac6755020fc",
+  "bytes": 83232,
+  "chars": 97
+ },
+ "ou-link": {
+  "hash": "495490a0d3f2",
+  "bytes": 49968,
+  "chars": 79
+ },
+ "ou-open": {
+  "hash": "025003402e84",
+  "bytes": 31824,
+  "chars": 48
+ },
+ "ou-fill": {
+  "hash": "a2a7141230ec",
+  "bytes": 138960,
+  "chars": 167
+ },
+ "ou-side": {
+  "hash": "8340170f6f7b",
+  "bytes": 140400,
+  "chars": 189
+ },
+ "ou-post": {
+  "hash": "fd191d6599e3",
+  "bytes": 19728,
+  "chars": 26
+ },
+ "ou-done": {
+  "hash": "0b5b6ccb52ac",
+  "bytes": 96768,
+  "chars": 115
+ },
+ "fg-link": {
+  "hash": "f04b0d470745",
+  "bytes": 31680,
+  "chars": 47
+ },
+ "fg-info": {
+  "hash": "991dd987f082",
+  "bytes": 122256,
+  "chars": 150
+ },
+ "fg-scrap": {
+  "hash": "78ac047f6315",
+  "bytes": 20160,
+  "chars": 30
+ },
+ "fg-scrap-info": {
+  "hash": "86dcfb47469b",
+  "bytes": 60336,
+  "chars": 98
+ },
+ "sc-link": {
+  "hash": "3595044ef074",
+  "bytes": 23616,
+  "chars": 35
+ },
+ "sc-kpi": {
+  "hash": "962e0d6333fc",
+  "bytes": 98784,
+  "chars": 129
+ },
+ "sc-box": {
+  "hash": "96f06a68870f",
+  "bytes": 84240,
+  "chars": 105
+ },
+ "sc-reg": {
+  "hash": "31b702f8fa49",
+  "bytes": 98784,
+  "chars": 115
+ },
+ "cv-link": {
+  "hash": "bfbe74aebcd6",
+  "bytes": 42912,
+  "chars": 72
+ },
+ "cv-view": {
+  "hash": "a48368689452",
+  "bytes": 26928,
+  "chars": 42
+ },
+ "cv-info": {
+  "hash": "f5f87473f53f",
+  "bytes": 172944,
+  "chars": 218
+ },
+ "cv-review": {
+  "hash": "0c331aedd206",
+  "bytes": 34560,
+  "chars": 54
+ },
+ "cv-done": {
+  "hash": "a43c7df7bce9",
+  "bytes": 18576,
+  "chars": 26
+ },
+ "po-final": {
+  "hash": "a761ece78279",
+  "bytes": 39024,
+  "chars": 55
+ },
+ "po-final-tab": {
+  "hash": "7021956a3b8f",
+  "bytes": 15840,
+  "chars": 21
+ },
+ "end": {
+  "hash": "607efc295d8f",
+  "bytes": 114480,
+  "chars": 166
+ }
+}

@@ -4,14 +4,14 @@
 # Shortcut wahi asli rules follow karta hai (stage ek ke baad ek, qty in -> out, machines used); sirf typing bachata hai.
 from datetime import timedelta
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 
 from app.extensions import db
 from app.models import Product, ProductionOrder, Warehouse
 from app.production_orders.scheduler import now_ist
 from app.routing.routes import order_batch_kg
 
-tour_bp = Blueprint("tour", __name__)
+tour_bp = Blueprint("tour", __name__, template_folder="templates")
 
 
 @tour_bp.route("/tour/info")
@@ -75,3 +75,9 @@ def tour_order_id():
     if order is None:
         return jsonify({"ok": False, "message": "Order not found."})
     return jsonify({"ok": True, "id": order.id})
+
+
+@tour_bp.route("/demo")
+def demo_player():
+    # 1-click auto demo: ERP iframe me, step khud chalte hain, Gujarati awaaz parent page se (static/js/demo.js)
+    return render_template("demo.html")

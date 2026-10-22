@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="gu">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ઓટો ડેમો — ગુજરાતી</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/demo.css') }}" />
+  <script>window.__ERP_DEMO_PLAYER = true;</script>
+  <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
+</head>
+<body class="dm">
+  <header id="dm-top">
+    <div class="brand">🎓 ઓટો ડેમો <small>ગુજરાતી · અવાજ સાથે</small></div>
+    <div class="prog"><div id="dm-bar"></div></div>
+    <span id="dm-count">પગલું 0 / 0</span>
+    <div class="ctl">
+      <button type="button" class="dm-btn" id="dm-pause" title="થોભાવો / ચાલુ કરો (Space)">⏸ થોભો</button>
+      <button type="button" class="dm-btn" id="dm-skip" title="આ પગલું છોડીને આગળ">⏭ આગળ</button>
+      <select id="dm-speed" title="ઝડપ"><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option></select>
+      <button type="button" class="dm-btn" id="dm-mute" title="અવાજ બંધ / ચાલુ">🔊</button>
+      <button type="button" class="dm-btn on" id="dm-cc" title="લખાણ બતાવો / છુપાવો">લખાણ</button>
+      <button type="button" class="dm-btn" id="dm-stop" title="ડેમો બંધ કરો">✕ બંધ</button>
+    </div>
+  </header>
+
+  <div id="dm-stage">
+    <iframe id="dm-frame" title="ERP" src="{{ url_for('production_orders.production_orders_list') }}"></iframe>
+    <div id="dm-overlay">
+      <div class="dm-shade" id="dm-s0"></div><div class="dm-shade" id="dm-s1"></div><div class="dm-shade" id="dm-s2"></div><div class="dm-shade" id="dm-s3"></div>
+      <div class="dm-ring" id="dm-ring"></div>
+      <svg class="dm-cursor" id="dm-cursor" viewBox="0 0 24 24"><path d="M4 2l15 9-6.5 1.6L9.7 19z" fill="#fff" stroke="#0F2F32" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </div>
+    <div id="dm-caption">
+      <div class="row"><span class="chip" id="dm-chip">—</span><span class="act" id="dm-act"></span><span id="dm-wave"><i></i><i></i><i></i><i></i></span></div>
+      <h3 id="dm-title"></h3>
+      <div class="txt" id="dm-text"></div>
+    </div>
+  </div>
+
+  <!-- Shuru screen -->
+  <div class="dm-screen show" id="dm-start">
+    <div class="dm-box">
+      <h1>🎓 1-ક્લિક ઓટો ડેમો</h1>
+      <p>આ ડેમો <b>પોતે જ</b> સોફ્ટવેર ચલાવશે — ક્લિક કરશે, ફોર્મ ભરશે, પોસ્ટ કરશે — અને દરેક પગલું <b>ગુજરાતી અવાજમાં</b> સમજાવશે. તમારે કંઈ કરવાનું નથી, ફક્ત જોવાનું અને સાંભળવાનું.</p>
+      <ul>
+        <li><b>સ્ટોક</b> → ઓપનિંગ સ્ટોક, લેજર, લોટ</li>
+        <li><b>પ્રોડક્શન ઓર્ડર</b> → કતાર, રિલીઝ</li>
+        <li><b>માલ આપવો / પાછો</b>, <b>સ્ટાર્ટ અને રાઉટિંગ</b></li>
+        <li><b>આઉટપુટ, તૈયાર માલ, સ્ક્રેપ, વેરિયન્સ</b></li>
+      </ul>
+      <p style="font-size:14px;color:#3D5A5D">સમય: લગભગ 12–15 મિનિટ. વચ્ચે <b>થોભો</b>, <b>ઝડપ</b> (1.25×, 1.5×) અને <b>અવાજ બંધ</b> કરી શકાય. ગુજરાતી લખાણ નીચે પણ દેખાશે.</p>
+      <div class="alert">⚠️ ડેમો <b>સાચી એન્ટ્રીઓ</b> બનાવશે — ઓપનિંગ સ્ટોક, પ્રોડક્શન ઓર્ડર, માલ આપવો/પાછો, રાઉટિંગ, આઉટપુટ વગેરે. ટ્રેનિંગ / ડેમો કોપી પર જ ચલાવો.
+        <label><input type="checkbox" id="dm-ok"> હું સમજું છું કે ડેમો સાચી એન્ટ્રીઓ બનાવશે.</label></div>
+      <div class="row">
+        <a class="dm-btn light" style="text-decoration:none" href="{{ url_for('production_orders.production_orders_list') }}">← ERP પર પાછા</a>
+        <button type="button" class="dm-btn primary" id="dm-go" disabled style="padding:10px 22px;font-size:15px">▶ ડેમો શરૂ કરો</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error screen -->
+  <div class="dm-screen" id="dm-err">
+    <div class="dm-box">
+      <h1>⚠️ આ પગલું થઈ શક્યું નહિ</h1>
+      <div class="err" id="dm-err-msg"></div>
+      <p style="font-size:14px">તમે ફરી પ્રયત્ન કરી શકો, આ પગલું છોડી શકો, અથવા ડેમો બંધ કરી શકો.</p>
+      <div class="row">
+        <button type="button" class="dm-btn light" id="dm-err-stop">✕ બંધ કરો</button>
+        <button type="button" class="dm-btn light" id="dm-err-skip">પગલું છોડો</button>
+        <button type="button" class="dm-btn primary" id="dm-err-retry">ફરી પ્રયત્ન</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- End screen -->
+  <div class="dm-screen" id="dm-end">
+    <div class="dm-box">
+      <h1>🎉 ડેમો પૂરો થયો!</h1>
+      <p>તમે આખું ચક્ર જોયું: <b>ઓપનિંગ સ્ટોક → પ્રોડક્શન ઓર્ડર → માલ આપવો / પાછો → સ્ટાર્ટ → રાઉટિંગ → આઉટપુટ → તૈયાર માલ → સ્ક્રેપ → વેરિયન્સ</b>.</p>
+      <p style="font-size:14px;color:#3D5A5D">હવે તમે જાતે પણ કરી શકો — ડાબા મેનુમાં <b>🎓 ડેમો ટૂર</b> માંથી "જાતે કરીને શીખો" ટૂર પણ છે.</p>
+      <div class="row">
+        <button type="button" class="dm-btn light" id="dm-again">↺ ફરી ચલાવો</button>
+        <a class="dm-btn primary" style="text-decoration:none" href="{{ url_for('production_orders.production_orders_list') }}">ERP ખોલો →</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/demo.js') }}"></script>
+</body>
+</html>

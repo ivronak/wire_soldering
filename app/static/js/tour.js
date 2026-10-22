@@ -10,6 +10,9 @@
  */
 (function () {
   'use strict';
+  // Demo player (/demo) ERP ko iframe me chalata hai — us iframe ke andar manual tour / launcher nahi chahiye
+  if (window.self !== window.top) return;
+  var PLAYER = !!window.__ERP_DEMO_PLAYER;      // /demo page: yahan sirf step data + helpers chahiye, engine nahi
   var KEY = 'erpTourV1';
   var DEV_KEY = 'erpTourAuto';
   var toasts = [];                 // is page load par jo toast aaye (type + message) — submit ka natija jaanchne ke liye
@@ -28,15 +31,17 @@
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   // ---------------------------------------------------------------- helpers
-  function $(sel, root) { return (root || document).querySelector(sel); }
-  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  // ctx: step ke target kis document me dhundhne hain (normal tour me yehi page; demo player me iframe ka page)
+  var ctx = { doc: document, win: window };
+  function $(sel, root) { return (root || ctx.doc).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || ctx.doc).querySelectorAll(sel)); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function path() { return location.pathname; }
+  function path() { return ctx.win.location.pathname; }
   function setVal(el, value) {
     if (!el) return;
     el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new ctx.win.Event('input', { bubbles: true }));
+    el.dispatchEvent(new ctx.win.Event('change', { bubbles: true }));
   }
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* private mode */ } }
@@ -317,8 +322,20 @@
     });
   }
 
+  // ---------------------------------------------------------------- awaaz (manual tour me best-effort; browser page badalne ke baad auto-play rok deta hai, isliye 🔊 button bhi hai)
+  var voice = { audio: null, key: '' };
+  function voiceOn() { try { return localStorage.getItem('erpTourVoice') !== '0'; } catch (e) { return true; } }
+  function stopVoice() { if (voice.audio) { try { voice.audio.pause(); } catch (e) { /* ignore */ } voice.audio = null; } }
+  function playVoice(id) {
+    stopVoice();
+    var a = new Audio('/static/audio/gu/' + id + '.mp3');
+    voice.audio = a;
+    var p = a.play();
+    if (p && p.catch) p.catch(function () { /* autoplay blocked — user 🔊 dabayega */ });
+  }
+
   // ---------------------------------------------------------------- state / navigation
-  var state = load();
+  var state = PLAYER ? { vars: {} } : load();
   var els = {};
   var ticker = null;
   var currentKey = '';
@@ -376,6 +393,7 @@
   function showFull() { var f = els.full; f.style.display = 'block'; f.style.left = '0'; f.style.top = '0'; f.style.width = '100vw'; f.style.height = '100vh'; }
   function hideShades() { els.shades.forEach(function (s) { s.style.display = 'none'; }); els.full.style.display = 'none'; els.ring.style.display = 'none'; }
   function teardown() {
+    stopVoice();
     if (ticker) { clearInterval(ticker); ticker = null; }
     ['card', 'ring', 'full'].forEach(function (k) { if (els[k] && els[k].parentNode) els[k].parentNode.removeChild(els[k]); });
     (els.shades || []).forEach(function (s) { if (s.parentNode) s.parentNode.removeChild(s); });
@@ -444,6 +462,22 @@
     var bar = mk('div', 'bar', card); bar.innerHTML = '<i style="width:' + Math.round(100 * (at - 1) / total) + '%"></i>';
     var head = mk('div', 'head', card);
     head.innerHTML = '<span class="chip">' + esc(c.title) + '</span><span>પગલું ' + at + ' / ' + total + '</span>';
+    if (mode !== 'goto') {
+      var speaker = document.createElement('button');
+      speaker.type = 'button'; speaker.className = 'tour-btn link'; speaker.style.cssText = 'font-size:16px;padding:0 4px';
+      speaker.title = 'અવાજ સાંભળો / બંધ કરો';
+      speaker.textContent = voiceOn() ? '🔊' : '🔇';
+      speaker.addEventListener('click', function () {
+        if (voice.audio && !voice.audio.paused) { stopVoice(); return; }
+        try { localStorage.setItem('erpTourVoice', '1'); } catch (e) { /* ignore */ }
+        speaker.textContent = '🔊'; playVoice(st.id);
+      });
+      head.insertBefore(speaker, head.lastChild);
+      if (voice.key !== state.ci + ':' + state.si) {
+        voice.key = state.ci + ':' + state.si;
+        if (voiceOn()) playVoice(st.id); else stopVoice();
+      }
+    }
     if (mode === 'goto') {
       mk('h3', '', card).textContent = 'આ પગલા માટે બીજા પેજ પર જાઓ';
       var b0 = mk('div', 'body', card);
@@ -646,6 +680,11 @@
     var box = mk('div', 'tour-menu', menuEl);
     box.innerHTML = '<div class="top"><h2>🎓 ડેમો ટૂર (ગુજરાતી)</h2><p>સ્ટોકથી લઈને તૈયાર માલ, Scrap અને Variance સુધીનું બધું <b>જાતે કરીને</b> શીખો. દરેક પગલું ગુજરાતીમાં સમજાવેલું છે.</p></div>' +
       '<div class="alert">⚠️ ટૂર <b>સાચી એન્ટ્રીઓ</b> બનાવશે — સ્ટોક, પ્રોડક્શન ઓર્ડર, માલ આપવો/પાછો, રૂટિંગ, output વગેરે. ટ્રેનિંગ / ડેમો માટે જ ચલાવો.<label><input type="checkbox" id="tour-ok"> હું સમજું છું કે ટૂર સાચી એન્ટ્રીઓ બનાવશે.</label></div>';
+    var auto = mk('div', 'tour-ch', box);
+    auto.style.cssText += ';background:#FBF4EE;border-color:#E8C9A8';
+    auto.innerHTML = '<div class="n">▶</div><div class="t"><b>1-ક્લિક ઓટો ડેમો (ગુજરાતી અવાજ સાથે)</b><span>તમારે કંઈ કરવાનું નથી — ડેમો પોતે બધું ક્લિક કરશે અને ગુજરાતીમાં સમજાવશે. થોભાવી શકાય, ઝડપ બદલી શકાય.</span></div>';
+    var autoBtn = btn('શરૂ કરો', 'primary', function () { location.href = '/demo'; });
+    auto.appendChild(autoBtn);
     var list = mk('div', '', box);
     CH.forEach(function (c, i) {
       var row = mk('div', 'tour-ch', list);
@@ -687,6 +726,20 @@
 
   // ---------------------------------------------------------------- init
   function init() {
+    if (PLAYER) {
+      // Demo player: engine nahi, sirf data + helpers (iframe ke document par kaam karne ke liye)
+      window.ERP_TOUR_API = {
+        chapters: CH,
+        resolve: resolveTarget,
+        pathOk: pathOk,
+        gotoUrl: gotoUrl,
+        setContext: function (doc, win) { ctx.doc = doc; ctx.win = win; },
+        setVar: function (k, v) { state.vars[k] = v; },
+        getVar: function (k) { return state.vars[k]; },
+        getInfo: getInfo
+      };
+      return;
+    }
     addLauncher();
     if (/[?&]tourauto=1/.test(location.search)) localStorage.setItem(DEV_KEY, '1');
     if (/[?&]tourauto=0/.test(location.search)) localStorage.removeItem(DEV_KEY);

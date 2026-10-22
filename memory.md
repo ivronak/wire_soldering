@@ -478,6 +478,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User chahta tha ki website par hi ek-ek cheez ka tour ho, steps asli me karke, Gujarati me, non-tech users ke liye.
 **How to apply:** Naya module aaye to uska chapter `tour.js` me jodo aur `tour_test.py` (paths / selectors check) chalao. Tour asli data banata hai — live par sirf training ke liye. Selectors / ids badlo (jaise `#mo-form`, `.po-chev`) to tour toot sakta hai — `tour_test.py` ki selector list update karo.
 
+### Decision: 1-click auto demo with Gujarati voice, iframe player + pre-generated mp3 (2026-10-22)
+**Date:** 2026-10-22
+**Kya:** `/demo` player (iframe) tour ke steps khud chalata hai; awaaz pre-generated edge-tts mp3 (gu-IN-DhwaniNeural), parent page se play. Browser SpeechSynthesis use nahi kiya (Gujarati voice har device par nahi hoti) aur single-document audio isliye kyunki page-reload ke baad autoplay block hota hai.
+**Kyun:** User ne kaha audio saath me ho, kuch karna na pade, ek click me poora demo.
+**How to apply:** Naya step jodo to narration + mp3 dono banao (`tour_narration.py` + `build_tour_audio.py`). Selectors / ids badlo to `tour_test.py` fail karega — tour dono (manual + auto) usi step data se chalte hain.
+
 ---
 
 ## Session Log
