@@ -118,7 +118,7 @@
           {% if cur.status == 'Pending' %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>
           {% else %}<button type="button" class="rt-act rt-btn teal" data-mode="complete" data-stage="{{ cur.id }}">Complete {{ cur.stage_name }}</button>{% endif %}
         {% else %}
-          <span class="rt-meta" style="max-width:190px;text-align:right">Next: record the production output</span>
+          <a href="{{ url_for('production_output.production_output_list') }}" class="rt-btn primary">Record output →</a>
         {% endif %}
       </div>
       <button type="button" class="rt-chev" aria-label="Show stage details">▾</button>

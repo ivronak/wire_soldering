@@ -167,6 +167,7 @@
         <a href="{{ url_for('stock_transfers.stock_transfers_list') }}" class="nav-link{% if active_nav == 'stock_transfers' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
         <a href="{{ url_for('stock_adjustments.stock_adjustments_list') }}" class="nav-link{% if active_nav == 'stock_adjustments' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
         <a href="{{ url_for('inventory.stock_valuation') }}" class="nav-link{% if active_nav == 'valuation' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
+        <a href="{{ url_for('production_output.finished_goods_list') }}" class="nav-link{% if active_nav == 'finished_goods' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>Finished goods</a>
 
         <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
         <a href="{{ url_for('production_orders.production_orders_list') }}" class="nav-link{% if active_nav == 'production_orders' %} is-active{% endif %}"{% if active_nav == 'production_orders' %} aria-current="page"{% endif %}>
@@ -180,6 +181,10 @@
         <a href="{{ url_for('routing.routing_list') }}" class="nav-link{% if active_nav == 'routing' %} is-active{% endif %}">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           Routing / stages
+        </a>
+        <a href="{{ url_for('production_output.production_output_list') }}" class="nav-link{% if active_nav == 'production_output' %} is-active{% endif %}">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Production output
         </a>
         <a href="#" class="nav-link">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>

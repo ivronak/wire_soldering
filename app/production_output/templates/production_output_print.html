@@ -1,0 +1,67 @@
+{% extends "print_base.html" %}
+{# Production output / batch slip: Nrupex letterhead. Raw material used (lot-wise), Good / Rework / Scrap, cost #}
+{% set doc_title = 'Production output ' ~ output.output_no %}
+{% set back_url = url_for('production_output.production_output_list', tab='recorded') %}
+{% set eyebrow = 'Production output · batch slip' %}
+{% set docno = output.output_no %}
+{% set status = output.status %}
+{% block sheet_body %}
+    {% set unit = order.product.base_unit.code if order.product and order.product.base_unit else '' %}
+    <div class="meta">
+      <div><span class="lbl">Output date</span><span class="val">{{ output.output_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Batch no.</span><span class="val">{{ output.batch_no }}</span></div>
+      <div><span class="lbl">Production order</span><span class="val">{{ order.prod_no }}</span></div>
+      <div><span class="lbl">Recorded by</span><span class="val">{{ output.recorded_by or '—' }}</span></div>
+    </div>
+    <div class="supplier">
+      <span class="lbl">Product</span>
+      <strong>{{ order.product.name if order.product else '—' }}</strong>
+      <p>{{ order.product.code if order.product else '' }} · {{ '%g'|format(order.planned_qty) }} {{ unit }} ordered</p>
+      {% if order.product and order.product.attributes %}
+      <div class="chips" style="margin-top:6px">{% for k, v in order.product.attributes.items() %}<span><b>{{ k }}</b><i>{{ v }}</i></span>{% endfor %}</div>
+      {% endif %}
+    </div>
+
+    <div class="sec">What came out</div>
+    <table class="lines">
+      <thead><tr><th>Result</th><th class="num">Quantity</th><th>Goes to</th></tr></thead>
+      <tbody>
+        <tr><td class="mat-name">Good</td><td class="num amt">{{ '%g'|format(output.good_qty) }} {{ unit }}</td><td>Finished goods (batch {{ output.batch_no }})</td></tr>
+        <tr><td class="mat-name">Rework</td><td class="num">{{ '%g'|format(output.rework_qty) }} {{ unit }}</td><td>Noted for rework</td></tr>
+        <tr><td class="mat-name">Scrap</td><td class="num">{{ '%g'|format(output.scrap_qty) }} {{ unit }}</td><td>Scrap yard</td></tr>
+      </tbody>
+    </table>
+
+    <div class="sec">Raw material used</div>
+    <table class="lines">
+      <thead><tr><th>Material</th><th>Lot</th><th class="num">Quantity</th><th class="num">Value</th></tr></thead>
+      <tbody>
+        {% for c in consumed %}
+        <tr>
+          <td><span class="mat-name">{{ c.material.name if c.material else '—' }}</span><span class="mat-sub">{{ c.material.code if c.material else '' }}</span></td>
+          <td>{{ c.lot.lot_code if c.lot else '' }}{% if c.lot and c.lot.vendor_batch_no %} · {{ c.lot.vendor_batch_no }}{% endif %}</td>
+          <td class="num">{{ '%g'|format(c.qty) }} {{ c.material.base_unit.code if c.material and c.material.base_unit else '' }}</td>
+          <td class="num">₹{{ '{:,.2f}'.format(c.value) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No material lines</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="close">
+      <div class="side">
+        {% if output.remarks %}<div class="remarks"><span class="lbl">Remarks</span><p>{{ output.remarks }}</p></div>{% endif %}
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs">
+          <div class="sign"><div class="name">{{ output.recorded_by or '' }}</div><div class="line">Recorded by (production)</div></div>
+          <div class="sign"><div class="name"></div><div class="line">Checked by (stores)</div></div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Raw material used</span><span>₹{{ '{:,.2f}'.format(output.total_value) }}</span></div>
+        <div class="row"><span>Good quantity</span><span>{{ '%g'|format(output.good_qty) }} {{ unit }}</span></div>
+        <div class="grand"><span>Cost per {{ unit or 'unit' }}</span><span>₹{{ '{:,.2f}'.format(output.unit_cost) }}</span></div>
+      </div>
+    </div>
+{% endblock %}

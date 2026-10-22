@@ -460,6 +460,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** Plan (stages, machines, ghante) pehle se order par snapshot hai; actual usi ke saath rakhne se plan vs actual seedha dikhta hai, alag table ki zaroorat nahi.
 **How to apply:** Production output / Scrap module banate waqt stage ka `scrap_qty` aur `qty_out` (aakhri stage) input maano. Overlapping stages (pipeline) chahiye to start rule `_previous_stages` (routing/routes.py) me badlo.
 
+### Decision: Production output — RM consumption, FG cost, one output per order (2026-10-22)
+**Date:** 2026-10-22
+**Kya:** Output post par order ka WIP me bacha poora RM `CONSUME` ho jaata hai (lot-wise, WIP average value). FG cost per unit = kul consumed value / Good qty. Scrap batch value 0. Ek order = ek Posted output; order Completed. Rework sirf record.
+**Kyun:** User ne recommended defaults chune (FG output par, Good / Rework / Scrap, cost Good par, automatic consumption). Non-tech users ke liye kam fields aur routing se pre-fill.
+**How to apply:** FG / Scrap ke liye alag ledger (`fg_batches` / `fg_movements`) — RM ledger (`stock_lots` / `stock_movements`) me product mat daalo. Sales dispatch `FGMovement` (type DISPATCH) likhega; tab output cancel guard khud kaam karega. Variance module `CONSUME` rows se actual lega.
+
 ---
 
 ## Session Log

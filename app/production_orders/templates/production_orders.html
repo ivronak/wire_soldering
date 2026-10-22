@@ -123,6 +123,7 @@
   {% if o.status == 'In production' %}<span class="po-chip run"><i></i>In production</span>
   {% elif o.status == 'Released' %}<span class="po-chip rel"><i></i>Released</span>
   {% elif o.status == 'Draft' %}<span class="po-chip draft"><i></i>Draft</span>
+  {% elif o.status == 'Completed' %}<span class="po-chip ok"><i></i>Completed</span>
   {% else %}<span class="po-chip gone"><i></i>{{ o.status }}</span>{% endif %}
 {% endmacro %}
 
@@ -163,6 +164,12 @@
       <div class="po-scol">
         {% if o.status == 'Cancelled' %}
         <div class="po-meta">Cancelled {{ o.cancelled_at.strftime('%d %b %Y') if o.cancelled_at else '' }}</div>
+        {% elif o.status == 'Completed' %}
+        {% set out = (o.outputs | selectattr('status', 'equalto', 'Posted') | list | last) if o.outputs else None %}
+        {% if out %}<div class="po-dates" style="font-size:13px">{{ '%g'|format(out.good_qty) }} good</div>
+        <div class="po-meta">{{ out.output_date.strftime('%d %b %Y') }} · batch {{ out.batch_no }}</div>
+        <div class="po-meta">scrap {{ '%g'|format(out.scrap_qty) }} · ₹{{ out.unit_cost|inr }} each</div>
+        <a href="{{ url_for('production_output.production_output_list', tab='recorded') }}" class="po-meta" style="color:#8A4A1C;font-weight:600;text-decoration:none">See output →</a>{% endif %}
         {% elif sc %}
         <div class="po-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
         <div class="po-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · ~{{ (o.planned_hours or 0)|round(0)|int }} h</div>
@@ -277,6 +284,7 @@
   <div class="po-tabs">
     <a href="{{ url_for('production_orders.production_orders_list', tab='open') }}" class="{{ 'on' if tab == 'open' else '' }}">Queue<span>{{ open_count }}</span></a>
     <a href="{{ url_for('production_orders.production_orders_list', tab='timeline') }}" class="{{ 'on' if tab == 'timeline' else '' }}">Timeline</a>
+    <a href="{{ url_for('production_orders.production_orders_list', tab='completed') }}" class="{{ 'on' if tab == 'completed' else '' }}">Completed<span>{{ completed_count }}</span></a>
     <a href="{{ url_for('production_orders.production_orders_list', tab='cancelled') }}" class="{{ 'on' if tab == 'cancelled' else '' }}">Cancelled<span>{{ cancelled_count }}</span></a>
   </div>
   {% if tab == 'timeline' %}
@@ -337,8 +345,8 @@
 
   {% elif not orders %}
     <div class="po-empty">
-      <h3>{{ 'No cancelled orders' if tab == 'cancelled' else 'The queue is empty' }}</h3>
-      <p>{{ 'Cancelled orders will be listed here.' if tab == 'cancelled' else 'Create a production order from a product recipe. It will join the end of the queue.' }}</p>
+      <h3>{{ 'No cancelled orders' if tab == 'cancelled' else ('No completed orders yet' if tab == 'completed' else 'The queue is empty') }}</h3>
+      <p>{{ 'Cancelled orders will be listed here.' if tab == 'cancelled' else ('An order is completed when you record its production output.' if tab == 'completed' else 'Create a production order from a product recipe. It will join the end of the queue.') }}</p>
     </div>
   {% else %}
     {% set running = orders | selectattr('status', 'equalto', 'In production') | list %}
@@ -348,7 +356,7 @@
     {% for o in running %}{{ order_card(o) }}{% endfor %}
     {% endif %}
     {% if waiting %}
-    <div class="po-group">{{ 'Cancelled' if tab == 'cancelled' else 'Waiting in the queue' }} <b>{{ waiting|length }}</b></div>
+    <div class="po-group">{{ 'Cancelled' if tab == 'cancelled' else ('Completed' if tab == 'completed' else 'Waiting in the queue') }} <b>{{ waiting|length }}</b></div>
     {% for o in waiting %}{{ order_card(o) }}{% endfor %}
     {% endif %}
   {% endif %}

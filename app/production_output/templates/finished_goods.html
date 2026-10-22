@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Finished goods{% endblock %}
+
+{% block page_css %}
+<style>
+  .fg-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .fg-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .fg-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .fg-kpi .h { font-size: 12px; color: #6B7F82; }
+  .fg-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .fg-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .fg-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .fg-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; }
+  .fg-row { display: grid; grid-template-columns: minmax(210px, 1.4fr) minmax(190px, 1.2fr) minmax(130px, .8fr) minmax(170px, 1fr) minmax(130px, .8fr); gap: 16px; align-items: center; padding: 13px 16px; }
+  .fg-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .fg-prod { font-size: 13.5px; color: #1C2B2D; }
+  .fg-meta { font-size: 12px; color: #6B7F82; }
+  .fg-qty { font-size: 22px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .fg-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .fg-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .fg-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .fg-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .fg-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .fg-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .fg-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) { .fg-row { grid-template-columns: 1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Finished goods</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Finished goods</h1>
+  <p class="text-[13px] text-ink-faint">Goods that production has made, batch by batch. Each batch comes from one production order and keeps its own cost. Sales will take goods from these batches.</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-3 gap-3 shrink-0">
+  <div class="fg-kpi"><span class="k">{{ 'Batches in stock' if tab == 'fg' else 'Scrap lots' }}</span><span class="v">{{ kpi.batches }}</span><span class="h">with goods left</span></div>
+  <div class="fg-kpi"><span class="k">{{ 'Goods in stock' if tab == 'fg' else 'Scrap in stock' }}</span><span class="v">{{ '%g'|format(kpi.qty) }}</span><span class="h">total quantity</span></div>
+  <div class="fg-kpi"><span class="k">Stock value</span><span class="v">₹{{ kpi.value|inr }}</span><span class="h">{{ 'at production cost' if tab == 'fg' else 'scrap is valued at zero' }}</span></div>
+</div>
+
+<div class="shrink-0">
+  <div class="fg-tabs">
+    <a href="{{ url_for('production_output.finished_goods_list', tab='fg') }}" class="{{ 'on' if tab == 'fg' else '' }}">Finished goods</a>
+    <a href="{{ url_for('production_output.finished_goods_list', tab='scrap') }}" class="{{ 'on' if tab == 'scrap' else '' }}">Scrap yard</a>
+  </div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {% for r in rows %}
+  {% set b = r.batch %}
+  <article class="fg-card">
+    <div class="fg-row">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="fg-no">{{ b.batch_no }}</span>
+          {% if r.qty > 0.00005 %}<span class="fg-chip ok"><i></i>In stock</span>{% else %}<span class="fg-chip gone"><i></i>Used up</span>{% endif %}</div>
+        <div class="fg-prod mt-0.5">{{ b.product.name if b.product else '—' }}</div>
+        <div class="fg-meta">From {{ r.order.prod_no }} · made {{ b.mfg_date.strftime('%d %b %Y') }}</div>
+      </div>
+      <div><div class="fg-qty">{{ '%g'|format(r.qty) }} <span class="text-[13px] font-semibold text-ink-faint">{{ b.unit_code }}</span></div>
+        <div class="fg-meta">{{ '%g'|format(r.made) }} {{ b.unit_code }} were made</div></div>
+      <div><div class="fg-meta">Cost per {{ b.unit_code or 'unit' }}</div><div class="text-[14px] font-semibold">₹{{ b.unit_cost|inr }}</div></div>
+      <div><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold">₹{{ r.value|inr }}</div></div>
+      <div><div class="fg-meta">Kept in</div><div class="text-[13px]">{{ r.where }}</div></div>
+    </div>
+  </article>
+  {% else %}
+  <div class="fg-empty">
+    <h3>{{ 'No finished goods yet' if tab == 'fg' else 'No scrap recorded yet' }}</h3>
+    <p>{{ 'Record a production output and the good goods will appear here as a batch.' if tab == 'fg' else 'Scrap from production outputs is listed here.' }}</p>
+    <p class="mt-3"><a href="{{ url_for('production_output.production_output_list') }}" class="text-copper-text font-semibold hover:underline">Go to Production output →</a></p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

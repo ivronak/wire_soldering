@@ -1689,3 +1689,86 @@ class ProductionOrderStageMachine(CreatedAtMixin, db.Model):
     # Routing tracker: plan me thi (True) ya stage chalate waqt kisi doosri machine ko jod diya (False); aur asli me use hui ya nahi
     is_planned = db.Column(db.Boolean, default=True, server_default="1", nullable=False)
     used = db.Column(db.Boolean, default=False, server_default="0", nullable=False)
+
+
+
+# ======================= Production output + Finished goods (FG) =======================
+class ProductionOutput(CreatedAtMixin, db.Model):
+    # Order ke saare stages poore hone par ek baar likhta hai: kitna Good / Rework / Scrap nikla. Post par: RM WIP se "use" ho jaata hai,
+    # Good maal FG warehouse me aur Scrap, Scrap warehouse me aata hai, aur order "Completed" ho jaata hai. Posted -> Cancelled (ulti rows).
+    __tablename__ = "production_outputs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    output_no = db.Column(db.String(20), unique=True, nullable=False)           # OUT-2026-001
+    batch_no = db.Column(db.String(30), unique=True, nullable=False)            # BATCH-WS-20261022-001 (FG ka batch)
+
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=False)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id], backref="outputs")
+
+    output_date = db.Column(db.Date, nullable=False)
+    good_qty = db.Column(db.Float, nullable=False)                               # order ki unit me (KG / roll ...)
+    rework_qty = db.Column(db.Float, default=0, nullable=False)                  # abhi sirf record (dobara kaam ke liye); stock nahi banta
+    scrap_qty = db.Column(db.Float, default=0, nullable=False)
+    total_value = db.Column(db.Float, default=0, nullable=False)                 # WIP se use hue RM ki kul value (Rs)
+    unit_cost = db.Column(db.Float, default=0, nullable=False)                   # total_value / good_qty
+    recorded_by = db.Column(db.String(60), nullable=True)
+    remarks = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(12), default="Posted", nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class FGBatch(CreatedAtMixin, db.Model):
+    # Ek batch = ek output ka Good maal (kind "FG") ya Scrap (kind "SCRAP"). Qty ka balance FGMovement ke SUM se, yahan store nahi.
+    __tablename__ = "fg_batches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_no = db.Column(db.String(34), unique=True, nullable=False)
+    kind = db.Column(db.String(8), default="FG", nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product = db.relationship("Product", foreign_keys=[product_id])
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=False)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id])
+    output_id = db.Column(db.Integer, db.ForeignKey("production_outputs.id"), nullable=False)
+    output = db.relationship("ProductionOutput", foreign_keys=[output_id], backref="batches")
+    mfg_date = db.Column(db.Date, nullable=False)
+    unit_cost = db.Column(db.Float, default=0, nullable=False)
+
+    @property
+    def balance(self):
+        row = db.session.query(db.func.coalesce(db.func.sum(FGMovement.qty), 0), db.func.coalesce(db.func.sum(FGMovement.value), 0)).filter(
+            FGMovement.batch_id == self.id).one()
+        return round(row[0], 4), round(row[1], 2)
+
+    @property
+    def unit_code(self):
+        return self.product.base_unit.code if self.product and self.product.base_unit else ""
+
+
+class FGMovement(CreatedAtMixin, db.Model):
+    # FG / Scrap stock ki ledger (RM ki stock_movements jaisi): signed qty + value, kabhi UPDATE / DELETE nahi, galti = ulti row.
+    __tablename__ = "fg_movements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey("fg_batches.id"), nullable=False)
+    batch = db.relationship("FGBatch", foreign_keys=[batch_id], backref="movements")
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
+    movement_date = db.Column(db.Date, nullable=False)
+    movement_type = db.Column(db.String(20), nullable=False)                      # OUTPUT_IN (aage Sales me DISPATCH ...)
+    qty = db.Column(db.Float, nullable=False)
+    value = db.Column(db.Float, default=0, nullable=False)
+    ref_type = db.Column(db.String(12), nullable=False)
+    ref_id = db.Column(db.Integer, nullable=False)
+    ref_no = db.Column(db.String(30), nullable=True)
+    reverses_movement_id = db.Column(db.Integer, db.ForeignKey("fg_movements.id"), nullable=True, unique=True)
+    note = db.Column(db.String(255), nullable=True)
+
+
+@event.listens_for(FGMovement, "before_update")
+def _fg_movement_no_update(mapper, connection, target):
+    raise RuntimeError("FG stock rows are never edited. Add a reversing row instead.")
+
+
+@event.listens_for(FGMovement, "before_delete")
+def _fg_movement_no_delete(mapper, connection, target):
+    raise RuntimeError("FG stock rows are never deleted. Add a reversing row instead.")

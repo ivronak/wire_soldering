@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Production output{% endblock %}
+
+{% block page_css %}
+<style>
+  /* Production output UI — queue / routing jaisa card look (copper-teal theme), simple English */
+  .ou-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .ou-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .ou-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .ou-kpi .h { font-size: 12px; color: #6B7F82; }
+  .ou-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .ou-kpi.warn .v { color: #8A4A1C; }
+  .ou-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .ou-kpi.good .v { color: #1F7A4D; }
+  .ou-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .ou-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .ou-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .ou-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
+  .ou-group { padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; }
+  .ou-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 10px; }
+  .ou-card.ready { border-left: 4px solid #1F7A4D; }
+  .ou-row { display: grid; grid-template-columns: minmax(210px, 1.4fr) minmax(220px, 1.5fr) minmax(170px, 1fr) auto; gap: 16px; align-items: center; padding: 14px 16px; }
+  .ou-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .ou-prod { font-size: 13.5px; color: #1C2B2D; }
+  .ou-meta { font-size: 12px; color: #6B7F82; }
+  .ou-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .ou-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .ou-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .ou-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .ou-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .ou-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .ou-nums { display: flex; gap: 18px; }
+  .ou-nums div { text-align: left; }
+  .ou-nums b { display: block; font-size: 17px; color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .ou-nums small { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .ou-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .ou-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .ou-btn.primary:hover { background: #A35522; }
+  .ou-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .ou-btn.ghost:hover { background: #F4F6F5; }
+  .ou-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .ou-btn.danger:hover { background: #FDECEC; }
+  .ou-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .ou-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) { .ou-row { grid-template-columns: 1fr auto; } .ou-row > :nth-child(2), .ou-row > :nth-child(3) { grid-column: 1 / 3; } }
+  .ou-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .ou-box h3 { font-size: 15px; font-weight: 700; color: #0F2F32; margin-bottom: 2px; }
+  .ou-box .sub { font-size: 12.5px; color: #6B7F82; margin-bottom: 10px; }
+  .ou-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .ou-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .ou-input.big { font-size: 20px; font-weight: 700; padding: 10px 12px; }
+  .ou-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 3px; }
+  .ou-help { font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
+  .ou-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ou-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D1D9D8; text-align: left; }
+  .ou-table td { padding: 8px; border: 1px solid #E2E8E7; }
+  .ou-side { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 16px; position: sticky; top: 0; align-self: start; }
+  .ou-side ol { list-style: none; counter-reset: s; padding: 0; margin: 0; }
+  .ou-side li { counter-increment: s; position: relative; padding: 8px 0 8px 32px; font-size: 13.5px; border-bottom: 1px dashed #E1E8E7; }
+  .ou-side li:last-child { border-bottom: 0; }
+  .ou-side li::before { content: counter(s); position: absolute; left: 0; top: 8px; width: 22px; height: 22px; border-radius: 50%; background: #FBF4EE; color: #8A4A1C; border: 1px solid #E8C9A8; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  #ou-modal.hidden { display: none; } #ou-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Production output</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Production output</h1>
+  <p class="text-[13px] text-ink-faint">When every stage of an order is finished, record how much was made. The raw material is marked as used, the good goods go into finished stock, scrap goes to the scrap yard, and the order is completed.</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="ou-kpi {{ 'good' if kpi.ready else '' }}"><span class="k">Ready to record</span><span class="v">{{ kpi.ready }}</span><span class="h">all stages are finished</span></div>
+  <div class="ou-kpi {{ 'warn' if kpi.waiting else '' }}"><span class="k">Still in stages</span><span class="v">{{ kpi.waiting }}</span><span class="h">not finished yet</span></div>
+  <div class="ou-kpi"><span class="k">Outputs recorded</span><span class="v">{{ kpi.recorded }}</span><span class="h">batches made</span></div>
+  <div class="ou-kpi"><span class="k">Value recorded</span><span class="v">₹{{ kpi.value|inr }}</span><span class="h">raw material cost</span></div>
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="ou-tabs">
+    <a href="{{ url_for('production_output.production_output_list', tab='ready') }}" class="{{ 'on' if tab == 'ready' else '' }}">Ready to record<span>{{ kpi.ready }}</span></a>
+    <a href="{{ url_for('production_output.production_output_list', tab='recorded') }}" class="{{ 'on' if tab == 'recorded' else '' }}">Recorded<span>{{ outputs|length }}</span></a>
+  </div>
+  <a href="{{ url_for('production_output.finished_goods_list') }}" class="ou-btn ghost">See finished goods stock →</a>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+{% if tab == 'ready' %}
+  {% for o in ready %}
+  {% set plan = plans[o.id] %}
+  {% set sm = summaries[o.id] %}
+  <article class="ou-card ready">
+    <div class="ou-row">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="ou-no">{{ o.prod_no }}</span><span class="ou-chip ok"><i></i>All {{ sm.total }} stages done</span></div>
+        <div class="ou-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
+        <div class="ou-meta">{{ '%g'|format(o.planned_qty) }} {{ plan.unit }} ordered</div>
+      </div>
+      <div>
+        <div class="text-[13px]">Routing says about <b>{{ '%g'|format(plan.good) }} {{ plan.unit }}</b> came out{% if plan.scrap %} and <b>{{ '%g'|format(plan.scrap) }}</b> was scrap{% endif %}.</div>
+        <div class="ou-meta mt-1">{{ sm.actual_h }} h worked (plan {{ sm.planned_h }} h){% if plan.machines %} · last stage {{ plan.last_stage }} on {{ plan.machines }}{% endif %}</div>
+      </div>
+      <div>{% set bad = plan.materials | selectattr('issued', 'le', 0) | list %}
+        <div class="ou-meta">Material in production</div>
+        <div class="text-[13px] font-semibold">₹{{ (plan.materials | sum(attribute='value'))|inr }}</div></div>
+      <div><button type="button" class="ou-act ou-btn primary" data-plan='{{ plan|tojson }}'>Record output</button></div>
+    </div>
+  </article>
+  {% endfor %}
+  {% if waiting %}
+  <div class="ou-group">Still working through their stages ({{ waiting|length }})</div>
+  {% for o in waiting %}{% set sm = summaries[o.id] %}
+  <article class="ou-card"><div class="ou-row">
+    <div><span class="ou-no">{{ o.prod_no }}</span><div class="ou-prod">{{ o.product.name if o.product else '' }}</div></div>
+    <div class="text-[13px]">{{ sm.done }} of {{ sm.total }} stages done{% if sm.current %} · now: <b>{{ sm.current.stage_name }}</b>{% endif %}</div>
+    <div></div>
+    <div><a href="{{ url_for('routing.routing_list') }}" class="ou-btn ghost">Open Routing</a></div>
+  </div></article>
+  {% endfor %}
+  {% endif %}
+  {% if not ready and not waiting %}
+  <div class="ou-empty"><h3>Nothing to record yet</h3><p>Start an order in the Production queue and finish its stages in Routing / stages. It will appear here when the last stage is done.</p></div>
+  {% elif not ready %}
+  <div class="ou-empty" style="margin-top:12px"><h3>No order has finished all its stages</h3><p>Finish the remaining stages in Routing / stages first.</p></div>
+  {% endif %}
+
+{% else %}
+  {% for x in outputs %}
+  <article class="ou-card {{ 'ready' if x.status == 'Posted' else '' }}" {% if x.status != 'Posted' %}style="opacity:.7"{% endif %}>
+    <div class="ou-row">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="ou-no">{{ x.output_no }}</span>
+          {% if x.status == 'Posted' %}<span class="ou-chip ok"><i></i>Recorded</span>{% else %}<span class="ou-chip gone"><i></i>Cancelled</span>{% endif %}</div>
+        <div class="ou-prod mt-0.5">{{ x.production_order.prod_no }} · {{ x.production_order.product.name if x.production_order.product else '' }}</div>
+        <div class="ou-meta">{{ x.output_date.strftime('%d %b %Y') }} · batch <b>{{ x.batch_no }}</b>{% if x.recorded_by %} · by {{ x.recorded_by }}{% endif %}</div>
+      </div>
+      <div class="ou-nums">
+        <div><b>{{ '%g'|format(x.good_qty) }}</b><small>Good</small></div>
+        <div><b>{{ '%g'|format(x.rework_qty) }}</b><small>Rework</small></div>
+        <div><b>{{ '%g'|format(x.scrap_qty) }}</b><small>Scrap</small></div>
+      </div>
+      <div><div class="ou-meta">Cost</div><div class="text-[13px] font-semibold">₹{{ x.unit_cost|inr }} per {{ x.production_order.product.base_unit.code if x.production_order.product and x.production_order.product.base_unit else 'unit' }}</div>
+        <div class="ou-meta">₹{{ x.total_value|inr }} in total</div></div>
+      <div class="flex gap-2 justify-end">
+        {% if x.status == 'Posted' %}
+        <a href="{{ url_for('production_output.production_output_print', output_id=x.id) }}" target="_blank" class="ou-btn ghost">Print batch slip</a>
+        <form method="post" action="{{ url_for('production_output.production_output_cancel', output_id=x.id) }}" class="js-confirm-submit" data-confirm-title="Cancel output" data-confirm-ok="Cancel output"
+              data-confirm-message="Cancel {{ x.output_no }}? The finished goods and scrap are removed, the raw material goes back to production, and {{ x.production_order.prod_no }} is open again. This only works if none of the batch has been used or sent out.">
+          <button type="submit" class="ou-btn danger">Cancel</button></form>
+        {% endif %}
+      </div>
+    </div>
+  </article>
+  {% else %}
+  <div class="ou-empty"><h3>No output recorded yet</h3><p>Recorded outputs and their batch numbers are listed here.</p></div>
+  {% endfor %}
+{% endif %}
+</div>
+{% endblock %}
+
+{% block modals %}
+<div id="ou-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="ou-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-5xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+      <div><h2 class="text-[17px] font-bold text-ink">Record production output</h2><p id="ou-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <button type="button" id="ou-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
+    </div>
+    <form id="ou-form" method="post" action="{{ url_for('production_output.production_output_add') }}" class="flex-1 overflow-y-auto">
+      <input type="hidden" name="production_order_id" id="ou-order" />
+      <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_310px]">
+        <div class="space-y-4 min-w-0">
+          <section class="ou-box">
+            <h3>1. What came out?</h3>
+            <p class="sub">We filled this from the routing. Change it if the real count is different. Use the same unit as the order (<b id="ou-unit">KG</b>).</p>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div><label class="ou-label">Good *</label><input type="number" step="any" min="0" name="good_qty" id="ou-good" class="ou-input big" required />
+                <p class="ou-help">Ready to sell. This becomes finished goods stock.</p></div>
+              <div><label class="ou-label">Rework</label><input type="number" step="any" min="0" name="rework_qty" id="ou-rework" value="0" class="ou-input big" />
+                <p class="ou-help">Needs to be redone. Only noted for now.</p></div>
+              <div><label class="ou-label">Scrap</label><input type="number" step="any" min="0" name="scrap_qty" id="ou-scrap" value="0" class="ou-input big" />
+                <p class="ou-help">Wasted. Goes to the scrap yard.</p></div>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-3 mt-3">
+              <div><label class="ou-label">Output date *</label><input type="date" name="output_date" id="ou-date" class="ou-input" required /></div>
+              <div><label class="ou-label">Recorded by</label><input type="text" name="recorded_by" id="ou-by" maxlength="60" class="ou-input" /></div>
+              <div><label class="ou-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="ou-input" /></div>
+            </div>
+            <p id="ou-check" class="text-[12.5px] mt-3"></p>
+          </section>
+          <section class="ou-box">
+            <h3>2. Raw material used</h3>
+            <p class="sub">Everything that was given to production for this order is marked as used when you record the output. If some material was not used, return it to the store first (Material issue → Return).</p>
+            <div class="overflow-x-auto rounded-lg"><table class="ou-table">
+              <thead><tr><th>Material</th><th style="text-align:right">Planned</th><th style="text-align:right">Given to production</th><th>Check</th></tr></thead>
+              <tbody id="ou-mats"></tbody></table></div>
+          </section>
+        </div>
+        <aside class="ou-side">
+          <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint mb-1">What happens when you record</div>
+          <ol>
+            <li>The raw material given to production is <b>marked as used</b>.</li>
+            <li><b id="ou-s-good">0</b> good goes into <b>finished goods</b> with its own batch number.</li>
+            <li id="ou-s-scrap-li"><b id="ou-s-scrap">0</b> scrap goes to the <b>scrap yard</b>.</li>
+            <li>The order is marked <b>Completed</b>.</li>
+          </ol>
+          <div class="mt-3 pt-3 border-t border-slate-200">
+            <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Estimated cost</div>
+            <div class="text-[20px] font-bold text-ink" id="ou-s-cost">₹0</div>
+            <div class="text-[12.5px] text-ink-faint">per <span id="ou-s-unit">KG</span> of good goods. Raw material of <b id="ou-s-total">₹0</b> is spread over the good quantity.</div>
+          </div>
+        </aside>
+      </div>
+    </form>
+    <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+      <button type="button" id="ou-cancel" class="ou-btn ghost">Cancel</button>
+      <button type="submit" form="ou-form" class="ou-btn primary" style="padding:8px 22px">Record output</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  function fmt(x) { return String(Math.round(Number(x) * 100) / 100); }
+  function inr(x) { return '₹' + Number(x).toLocaleString('en-IN', {maximumFractionDigits: 2}); }
+  var modal = document.getElementById('ou-modal');
+  var current = null;
+
+  function refresh() {
+    if (!current) return;
+    var good = parseFloat(document.getElementById('ou-good').value) || 0;
+    var rework = parseFloat(document.getElementById('ou-rework').value) || 0;
+    var scrap = parseFloat(document.getElementById('ou-scrap').value) || 0;
+    var total = good + rework + scrap;
+    var totalValue = current.materials.reduce(function (s, m) { return s + m.value; }, 0);
+    document.getElementById('ou-s-good').textContent = fmt(good) + ' ' + current.unit;
+    document.getElementById('ou-s-scrap').textContent = fmt(scrap) + ' ' + current.unit;
+    document.getElementById('ou-s-scrap-li').style.display = scrap > 0 ? 'block' : 'none';
+    document.getElementById('ou-s-unit').textContent = current.unit;
+    document.getElementById('ou-s-total').textContent = inr(totalValue);
+    document.getElementById('ou-s-cost').textContent = good > 0 ? inr(totalValue / good) : '—';
+    var check = document.getElementById('ou-check');
+    if (good <= 0) { check.style.color = '#B42318'; check.textContent = 'Enter the good quantity.'; }
+    else if (total > current.planned * 1.1) { check.style.color = '#B42318'; check.textContent = 'Total (' + fmt(total) + ') is more than 10% above the ordered ' + fmt(current.planned) + ' ' + current.unit + '. Please check.'; }
+    else if (total < current.planned * 0.8) { check.style.color = '#8A4A1C'; check.textContent = 'Total (' + fmt(total) + ') is well below the ordered ' + fmt(current.planned) + ' ' + current.unit + '. That is fine if the order was cut short.'; }
+    else { check.style.color = '#1F7A4D'; check.textContent = 'Total ' + fmt(total) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered.'; }
+  }
+
+  function openOutput(btn) {
+    current = JSON.parse(btn.getAttribute('data-plan'));
+    document.getElementById('ou-order').value = current.order_id;
+    document.getElementById('ou-sub').textContent = current.prod_no + ' · ' + current.product;
+    document.getElementById('ou-unit').textContent = current.unit;
+    document.getElementById('ou-good').value = current.good;
+    document.getElementById('ou-rework').value = 0;
+    document.getElementById('ou-scrap').value = current.scrap;
+    document.getElementById('ou-by').value = current.operator || '';
+    var date = document.getElementById('ou-date');
+    date.value = {{ today|tojson }};
+    if (current.min_date) date.min = current.min_date;
+    date.max = {{ today|tojson }};
+    document.getElementById('ou-mats').innerHTML = current.materials.map(function (m) {
+      var diff = m.issued - m.planned;
+      var tol = Math.max(m.planned * 0.05, 0.0001);
+      var chip = diff > tol ? '<span class="ou-chip warn"><i></i>' + fmt(diff) + ' more than planned</span>'
+               : (diff < -tol ? '<span class="ou-chip warn"><i></i>' + fmt(-diff) + ' less than planned</span>' : '<span class="ou-chip ok"><i></i>As planned</span>');
+      return '<tr><td><b>' + esc(m.name) + '</b><div class="ou-meta">' + esc(m.code) + '</div></td><td style="text-align:right">' + fmt(m.planned) + ' ' + esc(m.unit) + '</td><td style="text-align:right"><b>' + fmt(m.issued) + '</b> ' + esc(m.unit) + '</td><td>' + chip + '</td></tr>';
+    }).join('');
+    refresh();
+    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
+  }
+  function closeOutput() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+  document.querySelectorAll('.ou-act').forEach(function (b) { b.addEventListener('click', function () { openOutput(b); }); });
+  ['ou-close', 'ou-cancel', 'ou-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeOutput); });
+  ['ou-good', 'ou-rework', 'ou-scrap'].forEach(function (id) { document.getElementById(id).addEventListener('input', refresh); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeOutput(); });
+</script>
+{% endblock %}

@@ -165,16 +165,19 @@ def _planner_products():
 def production_orders_list():
     # Open = queue me saare orders (Draft / Released / In production), Cancelled = alag tab (aage Completed bhi yahin judega)
     tab = request.args.get("tab", "open")
-    if tab not in ("open", "timeline", "cancelled"):
+    if tab not in ("open", "timeline", "completed", "cancelled"):
         tab = "open"
     by = "machine" if request.args.get("by") == "machine" else "order"
     base = ProductionOrder.query.filter(ProductionOrder.is_deleted == False)
     open_count = base.filter(ProductionOrder.status.in_(OPEN_STATUSES)).count()
     cancelled_count = base.filter(ProductionOrder.status == "Cancelled").count()
+    completed_count = base.filter(ProductionOrder.status == "Completed").count()
     # Queue + schedule + raw material ka live hisaab ek hi baar: list isi se dikhti hai
     queue, materials, schedule = live_schedule()
     if tab == "cancelled":
         orders = base.filter(ProductionOrder.status == "Cancelled").order_by(ProductionOrder.id.desc()).all()
+    elif tab == "completed":
+        orders = base.filter(ProductionOrder.status == "Completed").order_by(ProductionOrder.id.desc()).all()
     else:
         orders = queue
     today = today_ist()
@@ -247,6 +250,7 @@ def production_orders_list():
         tab=tab,
         open_count=open_count,
         cancelled_count=cancelled_count,
+        completed_count=completed_count,
         total_count=len(orders),
         result_count=len(orders),
         schedule=schedule,
