@@ -410,7 +410,7 @@
   // QC parameter ki limit ke andar ka ek theek maap (demo me sab test pass)
   function goodFromLimits(min, max) {
     if (min !== null && max !== null) return Math.round((min + max) / 2 * 1000) / 1000;
-    if (min !== null) return min + 1;
+    if (min !== null) return Math.round((min + Math.max(0.1, Math.abs(min) * 0.002)) * 1000) / 1000;     // sirf Min ho to thoda upar (purity 99.5 -> 99.7)
     if (max !== null) return max > 0 ? max / 2 : max - 1;
     return 1;
   }
