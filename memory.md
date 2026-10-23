@@ -478,6 +478,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User chahta tha ki website par hi ek-ek cheez ka tour ho, steps asli me karke, Gujarati me, non-tech users ke liye.
 **How to apply:** Naya module aaye to uska chapter `tour.js` me jodo aur `tour_test.py` (paths / selectors check) chalao. Tour asli data banata hai — live par sirf training ke liye. Selectors / ids badlo (jaise `#mo-form`, `.po-chev`) to tour toot sakta hai — `tour_test.py` ki selector list update karo.
 
+### Decision: Live ERP ka test data reset (transactions hard-delete, masters soft-delete) (2026-10-23)
+**Date:** 2026-10-23
+**Kya:** Live portal par test transactions (PO/GRN/QC/bill/return/production order/stock) hata diye aur masters me test junk soft-delete; script `scripts/live_data_reset.py`, backup ke baad.
+**Kyun:** User ko live par real jaisa, kam data (har master me 1-3 entry) chahiye tha taaki client ko demo dikhe; "no hard delete" rule masters / business history par hai — yahan user ne khud test transactions reset ka option chuna.
+**How to apply:** Asli client data aane ke baad ye script kabhi live par mat chalao. Demo ke baad live saaf karna ho to script dobara (idempotent) — pehle backup lo.
+
 ### Decision: Demo ab Purchase Order se shuru hota hai, opening stock nahi (2026-10-22)
 **Date:** 2026-10-22
 **Kya:** Demo ka stock ab **PO -> GRN -> Inward QC -> Purchase bill** se aata hai (naya chapter `procure`, 34 steps); Opening stock demo me sirf end me samjhaya jaata hai. Inward QC me pehla lot poora manual, baaki lots ek shortcut button se (wahi route, sab test pass). Post bill ka confirm popup player khud accept karta hai.
