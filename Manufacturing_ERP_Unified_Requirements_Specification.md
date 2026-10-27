@@ -826,3 +826,61 @@ All modules stay data-connected so no transaction is ever manually re-entered ac
 | §10.10 | Printed document footer with "Created By" / "Approved By" attribution |
 | §10.11 | Visitor Gate Pass |
 | §10.12 | Recipe-based product formulation (alloy ratio per product; drives production material requirement) |
+
+---
+
+## 28. Addendum — Client Meeting Round 3 (2026-10-26)
+
+**Source:** two meeting recordings with the client (transcript + change list: `erp_client_meeting_gujarati_transcript_and_changes.md`, received 2026-10-27). Twelve changes. Status of each is tracked in `development.md` §14 and `tracker.md`. The client asked that every future idea be sent as a PDF in the WhatsApp group so nothing is forgotten.
+
+### 28.1 Production Line Master (new master)
+- A **Line** = one complete set of the 8 stages with its own machines. A machine belongs to exactly one line; new lines get new machines. Each line has a **daily capacity (KG/day)** and an operator/handler.
+- When an order moves from the Production Queue to Process, the system asks **which line**, showing each line's live status: current order, pending quantity, days busy, when it frees up. Moving an order to another line stays possible.
+- If a line's committed quantity is below its capacity (e.g. 150 of 200 KG), the user must either add another order / own-stock / sample for the gap or enter a **mandatory under-capacity reason**.
+- Future: line-wise and operator-wise **performance report**; better orders go to the better line/operator.
+
+### 28.2 Packing Material in the Product Master
+- Product Master gets a third recipe section **Packing Material** (after Base Metal and Core Flux): Spool (1 KG / 500 g / 250 g), Sleeve, Corrugated Box (e.g. 20 KG capacity).
+- Example: 500 KG order of a 1 KG-spool product → 500 spools and 25 boxes calculated automatically; shortage shows as **Need to Buy** in the Production Queue.
+
+### 28.3 30-Day Forward Material Planning (MRP)
+- Material check must look at the whole queue for the next 30 days: current stock + pending POs (with expected reach date) - all earlier queued orders = surplus/shortfall **per material per date**.
+- Per-supplier lead time (15-20 days) → alert **"place the PO before <date>"**, and an option to raise one consolidated PO for several queued orders.
+
+### 28.4 Blind Production Order (party name hidden)
+- The plant never sees the customer name: production order print/slip and plant screens carry only the **Production Order Number** (the sticker that travels with the goods). Customer name is visible only to Office, Sales and Accounts.
+- Main action buttons (Release, Print, ...) are shown directly on the screen, not hidden in menus.
+
+### 28.5 Material Issue (FIFO) and Return
+- Partial issue is allowed (metal and flux can start without spools/boxes). Issue is **FIFO by GRN lot**; the slip prints lot-wise quantities. Return is lot-wise with a reason; a returned lot is skipped on re-issue and the next FIFO lot is used.
+
+### 28.6 Flux Preparation vs Melting; Furnace Batching
+- **Flux Preparation** shows only the flux (2% → 10 KG for a 500 KG order) and its chemicals (up to ~10 types). **Tin and Lead are inputs of Melting & Alloying**, not of flux preparation.
+- **Furnace capacity batching:** an order larger than the furnace capacity (e.g. 100/200 KG per hour) is dispatched to the furnace in lots of that size, not all at once.
+
+### 28.7 In-Process Lab QC and Test Certificate (TC)
+- After melting (about an hour of stirring) a sample ingot goes to the lab. If the alloy is off by 1-2 KG, material is added and re-tested; the added quantity counts in Planned-vs-Actual variance and costing.
+- **Hard gate:** the batch cannot move to Ingot Casting until the lab QC-OK report / **TC is uploaded**. The TC stays linked to the lot and the party order forever (lot → TC, and party order → TC).
+
+### 28.8 Single-Entry Scrap; Casting, Extrusion, 3-Machine Drawing, Scrap Barcode
+- The operator enters **only scrap** per stage; good output = input - scrap (computed). Melting scrap (dross/slag) is recorded only after the crucible is emptied into the molds; later stages produce scrap only for rejected material.
+- Ingot Casting weights are in **KG**. Extrusion turns the billet into a continuous 10-16 mm bar. **Wire Drawing = 3 machines in a line** (e.g. 12 mm → 3 mm → 1 mm → 0.8 mm). Spooling keeps raw packing (large drum) and final packing as separate stages for now.
+- **Scrap barcode:** scrap is packed per batch or per day, barcoded, and put in the Scrap Yard, so stage, batch and operator of the scrap are traceable; sold/written off in bulk later.
+
+### 28.9 Cost Secrecy and Daily Fixed Overheads
+- Raw material prices and finished-goods cost per KG are visible **only to the Owner / main Admin** (role permission); hidden from salesmen and plant staff.
+- A **daily fixed overhead** setting (staff salary, security, electricity, maintenance, miscellaneous - e.g. INR 10,000/day regardless of output) is added to production cost. Later it will come automatically from HR/Accounts inside this same software (lead generation, CRM, HR, accounts all stay in one product).
+
+### 28.10 Tally-Style Finished-Goods Inventory and Rack Management
+- FG list shows **product item + total quantity only**; expanding an item shows batch-wise detail, which party's order it belongs to, and **Own Stock** (free surplus, e.g. 50 KG made beyond a 150 KG order) that can be given to an urgent request.
+- **Racks** (A, B, C, D / 1, 2, 3) for raw material and finished goods: at GRN or FG receipt the system asks which rack the goods go to, so a lot is always locatable.
+- Alerts: Out of Stock (red), Below Minimum, **Overstock** (above the maximum).
+
+### 28.11 Quotation Revisions and Finalize → Production Queue
+- Sales starts with **Quotation**; opening a party shows all quotations of the year (party history). Revisions (price 500 → 350, terms, delivery, quality, TC, packing) are tracked **inside the same quotation number** with dates.
+- **Finalize Quotation** asks for the party's own PO number, PO copy upload, final rate, payment and delivery terms, and creates the Production Order in the queue directly (no double entry); the production side only verifies and OKs.
+
+### 28.12 Loss Approval Gate, Flexible Dispatch and All-in-One Billing
+- If actual cost per unit is above the quoted/billed price by even INR 1 (e.g. quoted 200, cost 250), the Sales Invoice is **blocked until the Owner/main Admin approves**.
+- At dispatch the quantity is editable (default = order quantity): partial dispatch keeps the balance pending; extra dispatch pulls from free stock.
+- Final billing generates **Sales Invoice, Packing List, E-Invoice and E-Way Bill together**.

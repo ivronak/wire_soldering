@@ -517,3 +517,38 @@ This wasn't just the 12 client-meeting items — real scope grew along the way. 
 **Production output ke 3 faisle abhi khule** (user ne jawab nahi diya): (a) FG kab aaye — output post karte hi (recommended) ya pehle batch QC; (b) output me kya — Good / Scrap / Rework / machine + operator; (c) FG ki cost — issue hue RM ki value Good maal par baant do (recommended) ya scrap ko bhi value.
 
 **Kaam ka tareeka ab:** user ke kehne par Claude seedha module banata hai (Manual Learning Mode ka scoped exception, `CLAUDE.md` §0A) — har module: models + migration → stock / paisa ke rules ek jagah (`app/inventory/posting.py`, `app/purchase_invoices/posting.py`) → routes + page → test (DB ki copy par) → `tracker.md` → GitHub push → server update (`update_live.sh`: backup + staging + migrate + health + auto-rollback).
+
+---
+
+## 14. Client Meeting Round 3 (2026-10-26) — 12 Changes (added 2026-10-27)
+
+**Source:** `erp_client_meeting_gujarati_transcript_and_changes.md` (Downloads) → written up as spec §28. Nothing below is built yet; this is the plan.
+
+### 14.1 Status of each change
+| # | Change | Already in the system | Still to build |
+|---|---|---|---|
+| 1 | Production **Line Master** (Line 1/2/3, capacity, machines, live status, under-capacity reason, performance report) | 8 stages + machines + KG/hr per machine, queue scheduler | New `lines` master; machine → one line; line pick when moving Queue → Process; live line status; mandatory reason when below capacity; scheduler per line |
+| 2 | **Packing Material** section in Product Master | "Extra material" lines on a production order (manual), Need to Buy check | Recipe section Packing Material (spool / sleeve / box with per-pack quantity), auto quantity from order KG, include in Need to Buy |
+| 3 | **30-day forward MRP** + PO-by-date alert | Queue-wise RM check (soft reservation by queue order) | Pending POs with expected reach date in the check, supplier lead time, "order before <date>", consolidated PO |
+| 4 | **Blind production order** (no party name) + buttons visible | Production order print has no customer today (Sales not built) | Enforce when Sales order → production order is built; show Release / Print buttons directly on cards |
+| 5 | Material Issue FIFO + Return | Lot-wise FIFO issue, partial issue, "Issue all available", return with reason, slips | Verify returned-lot-skip on re-issue; no big build |
+| 6 | **Flux Prep vs Melting** + **furnace batching** | Stage list per product | Stage-wise material input (flux chemicals at Flux Prep; Tin/Lead at Melting); furnace capacity → lots |
+| 7 | **In-process Lab QC + TC gate** | Inward QC (RM) exists; FG batch QC not built | Lab QC step after Melting, material-add during QC (counts in variance), TC upload, hard block before Casting, TC linked to lot + party order |
+| 8 | **Single-entry scrap**, Ingot in KG, 3-machine drawing, scrap barcode | Scrap types master, Saleable / Process-loss, scrap yard; routing form takes qty out AND scrap | Routing form: scrap only, output computed; melting scrap only after casting empty; drawing as 3 machines; scrap pack + barcode |
+| 9 | **Cost secrecy** + **daily fixed overhead** | FG cost = consumed RM / good qty (visible to all - no login yet) | Roles (Phase 0) to hide cost; overhead setting (INR/day) added to cost |
+| 10 | **Tally-style FG view**, Own Stock, **Racks**, Overstock alert | FG batches page, min / reorder alerts | FG list grouped by product with expand; own-stock flag; Rack master + rack pick at GRN / FG receipt; max-stock alert |
+| 11 | **Quotation revisions** → Finalize → Production queue | Customer master only | Sales module (Phase 6) |
+| 12 | **Loss approval gate**, flexible dispatch, all-in-one billing (Invoice + Packing List + E-Invoice + E-Way Bill) | — | Sales module + roles; E-Invoice / E-Way need GST portal API |
+
+### 14.2 Proposed build order (awaiting user's OK, 2026-10-27)
+1. Quick ones: #4 buttons, #2 packing material, #5 verification.
+2. Production core, built together (they affect each other): #1 Line Master, #6 flux / furnace, #7 Lab QC + TC, #8 single-entry scrap.
+3. #10 Tally-style FG + racks, then #3 30-day MRP.
+4. Auth / roles (#9) when Sales starts; then #11, #12.
+
+### 14.3 Open decisions
+- E-Invoice / E-Way Bill: GST portal API access and cost; what comes first.
+- Furnace capacity: set on the Line Master or on the Machine?
+- #8 changes the routing form → the **Gujarati demo tour and audio must be re-recorded** (tour.js steps, narration, mp3) after the build.
+- Rack master scope: per warehouse, capacity needed or only a name?
+- Where does a lab-added material (1-2 KG) get issued from - a separate "additional issue" with reason (also pending from the scrap/variance work)?

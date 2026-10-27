@@ -478,6 +478,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User chahta tha ki website par hi ek-ek cheez ka tour ho, steps asli me karke, Gujarati me, non-tech users ke liye.
 **How to apply:** Naya module aaye to uska chapter `tour.js` me jodo aur `tour_test.py` (paths / selectors check) chalao. Tour asli data banata hai — live par sirf training ke liye. Selectors / ids badlo (jaise `#mo-form`, `.po-chev`) to tour toot sakta hai — `tour_test.py` ki selector list update karo.
 
+### Decision: Client Round 3 (2026-10-26) — nayi business rules jo kabhi todni nahi (2026-10-27)
+**Date:** 2026-10-27
+**Kya:** Client meeting ke 12 changes (spec §28). Pakke rules: (a) **Plant ko party ka naam kabhi nahi dikhna** — production order print / screen par sirf Production Order Number; naam sirf Office / Sales / Accounts. (b) **Cost / price sirf Owner / main Admin** ko; baaki sab ke liye hide. (c) **Single-entry scrap** — operator sirf scrap likhe, good output system nikaale; melting ka scrap sirf casting ke baad (kadhai khali hone par). (d) **Lab QC + TC ke bina batch Ingot Casting me nahi jaa sakta** (hard gate); TC lot + party order se hamesha juda. (e) **Line = 8 stages ka poora set + apni machines; ek machine ek hi line me**; Queue se Process me bhejte waqt line chunni padegi; capacity se kam banao to reason mandatory. (f) **Tin / Lead Melting me jaate hain, Flux Prep me sirf flux + chemicals**; furnace capacity ke hisaab se lots. (g) **FG list Tally jaisi** — product + total qty, andar batch / party / Own Stock. (h) **Loss par sales bill owner approval ke bina nahi** (cost > rate, Rs 1 bhi).
+**Kyun:** Client ka business-secrecy aur cost-control ka tareeka; user ke kehne par spec §28, `development.md` §14 aur tracker me likha.
+**How to apply:** Naya module (Line Master, Lab QC, Sales) banate waqt in rules ko pehle dekho. Jab roles aaye tab (b) enforce karo. #8 se routing form badlega — tab Gujarati demo tour + audio (tour.js, narration, mp3) dobara banana hai. Build order abhi user ke OK ka intezaar.
+
 ### Decision: Live ERP ka test data reset (transactions hard-delete, masters soft-delete) (2026-10-23)
 **Date:** 2026-10-23
 **Kya:** Live portal par test transactions (PO/GRN/QC/bill/return/production order/stock) hata diye aur masters me test junk soft-delete; script `scripts/live_data_reset.py`, backup ke baad.
