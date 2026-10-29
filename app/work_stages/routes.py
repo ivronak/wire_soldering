@@ -35,6 +35,7 @@ def work_stages_add():
     code = generate_next_work_stage_code()
     name = (request.form.get('name') or "").strip()
     sort_order = request.form.get('sort_order') or 0
+    is_batch = request.form.get('is_batch') == 'on'
 
     if not name:
         return redirect(url_for('work_stages.work_stages_list'))
@@ -46,6 +47,7 @@ def work_stages_add():
             existing.code = code
             existing.name = name
             existing.sort_order = sort_order
+            existing.is_batch = is_batch
             existing.is_active = True
             db.session.commit()
             flash("Work Stage restored with this code.","success")
@@ -58,6 +60,7 @@ def work_stages_add():
         code=code,
         name=name,
         sort_order=sort_order,
+        is_batch=is_batch,
         is_active=True,
         is_deleted=False,
     ))
@@ -71,6 +74,7 @@ def work_stages_edit(stage_id):
 
     name = (request.form.get('name') or "").strip()
     sort_order = request.form.get('sort_order') or 0
+    is_batch = request.form.get('is_batch') == 'on'
 
     if not name:
         return redirect(url_for('work_stages.work_stages_list'))
@@ -78,6 +82,7 @@ def work_stages_edit(stage_id):
     # Code ab auto-generated — edit pe immutable
     s.name = name
     s.sort_order = sort_order
+    s.is_batch = is_batch
     db.session.commit()
     flash("Work Stage Updated", "success")
     return redirect(url_for('work_stages.work_stages_list'))

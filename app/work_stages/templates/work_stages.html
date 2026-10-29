@@ -116,6 +116,7 @@
                   <span class="font-medium {% if s.is_active %}text-ink{% else %}text-ink-faint{% endif %}">
                     {{ s.name }}
                   </span>
+                  {% if s.is_batch %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
                 </td>
                 <td class="text-[13px] {% if s.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %} tabular-nums">
                   {{ s.sort_order }}
@@ -138,7 +139,8 @@
                       data-id="{{ s.id }}"
                       data-code="{{ s.code }}"
                       data-name="{{ s.name }}"
-                      data-sort="{{ s.sort_order }}">
+                      data-sort="{{ s.sort_order }}"
+                      data-batch="{{ 1 if s.is_batch else 0 }}">
                       Edit
                     </button>
                     {# Soft-delete — confirm popup = js-confirm-submit (erp-toast.js) #}
@@ -217,6 +219,13 @@
         <input type="number" id="stage-sort" name="sort_order" placeholder="10" min="0" step="10"
           class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         <p class="mt-1 text-[12px] text-ink-faint">Lower number = earlier in the pipeline</p>
+      </div>
+      <div>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" id="stage-batch" name="is_batch" value="on" class="mt-1" />
+          <span><span class="block text-[13px] font-semibold text-ink">Batch stage (furnace type)</span>
+            <span class="block text-[12px] text-ink-faint">The order is processed in lots of the machine capacity (for example a furnace of 100 KG/hour makes 5 lots for a 500 KG order), not all at once.</span></span>
+        </label>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
@@ -320,6 +329,7 @@
     document.getElementById('stage-code').value = btn.getAttribute('data-code') || '';
     document.getElementById('stage-name').value = btn.getAttribute('data-name') || '';
     document.getElementById('stage-sort').value = btn.getAttribute('data-sort') || '';
+    document.getElementById('stage-batch').checked = btn.getAttribute('data-batch') === '1';
     openModal();
   }
 

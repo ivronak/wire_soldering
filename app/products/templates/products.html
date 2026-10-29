@@ -375,7 +375,7 @@
                       data-hsn="{{ p.hsn_code or '' }}"
                       data-tax-rate-id="{{ p.tax_rate_id or '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
-                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }}}{% if not loop.last %},{% endif %}{% endfor %}]'
+                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }}}{% if not loop.last %},{% endif %}{% endfor %}]'
                       data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
@@ -582,6 +582,7 @@
                   <th class="px-2 py-2 w-28">Type</th>
                   <th class="px-2 py-2 w-20">Unit</th>
                   <th class="px-2 py-2 w-28">Ratio %</th>
+                  <th class="px-2 py-2 w-40">Used in stage</th>
                   <th class="px-2 py-2 w-16"></th>
                 </tr>
               </thead>
@@ -1010,7 +1011,7 @@
       return;
     }
     lines.forEach(function (line) {
-      addRecipeLine(line.id, line.ratio);
+      addRecipeLine(line.id, line.ratio, line.stage);
     });
   }
 
@@ -1464,7 +1465,12 @@
   if (variantPreviewQty) variantPreviewQty.addEventListener('input', refreshVariantFlow);
   if (variantUnitWeight) variantUnitWeight.addEventListener('input', refreshVariantFlow);
 
-  function addRecipeLine(rmId, ratio) {
+  // "Used in stage" dropdown: routing stages (Work Stage master se)
+  var stageOptions = [{% for st in routing_stages %}{id: {{ st.id }}, name: {{ st.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+  function stageOptionsHtml() {
+    return '<option value="">Not tied to a stage</option>' + stageOptions.map(function (st) { return '<option value="' + st.id + '">' + st.name + '</option>'; }).join('');
+  }
+  function addRecipeLine(rmId, ratio, stageId) {
     var body = document.getElementById('recipe-body');
     if (!body) return;
     var tr = document.createElement('tr');
@@ -1475,9 +1481,11 @@
       '<td class="px-2 py-2 text-ink-muted recipe-type">—</td>' +
       '<td class="px-2 py-2 font-mono text-[12px] text-ink-muted recipe-unit">—</td>' +
       '<td class="px-2 py-2"><input type="number" name="recipe_ratio[]" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-2"><select name="recipe_stage[]" class="recipe-stage w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + stageOptionsHtml() + '</select></td>' +
       '<td class="px-2 py-2 text-right"><button type="button" class="recipe-remove text-[12px] text-stop hover:underline">Remove</button></td>';
     body.appendChild(tr);
     if (rmId) tr.querySelector('.recipe-rm').value = String(rmId);
+    if (stageId) tr.querySelector('.recipe-stage').value = String(stageId);
     if (ratio !== undefined && ratio !== null && ratio !== '') tr.querySelector('.recipe-ratio').value = ratio;
     renumberRecipe();
   }

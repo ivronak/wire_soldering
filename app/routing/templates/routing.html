@@ -144,7 +144,15 @@
           <tr>
             <td><b>{{ loop.index }}. {{ st.stage_name }}</b></td>
             <td><div>{{ '%.1f'|format(st.planned_hours or 0) }} h{% if st.start_date %} · {{ dshort(st.start_date) }}{% if st.end_date != st.start_date %}–{{ dshort(st.end_date) }}{% endif %}{% endif %}</div>
-              <div class="rt-meta">{% for m in st.machines if m.is_planned %}{{ m.machine_name }}{% if not loop.last %}, {% endif %}{% endfor %}</div></td>
+              <div class="rt-meta">{% for m in st.machines if m.is_planned %}{{ m.machine_name }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+              {% set sp = stage_plan(o, st) %}
+              {% if sp %}
+              <div class="rt-meta rt-stage-mat" style="margin-top:6px;color:#0F2F32"><b>Material for this stage:</b> {% for m in sp.materials %}{{ m.name }} {{ '%g'|format(m.qty) }} {{ m.unit }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+              {% if sp.lots %}
+              <div class="rt-meta rt-lots" style="color:#8A4A1C"><b>Furnace lots:</b> {{ sp.lots|length }} lot{{ 's' if sp.lots|length != 1 else '' }} of up to {{ '%g'|format(sp.lot_kg) }} KG (one lot per hour)
+                {% for lot in sp.lots %}<div>Lot {{ lot.n }}: {{ '%g'|format(lot.kg) }} KG — {% for m in lot.mats %}{{ m.name }} {{ '%g'|format(m.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}</div>
+              {% endif %}
+              {% endif %}</td>
             <td>
               {% if st.status == 'Pending' %}<span class="rt-meta">Not started</span>
               {% else %}

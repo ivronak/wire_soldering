@@ -89,6 +89,8 @@ class WorkStage(CreatedAtMixin, db.Model):
     sort_order = db.Column(db.Integer, default=0, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    # Batch stage (jaise Melting / furnace): order ek saath nahi, machine ki capacity ke hisaab se lots me jaata hai (client change #6)
+    is_batch = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
 
 class RmCategories(CreatedAtMixin, db.Model):
     __tablename__='rm_categories'
@@ -220,6 +222,9 @@ class VariantRecipeItem(CreatedAtMixin, db.Model):
 
     ratio_percent = db.Column(db.Float, nullable=False)
     is_flux = db.Column(db.Boolean, default=False, nullable=False)
+    # Ye material kis stage me daalna hai (Flux -> Flux Preparation, Tin / Lead -> Melting). Khaali = kisi khaas stage se bandha nahi.
+    work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=True)
+    work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
     
 
 class ProductPackingItem(CreatedAtMixin, db.Model):
@@ -775,6 +780,9 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
     is_extra = db.Column(db.Boolean, default=False, nullable=False)
     # True = product ke Packing Material section se aayi line (spool / sleeve / box); qty order KG / kg_per_pack
     is_packing = db.Column(db.Boolean, default=False, nullable=False)
+    # Recipe se copy: ye material kis stage me jaata hai (order par freeze; master badle to purana order na badle)
+    work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=True)
+    work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
 
     @property
     def issued_qty(self):

@@ -370,6 +370,7 @@ def production_orders_add():
             required_qty=batch_kg * (r.ratio_percent or 0) / 100,
             is_flux=bool(r.is_flux),
             is_extra=False,
+            work_stage_id=r.work_stage_id,
         ))
 
     # Packing Material (spool / sleeve / box): har kg_per_pack KG par 1 pack, upar round (500 KG / 20 = 25 box). Master badle to purana order na badle.

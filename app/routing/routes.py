@@ -1,6 +1,7 @@
 # Routing / stages tracker: In production order ke har stage ka ASLI kaam — kisne, kaun si machine, kab se kab tak, kitna maal nikla — plan ke saath.
 # Stage ek ke baad ek chalte hain (Pending -> In progress -> Done). Stage kabhi delete nahi hota; galti ho to sirf aakhri Done stage "Reopen" hota hai.
 # Plan (stages / machines / dates) production_orders me bana hai; yahan sirf asli record aur plan se farak (late / early) dikhta hai.
+import math
 from datetime import datetime, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -21,6 +22,28 @@ def _back(tab="running"):
 
 def order_batch_kg(order):
     return round(order.planned_qty * order.unit_weight, 4)
+
+
+def stage_plan(order, stage):
+    """Is stage me kaunsa material kitna jaata hai, aur batch stage (furnace) ho to kitne lot (client change #6).
+    Material = order ki wo lines jinka work_stage_id is stage ka hai. Lot = machine capacity (KG/hr) ke hisaab se, har lot me material
+    batch ke hisaab se barabar hissa. Dono khaali ho to None (template kuch nahi dikhata)."""
+    lines = [l for l in order.lines if l.work_stage_id and l.work_stage_id == stage.work_stage_id]
+    batch_kg = order_batch_kg(order)
+    mats = [{"name": l.raw_material.name if l.raw_material else "", "qty": round(l.required_qty, 3),
+             "unit": l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else ""} for l in lines]
+    lots = []
+    cap = stage.capacity_per_hour or 0
+    if stage.work_stage and stage.work_stage.is_batch and cap > 0 and batch_kg > 0:
+        count = math.ceil(batch_kg / cap - 1e-9)
+        left = batch_kg
+        for n in range(1, count + 1):
+            kg = round(min(cap, left), 3)
+            left = round(left - kg, 3)
+            lots.append({"n": n, "kg": kg, "mats": [{"name": m["name"], "qty": round(m["qty"] * kg / batch_kg, 3), "unit": m["unit"]} for m in mats]})
+    if not mats and not lots:
+        return None
+    return {"materials": mats, "lots": lots, "lot_kg": cap if lots else None}
 
 
 def order_summary(order, today):
@@ -103,7 +126,7 @@ def routing_list():
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
-        operators=operators, running_count=len(running), done_count=len(finished), today=today,
+        operators=operators, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"),
     )
 

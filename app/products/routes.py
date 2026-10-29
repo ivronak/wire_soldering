@@ -145,9 +145,14 @@ def products_add():
     recipe_rms = (request.form.getlist('recipe_rm_id[]'))
     recipe_ratios = (request.form.getlist('recipe_ratio[]'))
 
-    for rm_id_str, ratio_str in zip(recipe_rms, recipe_ratios):
+    recipe_stages = request.form.getlist('recipe_stage[]')          # har recipe line ka "kis stage me" (khaali = koi nahi)
+    for idx, (rm_id_str, ratio_str) in enumerate(zip(recipe_rms, recipe_ratios)):
         rm_id_str = (rm_id_str or "").strip()
         ratio_str = (ratio_str or "").strip()
+        stage_id = None
+        if idx < len(recipe_stages) and (recipe_stages[idx] or "").strip().isdigit():
+            ws = WorkStage.query.get(int(recipe_stages[idx]))
+            stage_id = ws.id if ws and not ws.is_deleted else None
         
         if rm_id_str and ratio_str:
             try:
@@ -167,6 +172,7 @@ def products_add():
                        raw_material_id=rm.id,
                        ratio_percent=ratio,
                        is_flux=is_flux, 
+                       work_stage_id=stage_id,
                     ))
             except (ValueError, TypeError):
                 continue
@@ -257,9 +263,14 @@ def products_edit(p_id):
     recipe_rms = (request.form.getlist('recipe_rm_id[]'))
     recipe_ratios = (request.form.getlist('recipe_ratio[]'))
 
-    for rm_id_str, ratio_str in zip(recipe_rms, recipe_ratios):
+    recipe_stages = request.form.getlist('recipe_stage[]')          # har recipe line ka "kis stage me" (khaali = koi nahi)
+    for idx, (rm_id_str, ratio_str) in enumerate(zip(recipe_rms, recipe_ratios)):
         rm_id_str = (rm_id_str or "").strip()
         ratio_str = (ratio_str or "").strip()
+        stage_id = None
+        if idx < len(recipe_stages) and (recipe_stages[idx] or "").strip().isdigit():
+            ws = WorkStage.query.get(int(recipe_stages[idx]))
+            stage_id = ws.id if ws and not ws.is_deleted else None
         
         if rm_id_str and ratio_str:
             try:
@@ -279,6 +290,7 @@ def products_edit(p_id):
                        raw_material_id=rm.id,
                        ratio_percent=ratio,
                        is_flux=is_flux, 
+                       work_stage_id=stage_id,
                     ))
             except (ValueError, TypeError):
                 continue
