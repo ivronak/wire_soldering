@@ -30,8 +30,8 @@
         {% set rm = line.raw_material %}
         <tr>
           <td><span class="mat-name">{{ rm.name if rm else '—' }}</span><span class="mat-sub">{{ rm.code if rm else '' }}</span></td>
-          <td>{{ 'Added' if line.is_extra else ('Core flux' if line.is_flux else 'Base metal') }}</td>
-          <td class="num">{{ '' if line.is_extra else ('%.1f'|format(line.ratio_percent) ~ '%') }}</td>
+          <td>{{ 'Added' if line.is_extra else ('Packing' if line.is_packing else ('Core flux' if line.is_flux else 'Base metal')) }}</td>
+          <td class="num">{{ '' if (line.is_extra or line.is_packing) else ('%.1f'|format(line.ratio_percent) ~ '%') }}</td>
           <td class="num amt">{{ '%g'|format(line.required_qty) }} {{ rm.base_unit.code if rm and rm.base_unit else '' }}</td>
           <td class="num">{{ '%g'|format(line.issued_qty) }} {{ rm.base_unit.code if rm and rm.base_unit else '' }}</td>
         </tr>

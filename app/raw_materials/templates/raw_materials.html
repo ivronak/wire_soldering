@@ -156,7 +156,8 @@
                       data-hsn="{{ m.hsn_code or '' }}"
                       data-valuation="{{ m.valuation_method or 'fifo' }}"
                       data-base-metal="{% if m.is_base_metal %}1{% else %}0{% endif %}"
-                      data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}">
+                      data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}"
+                      data-packing="{% if m.is_packing %}1{% else %}0{% endif %}">
                       View
                     </button>
                     <button type="button"
@@ -176,7 +177,8 @@
                       data-tax-rate="{{ m.tax_rate_id or '' }}"
                       data-valuation="{{ m.valuation_method or 'fifo' }}"
                       data-base-metal="{% if m.is_base_metal %}1{% else %}0{% endif %}"
-                      data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}">
+                      data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}"
+                      data-packing="{% if m.is_packing %}1{% else %}0{% endif %}">
                       Edit
                     </button>
                     {# QC tests: inward QC ke test parameters (purity, gauge...) ka panel kholta hai. Count = remove kiye hue parameters ko chhod kar #}
@@ -357,7 +359,7 @@
       <hr class="border-slate-200 !my-4" />
       <p class="form-section-title">Recipe role</p>
       <p class="text-[12px] text-ink-faint -mt-1">Pick one. None means this material is not part of a product recipe.</p>
-      <div class="grid grid-cols-3 gap-2" role="group" aria-label="Recipe role">
+      <div class="grid grid-cols-4 gap-2" role="group" aria-label="Recipe role">
         <button type="button" data-role="none" class="rm-role-btn text-left px-2.5 py-2 rounded border border-copper bg-copper text-white font-semibold">
           <span class="block text-[13px]">None</span>
           <span class="block text-[11px] mt-0.5 opacity-80 font-normal">Not in a recipe</span>
@@ -370,10 +372,15 @@
           <span class="block text-[13px]">Core flux</span>
           <span class="block text-[11px] mt-0.5 opacity-80 font-normal">Flux only</span>
         </button>
+        <button type="button" data-role="packing" class="rm-role-btn text-left px-2.5 py-2 rounded border border-slate-300 bg-white text-ink">
+          <span class="block text-[13px]">Packing</span>
+          <span class="block text-[11px] mt-0.5 opacity-80 font-normal">Spool, sleeve, box</span>
+        </button>
       </div>
       {# Asli values yahi checkboxes submit karte hain — buttons sirf inhe on/off karte hain #}
       <input type="checkbox" id="rm-base-metal" name="is_base_metal" value="on" class="sr-only" tabindex="-1" />
       <input type="checkbox" id="rm-core-flux" name="is_core_flux" value="on" class="sr-only" tabindex="-1" />
+      <input type="checkbox" id="rm-packing" name="is_packing" value="on" class="sr-only" tabindex="-1" />
       <p class="text-[11.5px] text-ink-faint bg-mist border border-slate-200 rounded px-2.5 py-2">
         No price field here — the rate is entered every time on the Purchase Invoice.
       </p>
@@ -566,6 +573,7 @@
     document.getElementById('rm-valuation').value = btn.getAttribute('data-valuation') || 'fifo';
     document.getElementById('rm-base-metal').checked = btn.getAttribute('data-base-metal') === '1';
     document.getElementById('rm-core-flux').checked = btn.getAttribute('data-core-flux') === '1';
+    document.getElementById('rm-packing').checked = btn.getAttribute('data-packing') === '1';
     if (document.getElementById('rm-base-metal').checked && document.getElementById('rm-core-flux').checked) {
       document.getElementById('rm-core-flux').checked = false;
     }
@@ -599,6 +607,7 @@
       viewField('Valuation', valLabel) +
       viewField('Base metal', btn.getAttribute('data-base-metal') === '1' ? 'Yes' : 'No') +
       viewField('Core flux', btn.getAttribute('data-core-flux') === '1' ? 'Yes' : 'No') +
+      viewField('Packing material', btn.getAttribute('data-packing') === '1' ? 'Yes' : 'No') +
       '</div>' +
       '<div class="pt-2">' + viewField('Description', btn.getAttribute('data-description')) + '</div>';
     viewModal.classList.remove('hidden');
@@ -663,11 +672,13 @@
 
   var rmBaseMetal = document.getElementById('rm-base-metal');
   var rmCoreFlux = document.getElementById('rm-core-flux');
+  var rmPacking = document.getElementById('rm-packing');
 
   function syncRecipeRoleUi() {
     var role = 'none';
     if (rmBaseMetal.checked) role = 'base';
     else if (rmCoreFlux.checked) role = 'flux';
+    else if (rmPacking.checked) role = 'packing';
     document.querySelectorAll('.rm-role-btn').forEach(function (btn) {
       var on = btn.getAttribute('data-role') === role;
       btn.classList.toggle('border-copper', on);
@@ -683,6 +694,7 @@
   function setRecipeRole(role) {
     rmBaseMetal.checked = role === 'base';
     rmCoreFlux.checked = role === 'flux';
+    rmPacking.checked = role === 'packing';
     syncRecipeRoleUi();
   }
   document.querySelectorAll('.rm-role-btn').forEach(function (btn) {

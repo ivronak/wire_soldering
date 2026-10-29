@@ -2,7 +2,7 @@ import os
 from werkzeug.utils import secure_filename
 from flask import render_template, Blueprint, redirect, url_for, request, flash
 from sqlalchemy import or_
-from app.models import Product, ProductCategories, Unit, TaxRate, RawMaterial, VariantRecipeItem, WorkStage, ProductRoutingStage
+from app.models import Product, ProductCategories, Unit, TaxRate, RawMaterial, VariantRecipeItem, WorkStage, ProductRoutingStage, ProductPackingItem
 from app.extensions import db
 from datetime import datetime
 
@@ -29,6 +29,10 @@ def products_list():
         RawMaterial.is_active == True,
         or_(RawMaterial.is_base_metal == True, RawMaterial.is_core_flux == True),
     ).order_by(RawMaterial.code).all()
+    # Packing Material dropdown: sirf jin RM pe "Packing" role hai
+    packing_materials = RawMaterial.query.filter(
+        RawMaterial.is_deleted == False, RawMaterial.is_active == True, RawMaterial.is_packing == True,
+    ).order_by(RawMaterial.code).all()
 
     next_code = generate_next_product_code()
 
@@ -43,6 +47,7 @@ def products_list():
         units=units,
         tax_rates=tax_rates,
         recipe_materials=recipe_materials,
+        packing_materials=packing_materials,
         routing_stages=WorkStage.query.filter(WorkStage.is_deleted == False, WorkStage.is_active == True).order_by(WorkStage.sort_order, WorkStage.id).all(),
     )
 
@@ -165,6 +170,23 @@ def products_add():
                     ))
             except (ValueError, TypeError):
                 continue
+
+    # Packing Material (spool / sleeve / box): "har X KG par 1 pack". Edit par purani lines hata ke nayi (recipe jaisa hi tareeka)
+    
+    pk_rms = request.form.getlist('packing_rm_id[]')
+    pk_kgs = request.form.getlist('packing_kg[]')
+    seen_pk = set()
+    for rm_id_str, kg_str in zip(pk_rms, pk_kgs):
+        try:
+            rm = RawMaterial.query.get(int((rm_id_str or '').strip()))
+            kg = float((kg_str or '').strip())
+        except (ValueError, TypeError):
+            continue
+        if not rm or rm.is_deleted or not rm.is_packing or kg <= 0 or rm.id in seen_pk:
+            continue
+        seen_pk.add(rm.id)
+        db.session.add(ProductPackingItem(product_id=product.id, raw_material_id=rm.id, kg_per_pack=kg))
+
     if cat:
         fields = list(cat.attribute_fields or [])
         known = {f.lower() for f in fields}
@@ -260,6 +282,23 @@ def products_edit(p_id):
                     ))
             except (ValueError, TypeError):
                 continue
+
+
+    # Packing Material (spool / sleeve / box): "har X KG par 1 pack". Edit par purani lines hata ke nayi (recipe jaisa hi tareeka)
+    ProductPackingItem.query.filter_by(product_id=p.id).delete()
+    pk_rms = request.form.getlist('packing_rm_id[]')
+    pk_kgs = request.form.getlist('packing_kg[]')
+    seen_pk = set()
+    for rm_id_str, kg_str in zip(pk_rms, pk_kgs):
+        try:
+            rm = RawMaterial.query.get(int((rm_id_str or '').strip()))
+            kg = float((kg_str or '').strip())
+        except (ValueError, TypeError):
+            continue
+        if not rm or rm.is_deleted or not rm.is_packing or kg <= 0 or rm.id in seen_pk:
+            continue
+        seen_pk.add(rm.id)
+        db.session.add(ProductPackingItem(product_id=p.id, raw_material_id=rm.id, kg_per_pack=kg))
 
     if cat:
         fields = list(cat.attribute_fields or [])

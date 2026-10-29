@@ -1,3 +1,4 @@
+import math
 # Production order: product choose karo, qty do, uski recipe is document pe copy ho jati hai.
 # Baad mein product recipe badlegi to purana order nahi badlega.
 import os
@@ -148,6 +149,16 @@ def _planner_products():
                 "ratio": r.ratio_percent,
                 "is_flux": bool(r.is_flux),
             })
+        packing = []
+        for k in p.packing_items:
+            rm = k.raw_material
+            packing.append({
+                "rm_id": k.raw_material_id,
+                "code": rm.code if rm else "",
+                "name": rm.name if rm else "",
+                "unit": rm.base_unit.code if rm and rm.base_unit else "",
+                "kg_per_pack": k.kg_per_pack,
+            })
         planner.append({
             "id": p.id,
             "code": p.code,
@@ -157,6 +168,7 @@ def _planner_products():
             "attributes": p.attributes or {},
             "routing": _routing_for(p),
             "recipe": lines,
+            "packing": packing,
         })
     return products, planner
 
@@ -358,12 +370,26 @@ def production_orders_add():
             is_extra=False,
         ))
 
+    # Packing Material (spool / sleeve / box): har kg_per_pack KG par 1 pack, upar round (500 KG / 20 = 25 box). Master badle to purana order na badle.
+    for k in product.packing_items:
+        if not k.raw_material or k.raw_material.is_deleted or not k.kg_per_pack:
+            continue
+        db.session.add(ProductionOrderLine(
+            production_order_id=order.id,
+            raw_material_id=k.raw_material_id,
+            ratio_percent=0,
+            required_qty=math.ceil(round(batch_kg / k.kg_per_pack, 6)),
+            is_flux=False,
+            is_extra=False,
+            is_packing=True,
+        ))
+
     # Packaging / extra RM recipe ka percent nahi. User jo qty type kare wahi save.
     extra_ids = request.form.getlist("extra_rm_id[]")
     extra_qtys = request.form.getlist("extra_qty[]")
     seen_extra = set()
     # Jo material recipe me pehle se hai wo extra me dobara nahi aa sakta — warna aage "total material required" me double ginega
-    recipe_rm_ids = {r.raw_material_id for r in product.recipe_items}
+    recipe_rm_ids = {r.raw_material_id for r in product.recipe_items} | {k.raw_material_id for k in product.packing_items}
     for rm_raw, qty_raw in zip(extra_ids, extra_qtys):
         rm_raw = (rm_raw or "").strip()
         qty_raw = (qty_raw or "").strip()

@@ -375,7 +375,8 @@
                       data-hsn="{{ p.hsn_code or '' }}"
                       data-tax-rate-id="{{ p.tax_rate_id or '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
-                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
+                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }}}{% if not loop.last %},{% endif %}{% endfor %}]'
+                      data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
                     <form method="post" action="{{ url_for('products.products_delete', p_id=p.id) }}" class="inline-flex js-confirm-submit"
@@ -590,6 +591,29 @@
           <button type="button" id="btn-add-recipe-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add material line</button>
           <p id="recipe-balance" class="mt-2 text-[13px] text-ink-muted">Base metals total: 0% · Flux total: 0%</p>
         </div>
+
+        <hr class="border-slate-200" />
+        <div id="packing-section">
+          <p class="form-section-title">Packing material</p>
+          <p class="text-[12px] text-ink-faint -mt-1 mb-2">Spool, sleeve and box used for this product. Enter how many KG of finished wire go into <b>one</b> pack — a 1 KG spool is 1, a 20 KG box is 20. A 500 KG order then needs 500 spools and 25 boxes automatically.</p>
+          {% if not packing_materials %}
+          <p class="text-[13px] text-ink bg-mist border border-slate-200 rounded px-3 py-2">No packing materials yet. Open Raw Materials and set the role <b>Packing</b> on the spool, sleeve and box first.</p>
+          {% endif %}
+          <div class="overflow-x-auto border border-slate-200 rounded">
+            <table class="w-full text-[13px]">
+              <thead class="bg-mist text-left text-[11.5px] uppercase tracking-wide text-ink-faint">
+                <tr><th class="px-2 py-2">Packing material</th><th class="px-2 py-2 w-40">KG per pack</th><th class="px-2 py-2 w-16"></th></tr>
+              </thead>
+              <tbody id="packing-body"></tbody>
+            </table>
+          </div>
+          <button type="button" id="btn-add-packing-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add packing line</button>
+        </div>
+        <script type="application/json" id="packing-materials-data">[
+          {%- for m in packing_materials -%}
+          {"id": {{ m.id }}, "code": {{ m.code|tojson }}, "name": {{ m.name|tojson }}, "unit": {{ (m.base_unit.code if m.base_unit else 'PCS')|tojson }}}{% if not loop.last %},{% endif %}
+          {%- endfor -%}
+        ]</script>
 
         <hr class="border-slate-200" />
         <!-- IS PURANE BLOCK KO REPLACE KAREIN -->
@@ -885,7 +909,35 @@
     renderCategoryFields();
   }
 
+  // ---- Packing material lines (Product form) ----
+  var packingData = [];
+  try { packingData = JSON.parse(document.getElementById('packing-materials-data').textContent || '[]'); } catch (err) { packingData = []; }
+  function addPackingLine(rmId, kg) {
+    var body = document.getElementById('packing-body');
+    if (!body) return;
+    var tr = document.createElement('tr');
+    var opts = '<option value="">Select packing material…</option>' + packingData.map(function (m) {
+      return '<option value="' + m.id + '"' + (String(m.id) === String(rmId) ? ' selected' : '') + '>' + m.code + ' — ' + m.name + ' (' + m.unit + ')</option>';
+    }).join('');
+    tr.innerHTML = '<td class="px-2 py-1.5"><select name="packing_rm_id[]" class="w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + opts + '</select></td>' +
+      '<td class="px-2 py-1.5"><input type="number" name="packing_kg[]" min="0.001" step="0.001" placeholder="e.g. 1 or 20" value="' + (kg || '') + '" class="w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-1.5 text-center"><button type="button" class="packing-remove text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove">&times;</button></td>';
+    body.appendChild(tr);
+  }
+  function fillPackingLines(lines) {
+    var body = document.getElementById('packing-body');
+    if (!body) return;
+    body.innerHTML = '';
+    (lines || []).forEach(function (l) { addPackingLine(l.id, l.kg); });
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#btn-add-packing-line')) addPackingLine();
+    var rm = e.target.closest('.packing-remove');
+    if (rm) rm.closest('tr').remove();
+  });
+
   function resetVariantSection() {
+    fillPackingLines([]);
     resetSpecAttributes();
     var body = document.getElementById('recipe-body');
     if (!body) return;
@@ -939,6 +991,9 @@
     try { recipe = JSON.parse(btn.getAttribute('data-recipe') || '[]'); } catch (err) { recipe = []; }
     renderCategoryFields(attrs);
     fillProductRecipe(recipe);
+    var packing = [];
+    try { packing = JSON.parse(btn.getAttribute('data-packing') || '[]'); } catch (err) { packing = []; }
+    fillPackingLines(packing);
     var formulation = document.getElementById('formulation-section');
     if (formulation) formulation.classList.remove('hidden');
     var qty = document.getElementById('recipe-preview-qty');

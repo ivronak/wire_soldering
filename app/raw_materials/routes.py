@@ -56,6 +56,9 @@ def raw_materials_add():
     valuation_method = (request.form.get('valuation_method') or "").strip()
     is_base_metal = request.form.get('is_base_metal') == 'on'
     is_core_flux = request.form.get('is_core_flux') == 'on'
+    is_packing = request.form.get('is_packing') == 'on'
+    if is_packing:
+        is_base_metal = is_core_flux = False          # ek hi role: packing material recipe ka metal / flux nahi
 
     if not name or category_id is None or base_unit_id is None:
         return redirect(url_for('raw_materials.raw_materials_list'))
@@ -78,6 +81,7 @@ def raw_materials_add():
             existing.valuation_method = valuation_method
             existing.is_base_metal=is_base_metal
             existing.is_core_flux=is_core_flux
+            existing.is_packing=is_packing
             existing.is_active = True
             db.session.commit()
             flash("A Raw Material restored with this code.", "success")
@@ -103,6 +107,7 @@ def raw_materials_add():
         valuation_method=valuation_method,
         is_base_metal=is_base_metal,
         is_core_flux=is_core_flux,
+        is_packing=is_packing,
         is_active=True,
         is_deleted=False,
     ))
@@ -140,6 +145,9 @@ def raw_materials_edit(m_id):
     valuation_method = (request.form.get('valuation_method') or "").strip()
     is_base_metal = request.form.get('is_base_metal') == 'on'
     is_core_flux = request.form.get('is_core_flux') == 'on'
+    is_packing = request.form.get('is_packing') == 'on'
+    if is_packing:
+        is_base_metal = is_core_flux = False          # ek hi role: packing material recipe ka metal / flux nahi
 
     if not name or category_id is None or base_unit_id is None:
         return redirect(url_for('raw_materials.raw_materials_list'))
@@ -158,6 +166,7 @@ def raw_materials_edit(m_id):
     m.valuation_method = valuation_method
     m.is_base_metal = is_base_metal
     m.is_core_flux=is_core_flux
+    m.is_packing=is_packing
     m.is_deleted = False
 
     db.session.commit()

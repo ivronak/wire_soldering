@@ -100,6 +100,8 @@ class RawMaterial(CreatedAtMixin, db.Model):
     # Recipe form ke dropdown ke liye — dono optional, default off
     is_base_metal = db.Column(db.Boolean, default=False, nullable=False)
     is_core_flux = db.Column(db.Boolean, default=False, nullable=False)
+    # Packing material (spool, sleeve, box): product ke "Packing Material" section ke dropdown ke liye (client change #2, 2026-10-26)
+    is_packing = db.Column(db.Boolean, default=False, nullable=False)
 
     conversion_note = db.Column(db.String(100), nullable=True)
     reorder_level = db.Column(db.Integer, nullable=True)
@@ -197,6 +199,21 @@ class VariantRecipeItem(CreatedAtMixin, db.Model):
     ratio_percent = db.Column(db.Float, nullable=False)
     is_flux = db.Column(db.Boolean, default=False, nullable=False)
     
+
+class ProductPackingItem(CreatedAtMixin, db.Model):
+    # Product ka Packing Material: "har kg_per_pack KG tayyar maal ke liye 1 pack" (1 KG spool -> 1, 20 KG box -> 20).
+    # Production order banate waqt ye lines order par copy hoti hain: qty = order KG / kg_per_pack (upar round).
+    __tablename__ = "product_packing_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product = db.relationship("Product", foreign_keys=[product_id], backref="packing_items")
+
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+
+    kg_per_pack = db.Column(db.Float, nullable=False)
+
 
 class Branch(CreatedAtMixin, db.Model):
     __tablename__ = "branches"
@@ -727,6 +744,8 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
     is_flux = db.Column(db.Boolean, default=False, nullable=False)
     # True = user ne packaging / extra RM add kiya. Ratio nahi, qty seedha type hoti hai.
     is_extra = db.Column(db.Boolean, default=False, nullable=False)
+    # True = product ke Packing Material section se aayi line (spool / sleeve / box); qty order KG / kg_per_pack
+    is_packing = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
     def issued_qty(self):

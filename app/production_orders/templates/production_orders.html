@@ -245,7 +245,7 @@
           {% for line in o.lines %}
           {% set ml = mat.lines[loop.index0] if mat else None %}
           <div class="po-mat">
-            <div style="min-width:0"><div class="font-semibold text-ink">{{ line.raw_material.name if line.raw_material else '—' }}{% if line.is_extra %} <span class="po-meta">(added)</span>{% endif %}</div>
+            <div style="min-width:0"><div class="font-semibold text-ink">{{ line.raw_material.name if line.raw_material else '—' }}{% if line.is_extra %} <span class="po-meta">(added)</span>{% elif line.is_packing %} <span class="po-meta">(packing)</span>{% endif %}</div>
               <div class="po-meta">{{ line.raw_material.code if line.raw_material else '' }} · need {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}{% if line.issued_qty > 0 %} · issued {{ '%.2f'|format(line.issued_qty) }}{% endif %}</div></div>
             {% if o.status != 'Cancelled' and ml %}
               {% if ml.issued_all %}<span class="po-chip ok"><i></i>Issued</span>
@@ -976,6 +976,19 @@
         '<td><div class="font-semibold text-ink">' + esc(line.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(line.code) + ' · ' + Number(line.ratio).toFixed(1) + '% · ' + (line.is_flux ? 'core flux' : 'base metal') + '</div></td>' +
         '<td class="font-mono font-semibold text-right">' + need.toFixed(2) + ' ' + esc(line.unit || '') + '</td>' +
         '<td class="font-mono text-right text-ink-muted">' + have.toFixed(2) + '</td>' +
+        '<td>' + status + '</td>' +
+        '</tr>';
+    }).join('') + (product.packing || []).map(function (k) {
+      var need = Math.ceil(Math.round(batchKg / k.kg_per_pack * 1e6) / 1e6);
+      var have = STORE[String(k.rm_id)] || 0;
+      var short = need - have;
+      var status = short <= 0.0001
+        ? '<span class="po-chip ok"><i></i>In stock</span>'
+        : '<span class="po-chip bad"><i></i>Short ' + short.toFixed(0) + '</span>';
+      return '<tr>' +
+        '<td><div class="font-semibold text-ink">' + esc(k.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(k.code) + ' · packing · 1 per ' + Number(k.kg_per_pack) + ' KG</div></td>' +
+        '<td class="font-mono font-semibold text-right">' + need.toFixed(0) + ' ' + esc(k.unit || '') + '</td>' +
+        '<td class="font-mono text-right text-ink-muted">' + have.toFixed(0) + '</td>' +
         '<td>' + status + '</td>' +
         '</tr>';
     }).join('');
