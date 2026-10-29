@@ -174,6 +174,7 @@
         {% elif sc %}
         <div class="po-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
         <div class="po-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · ~{{ (o.planned_hours or 0)|round(0)|int }} h</div>
+        {% if o.line and o.status in ('In production', 'Completed') %}<div class="po-meta mt-1">{{ o.line.name }}{% if o.under_capacity_kg %} · <span style="color:#8A4A1C">{{ '%g'|format(o.under_capacity_kg) }} KG capacity unused: {{ o.under_capacity_reason }}</span>{% endif %}</div>{% endif %}
         {% if o.status == 'In production' %}
         {% set sn = stage_now.get(o.id) %}
         <div class="po-bar" title="{{ progress.get(o.id, 0) }}%"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>
@@ -531,7 +532,7 @@
     </div>
     <form id="start-form" method="post" action="" class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
       {% for ln in line_board %}
-      <label class="start-line block border border-slate-300 rounded-lg p-3 cursor-pointer hover:border-copper" data-cap="{{ ln.capacity }}">
+      <label class="start-line block border border-slate-300 rounded-lg p-3 cursor-pointer hover:border-copper" data-cap="{{ ln.capacity }}" data-left="{{ ln.left_kg }}" data-name="{{ ln.name }}">
         <div class="flex items-start gap-3">
           <input type="radio" name="line_id" value="{{ ln.id }}" class="mt-1" {% if loop.first %}required{% endif %} />
           <div class="flex-1">
@@ -555,6 +556,14 @@
         </div>
       </label>
       {% endfor %}
+      <div id="start-under" class="hidden rounded-lg p-3" style="background:#FFF4E5;border:1px solid #F5D9B5">
+        <div class="text-[13px] font-semibold" style="color:#7A4A12">Line will run below its daily capacity</div>
+        <p id="start-under-text" class="text-[12.5px] mt-1" style="color:#7A4A12"></p>
+        <label for="start-reason" class="block text-[12.5px] font-semibold text-ink mt-2 mb-1">Why is the capacity not fully used? *</label>
+        <textarea id="start-reason" name="under_reason" rows="2" maxlength="255" placeholder="e.g. No other order waiting; remaining capacity kept for a sample / own stock"
+          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        <p class="text-[11.5px] mt-1" style="color:#7A4A12">Tip: you can also add another order first, so the line is fully used.</p>
+      </div>
     </form>
     <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel-start" class="po-btn ghost">Cancel</button>
@@ -1097,6 +1106,23 @@
     if (!modal) return;
     var form = document.getElementById('start-form');
     function close() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+    // Chuni hui line ki daily capacity se kam kaam ho to wajah wala box dikhao (aur zaroori karo)
+    function refreshUnder() {
+      var box = document.getElementById('start-under'), reason = document.getElementById('start-reason');
+      var picked = form.querySelector('input[name=line_id]:checked');
+      var kg = parseFloat(modal.getAttribute('data-kg')) || 0, gap = 0, name = '';
+      if (picked) {
+        var card = picked.closest('.start-line');
+        var cap = parseFloat(card.getAttribute('data-cap')) || 0, left = parseFloat(card.getAttribute('data-left')) || 0;
+        gap = Math.round((cap - (left + kg)) * 100) / 100;
+        name = card.getAttribute('data-name');
+        document.getElementById('start-under-text').textContent = name + ' can make ' + cap + ' KG a day, but only ' + Math.round((left + kg) * 100) / 100 + ' KG is planned. ' + gap + ' KG of capacity stays unused.';
+      }
+      var need = gap > 0.0001;
+      box.classList.toggle('hidden', !need);
+      reason.required = need;
+    }
+    form.addEventListener('change', refreshUnder);
     document.querySelectorAll('.btn-start-line').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var kg = parseFloat(btn.getAttribute('data-kg')) || 0;
@@ -1104,6 +1130,8 @@
         document.getElementById('start-no').textContent = btn.getAttribute('data-no');
         document.getElementById('start-kg').textContent = kg;
         form.reset();
+        modal.setAttribute('data-kg', kg);
+        refreshUnder();
         modal.querySelectorAll('.start-line').forEach(function (card) {
           var cap = parseFloat(card.getAttribute('data-cap')) || 0;
           var d = card.querySelector('.start-days');

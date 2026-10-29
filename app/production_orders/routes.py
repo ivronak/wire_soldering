@@ -581,6 +581,21 @@ def production_orders_start(order_id):
             flash("Choose the production line for this order.", "error")
             return redirect(url_for("production_orders.production_orders_list"))
         order.line_id = line_id
+        # Line ki daily capacity se kam kaam (is order + us line par baaki chalte orders) ho to wajah likhna zaroori
+        chosen = next(row for row in board if row["id"] == line_id)
+        batch_kg = (order.planned_qty or 0) * (order.unit_weight or 1)
+        gap = round(chosen["capacity"] - (chosen["left_kg"] + batch_kg), 2)
+        reason = (request.form.get("under_reason") or "").strip()[:255]
+        if gap > 0.0001:
+            if len(reason) < 3:
+                flash(f"{chosen['name']} can make {chosen['capacity']:g} KG a day but only {chosen['left_kg'] + batch_kg:g} KG is planned. "
+                      f"Write why {gap:g} KG of its capacity is unused (or add another order first).", "error")
+                return redirect(url_for("production_orders.production_orders_list"))
+            order.under_capacity_kg = gap
+            order.under_capacity_reason = reason
+        else:
+            order.under_capacity_kg = None
+            order.under_capacity_reason = None
     order.planned_start_date = info["start"]
     order.planned_end_date = info["end"]
     order.earliest_start_date = today

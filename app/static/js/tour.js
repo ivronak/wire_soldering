@@ -270,7 +270,7 @@
         when: function () { var m = $('#start-modal'); return !!m && !m.classList.contains('hidden'); },
         title: 'Production line ચૂંટો',
         text: 'જ્યારે <b>Production lines</b> બનેલી હોય, ત્યારે ઓર્ડર કઈ લાઇનમાં ચલાવવો તે અહીં ચૂંટવાનું. દરેક લાઇન પર <b>હાલ કયો ઓર્ડર ચાલે છે</b>, કેટલો માલ બાકી છે અને લાઇન <b>ક્યારથી ખાલી</b> થશે તે દેખાય છે.',
-        prefill: { label: 'પહેલી લાઇન ચૂંટો', run: function () { var r = $('#start-form input[name=line_id]'); if (r) r.checked = true; return Promise.resolve(); } } },
+        prefill: { label: 'પહેલી લાઇન ચૂંટો', run: function () { var r = $('#start-form input[name=line_id]'); if (r) { r.checked = true; r.dispatchEvent(new ctx.win.Event('change', { bubbles: true })); } return sleep(150).then(function () { var t = $('#start-reason'); if (t && !t.closest('.hidden')) setVal(t, 'Demo order - no other order waiting'); }); } } },
       { id: 'st-start-ok', type: 'click', when: function () { return !!$('#erp-confirm-root.is-open'); }, target: '#erp-confirm-root.is-open .erp-confirm__btn--ok', retryTo: 'st-start', title: 'પુષ્ટિ', text: '<b>Start</b> દબાવો.', todo: 'ક્લિક કરો: Start (પુષ્ટિ)' },
       { id: 'st-run', type: 'info', path: '/production_orders', target: function () { return orderCard('.po-card'); }, title: 'ઓર્ડર ચાલુ થઈ ગયો ✅',
         text: 'Status <b>In production</b>. હવે તેને Move/Cancel/Reschedule થઈ ન શકે (તારીખો ફિક્સ). ઉત્પાદનમાં દરેક સ્ટેજનું કામ <b>Routing</b> માં નોંધાય છે.' },

@@ -710,6 +710,9 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     # Kis production line me chal raha hai: Queue se Start karte waqt chuni jaati hai (lines bani hon tab zaroori)
     line_id = db.Column(db.Integer, db.ForeignKey("production_lines.id"), nullable=True)
     line = db.relationship("ProductionLine", foreign_keys=[line_id])
+    # Line ki daily capacity se kam kaam laga ho to kitna KG khaali raha aur kyun (client change #1: reason mandatory)
+    under_capacity_kg = db.Column(db.Float, nullable=True)
+    under_capacity_reason = db.Column(db.String(255), nullable=True)
 
     order_date = db.Column(db.Date, nullable=False)
     planned_qty = db.Column(db.Float, nullable=False)
