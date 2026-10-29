@@ -2,12 +2,14 @@
 # Stage ek ke baad ek chalte hain (Pending -> In progress -> Done). Stage kabhi delete nahi hota; galti ho to sirf aakhri Done stage "Reopen" hota hai.
 # Plan (stages / machines / dates) production_orders me bana hai; yahan sirf asli record aur plan se farak (late / early) dikhta hai.
 import math
+import os
 from datetime import datetime, timedelta
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, ScrapType
+from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, ScrapType, StageLabQC
 from app.production_orders.planning import next_working_day
 from app.production_orders.scheduler import now_ist, today_ist
 
@@ -126,7 +128,7 @@ def routing_list():
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
-        operators=operators, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan,
+        operators=operators, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"),
     )
 
@@ -172,6 +174,10 @@ def routing_start(stage_id):
     not_done = [s.stage_name for s in previous if s.status != "Done"]
     if not_done:
         flash(f"Finish {not_done[0]} first. Stages run one after another.", "error")
+        return _back()
+    blocker = lab_qc_blocker(order, stage)
+    if blocker is not None:
+        flash(f"{stage.stage_name} cannot start yet: {blocker.stage_name} needs a passed lab test with the test certificate (TC) uploaded first.", "error")
         return _back()
     operator = (request.form.get("operator") or "").strip()[:60]
     if not operator:
@@ -305,3 +311,88 @@ def routing_reopen(stage_id):
     db.session.commit()
     flash(f"{stage.stage_name} reopened. Enter the finish details again.", "success")
     return _back()
+
+
+# ---------------------------------------------------------------- Lab QC + TC (client change #7)
+ALLOWED_TC_EXT = {"pdf", "png", "jpg", "jpeg"}
+MAX_TC_BYTES = 5 * 1024 * 1024
+
+
+def lab_qc_passed(stage):
+    # Is stage ka koi Pass round jisme TC file lagi ho
+    return any(q.result == "Pass" and q.tc_file for q in stage.lab_qcs)
+
+
+def lab_qc_blocker(order, stage):
+    # Agar is stage se pehle ka koi Lab-QC-wala stage Pass + TC ke bina hai to uska naam (warna None)
+    for prev in _previous_stages(order, stage):
+        if prev.work_stage and prev.work_stage.requires_lab_qc and not lab_qc_passed(prev):
+            return prev
+    return None
+
+
+@routing_bp.route("/routing/lab_qc/<int:stage_id>", methods=["POST"])
+def routing_lab_qc(stage_id):
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if not (stage.work_stage and stage.work_stage.requires_lab_qc):
+        flash(f"{stage.stage_name} does not need a lab QC.", "error")
+        return _back()
+    if stage.status == "Pending":
+        flash(f"Start {stage.stage_name} before recording its lab test.", "error")
+        return _back()
+    tested_by = (request.form.get("tested_by") or "").strip()[:60]
+    result = (request.form.get("result") or "").strip()
+    remarks = (request.form.get("remarks") or "").strip()[:255] or None
+    tested_at, error = _read_when("tested_at")
+    if error:
+        flash(error, "error")
+        return _back()
+    if not tested_by:
+        flash("Enter who did the lab test.", "error")
+        return _back()
+    if result not in ("Pass", "Fail"):
+        flash("Choose the lab result: Pass or Fail.", "error")
+        return _back()
+    tc = request.files.get("tc_file")
+    has_file = bool(tc and tc.filename)
+    if result == "Pass" and not has_file:
+        flash("Upload the test certificate (TC) — a passed lab test needs it before the next stage can start.", "error")
+        return _back()
+    ext = tc.filename.rsplit(".", 1)[1].lower() if has_file and "." in tc.filename else ""
+    if has_file:
+        if ext not in ALLOWED_TC_EXT:
+            flash("The test certificate must be a PDF, PNG or JPG file.", "error")
+            return _back()
+        tc.stream.seek(0, os.SEEK_END)
+        size = tc.stream.tell()
+        tc.stream.seek(0)
+        if size > MAX_TC_BYTES:
+            flash("The test certificate file is too large (maximum 5 MB).", "error")
+            return _back()
+    row = StageLabQC(stage_id=stage.id, tested_at=tested_at, tested_by=tested_by, result=result, remarks=remarks)
+    db.session.add(row)
+    db.session.flush()                      # id chahiye: file ka folder QC id se banta hai
+    if has_file:
+        folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "lab_qc", str(row.id))
+        os.makedirs(folder, exist_ok=True)
+        name = secure_filename(tc.filename) or ("tc." + ext)
+        tc.save(os.path.join(folder, name))
+        row.tc_file = "lab_qc/" + str(row.id) + "/" + name         # DB me hamesha "/"
+    db.session.commit()
+    if result == "Pass":
+        flash(f"Lab test passed for {stage.stage_name} ({order.prod_no}) and the TC is saved. The next stage can start.", "success")
+    else:
+        flash(f"Lab test failed for {stage.stage_name} ({order.prod_no}). Correct the batch and record the next test.", "success")
+    return _back()
+
+
+@routing_bp.route("/routing/tc/<int:qc_id>")
+def routing_tc(qc_id):
+    # Test Certificate file kholna
+    row = db.session.get(StageLabQC, qc_id)
+    if row is None or not row.tc_file:
+        abort(404)
+    return send_from_directory(current_app.config["UPLOAD_FOLDER"], row.tc_file)

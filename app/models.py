@@ -91,6 +91,8 @@ class WorkStage(CreatedAtMixin, db.Model):
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
     # Batch stage (jaise Melting / furnace): order ek saath nahi, machine ki capacity ke hisaab se lots me jaata hai (client change #6)
     is_batch = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    # Is stage ke baad Lab QC + Test Certificate (TC) zaroori: TC upload hue bina agla stage start nahi hota (client change #7)
+    requires_lab_qc = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
 
 class RmCategories(CreatedAtMixin, db.Model):
     __tablename__='rm_categories'
@@ -1848,3 +1850,18 @@ class ScrapType(CreatedAtMixin, db.Model):
     name = db.Column(db.String(60), unique=True, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class StageLabQC(CreatedAtMixin, db.Model):
+    # In-process Lab QC: stage (jaise Melting) ke baad sample lab me. Har round ek row (Fail -> material add -> dobara test). Kabhi delete nahi.
+    # Pass round par TC (Test Certificate) file zaroori; wo order / lot ke saath hamesha juda rehta hai.
+    __tablename__ = "stage_lab_qc"
+
+    id = db.Column(db.Integer, primary_key=True)
+    stage_id = db.Column(db.Integer, db.ForeignKey("production_order_stages.id"), nullable=False)
+    stage = db.relationship("ProductionOrderStage", foreign_keys=[stage_id], backref=db.backref("lab_qcs", order_by="StageLabQC.id"))
+    tested_at = db.Column(db.DateTime, nullable=False)
+    tested_by = db.Column(db.String(60), nullable=False)
+    result = db.Column(db.String(8), nullable=False)             # "Pass" / "Fail"
+    remarks = db.Column(db.String(255), nullable=True)
+    tc_file = db.Column(db.String(255), nullable=True)           # UPLOAD_FOLDER ke andar ka relative path (Pass par zaroori)

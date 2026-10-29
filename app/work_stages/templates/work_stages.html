@@ -116,6 +116,7 @@
                   <span class="font-medium {% if s.is_active %}text-ink{% else %}text-ink-faint{% endif %}">
                     {{ s.name }}
                   </span>
+                  {% if s.requires_lab_qc %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border" title="Lab QC and test certificate needed before the next stage">Lab QC</span>{% endif %}
                   {% if s.is_batch %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
                 </td>
                 <td class="text-[13px] {% if s.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %} tabular-nums">
@@ -140,7 +141,8 @@
                       data-code="{{ s.code }}"
                       data-name="{{ s.name }}"
                       data-sort="{{ s.sort_order }}"
-                      data-batch="{{ 1 if s.is_batch else 0 }}">
+                      data-batch="{{ 1 if s.is_batch else 0 }}"
+                      data-labqc="{{ 1 if s.requires_lab_qc else 0 }}">
                       Edit
                     </button>
                     {# Soft-delete — confirm popup = js-confirm-submit (erp-toast.js) #}
@@ -225,6 +227,13 @@
           <input type="checkbox" id="stage-batch" name="is_batch" value="on" class="mt-1" />
           <span><span class="block text-[13px] font-semibold text-ink">Batch stage (furnace type)</span>
             <span class="block text-[12px] text-ink-faint">The order is processed in lots of the machine capacity (for example a furnace of 100 KG/hour makes 5 lots for a 500 KG order), not all at once.</span></span>
+        </label>
+      </div>
+      <div>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" id="stage-labqc" name="requires_lab_qc" value="on" class="mt-1" />
+          <span><span class="block text-[13px] font-semibold text-ink">Lab QC + test certificate after this stage</span>
+            <span class="block text-[12px] text-ink-faint">The next stage cannot start until the lab result is Pass and the test certificate (TC) is uploaded. Use it on Melting.</span></span>
         </label>
       </div>
     </form>
@@ -330,6 +339,7 @@
     document.getElementById('stage-name').value = btn.getAttribute('data-name') || '';
     document.getElementById('stage-sort').value = btn.getAttribute('data-sort') || '';
     document.getElementById('stage-batch').checked = btn.getAttribute('data-batch') === '1';
+    document.getElementById('stage-labqc').checked = btn.getAttribute('data-labqc') === '1';
     openModal();
   }
 

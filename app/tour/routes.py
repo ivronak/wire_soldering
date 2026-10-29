@@ -4,10 +4,12 @@
 # Shortcut wahi asli rules follow karta hai (stage ek ke baad ek, qty in -> out, machines used); sirf typing bachata hai.
 from datetime import timedelta
 
-from flask import Blueprint, jsonify, render_template, request
+import os
+
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from app.extensions import db
-from app.models import Product, ProductionOrder, Vendor, Warehouse
+from app.models import Product, ProductionOrder, StageLabQC, Vendor, Warehouse, WorkStage
 from app.production_orders.scheduler import now_ist
 from app.routing.routes import order_batch_kg
 
@@ -32,9 +34,10 @@ def tour_info():
         rm = item.raw_material
         recipe.append({"rm_id": item.raw_material_id, "code": rm.code if rm else "", "name": rm.name if rm else "",
                        "unit": rm.base_unit.code if rm and rm.base_unit else "", "ratio": item.ratio_percent})
+    lab_qc = WorkStage.query.filter_by(is_deleted=False, is_active=True, requires_lab_qc=True).first() is not None
     return jsonify({"ok": True, "product": {"id": product.id, "name": product.name, "category_id": product.category_id, "recipe": recipe},
                     "store_warehouse_id": store.id if store else None,
-                    "vendor_id": vendor.id if vendor else None})
+                    "vendor_id": vendor.id if vendor else None, "lab_qc": lab_qc})
 
 
 @tour_bp.route("/tour/finish_stages/<int:order_id>", methods=["POST"])
@@ -66,6 +69,16 @@ def tour_finish_stages(order_id):
         stage.scrap_type_id = None
         stage.scrap_kind = "Saleable"
         stage.status = "Done"
+        # Lab QC wala stage (Melting) ho to demo ek Pass test + nakli TC (chhoti PDF) bhi daal deta hai, taaki TC order se juda dikhe
+        if stage.work_stage and stage.work_stage.requires_lab_qc and not any(q.result == "Pass" and q.tc_file for q in stage.lab_qcs):
+            qc = StageLabQC(stage_id=stage.id, tested_at=stage.completed_at, tested_by="Demo lab", result="Pass", remarks="Demo tour")
+            db.session.add(qc)
+            db.session.flush()
+            folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "lab_qc", str(qc.id))
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, "demo-tc.pdf"), "wb") as handle:
+                handle.write(b"%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 120]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF")
+            qc.tc_file = "lab_qc/" + str(qc.id) + "/demo-tc.pdf"
         cursor = stage.completed_at + timedelta(minutes=1)
     db.session.commit()
     return jsonify({"ok": True, "message": f"{len(pending)} stages completed (demo shortcut)."})

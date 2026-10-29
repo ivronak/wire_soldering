@@ -292,6 +292,8 @@
       { id: 'rt-shortcut', type: 'action', path: '/routing', target: inCard('.rt-card', '.rt-pipe'), title: 'બાકીના સ્ટેજ (ડેમો શૉર્ટકટ)',
         text: 'બાકીના 7 સ્ટેજ પણ આ જ રીતે (Start → Complete) થાય. ટૂરનો સમય બચાવવા આ <b>ડેમો શૉર્ટકટ</b> બટન બાકીના બધા સ્ટેજ આપમેળે પૂરા કરી દેશે.',
         button: { label: 'બાકીના સ્ટેજ આપમેળે પૂરા કરો', run: finishStagesDemo } },
+      { id: 'rt-labqc', type: 'info', when: function () { return !!(infoCache && infoCache.lab_qc); }, title: 'Lab QC અને TC',
+        text: 'મેલ્ટિંગ પછી તરત <b>Lab QC</b>: સેમ્પલ લેબમાં જાય, અને <b>Pass</b> થાય ત્યારે <b>Test Certificate (TC)</b> અપલોડ કરવું પડે. <b>TC વગર આગળનું સ્ટેજ (Ingot Casting) શરૂ થઈ શકતું નથી.</b> આ TC હંમેશા આ ઓર્ડર અને લોટ સાથે જોડાયેલું રહે છે. ડેમો શૉર્ટકટે આપણા માટે એક Pass ટેસ્ટ અને TC નાખી દીધું છે.' },
       { id: 'rt-alldone', type: 'info', path: '/routing', target: '.rt-tabs', title: 'બધા સ્ટેજ પૂરા ✅',
         text: 'ઓર્ડર <b>Running</b> ટૅબમાંથી નીકળીને <b>All stages done</b> માં ગયો. હવે તૈયાર થયેલા માલની (output) નોંધ કરવાની.' },
       { id: 'rt-tab', type: 'click', path: '/routing', target: '.rt-tabs a[href*="tab=done"]', title: 'All stages done', text: 'આ ટૅબ ખોલો.', todo: 'ક્લિક કરો: All stages done' },
