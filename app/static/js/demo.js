@@ -179,6 +179,7 @@
     // ---------------------------------------------------------------- ek step chalao
     function runStep(item) {
       var st = item.st;
+      if (API.stepOn && !API.stepOn(st)) return Promise.resolve();      // jaise Production line ka step: lines na hon to chhod do
       var chars = (st.text || '').replace(/<[^>]+>/g, '').length;
       setTarget(null, false);
       cursor.style.display = S.i === 0 ? 'none' : cursor.style.display;

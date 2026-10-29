@@ -50,6 +50,8 @@
     if (infoCache) return Promise.resolve(infoCache);
     return fetch('/tour/info').then(function (r) { return r.json(); }).then(function (j) { infoCache = j; return j; });
   }
+  // Step sirf tab chalta hai jab uska `when()` true ho (jaise Production line ka modal tabhi jab lines bani hon)
+  function stepOn(st) { try { return !st.when || !!st.when(); } catch (e) { return true; } }
   function navLink(href) { return 'aside a.nav-link[href="' + href + '"]'; }
   // Is order wala card (production queue / issue / routing / output ... ka koi bhi card)
   function orderCard(sel) {
@@ -262,9 +264,14 @@
     id: 'routing', title: 'Start અને Routing (સ્ટેજ)', desc: 'ઓર્ડર Start કરો, દરેક સ્ટેજમાં ઓપરેટર, મશીન, qty, scrap.',
     steps: [
       { id: 'st-po', type: 'click', target: navLink('/production_orders'), title: 'ફરી Production order', text: 'ઓર્ડરને હવે <b>Start</b> કરવાનો.', todo: 'ક્લિક કરો: Production order' },
-      { id: 'st-start', type: 'click', path: '/production_orders', target: inCard('.po-card', 'form[action*="/start/"] button'), title: 'Start production',
+      { id: 'st-start', type: 'click', path: '/production_orders', target: inCard('.po-card', 'form[action*="/start/"] button, .btn-start-line'), title: 'Start production',
         text: 'માલ આપાઈ ગયો હોય તો <b>Start</b> દેખાય છે. Start થતાં ઓર્ડરની <b>તારીખો આજથી નક્કી</b> થઈ જાય, અને બાકી ઓર્ડરો તેની આસપાસ ગોઠવાય.', todo: 'ક્લિક કરો: Start' },
-      { id: 'st-start-ok', type: 'click', target: '#erp-confirm-root.is-open .erp-confirm__btn--ok', retryTo: 'st-start', title: 'પુષ્ટિ', text: '<b>Start</b> દબાવો.', todo: 'ક્લિક કરો: Start (પુષ્ટિ)' },
+      { id: 'st-line', type: 'submit', path: '/production_orders', target: '#start-form', retryTo: 'st-start',
+        when: function () { var m = $('#start-modal'); return !!m && !m.classList.contains('hidden'); },
+        title: 'Production line ચૂંટો',
+        text: 'જ્યારે <b>Production lines</b> બનેલી હોય, ત્યારે ઓર્ડર કઈ લાઇનમાં ચલાવવો તે અહીં ચૂંટવાનું. દરેક લાઇન પર <b>હાલ કયો ઓર્ડર ચાલે છે</b>, કેટલો માલ બાકી છે અને લાઇન <b>ક્યારથી ખાલી</b> થશે તે દેખાય છે.',
+        prefill: { label: 'પહેલી લાઇન ચૂંટો', run: function () { var r = $('#start-form input[name=line_id]'); if (r) r.checked = true; return Promise.resolve(); } } },
+      { id: 'st-start-ok', type: 'click', when: function () { return !!$('#erp-confirm-root.is-open'); }, target: '#erp-confirm-root.is-open .erp-confirm__btn--ok', retryTo: 'st-start', title: 'પુષ્ટિ', text: '<b>Start</b> દબાવો.', todo: 'ક્લિક કરો: Start (પુષ્ટિ)' },
       { id: 'st-run', type: 'info', path: '/production_orders', target: function () { return orderCard('.po-card'); }, title: 'ઓર્ડર ચાલુ થઈ ગયો ✅',
         text: 'Status <b>In production</b>. હવે તેને Move/Cancel/Reschedule થઈ ન શકે (તારીખો ફિક્સ). ઉત્પાદનમાં દરેક સ્ટેજનું કામ <b>Routing</b> માં નોંધાય છે.' },
       { id: 'rt-link', type: 'click', target: navLink('/routing'), title: 'Routing / stages', text: 'સ્ટેજ-વાર ખરું કામ અહીં નોંધાય.', todo: 'ક્લિક કરો: Routing / stages' },
@@ -666,6 +673,7 @@
       return render();
     }
 
+    if (!stepOn(st)) { advance(); return render(); }          // is waqt ye step lagu nahi (when false) - agle par
     if (key !== currentKey) { currentKey = key; st._ready = false; }
     var shown = !pathOk(st) ? 'goto' : 'step';
     drawCard(c, st, at, total, shown);
@@ -954,6 +962,7 @@
       window.ERP_TOUR_API = {
         chapters: CH,
         resolve: resolveTarget,
+        stepOn: stepOn,
         pathOk: pathOk,
         gotoUrl: gotoUrl,
         setContext: function (doc, win) { ctx.doc = doc; ctx.win = win; },

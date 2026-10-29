@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
 from app.production_orders.planning import plan_stages
+from app.production_lines.status import line_board
 from app.inventory.alerts import store_stock_by_material
 from app.production_orders.timeline import build_timeline
 from app.production_orders.scheduler import OPEN_STATUSES, live_schedule, persist_schedule, queue_orders, renumber_queue, today_ist
@@ -274,6 +275,7 @@ def production_orders_list():
         timeline=timeline,
         by=by,
         store_stock={str(k): v for k, v in store_stock_by_material().items()},
+        line_board=line_board(today),
         resched=resched,
         products=products,
         categories=categories,
@@ -571,6 +573,14 @@ def production_orders_start(order_id):
     for stage, (start, end) in zip(order.stages, info["windows"]):
         stage.start_date = start
         stage.end_date = end
+    # Production line: lines bani hon to chunna zaroori (client change #1); koi line nahi to pehle jaisa chalta hai
+    board = line_board(today)
+    if board:
+        line_id = request.form.get("line_id", type=int)
+        if line_id not in {row["id"] for row in board}:
+            flash("Choose the production line for this order.", "error")
+            return redirect(url_for("production_orders.production_orders_list"))
+        order.line_id = line_id
     order.planned_start_date = info["start"]
     order.planned_end_date = info["end"]
     order.earliest_start_date = today
@@ -579,7 +589,8 @@ def production_orders_start(order_id):
     renumber_queue()
     persist_schedule(today)
     db.session.commit()
-    flash(f"{order.prod_no} is now in production. Planned finish: {info['end'].strftime('%d %b %Y')}.", "success")
+    line_text = f" on {order.line.name}" if order.line else ""
+    flash(f"{order.prod_no} is now in production{line_text}. Planned finish: {info['end'].strftime('%d %b %Y')}.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
 
 

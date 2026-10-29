@@ -707,6 +707,10 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
     product = db.relationship("Product", foreign_keys=[product_id])
 
+    # Kis production line me chal raha hai: Queue se Start karte waqt chuni jaati hai (lines bani hon tab zaroori)
+    line_id = db.Column(db.Integer, db.ForeignKey("production_lines.id"), nullable=True)
+    line = db.relationship("ProductionLine", foreign_keys=[line_id])
+
     order_date = db.Column(db.Date, nullable=False)
     planned_qty = db.Column(db.Float, nullable=False)
     # KG product pe 1. Doosri unit pe ek piece ka weight, taaki batch KG nikal sake.
