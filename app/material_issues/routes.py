@@ -33,13 +33,29 @@ def reserved_in_drafts(lot_id):
     return round(total, 4)
 
 
-def free_lots(raw_material_id):
+def returned_lot_ids(order):
+    # Is production order ne jin lots ka maal wapas kiya (Posted returns). Client rule: wapas kiya lot dobara issue me pehle nahi lena.
+    ids = set()
+    if order is None:
+        return ids
+    for ret in order.returns:
+        if ret.is_deleted or ret.status != "Posted":
+            continue
+        for line in ret.lines:
+            ids.add(line.lot_id)
+    return ids
+
+
+def free_lots(raw_material_id, order=None):
     # FIFO: purana lot pehle; Draft issues ka tay kiya maal ghata ke. [(lot, qty_free)]
+    # order diya ho to us order ne jo lot return kiya wo sabse aakhir me (agla FIFO lot pehle); sirf agla lot kam pade tab wo kaam aata hai.
+    skip = returned_lot_ids(order)
     result = []
     for lot, _store, qty, _value in available_lots(raw_material_id):
         free = round(qty - reserved_in_drafts(lot.id), 4)
         if free > 0.00005:
             result.append((lot, free))
+    result.sort(key=lambda row: row[0].id in skip)      # sort stable hai: baaki sab purane-pehle ke order me hi rehte hain
     return result
 
 
@@ -48,7 +64,7 @@ def issue_plan(order):
     lines = []
     for line in order.lines:
         material = line.raw_material
-        free = sum(qty for _lot, qty in free_lots(line.raw_material_id))
+        free = sum(qty for _lot, qty in free_lots(line.raw_material_id, order))
         remaining = line.remaining_qty
         available = round(free, 4)
         suggest = round(min(remaining, available), 4)          # default "Issue now": jitna baaki, par store ke free se zyada nahi
@@ -191,7 +207,7 @@ def read_issue_form():
     allocation = []      # (production_order_line, lot, qty)
     for line, qty, name, unit in wanted:
         left = qty
-        for lot, free in free_lots(line.raw_material_id):
+        for lot, free in free_lots(line.raw_material_id, order):
             usable = round(free - taken.get(lot.id, 0), 4)
             if usable <= 0:
                 continue
