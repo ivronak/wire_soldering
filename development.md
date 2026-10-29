@@ -540,6 +540,9 @@ This wasn't just the 12 client-meeting items — real scope grew along the way. 
 | 11 | **Quotation revisions** → Finalize → Production queue | Customer master only | Sales module (Phase 6) |
 | 12 | **Loss approval gate**, flexible dispatch, all-in-one billing (Invoice + Packing List + E-Invoice + E-Way Bill) | — | Sales module + roles; E-Invoice / E-Way need GST portal API |
 
+
+> **Update 2026-10-29:** #4 (buttons bahar), #2 (Packing Material: RM role + Product section + auto order lines) aur #5 (returned lot FIFO me last) **bana aur live**. Baaki #1, #3, #6-#12 pending.
+
 ### 14.2 Proposed build order (awaiting user's OK, 2026-10-27)
 1. Quick ones: #4 buttons, #2 packing material, #5 verification.
 2. Production core, built together (they affect each other): #1 Line Master, #6 flux / furnace, #7 Lab QC + TC, #8 single-entry scrap.
