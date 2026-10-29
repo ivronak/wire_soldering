@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Production Lines{% endblock %}
+
+{% block page_css %}
+<style>
+  .line-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .line-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 14px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .line-table thead th:first-child, .line-table tbody td:first-child { text-align: left; padding-left: 18px; }
+  .line-table tbody td { padding: 11px 14px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
+  .line-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .line-table tbody tr:hover { background: #FBF4EE; }
+  .line-table tbody tr.row-muted { opacity: 0.72; }
+  .line-machines { font-size: 12px; color: #3D5A5D; line-height: 1.5; text-align: left; }
+  #line-modal.hidden { display: none; }
+  #line-modal { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Masters / Production lines</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Production lines</h1>
+        </div>
+        <button type="button" id="btn-add-line"
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add line
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0 text-[12.5px] text-ink-faint">
+          <span><b class="text-ink">Line</b> = one complete set of stages with its own machines. A machine belongs to one line only. Set each machine's line on the <a href="{{ url_for('machines.machines_list') }}" class="text-copper-text font-semibold hover:underline">Machines</a> page.</span>
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="line-table">
+            <colgroup>
+              <col style="width:5%" /><col style="width:10%" /><col style="width:18%" /><col style="width:13%" /><col style="width:15%" /><col style="width:17%" /><col style="width:22%" />
+            </colgroup>
+            <thead>
+              <tr><th>#</th><th>Code</th><th>Line name</th><th>Capacity</th><th>Handler</th><th>Machines</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {% for l in lines %}
+              <tr class="{% if not l.is_active %}row-muted{% endif %}">
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
+                <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ l.code }}</span></td>
+                <td>
+                  <span class="font-medium text-ink">{{ l.name }}</span>
+                  {% if not l.is_active %}<div class="text-[11.5px] text-stop font-semibold">Stopped</div>{% endif %}
+                </td>
+                <td class="tabular-nums font-semibold">{{ '%g'|format(l.daily_capacity_kg) }} KG/day</td>
+                <td class="text-[13px] text-ink-muted">{{ l.handler or '—' }}</td>
+                <td>
+                  {% set ms = l.active_machines %}
+                  {% if ms %}
+                  <div class="line-machines"><b>{{ ms|length }}</b> machine{{ 's' if ms|length != 1 else '' }}<br>{% for m in ms[:4] %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% if ms|length > 4 %} +{{ ms|length - 4 }} more{% endif %}</div>
+                  {% else %}<span class="text-ink-faint text-[12.5px]">No machines yet</span>{% endif %}
+                </td>
+                <td>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <button type="button" class="btn-edit-line px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      data-id="{{ l.id }}" data-code="{{ l.code }}" data-name="{{ l.name }}" data-capacity="{{ '%g'|format(l.daily_capacity_kg) }}" data-handler="{{ l.handler or '' }}">Edit</button>
+                    <form method="post" action="{{ url_for('production_lines.production_lines_delete', line_id=l.id) }}" class="inline js-confirm-submit"
+                          data-confirm-title="Remove production line" data-confirm-ok="Remove"
+                          data-confirm-message="Remove this line from the master list? It will be kept in the database but hidden.">
+                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">Delete</button>
+                    </form>
+                    <form method="post" action="{{ url_for('production_lines.production_lines_toggle', line_id=l.id) }}" class="inline">
+                      <label class="relative inline-flex items-center cursor-pointer" title="Click to toggle In use / Stopped">
+                        <input type="checkbox" class="sr-only peer" {% if l.is_active %}checked{% endif %} onchange="this.form.submit()">
+                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
+                      </label>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="py-12 text-ink-faint">No production lines yet. Click <b>Add line</b> to create Line 1.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span>{{ result_count }} line{{ 's' if result_count != 1 else '' }} · total capacity {{ '%g'|format(lines|selectattr('is_active')|sum(attribute='daily_capacity_kg')) }} KG/day (lines in use)</span>
+          <span>Next step: pick the line when an order leaves the queue</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="line-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add production line</h2>
+        <p class="text-[12.5px] text-ink-faint">Code is auto-generated</p>
+      </div>
+      <button type="button" id="btn-close-modal" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="line-form" method="post" action="{{ url_for('production_lines.production_lines_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div>
+        <label for="line-code" class="block text-[12.5px] font-semibold text-ink mb-1">Line code</label>
+        <input type="text" id="line-code" value="{{ next_code }}" disabled class="w-full px-2.5 py-2.5 text-[14.5px] font-mono border border-slate-200 bg-mist text-ink-faint rounded" />
+      </div>
+      <div>
+        <label for="line-name" class="block text-[12.5px] font-semibold text-ink mb-1">Line name *</label>
+        <input type="text" id="line-name" name="name" required placeholder="Line 1" autocomplete="off" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="line-capacity" class="block text-[12.5px] font-semibold text-ink mb-1">Daily capacity (KG per day) *</label>
+        <input type="number" id="line-capacity" name="daily_capacity_kg" required min="0" step="any" placeholder="200" class="w-full px-2.5 py-2.5 text-[14.5px] tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="mt-1 text-[12px] text-ink-faint">How much finished wire this whole line can make in one day.</p>
+      </div>
+      <div>
+        <label for="line-handler" class="block text-[12.5px] font-semibold text-ink mb-1">Handler / in-charge</label>
+        <input type="text" id="line-handler" name="handler" maxlength="100" placeholder="Person who runs this line" autocomplete="off" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="line-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save line</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var modal = document.getElementById('line-modal');
+  var form = document.getElementById('line-form');
+  var addAction = "{{ url_for('production_lines.production_lines_add') }}";
+  function openModal() { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); document.getElementById('line-name').focus(); }
+  function closeModal() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); form.reset(); form.action = addAction; document.getElementById('modal-title').textContent = 'Add production line'; document.getElementById('line-code').value = "{{ next_code }}"; }
+  document.getElementById('btn-add-line').addEventListener('click', function () { form.reset(); form.action = addAction; openModal(); });
+  document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(); });
+  document.querySelectorAll('.btn-edit-line').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      form.action = '/production_lines/edit/' + btn.getAttribute('data-id');
+      document.getElementById('modal-title').textContent = 'Edit production line';
+      document.getElementById('line-code').value = btn.getAttribute('data-code') || '';
+      document.getElementById('line-name').value = btn.getAttribute('data-name') || '';
+      document.getElementById('line-capacity').value = btn.getAttribute('data-capacity') || '';
+      document.getElementById('line-handler').value = btn.getAttribute('data-handler') || '';
+      openModal();
+    });
+  });
+</script>
+{% endblock %}

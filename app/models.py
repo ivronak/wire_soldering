@@ -22,6 +22,25 @@ class Unit(CreatedAtMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+class ProductionLine(CreatedAtMixin, db.Model):
+    # Production Line (Line 1, Line 2 ...): 8 stages ka poora set + apni machines + daily capacity (KG/din). Client change #1.
+    # Machine sirf ek line me hoti hai (machines.line_id). Order ko line dena queue -> process ke time hoga.
+    __tablename__ = "production_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    daily_capacity_kg = db.Column(db.Float, nullable=False)
+    handler = db.Column(db.String(100), nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def active_machines(self):
+        # Is line ki machines jo list se hati nahi (retired bhi dikhti hain, delete hui nahi)
+        return [m for m in self.machines if not m.is_deleted]
+
+
 class Machines(CreatedAtMixin, db.Model):
     __tablename__ = "machines"
 
@@ -30,6 +49,9 @@ class Machines(CreatedAtMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=False)
     work_stage = db.relationship("WorkStage")
+    # Machine kis production line ki hai (ek hi line). Khaali = abhi kisi line me nahi lagi.
+    line_id = db.Column(db.Integer, db.ForeignKey("production_lines.id"), nullable=True)
+    line = db.relationship("ProductionLine", foreign_keys=[line_id], backref="machines")
     # Purana text capacity ("500 units/hr") — dikhane ke liye bacha hai. Hisaab ab neeche ke numbers se hota hai.
     capacity = db.Column(db.String(50), nullable=True)
     # Numeric capacity: ek ghante me kitna bana sakti hai (unit Unit Master se, jaise KG) aur din me kitne ghante chalti hai.

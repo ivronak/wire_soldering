@@ -196,12 +196,13 @@
             <colgroup>
               <col style="width:4%" />
               <col style="width:8%" />
-              <col style="width:19%" />
-              <col style="width:12%" />
+              <col style="width:16%" />
               <col style="width:11%" />
-              <col style="width:12%" />
-              <col style="width:15%" />
-              <col style="width:19%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:11%" />
+              <col style="width:13%" />
+              <col style="width:18%" />
             </colgroup>
             <thead>
               <tr>
@@ -209,6 +210,7 @@
                 <th>Code</th>
                 <th>Machine name</th>
                 <th>Work Stage</th>
+                <th>Line</th>
                 <th>Capacity</th>
                 <th>Installed</th>
                 <th>Status</th>
@@ -222,6 +224,7 @@
                 <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ m.code }}</span></td>
                 <td><span class="font-medium text-ink">{{ m.name }}</span></td>
                 <td class="text-[13px] text-ink-muted">{{ m.work_stage.name if m.work_stage else "_" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ m.line.name if m.line else "—" }}</td>
                 <td class="text-[13px] text-ink-muted tabular-nums">{{ m.capacity_text }}</td>
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ m.installed_date or '_' }}</td>
                 <td class="text-center">
@@ -250,6 +253,7 @@
                       data-id="{{ m.id }}"
                       data-code="{{ m.code }}"
                       data-name="{{ m.name }}"
+                      data-line-id="{{ m.line_id or '' }}"
                       data-work-stage-id="{{ m.work_stage_id or '' }}"
                       data-capacity="{{ m.capacity or '' }}"
                       data-per-hour="{{ m.capacity_per_hour if m.capacity_per_hour else '' }}"
@@ -364,6 +368,17 @@
             <option value="{{ s.id }}">{{ s.code }} — {{ s.name }}</option>
             {% endfor %}
           </select>
+        </div>
+        <div>
+          <label for="machine-line" class="block text-[12.5px] font-semibold text-ink mb-1">Production line</label>
+          <select id="machine-line" name="line_id"
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            <option value="">No line yet</option>
+            {% for l in lines %}
+            <option value="{{ l.id }}">{{ l.code }} — {{ l.name }}</option>
+            {% endfor %}
+          </select>
+          <p class="mt-1 text-[12px] text-ink-faint">A machine can belong to one line only. Lines are created in Production lines.</p>
         </div>
         <div>
           <label for="machine-per-hour" class="block text-[12.5px] font-semibold text-ink mb-1">Output per hour</label>
@@ -501,6 +516,7 @@
     document.getElementById('machine-code').value = btn.getAttribute('data-code') || '';
     document.getElementById('machine-name').value = btn.getAttribute('data-name') || '';
     document.getElementById('machine-stage').value = btn.getAttribute('data-work-stage-id') || '';
+    document.getElementById('machine-line').value = btn.getAttribute('data-line-id') || '';
     document.getElementById('machine-per-hour').value = btn.getAttribute('data-per-hour') || '';
     document.getElementById('machine-unit').value = btn.getAttribute('data-unit-id') || '';
     document.getElementById('machine-hours').value = btn.getAttribute('data-hours') || '8';

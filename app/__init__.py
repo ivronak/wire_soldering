@@ -3,6 +3,7 @@ import os
 from flask import Flask, flash, jsonify, redirect, request, url_for
 from app.units.routes import units_bp
 from app.machines.routes import machines_bp
+from app.production_lines.routes import production_lines_bp
 from app.work_stages.routes import work_stages_bp
 from app.rm_categories.routes import rm_categories_bp
 from app.raw_materials.routes import raw_materials_bp
@@ -71,6 +72,7 @@ def create_app():
     # Har module (Blueprint) ko app me jodo — bina register kiye uske URLs kaam nahi karte
     app.register_blueprint(units_bp)
     app.register_blueprint(machines_bp)
+    app.register_blueprint(production_lines_bp)
     app.register_blueprint(work_stages_bp)
     app.register_blueprint(rm_categories_bp)
     app.register_blueprint(raw_materials_bp)

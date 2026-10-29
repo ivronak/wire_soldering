@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
-from app.models import Machines, WorkStage, Unit
+from app.models import Machines, WorkStage, Unit, ProductionLine
 from app.extensions import db
 from datetime import datetime
 
@@ -34,6 +34,7 @@ def machines_list():
         active_nav="machines",
         result_count=total_count,
         stages=stages,
+        lines=ProductionLine.query.filter_by(is_deleted=False, is_active=True).order_by(ProductionLine.code).all(),
         units=Unit.query.filter(Unit.is_active == True, Unit.is_deleted == False).order_by(Unit.code).all(),
     )
 
@@ -62,6 +63,9 @@ def machines_add():
     name = (request.form.get('name') or "").strip()
     # type=int: value khaali/galat ho to None milta hai — int("") ki tarah crash nahi karta
     work_stage_id = request.form.get('work_stage_id', type=int)
+    line_id = request.form.get('line_id', type=int)            # optional: machine kis production line ki hai
+    if line_id and not ProductionLine.query.filter_by(id=line_id, is_deleted=False).first():
+        line_id = None
     capacity = (request.form.get('capacity') or "").strip() or None
     status = (request.form.get('status') or "active").strip().lower()
     raw_date = (request.form.get('installed_date') or "").strip()
@@ -83,6 +87,7 @@ def machines_add():
             existing.is_deleted = False
             existing.name = name
             existing.work_stage_id = work_stage_id
+            existing.line_id = line_id
             existing.capacity =  capacity
             existing.capacity_per_hour, existing.capacity_unit_id, existing.hours_per_day = cap["per_hour"], cap["unit_id"], cap["hours"]
             existing.installed_date = installed_date
@@ -97,6 +102,7 @@ def machines_add():
         code=code,
         name=name,
         work_stage_id=work_stage_id,
+        line_id=line_id,
         capacity=capacity,
         capacity_per_hour=cap["per_hour"],
         capacity_unit_id=cap["unit_id"],
@@ -127,6 +133,9 @@ def machines_edit(machine_id):
     name = (request.form.get('name') or "").strip()
     # type=int: khaali/galat value pe None — crash nahi
     work_stage_id = request.form.get('work_stage_id', type=int)
+    line_id = request.form.get('line_id', type=int)
+    if line_id and not ProductionLine.query.filter_by(id=line_id, is_deleted=False).first():
+        line_id = None
     capacity = (request.form.get('capacity') or "").strip() or None
     status = (request.form.get('status') or "active").strip().lower()
     raw_date = (request.form.get('installed_date') or "").strip()
@@ -145,6 +154,7 @@ def machines_edit(machine_id):
 
     m.name = name
     m.work_stage_id = work_stage_id
+    m.line_id = line_id
     m.capacity = capacity
     m.capacity_per_hour, m.capacity_unit_id, m.hours_per_day = cap["per_hour"], cap["unit_id"], cap["hours"]
     m.status = status
