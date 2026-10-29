@@ -41,7 +41,8 @@
   .po-dates span { color: #98A5A4; font-weight: 500; margin: 0 4px; }
   .po-bar { height: 6px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 7px; }
   .po-bar div { height: 100%; background: #C46B2D; border-radius: 999px; }
-  .po-act { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .po-act { display: flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .po-btn.sm { padding: 5px 10px; font-size: 12.5px; }
   .po-btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
   .po-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .po-btn.primary:hover { background: #A35522; }
   .po-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .po-btn.teal:hover { background: #1F5558; }
@@ -198,19 +199,24 @@
         {% elif o.status == 'In production' %}
         <a href="{{ url_for('material_issues.material_issues_list') }}" class="po-btn ghost">Material issue</a>
         {% endif %}
+        {# Client ka kehna (2026-10-26): kaam ke buttons seedha bahar dikhein, menu me dhoondhna na pade. Menu me sirf kam-use wale bache. #}
         {% if o.status != 'Cancelled' %}
+        <a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank" class="po-btn ghost sm">Print order</a>
+        {% if o.status in ('Draft', 'Released') %}
+        <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><button type="submit" class="po-btn ghost sm">Make first</button></form>
+        <button type="button" class="po-btn ghost sm btn-resched" data-id="{{ o.id }}">Reschedule</button>
+        {% endif %}
+        {% if o.status in ('Draft', 'Released', 'In production') %}
         <details class="po-menu"><summary aria-label="More actions">⋯</summary>
           <div class="items">
-            <a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank">Print order</a>
             {% if o.status == 'In production' %}<a href="{{ url_for('routing.routing_list') }}">Routing / stages</a>{% endif %}
-            {% if o.status in ('Draft', 'Released') %}
             {% if o.status == 'Released' %}<a href="{{ url_for('material_issues.material_issues_list') }}">Issue material</a>{% endif %}
-            <button type="button" class="btn-resched" data-id="{{ o.id }}">Reschedule / change machines</button>
-            <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><button type="submit">Make first in queue</button></form>
+            {% if o.status in ('Draft', 'Released') %}
             <button type="button" class="btn-cancel-order danger" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>
             {% endif %}
           </div>
         </details>
+        {% endif %}
         {% endif %}
       </div>
       <button type="button" class="po-chev" aria-label="Show details">▾</button>
