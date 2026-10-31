@@ -23,6 +23,14 @@
   .fg-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
   .fg-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
   .fg-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .fg-chip.bad { background: #FDECEA; color: #B42318; border-color: #F4C7C2; }
+  .fg-group > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 22px minmax(220px, 2fr) minmax(130px, 1fr) minmax(150px, 1fr) minmax(130px, .8fr); gap: 16px; align-items: center; padding: 13px 16px; }
+  .fg-group > summary::-webkit-details-marker { display: none; }
+  .fg-group .arrow { color: #6B7F82; transition: transform .15s; display: inline-block; }
+  .fg-group[open] .arrow { transform: rotate(90deg); }
+  .fg-group .inner { border-top: 1px solid #E4EAE9; background: #FAFBFB; border-radius: 0 0 12px 12px; }
+  .fg-group .inner .fg-row { padding: 10px 16px 10px 38px; border-bottom: 1px solid #EEF2F1; }
+  .fg-group .inner .fg-row:last-child { border-bottom: 0; }
   @media (max-width: 1100px) { .fg-row { grid-template-columns: 1fr 1fr; } }
 </style>
 {% endblock %}
@@ -31,7 +39,7 @@
 <div class="shrink-0">
   <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Finished goods</div>
   <h1 class="text-[22px] font-bold text-ink leading-tight">Finished goods</h1>
-  <p class="text-[13px] text-ink-faint">Goods that production has made, batch by batch. Each batch comes from one production order and keeps its own cost. Sales will take goods from these batches.</p>
+  <p class="text-[13px] text-ink-faint">Goods that production has made. Each product shows its total quantity; click it to see the batches. Each batch comes from one production order and keeps its own cost. Sales will take goods from these batches.</p>
 </div>
 
 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 shrink-0">
@@ -48,9 +56,8 @@
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
-  {% for r in rows %}
+  {% macro batch_row(r) %}
   {% set b = r.batch %}
-  <article class="fg-card">
     <div class="fg-row">
       <div>
         <div class="flex items-center gap-2 flex-wrap"><span class="fg-no">{{ b.batch_no }}</span>
@@ -64,13 +71,37 @@
       <div><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold">₹{{ r.value|inr }}</div></div>
       <div><div class="fg-meta">Kept in</div><div class="text-[13px]">{{ r.where }}</div></div>
     </div>
-  </article>
+  {% endmacro %}
+  {% if tab == 'fg' %}
+  {# Tally jaisa: product + total quantity; click karo to batch-wise detail #}
+  {% for g in groups %}
+  <details class="fg-card fg-group">
+    <summary>
+      <span class="arrow">▶</span>
+      <div><div class="text-[15px] font-bold text-ink">{{ g.product.name if g.product else '—' }}</div>
+        <div class="fg-meta">{{ g.in_stock }} batch{{ '' if g.in_stock == 1 else 'es' }} in stock{% if g.batches|length > g.in_stock %} · {{ g.batches|length - g.in_stock }} used up{% endif %}</div></div>
+      <div><div class="fg-qty">{{ '%g'|format(g.qty) }} <span class="text-[13px] font-semibold text-ink-faint">{{ g.unit }}</span></div><div class="fg-meta">total in stock</div></div>
+      <div><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold">₹{{ g.value|inr }}</div></div>
+      <div>{% if g.alert %}<span class="fg-chip {{ g.alert[1] }}"><i></i>{{ g.alert[0] }}</span>{% else %}<span class="fg-chip ok"><i></i>In stock</span>{% endif %}</div>
+    </summary>
+    <div class="inner">{% for r in g.batches %}{{ batch_row(r) }}{% endfor %}</div>
+  </details>
   {% else %}
   <div class="fg-empty">
-    <h3>{{ 'No finished goods yet' if tab == 'fg' else 'No scrap recorded yet' }}</h3>
-    <p>{{ 'Record a production output and the good goods will appear here as a batch.' if tab == 'fg' else 'Scrap from production outputs is listed here.' }}</p>
+    <h3>No finished goods yet</h3>
+    <p>Record a production output and the good goods will appear here as a batch.</p>
     <p class="mt-3"><a href="{{ url_for('production_output.production_output_list') }}" class="text-copper-text font-semibold hover:underline">Go to Production output →</a></p>
   </div>
   {% endfor %}
+  {% else %}
+  {% for r in rows %}
+  <article class="fg-card">{{ batch_row(r) }}</article>
+  {% else %}
+  <div class="fg-empty">
+    <h3>No scrap recorded yet</h3>
+    <p>Scrap from production outputs is listed here.</p>
+  </div>
+  {% endfor %}
+  {% endif %}
 </div>
 {% endblock %}

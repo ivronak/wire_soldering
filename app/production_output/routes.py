@@ -181,4 +181,38 @@ def finished_goods_list():
                      "where": where, "order": batch.production_order})
     fg_in_stock = [r for r in rows if r["qty"] > 0.00005] if tab == "fg" else []
     kpi = {"batches": len([r for r in rows if r["qty"] > 0.00005]), "qty": round(sum(r["qty"] for r in rows), 4), "value": round(sum(r["value"] for r in rows), 2)}
-    return render_template("finished_goods.html", active_nav="finished_goods", tab=tab, rows=rows, kpi=kpi, fg_in_stock=fg_in_stock)
+    groups = fg_groups(rows) if tab == "fg" else []
+    return render_template("finished_goods.html", active_nav="finished_goods", tab=tab, rows=rows, kpi=kpi, fg_in_stock=fg_in_stock, groups=groups)
+
+
+def fg_groups(rows):
+    """Tally jaisa view (client change #10): product-wise ek line (total qty); kholne par batch-wise detail.
+    Alert: Out of stock (0). Below minimum / Overstock tab lagenge jab Product par min / max stock aayega (abhi sirf Raw Material par hai)."""
+    by_product = {}
+    for r in rows:
+        product = r["batch"].product
+        key = product.id if product else 0
+        group = by_product.setdefault(key, {"product": product, "qty": 0.0, "value": 0.0, "batches": []})
+        group["qty"] += r["qty"]
+        group["value"] += r["value"]
+        group["batches"].append(r)
+    groups = []
+    for group in by_product.values():
+        product = group["product"]
+        qty = round(group["qty"], 4)
+        alert = None
+        if qty <= 0.00005:
+            alert = ("Out of stock", "bad")
+        else:
+            low, high = getattr(product, "min_stock", None), getattr(product, "max_stock", None)
+            if low and qty < low:
+                alert = ("Below minimum", "warn")
+            elif high and qty > high:
+                alert = ("Overstock", "warn")
+        # Pehle jinme maal bacha hai (naya upar), used-up batch neeche
+        group["batches"].sort(key=lambda r: (r["qty"] <= 0.00005, -r["batch"].id))
+        group.update(qty=qty, value=round(group["value"], 2), alert=alert, in_stock=len([r for r in group["batches"] if r["qty"] > 0.00005]),
+                     unit=group["batches"][0]["batch"].unit_code)
+        groups.append(group)
+    groups.sort(key=lambda g: (g["product"].name if g["product"] else ""))
+    return groups
