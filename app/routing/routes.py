@@ -123,7 +123,15 @@ def routing_list():
             "operator": cur.operator or "", "qty_in": cur.qty_in if cur.qty_in is not None else qty_in,
             "planned_hours": cur.planned_hours, "machines": _machine_choices(cur),
             "started_at": cur.started_at.strftime("%d %b %H:%M") if cur.started_at else "",
+            "defer_self": bool(cur.work_stage and cur.work_stage.scrap_after_next),
+            "defer_prev": None,
         }
+        deferred = deferred_scrap_stage(o, cur)
+        if deferred is not None:
+            actions[str(cur.id)]["defer_prev"] = {
+                "name": deferred.stage_name, "qty_in": deferred.qty_in or 0, "scrap": deferred.scrap_qty or 0,
+                "type_id": deferred.scrap_type_id or "", "kind": deferred.scrap_kind or "Saleable",
+            }
     operators = [r[0] for r in db.session.query(ProductionOrderStage.operator).filter(ProductionOrderStage.operator.isnot(None)).distinct().order_by(ProductionOrderStage.operator).all()]
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
@@ -159,6 +167,14 @@ def _stage_for_action(stage_id):
 
 def _previous_stages(order, stage):
     return [s for s in order.stages if s.sort_order < stage.sort_order]
+
+
+def deferred_scrap_stage(order, stage):
+    # Is stage se theek pehle ka Done stage agar "scrap baad me" wala hai (Melting) to wahi; warna None
+    previous = _previous_stages(order, stage)
+    if previous and previous[-1].status == "Done" and previous[-1].work_stage and previous[-1].work_stage.scrap_after_next:
+        return previous[-1]
+    return None
 
 
 @routing_bp.route("/routing/start/<int:stage_id>", methods=["POST"])
@@ -216,13 +232,47 @@ def routing_complete(stage_id):
     if completed_at < stage.started_at:
         flash("The finish time cannot be before the start time.", "error")
         return _back()
-    qty_out = request.form.get("qty_out", type=float)
+    # Single-entry scrap (client change 8): operator sirf scrap likhta hai, good output = aaya hua maal - scrap system nikaalta hai
+    # (form ka purana qty_out field ab ignore hota hai — ek hi jagah se number aaye taaki in/out/scrap kabhi na ladein)
     scrap = request.form.get("scrap_qty", type=float) or 0.0
-    if qty_out is None or qty_out <= 0:
-        flash("Enter the quantity (KG) that came out of this stage.", "error")
-        return _back()
+    qty_in = stage.qty_in or 0
     if scrap < 0:
         flash("Scrap cannot be negative.", "error")
+        return _back()
+    # "Scrap baad me" wala stage (Melting): uska apna scrap yahan nahi, agle stage (Casting) ke complete par likha jaata hai
+    if stage.work_stage and stage.work_stage.scrap_after_next:
+        scrap = 0.0
+    # Pichhla stage (Melting) ka scrap abhi likhna hai: kadhai molds me khali ho chuki, ab dross / slag pata hai
+    deferred = deferred_scrap_stage(order, stage)
+    prev_scrap = 0.0
+    prev_type = None
+    prev_kind = "Saleable"
+    if deferred is not None:
+        prev_scrap = request.form.get("prev_scrap_qty", type=float) or 0.0
+        if prev_scrap < 0:
+            flash("Scrap cannot be negative.", "error")
+            return _back()
+        if prev_scrap > (deferred.qty_in or 0) + EPS:
+            flash(f"{deferred.stage_name} scrap ({prev_scrap:g}) cannot be more than what came into {deferred.stage_name} ({(deferred.qty_in or 0):g} KG).", "error")
+            return _back()
+        if prev_scrap > 0:
+            prev_kind = (request.form.get("prev_scrap_kind") or "Saleable").strip()
+            if prev_kind not in ("Saleable", "Process loss"):
+                flash("Choose whether the scrap is saleable or a process loss.", "error")
+                return _back()
+            prev_type_id = request.form.get("prev_scrap_type_id", type=int)
+            prev_type = db.session.get(ScrapType, prev_type_id) if prev_type_id else None
+            if prev_type is None or prev_type.is_deleted or not prev_type.is_active:
+                flash(f"Choose the type of the {deferred.stage_name} scrap.", "error")
+                return _back()
+        # Casting me aane wala maal = Melting me gaya maal - Melting ka scrap
+        qty_in = round((deferred.qty_in or 0) - prev_scrap, 4)
+    if scrap > qty_in + EPS:
+        flash(f"Scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} KG).", "error")
+        return _back()
+    qty_out = max(qty_in - scrap, 0.0)
+    if qty_out <= EPS:
+        flash("Scrap cannot be the whole quantity. Some material must go on to the next stage.", "error")
         return _back()
     # Scrap hui to batao kis tarah ka aur kaisa (Saleable = Scrap warehouse me jaayega, Process loss = sirf record)
     scrap_type = None
@@ -237,10 +287,6 @@ def routing_complete(stage_id):
         if scrap_type is None or scrap_type.is_deleted or not scrap_type.is_active:
             flash("Choose the scrap type.", "error")
             return _back()
-    qty_in = stage.qty_in or 0
-    if qty_out + scrap > qty_in + EPS:
-        flash(f"Output ({qty_out:g}) plus scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} KG).", "error")
-        return _back()
     # Machines jo asli me chali: plan wali + usi work stage ki koi bhi active machine
     ids = {int(x) for x in request.form.getlist("machine_ids") if x.isdigit()}
     if not ids:
@@ -265,6 +311,13 @@ def routing_complete(stage_id):
     operator = (request.form.get("operator") or "").strip()[:60]
     if operator:
         stage.operator = operator
+    if deferred is not None:
+        # Melting stage ka scrap + uska qty_out ab pakka; Casting ka qty_in bhi usi hisaab se
+        deferred.scrap_qty = round(prev_scrap, 4)
+        deferred.scrap_type_id = prev_type.id if prev_type else None
+        deferred.scrap_kind = prev_kind
+        deferred.qty_out = round(qty_in, 4)
+        stage.qty_in = round(qty_in, 4)
     stage.status = "Done"
     stage.completed_at = completed_at
     stage.qty_out = round(qty_out, 4)

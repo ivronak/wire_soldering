@@ -264,10 +264,25 @@
           <div id="rt-machines" class="space-y-1.5"></div>
           <p class="text-[11.5px] text-ink-faint mt-2">Planned machines are ticked. Untick one that was not used, or tick another machine of this stage if it was used instead.</p>
         </div>
+        {# Pichhle stage (Melting) ka scrap: kadhai molds me khali hone ke baad hi pata chalta hai, isliye Casting complete par likhte hain #}
+        <div class="rt-box space-y-3" id="rt-prev-box" style="display:none">
+          <div class="text-[12.5px] text-ink-muted"><b id="rt-prev-title">Scrap of the earlier stage</b> — the crucible is now empty, so enter the dross / slag left behind.</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="rt-label">Scrap (KG)</label><input type="number" step="any" min="0" name="prev_scrap_qty" id="rt-prev-scrap" value="0" class="rt-input" /></div>
+            <div><label class="rt-label">Type of scrap</label>
+              <select name="prev_scrap_type_id" id="rt-prev-type" class="rt-input"><option value="">Select type</option>{% for t in scrap_types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+          </div>
+          <div id="rt-prev-kind">
+            <label class="flex items-start gap-2 text-[13.5px] mb-1"><input type="radio" name="prev_scrap_kind" value="Saleable" checked class="mt-1"> <span><b>Saleable scrap</b></span></label>
+            <label class="flex items-start gap-2 text-[13.5px]"><input type="radio" name="prev_scrap_kind" value="Process loss" class="mt-1"> <span><b>Process loss</b> — only recorded, not stocked.</span></label></div>
+        </div>
         <div class="rt-box grid grid-cols-2 gap-3">
           <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> KG</div>
-          <div><label class="rt-label">Quantity out (KG) *</label><input type="number" step="any" min="0" name="qty_out" id="rt-qty-out" class="rt-input" /></div>
-          <div><label class="rt-label">Scrap (KG)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
+          {# Sirf scrap likhna hai; good output = aaya hua - scrap, system khud nikaalta hai (client change 8) #}
+          <div id="rt-scrap-wrap"><label class="rt-label">Scrap (KG)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
+          <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none">Scrap of this stage is entered when the next stage is completed (after the crucible is emptied).</div>
+          <div><label class="rt-label">Good output (KG)</label><div id="rt-qty-out" class="rt-input" style="background:#F3F4F6;font-weight:600">0</div></div>
+          <div class="col-span-2 text-[11.5px] text-ink-faint">Enter only the scrap. Good output is worked out for you: came in − scrap.</div>
         </div>
         <div class="rt-box space-y-3" id="rt-scrap-box" style="display:none">
           <div class="text-[12.5px] text-ink-muted"><b>About the scrap</b> — so it can be tracked and later sold.</div>
@@ -318,8 +333,22 @@
     document.getElementById('rt-notes').value = '';
     if (!start) {
       document.getElementById('rt-qty-in').textContent = a.qty_in;
-      document.getElementById('rt-qty-out').value = a.qty_in;
+      QTY_IN = a.qty_in;
+      DEFER_PREV = a.defer_prev;
+      DEFER_SELF = !!a.defer_self;
       document.getElementById('rt-scrap').value = 0;
+      document.getElementById('rt-scrap').disabled = DEFER_SELF;       // disabled field submit nahi hota, server 0 maanta hai
+      document.getElementById('rt-scrap-wrap').style.display = DEFER_SELF ? 'none' : 'block';
+      document.getElementById('rt-defer-note').style.display = DEFER_SELF ? 'block' : 'none';
+      document.getElementById('rt-prev-box').style.display = DEFER_PREV ? 'block' : 'none';
+      document.getElementById('rt-prev-scrap').disabled = !DEFER_PREV;
+      document.getElementById('rt-prev-type').disabled = !DEFER_PREV;
+      document.querySelectorAll('input[name=prev_scrap_kind]').forEach(function (r) { r.disabled = !DEFER_PREV; r.checked = r.value === (DEFER_PREV ? DEFER_PREV.kind : 'Saleable'); });
+      if (DEFER_PREV) {
+        document.getElementById('rt-prev-title').textContent = 'Scrap of ' + DEFER_PREV.name;
+        document.getElementById('rt-prev-scrap').value = DEFER_PREV.scrap;
+        document.getElementById('rt-prev-type').value = DEFER_PREV.type_id;
+      }
       syncScrap();
       document.getElementById('rt-machines').innerHTML = a.machines.map(function (m) {
         return '<label class="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="machine_ids" value="' + m.id + '"' + (m.planned ? ' checked' : '') + '> ' + esc(m.name) +
@@ -328,12 +357,22 @@
     }
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
+  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false;
   function syncScrap() {
-    var has = (parseFloat(document.getElementById('rt-scrap').value) || 0) > 0;
+    var scrapNow = DEFER_SELF ? 0 : (parseFloat(document.getElementById('rt-scrap').value) || 0);
+    // Pichhle stage ka scrap ghata ke hi is stage me aaya maal nikalta hai
+    var prevScrap = DEFER_PREV ? (parseFloat(document.getElementById('rt-prev-scrap').value) || 0) : 0;
+    var cameIn = DEFER_PREV ? Math.max(DEFER_PREV.qty_in - prevScrap, 0) : QTY_IN;
+    document.getElementById('rt-qty-in').textContent = Math.round(cameIn * 10000) / 10000;
+    document.getElementById('rt-prev-type').required = prevScrap > 0;
+    var good = Math.max(cameIn - scrapNow, 0);
+    document.getElementById('rt-qty-out').textContent = (Math.round(good * 10000) / 10000);
+    var has = scrapNow > 0;
     document.getElementById('rt-scrap-box').style.display = has ? 'block' : 'none';
     document.getElementById('rt-scrap-type').required = has;
   }
   document.getElementById('rt-scrap').addEventListener('input', syncScrap);
+  document.getElementById('rt-prev-scrap').addEventListener('input', syncScrap);
   function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });
   ['rt-close', 'rt-cancel', 'rt-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeStage); });

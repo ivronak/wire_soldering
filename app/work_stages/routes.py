@@ -37,6 +37,7 @@ def work_stages_add():
     sort_order = request.form.get('sort_order') or 0
     is_batch = request.form.get('is_batch') == 'on'
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
+    scrap_after_next = request.form.get('scrap_after_next') == 'on'
 
     if not name:
         return redirect(url_for('work_stages.work_stages_list'))
@@ -50,6 +51,7 @@ def work_stages_add():
             existing.sort_order = sort_order
             existing.is_batch = is_batch
             existing.requires_lab_qc = requires_lab_qc
+            existing.scrap_after_next = scrap_after_next
             existing.is_active = True
             db.session.commit()
             flash("Work Stage restored with this code.","success")
@@ -64,6 +66,7 @@ def work_stages_add():
         sort_order=sort_order,
         is_batch=is_batch,
         requires_lab_qc=requires_lab_qc,
+        scrap_after_next=scrap_after_next,
         is_active=True,
         is_deleted=False,
     ))
@@ -79,6 +82,7 @@ def work_stages_edit(stage_id):
     sort_order = request.form.get('sort_order') or 0
     is_batch = request.form.get('is_batch') == 'on'
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
+    scrap_after_next = request.form.get('scrap_after_next') == 'on'
 
     if not name:
         return redirect(url_for('work_stages.work_stages_list'))
@@ -88,6 +92,7 @@ def work_stages_edit(stage_id):
     s.sort_order = sort_order
     s.is_batch = is_batch
     s.requires_lab_qc = requires_lab_qc
+    s.scrap_after_next = scrap_after_next
     db.session.commit()
     flash("Work Stage Updated", "success")
     return redirect(url_for('work_stages.work_stages_list'))

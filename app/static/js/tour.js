@@ -284,7 +284,7 @@
       { id: 'rt-start-post', type: 'submit', path: '/routing', target: '#rt-form', retryTo: 'rt-start', title: 'Start stage', text: '<b>Start stage</b> દબાવો.', todo: 'ક્લિક કરો: Start stage' },
       { id: 'rt-comp', type: 'click', path: '/routing', target: inCard('.rt-card', '.rt-act'), title: 'સ્ટેજ પૂરું કરો', text: 'હવે એ જ જગ્યાએ <b>Complete …</b> બટન છે.', todo: 'ક્લિક કરો: Complete (સ્ટેજ)' },
       { id: 'rt-comp-fill', type: 'fill', path: '/routing', target: '#rt-form', title: 'પૂરું કરવાની વિગત',
-        text: '<ul><li><b>Machines used</b> — ખરેખર કયા મશીન ચાલ્યા (ન ચાલ્યું તે અનટિક કરો)</li><li><b>Quantity out</b> — આ સ્ટેજમાંથી કેટલો KG માલ આગળ ગયો</li><li><b>Scrap</b> — કેટલો બગડ્યો; બગડ્યો હોય તો <b>પ્રકાર</b> અને <b>વેચી શકાય (Saleable)</b> કે <b>Process loss</b> પસંદ કરો</li></ul>ડેમો માટે 1 KG scrap (Metal slag) ભરાશે.',
+        text: '<ul><li><b>Machines used</b> — ખરેખર કયા મશીન ચાલ્યા (ન ચાલ્યું તે અનટિક કરો)</li><li><b>Good output</b> — આપોઆપ ગણાય છે (આવેલો માલ − scrap), લખવાનું નથી</li><li><b>Scrap</b> — ફક્ત આ જ લખવાનું: કેટલો બગડ્યો; બગડ્યો હોય તો <b>પ્રકાર</b> અને <b>વેચી શકાય (Saleable)</b> કે <b>Process loss</b> પસંદ કરો</li></ul>ડેમો માટે 1 KG scrap (Metal slag) ભરાશે.',
         prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillStageComplete } },
       { id: 'rt-comp-post', type: 'submit', path: '/routing', target: '#rt-form', retryTo: 'rt-comp', title: 'Complete stage', text: '<b>Complete stage</b> દબાવો.', todo: 'ક્લિક કરો: Complete stage' },
       { id: 'rt-done1', type: 'info', path: '/routing', target: inCard('.rt-card', '.rt-head'), title: 'પહેલું સ્ટેજ પૂરું ✅',
@@ -523,10 +523,8 @@
 
   function prefillStageComplete() {
     return sleep(50).then(function () {
-      var scrapInput = $('#rt-scrap'), qtyOut = $('#rt-qty-out');
-      var qtyIn = parseFloat(($('#rt-qty-in') || {}).textContent) || 0;
-      setVal(scrapInput, '1');
-      setVal(qtyOut, String(Math.round((qtyIn - 1) * 1000) / 1000));
+      // Good output ab system khud nikaalta hai, demo me sirf scrap bharna hai
+      setVal($('#rt-scrap'), '1');
       var type = $('#rt-scrap-type');
       var pick = $$('option', type).filter(function (o) { return /slag/i.test(o.textContent); })[0] || $$('option', type)[1];
       if (pick) setVal(type, pick.value);

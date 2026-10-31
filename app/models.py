@@ -93,6 +93,8 @@ class WorkStage(CreatedAtMixin, db.Model):
     is_batch = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     # Is stage ke baad Lab QC + Test Certificate (TC) zaroori: TC upload hue bina agla stage start nahi hota (client change #7)
     requires_lab_qc = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    # Is stage (jaise Melting) ka scrap abhi nahi likhte: kadhai khali hone par agle stage (Ingot Casting) ke complete par likhte hain (client change #8)
+    scrap_after_next = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
 
 class RmCategories(CreatedAtMixin, db.Model):
     __tablename__='rm_categories'
