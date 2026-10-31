@@ -354,7 +354,9 @@
                       data-base-unit="{{ p.base_unit.code if p.base_unit else '' }}"
                       data-hsn="{{ p.hsn_code or '' }}"
                       data-id="{{ p.id }}"
-                      data-tax-rate="{{ (p.tax_rate.code ~ ' — ' ~ p.tax_rate.rate_percent ~ '%') if p.tax_rate else '' }}">
+                      data-tax-rate="{{ (p.tax_rate.code ~ ' — ' ~ p.tax_rate.rate_percent ~ '%') if p.tax_rate else '' }}"
+                      data-min-stock="{{ p.min_stock if p.min_stock is not none else '' }}"
+                      data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}">
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
                     <button type="button" title="Production stages (routing)" aria-label="Production stages"
@@ -374,6 +376,8 @@
                       data-base-unit-id="{{ p.base_unit_id or '' }}"
                       data-hsn="{{ p.hsn_code or '' }}"
                       data-tax-rate-id="{{ p.tax_rate_id or '' }}"
+                      data-min-stock="{{ p.min_stock if p.min_stock is not none else '' }}"
+                      data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
                       data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }}}{% if not loop.last %},{% endif %}{% endfor %}]'
                       data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
@@ -555,6 +559,19 @@
           <option value="{{ t.id }}">{{ t.code }} — {{ t.rate_percent }}%</option>
           {% endfor %}
         </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="product-min-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Min stock (finished goods)</label>
+          <input type="number" id="product-min-stock" name="min_stock" placeholder="Optional" min="0" step="1"
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <div>
+          <label for="product-max-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Max stock (finished goods)</label>
+          <input type="number" id="product-max-stock" name="max_stock" placeholder="Optional" min="0" step="1"
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        </div>
+        <p class="col-span-2 text-[11.5px] text-ink-faint -mt-1">Total quantity in the Finished goods page is compared with these: below the minimum shows "Below minimum", above the maximum shows "Overstock". Leave empty for no alert.</p>
       </div>
       <div id="formulation-section" class="space-y-4">
         <hr class="border-slate-200" />
@@ -986,6 +1003,8 @@
     document.getElementById('product-base-unit').value = btn.getAttribute('data-base-unit-id') || '';
     document.getElementById('product-hsn').value = btn.getAttribute('data-hsn') || '';
     document.getElementById('product-tax-rate').value = btn.getAttribute('data-tax-rate-id') || '';
+    document.getElementById('product-min-stock').value = btn.getAttribute('data-min-stock') || '';
+    document.getElementById('product-max-stock').value = btn.getAttribute('data-max-stock') || '';
     var attrs = {};
     var recipe = [];
     try { attrs = JSON.parse(btn.getAttribute('data-attributes') || '{}'); } catch (err) { attrs = {}; }
@@ -1033,6 +1052,8 @@
       viewField('Base unit', btn.getAttribute('data-base-unit')) +
       viewField('HSN', btn.getAttribute('data-hsn')) +
       viewField('Tax rate', btn.getAttribute('data-tax-rate')) +
+      viewField('Min stock', btn.getAttribute('data-min-stock')) +
+      viewField('Max stock', btn.getAttribute('data-max-stock')) +
       '</div>' +
       '<div class="pt-2">' + viewField('Description', btn.getAttribute('data-description')) + '</div>'+
       '<div class="pt-3"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1">Attributes and recipe</div>' +

@@ -478,6 +478,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User chahta tha ki website par hi ek-ek cheez ka tour ho, steps asli me karke, Gujarati me, non-tech users ke liye.
 **How to apply:** Naya module aaye to uska chapter `tour.js` me jodo aur `tour_test.py` (paths / selectors check) chalao. Tour asli data banata hai — live par sirf training ke liye. Selectors / ids badlo (jaise `#mo-form`, `.po-chev`) to tour toot sakta hai — `tour_test.py` ki selector list update karo.
 
+### Decision: Rack = warehouse ke andar sirf naam, capacity nahi (2026-10-31)
+**Date:** 2026-10-31
+**Kya:** Client change #10 ka Rack master: ek rack ek warehouse ka hota hai, sirf naam (A, B, C / 1, 2, 3) + auto code RK-xxxx, capacity nahi. Same naam alag warehouse me chal sakta hai, ek warehouse me nahi. Soft-delete.
+**Kyun:** Client ne bas itna kaha ki GRN / FG receipt par poochho "kis rack me" taaki lot hamesha mile; capacity ki zaroorat nahi boli. Khule sawaal ka recommended default liya (user ne "Rack master next" kaha); capacity baad me jod sakte hain.
+**How to apply:** Rack chunna GRN aur Production output (FG receipt) me jodna hai; lot / batch par rack_id nullable rakho (purane lots bina rack ke). Capacity maange to Rack me ek nullable column jodo.
+
 ### Decision: Client Round 3 (2026-10-26) — nayi business rules jo kabhi todni nahi (2026-10-27)
 **Date:** 2026-10-27
 **Kya:** Client meeting ke 12 changes (spec §28). Pakke rules: (a) **Plant ko party ka naam kabhi nahi dikhna** — production order print / screen par sirf Production Order Number; naam sirf Office / Sales / Accounts. (b) **Cost / price sirf Owner / main Admin** ko; baaki sab ke liye hide. (c) **Single-entry scrap** — operator sirf scrap likhe, good output system nikaale; melting ka scrap sirf casting ke baad (kadhai khali hone par). (d) **Lab QC + TC ke bina batch Ingot Casting me nahi jaa sakta** (hard gate); TC lot + party order se hamesha juda. (e) **Line = 8 stages ka poora set + apni machines; ek machine ek hi line me**; Queue se Process me bhejte waqt line chunni padegi; capacity se kam banao to reason mandatory. (f) **Tin / Lead Melting me jaate hain, Flux Prep me sirf flux + chemicals**; furnace capacity ke hisaab se lots. (g) **FG list Tally jaisi** — product + total qty, andar batch / party / Own Stock. (h) **Loss par sales bill owner approval ke bina nahi** (cost > rate, Rs 1 bhi).

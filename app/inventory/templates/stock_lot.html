@@ -25,7 +25,7 @@
         <div>
           <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('inventory.stock_list') }}" class="hover:underline">Inventory / Stock</a> / Lot history</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">{{ lot.raw_material.name if lot.raw_material else '' }} <span class="font-mono text-[15px] text-ink-faint">{{ lot.lot_code }}</span></h1>
-          <div class="text-[12.5px] text-ink-faint">From {{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else 'opening stock' }} · vendor batch {{ lot.vendor_batch_no or '—' }} · {{ received|qty }} {{ unit }} received</div>
+          <div class="text-[12.5px] text-ink-faint">From {{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else 'opening stock' }} · vendor batch {{ lot.vendor_batch_no or '—' }}{% if lot.rack %} · rack {{ lot.rack.name }}{% endif %} · {{ received|qty }} {{ unit }} received</div>
         </div>
         <a href="{{ url_for('inventory.stock_list') }}" class="px-3 py-1.5 text-[13px] text-ink border border-slate-300 rounded hover:bg-mist">&larr; Back to stock</a>
       </div>

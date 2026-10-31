@@ -69,7 +69,7 @@
         <div class="fg-meta">{{ '%g'|format(r.made) }} {{ b.unit_code }} were made</div></div>
       <div><div class="fg-meta">Cost per {{ b.unit_code or 'unit' }}</div><div class="text-[14px] font-semibold">₹{{ b.unit_cost|inr }}</div></div>
       <div><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold">₹{{ r.value|inr }}</div></div>
-      <div><div class="fg-meta">Kept in</div><div class="text-[13px]">{{ r.where }}</div></div>
+      <div><div class="fg-meta">Kept in</div><div class="text-[13px]">{{ r.where }}{% if r.rack %} · Rack {{ r.rack }}{% endif %}</div></div>
     </div>
   {% endmacro %}
   {% if tab == 'fg' %}

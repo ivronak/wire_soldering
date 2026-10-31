@@ -11,6 +11,7 @@ from app.tax_rates.routes import tax_rates_bp
 from app.product_categories.routes import product_categories_bp
 from app.products.routes import products_bp
 from app.warehouses.routes import warehouses_bp
+from app.racks.routes import racks_bp
 from app.vendors.routes import vendors_bp
 from app.customers.routes import customers_bp
 from app.purchase_orders.routes import purchase_orders_bp
@@ -80,6 +81,7 @@ def create_app():
     app.register_blueprint(product_categories_bp)
     app.register_blueprint(products_bp)
     app.register_blueprint(warehouses_bp)
+    app.register_blueprint(racks_bp)
     app.register_blueprint(vendors_bp)
     app.register_blueprint(customers_bp)
     app.register_blueprint(purchase_orders_bp)

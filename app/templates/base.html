@@ -151,6 +151,7 @@
         {# Sub-group: Storage — physical/logical stock buckets #}
         <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Storage</div>
         <a href="{{ url_for('warehouses.warehouses_list') }}" class="nav-link{% if active_nav == 'warehouses' %} is-active{% endif %}"{% if active_nav == 'warehouses' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
+        <a href="{{ url_for('racks.racks_list') }}" class="nav-link{% if active_nav == 'racks' %} is-active{% endif %}"{% if active_nav == 'racks' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16M4 12h16M4 19h16M7 5v14M17 5v14"/></svg>Racks</a>
 
         {# Sub-group: Partners — external parties (vendor type vendor ke saath) #}
         <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Partners</div>

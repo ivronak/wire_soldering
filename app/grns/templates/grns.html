@@ -121,7 +121,8 @@
         data-descs='{{ (g.lines | map(attribute="po_line.raw_material.name") | list) | tojson }}'
         data-qtys='{{ (g.lines | map(attribute="received_qty") | list) | tojson }}'
         data-units='{{ (g.lines | map(attribute="po_line.unit.code") | list) | tojson }}'
-        data-batches='{{ (g.lines | map(attribute="batch_lot_no") | list) | tojson }}'>
+        data-batches='{{ (g.lines | map(attribute="batch_lot_no") | list) | tojson }}'
+        data-racks='{{ (g.lines | map(attribute="rack.name") | map("default", "—", true) | list) | tojson }}'>
         View
       </button>
       {% endmacro %}
@@ -428,13 +429,14 @@
               <th style="width:9%">Prev. recv.</th>
               <th style="width:11%">This receipt *</th>
               <th style="width:7%">Unit</th>
-              <th style="width:14%">Vendor batch / lot *</th>
-              <th style="width:12%">Mfg date</th>
+              <th style="width:13%">Vendor batch / lot *</th>
+              <th style="width:11%">Mfg date</th>
+              <th style="width:9%">Rack</th>
             </tr>
           </thead>
           <tbody id="receipt-tbody">
             <tr>
-              <td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td>
+              <td colspan="9" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td>
             </tr>
           </tbody>
         </table>
@@ -507,25 +509,29 @@
     grnModal.setAttribute('aria-hidden', 'true');
     grnForm.reset();
     document.getElementById('grn-vendor').value = '';
-    receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td></tr>';
+    receiptTbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td></tr>';
   }
 
   // ---- PO select hote hi uski lines real Flask se fetch() ----
   function renderReceiptLines(poId) {
     if (!poId) {
       document.getElementById('grn-vendor').value = '';
-      receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td></tr>';
+      receiptTbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-ink-faint text-[13px]">Select a purchase order to load lines</td></tr>';
       return;
     }
-    receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">Loading…</td></tr>';
+    receiptTbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-ink-faint text-[13px]">Loading…</td></tr>';
     fetch('/grns/po_lines/' + poId)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         document.getElementById('grn-vendor').value = data.vendor || '';
         if (!data.lines || !data.lines.length) {
-          receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-ink-faint text-[13px]">No lines found on this PO</td></tr>';
+          receiptTbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-ink-faint text-[13px]">No lines found on this PO</td></tr>';
           return;
         }
+        // Rack dropdown: PO ke store warehouse ke racks (optional). Rack nahi bane ho to sirf "No rack" dikhega.
+        var rackSelect = '<select class="line-rack"><option value="">No rack</option>' + (data.racks || []).map(function (rack) {
+          return '<option value="' + rack.id + '">' + String(rack.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') + '</option>';
+        }).join('') + '</select>';
         receiptTbody.innerHTML = data.lines.map(function (line) {
           return '<tr>' +
             '<td><input type="hidden" name="po_line_id_" class="line-po-line-id" value="' + line.po_line_id + '" />' +
@@ -537,12 +543,13 @@
             '<td><input type="text" readonly class="text-center" value="' + line.unit_code + '" /></td>' +
             '<td><input type="text" required class="line-batch font-mono text-[12px]" placeholder="Batch/lot" /></td>' +
             '<td><input type="date" class="line-mfg" /></td>' +
+            '<td>' + rackSelect + '</td>' +
             '</tr>';
         }).join('');
         renumberReceiptLines();
       })
       .catch(function () {
-        receiptTbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-stop text-[13px]">Could not load PO lines.</td></tr>';
+        receiptTbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-stop text-[13px]">Could not load PO lines.</td></tr>';
       });
   }
 
@@ -556,6 +563,7 @@
       row.querySelector('.line-recv').name = 'received_qty_' + index;
       row.querySelector('.line-batch').name = 'batch_lot_no_' + index;
       row.querySelector('.line-mfg').name = 'mfg_date_' + index;
+      row.querySelector('.line-rack').name = 'rack_id_' + index;
     });
   }
 
@@ -572,6 +580,7 @@
     var qtys = JSON.parse(btn.getAttribute('data-qtys') || '[]');
     var units = JSON.parse(btn.getAttribute('data-units') || '[]');
     var batches = JSON.parse(btn.getAttribute('data-batches') || '[]');
+    var racks = JSON.parse(btn.getAttribute('data-racks') || '[]');
 
     var html = '<dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] mb-4">';
     html += viewField('GRN date', btn.getAttribute('data-date'));
@@ -582,11 +591,11 @@
     html += viewField('Remarks', btn.getAttribute('data-remarks'));
     html += '</dl>';
     html += '<table class="w-full text-[13px] border border-slate-200 rounded overflow-hidden"><thead><tr class="bg-mist text-[11px] uppercase text-ink-muted">';
-    html += '<th class="p-2 text-left">Material</th><th class="p-2 text-left">Description</th><th class="p-2">Recv qty</th><th class="p-2">Unit</th><th class="p-2">Batch</th></tr></thead><tbody>';
+    html += '<th class="p-2 text-left">Material</th><th class="p-2 text-left">Description</th><th class="p-2">Recv qty</th><th class="p-2">Unit</th><th class="p-2">Batch</th><th class="p-2">Rack</th></tr></thead><tbody>';
     codes.forEach(function (code, i) {
       html += '<tr class="border-t border-slate-100"><td class="p-2 font-mono text-[12px]">' + code + '</td><td class="p-2">' + (descs[i] || '') +
         '</td><td class="p-2 text-center tabular-nums">' + (qtys[i] || '') + '</td><td class="p-2 text-center">' + (units[i] || '') +
-        '</td><td class="p-2 text-center font-mono text-[12px]">' + (batches[i] || '') + '</td></tr>';
+        '</td><td class="p-2 text-center font-mono text-[12px]">' + (batches[i] || '') + '</td><td class="p-2 text-center">' + (racks[i] || '—') + '</td></tr>';
     });
     html += '</tbody></table>';
     document.getElementById('view-body').innerHTML = html;

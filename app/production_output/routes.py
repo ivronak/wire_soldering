@@ -7,9 +7,9 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 
 from app.extensions import db
 from app.inventory.posting import InventoryError
-from app.models import FGBatch, ProductionOrder, ProductionOutput
+from app.models import FGBatch, ProductionOrder, ProductionOutput, Rack
 from app.production_orders.scheduler import persist_schedule, renumber_queue
-from app.production_output.posting import cancel_output, material_table, post_output, wip_lines
+from app.production_output.posting import cancel_output, fg_warehouse_for, material_table, post_output, wip_lines
 from app.routing.routes import order_summary
 
 production_output_bp = Blueprint("production_output", __name__, template_folder="templates")
@@ -19,6 +19,16 @@ OVER_TOLERANCE = 1.10          # ordered qty se 10% tak zyada ban sakta hai
 
 def _list_url(tab="ready"):
     return url_for("production_output.production_output_list", tab=tab)
+
+
+def fg_racks_for(order):
+    # Order ke FG warehouse ke chalu racks (Good maal wahin jaata hai). FG warehouse / material na ho to khaali list —
+    # rack optional hai, aur asli error post karte waqt dikhegi.
+    try:
+        warehouse = fg_warehouse_for(order)
+    except InventoryError:
+        return []
+    return Rack.query.filter_by(warehouse_id=warehouse.id, is_active=True, is_deleted=False).order_by(Rack.name).all()
 
 
 def output_plan(order):
@@ -38,6 +48,7 @@ def output_plan(order):
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
+        "racks": [{"id": rack.id, "name": rack.name} for rack in fg_racks_for(order)],
     }
 
 
@@ -93,7 +104,12 @@ def _read_form():
         return None, f"Good + rework + scrap + loss ({good + rework + scrap + loss:g}) is more than 10% above the ordered quantity ({order.planned_qty:g}). Check the numbers."
     if not wip_lines(order):
         return None, "No material is in production for this order. Issue material first."
-    return {"order": order, "output_date": output_date, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4), "loss": round(loss, 4),
+    # Rack optional; chuna ho to order ke FG warehouse ka chalu rack hona chahiye (backend pe bhi jaanch, sirf dropdown pe bharosa nahi)
+    rack_raw = (request.form.get("rack_id") or "").strip()
+    rack_id = int(rack_raw) if rack_raw.isdigit() else None
+    if rack_raw and (rack_id is None or rack_id not in {rack.id for rack in fg_racks_for(order)}):
+        return None, "Choose a rack that belongs to the finished goods warehouse of this order."
+    return {"order": order, "output_date": output_date, "rack_id": rack_id, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4), "loss": round(loss, 4),
             "recorded_by": (request.form.get("recorded_by") or "").strip()[:60], "remarks": (request.form.get("remarks") or "").strip()[:255]}, None
 
 
@@ -113,7 +129,7 @@ def production_output_add():
                               recorded_by=data["recorded_by"], remarks=data["remarks"], status="Posted", is_deleted=False)
     db.session.add(output)
     try:
-        post_output(output, order)
+        post_output(output, order, rack_id=data["rack_id"])
     except InventoryError as stock_error:
         db.session.rollback()
         flash(str(stock_error), "error")
@@ -178,7 +194,7 @@ def finished_goods_list():
         qty, value = batch.balance
         where = next((m.warehouse.name for m in batch.movements if m.warehouse is not None), "")
         rows.append({"batch": batch, "qty": qty, "value": value, "made": sum(m.qty for m in batch.movements if m.movement_type == "OUTPUT_IN" and m.reverses_movement_id is None),
-                     "where": where, "order": batch.production_order})
+                     "where": where, "order": batch.production_order, "rack": batch.rack.name if batch.rack else ""})
     fg_in_stock = [r for r in rows if r["qty"] > 0.00005] if tab == "fg" else []
     kpi = {"batches": len([r for r in rows if r["qty"] > 0.00005]), "qty": round(sum(r["qty"] for r in rows), 4), "value": round(sum(r["value"] for r in rows), 2)}
     groups = fg_groups(rows) if tab == "fg" else []

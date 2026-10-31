@@ -1,10 +1,20 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash, jsonify
-from app.inventory.posting import receive_grn, InventoryError
-from app.models import GRN, PurchaseOrder, GRNLine
+from app.inventory.posting import receive_grn, store_warehouse_for, InventoryError
+from app.models import GRN, PurchaseOrder, GRNLine, Rack
 from app.extensions import db
 from datetime import datetime
 
 grns_bp = Blueprint("grns", __name__, template_folder="templates")
+
+
+def store_racks_for(po):
+    # PO ke store (RM) warehouse ke chalu racks — QC pass ke baad maal isi warehouse me jaata hai, isliye rack bhi isi ke.
+    # Store warehouse na ho to khaali list (rack optional hai, GRN phir bhi ban sakti hai).
+    try:
+        store = store_warehouse_for(po)
+    except InventoryError:
+        return []
+    return Rack.query.filter_by(warehouse_id=store.id, is_active=True, is_deleted=False).order_by(Rack.name).all()
 
 def refresh_po_status(po):
     if po.status in ("Draft", "Cancelled"):
@@ -94,7 +104,8 @@ def grns_po_lines(po_id):
                 "unit_code": line.unit.code if line.unit else "",
             }
         )    
-    return jsonify(vendor=po.vendor.name if po.vendor else "", lines=lines)
+    racks = [{"id": rack.id, "name": rack.name} for rack in store_racks_for(po)]
+    return jsonify(vendor=po.vendor.name if po.vendor else "", lines=lines, racks=racks)
 
 @grns_bp.route('/grns/add', methods=['POST'])
 def grns_add():
@@ -119,6 +130,8 @@ def grns_add():
 
     # Is PO ki apni lines ke id — form me kisi aur PO ki line aaye to reject
     valid_line_ids = {line.id for line in po.lines}
+    # Rack sirf PO ke store warehouse ke chalu racks me se (frontend ki list pe bharosa nahi, backend pe bhi jaanch)
+    valid_rack_ids = {rack.id for rack in store_racks_for(po)}
 
     grn_date = datetime.strptime(grn_date_raw, "%Y-%m-%d").date()
 
@@ -150,6 +163,7 @@ def grns_add():
         received_qty_raw = (request.form.get(f'received_qty_{i}') or "").strip()
         batch_raw = (request.form.get(f'batch_lot_no_{i}') or "").strip()
         mfg_raw = (request.form.get(f'mfg_date_{i}') or "").strip()
+        rack_raw = (request.form.get(f'rack_id_{i}') or "").strip()
 
         if not po_line_id_raw:
             break
@@ -166,13 +180,19 @@ def grns_add():
                 flash("Each received qty must be more than 0 and belong to this purchase order.", "error")
                 return redirect(url_for('grns.grns_list'))
 
+            rack_id = int(rack_raw) if rack_raw.isdigit() else None
+            if rack_id is not None and rack_id not in valid_rack_ids:
+                db.session.rollback()
+                flash("Choose a rack that belongs to the store warehouse of this purchase order.", "error")
+                return redirect(url_for('grns.grns_list'))
+
             db.session.add(GRNLine(
                 grn_id=grn.id,
                 po_line_id=po_line_id,
                 received_qty=received_qty,
                 batch_lot_no=batch_raw,
                 mfg_date=datetime.strptime(mfg_raw, "%Y-%m-%d").date() if mfg_raw else None,
-
+                rack_id=rack_id,
             ))
             lines_added += 1
         i += 1

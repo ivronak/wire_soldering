@@ -14,6 +14,26 @@ def generate_next_product_code():
         return "FG-0001"
     return f"FG-{last.id + 1:04d}"
 
+def read_min_max():
+    """Form se Min / Max stock (KG, whole number, khaali ho sakta hai). Return (min, max, error)."""
+    values = []
+    for field in ("min_stock", "max_stock"):
+        raw = (request.form.get(field) or "").strip()
+        if not raw:
+            values.append(None)
+            continue
+        try:
+            number = int(raw)
+        except ValueError:
+            return None, None, "Min and max stock must be whole numbers."
+        if number < 0:
+            return None, None, "Min and max stock cannot be negative."
+        values.append(number)
+    if values[0] is not None and values[1] is not None and values[0] > values[1]:
+        return None, None, "Min stock cannot be more than max stock."
+    return values[0], values[1], None
+
+
 @products_bp.route("/products")
 def products_list():
 
@@ -81,6 +101,10 @@ def products_add():
     base_unit_id = int(request.form.get('base_unit_id')) if (request.form.get('base_unit_id') or "").strip() else None
     hsn_code = (request.form.get('hsn_code') or "").strip()
     tax_rate_id = int(request.form.get('tax_rate_id')) if (request.form.get('tax_rate_id') or "").strip() else None
+    min_stock, max_stock, mm_error = read_min_max()
+    if mm_error:
+        flash(mm_error, "error")
+        return redirect(url_for('products.products_list'))
     cat = ProductCategories.query.get(category_id) if category_id else None
     attr_keys = request.form.getlist('attr_key_0[]')
     attr_values = request.form.getlist('attr_value_0[]')
@@ -119,6 +143,8 @@ def products_add():
             existing.base_unit_id = base_unit_id
             existing.tax_rate_id = tax_rate_id
             existing.hsn_code = hsn_code
+            existing.min_stock = min_stock
+            existing.max_stock = max_stock
             existing.is_active = True
             db.session.commit()
             flash("A Product restored with this code.", "success")    
@@ -136,6 +162,8 @@ def products_add():
         base_unit_id=base_unit_id,
         tax_rate_id=tax_rate_id,
         hsn_code=hsn_code,
+        min_stock=min_stock,
+        max_stock=max_stock,
         is_active=True,
         is_deleted=False,
     )
@@ -224,6 +252,10 @@ def products_edit(p_id):
     base_unit_id = int(request.form.get('base_unit_id')) if (request.form.get('base_unit_id') or "").strip() else None
     hsn_code = (request.form.get('hsn_code') or "").strip()
     tax_rate_id = int(request.form.get('tax_rate_id')) if (request.form.get('tax_rate_id') or "").strip() else None
+    min_stock, max_stock, mm_error = read_min_max()
+    if mm_error:
+        flash(mm_error, "error")
+        return redirect(url_for('products.products_list'))
     cat = ProductCategories.query.get(category_id) if category_id else None
     attr_keys = request.form.getlist('attr_key_0[]')
     attr_values = request.form.getlist('attr_value_0[]')
@@ -256,6 +288,8 @@ def products_edit(p_id):
     p.base_unit_id = base_unit_id
     p.tax_rate_id = tax_rate_id
     p.hsn_code = hsn_code
+    p.min_stock = min_stock
+    p.max_stock = max_stock
     p.is_deleted = False
 
     VariantRecipeItem.query.filter_by(product_id=p.id).delete()

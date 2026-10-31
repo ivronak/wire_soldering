@@ -184,6 +184,10 @@ class Product(CreatedAtMixin, db.Model):
     tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=False)
     tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
 
+    # Finished goods ke alert (client change #10): total FG qty min se kam ho to "Below minimum", max se zyada ho to "Overstock". Khaali = alert nahi.
+    min_stock = db.Column(db.Integer, nullable=True)
+    max_stock = db.Column(db.Integer, nullable=True)
+
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -599,6 +603,11 @@ class GRNLine(CreatedAtMixin, db.Model):
     received_qty = db.Column(db.Float, nullable=False)
     batch_lot_no = db.Column(db.String(30), nullable=False)
     mfg_date = db.Column(db.Date, nullable=True)
+
+    # Rack (client change #10): QC pass hone ke baad maal store warehouse ke is rack me rakha jayega. Optional — purani GRN me khaali.
+    # Rack hamesha PO ke store (RM) warehouse ka hota hai (grns/routes.py me jaanch).
+    rack_id = db.Column(db.Integer, db.ForeignKey("racks.id"), nullable=True)
+    rack = db.relationship("Rack", foreign_keys=[rack_id])
 
     @property
     def final_qc(self):
@@ -1355,6 +1364,11 @@ class StockLot(CreatedAtMixin, db.Model):
     vendor_batch_no = db.Column(db.String(30), nullable=True)
 
     @property
+    def rack(self):
+        # Rack GRN line par chuna jaata hai (opening stock lot ka koi rack nahi => None)
+        return self.grn_line.rack if self.grn_line else None
+
+    @property
     def unit_code(self):
         # Is lot ki unit ka code: opening lot me apni, GRN lot me PO line se
         if self.unit is not None:
@@ -1802,6 +1816,10 @@ class FGBatch(CreatedAtMixin, db.Model):
     mfg_date = db.Column(db.Date, nullable=False)
     unit_cost = db.Column(db.Float, default=0, nullable=False)
 
+    # Rack (client change #10): FG warehouse ke andar batch kis rack me rakha hai. Optional; Scrap batch aur purane batch me khaali.
+    rack_id = db.Column(db.Integer, db.ForeignKey("racks.id"), nullable=True)
+    rack = db.relationship("Rack", foreign_keys=[rack_id])
+
     @property
     def balance(self):
         row = db.session.query(db.func.coalesce(db.func.sum(FGMovement.qty), 0), db.func.coalesce(db.func.sum(FGMovement.value), 0)).filter(
@@ -1867,3 +1885,17 @@ class StageLabQC(CreatedAtMixin, db.Model):
     result = db.Column(db.String(8), nullable=False)             # "Pass" / "Fail"
     remarks = db.Column(db.String(255), nullable=True)
     tc_file = db.Column(db.String(255), nullable=True)           # UPLOAD_FOLDER ke andar ka relative path (Pass par zaroori)
+
+
+class Rack(CreatedAtMixin, db.Model):
+    # Rack master (client change #10): warehouse ke andar ki jagah (A, B, C / 1, 2, 3 ...). Sirf naam, capacity nahi.
+    # Baad me GRN aur FG receipt par rack chunna jayega taaki lot / batch hamesha dhoondha ja sake. Delete nahi, sirf is_deleted (soft).
+    __tablename__ = "racks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(40), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
+    warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)

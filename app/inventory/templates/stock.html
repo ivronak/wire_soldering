@@ -109,12 +109,12 @@
             <p class="text-[12px] text-ink-faint">Each lot is one batch from one goods receipt. Open <strong>History</strong> to see everything that happened to it.</p>
           </div>
           <table class="st-table">
-            <colgroup><col style="width:9%"><col style="width:17%"><col style="width:14%"><col style="width:32%"><col style="width:18%"><col style="width:10%"></colgroup>
-            <thead><tr><th>Lot</th><th>Material</th><th>From</th><th>Where it is now</th><th>Value</th><th></th></tr></thead>
+            <colgroup><col style="width:9%"><col style="width:16%"><col style="width:13%"><col style="width:28%"><col style="width:8%"><col style="width:16%"><col style="width:10%"></colgroup>
+            <thead><tr><th>Lot</th><th>Material</th><th>From</th><th>Where it is now</th><th>Rack</th><th>Value</th><th></th></tr></thead>
             <tbody>
               {% for row in lot_rows %}
               {% set lot = row.lot %}
-              <tr class="lot-row" data-search="{{ ((lot.raw_material.name if lot.raw_material else '') ~ ' ' ~ lot.lot_code ~ ' ' ~ (lot.vendor_batch_no or '') ~ ' ' ~ (lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else ''))|lower }}">
+              <tr class="lot-row" data-search="{{ ((lot.raw_material.name if lot.raw_material else '') ~ ' ' ~ lot.lot_code ~ ' ' ~ (lot.vendor_batch_no or '') ~ ' ' ~ (lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else '') ~ ' ' ~ (lot.rack.name if lot.rack else ''))|lower }}">
                 <td class="font-mono font-semibold text-ink">{{ lot.lot_code }}</td>
                 <td>{{ lot.raw_material.name if lot.raw_material else '—' }}</td>
                 <td><div class="font-mono text-[12px]">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else 'Opening stock' }}</div><div class="text-[11px] text-ink-faint">Batch {{ lot.vendor_batch_no or '—' }}</div></td>
@@ -129,11 +129,12 @@
                     {% if not (row.available > 0 or row.waiting > 0 or row.rejected > 0 or row.wip > 0 or row.transit > 0 or row.scrap > 0) %}<span class="sc-chip zero">Empty</span>{% endif %}
                   </div>
                 </td>
+                <td>{{ lot.rack.name if lot.rack else '—' }}</td>
                 <td class="tabular-nums">₹{{ row.value|inr }}</td>
                 <td><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2.5 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">History</a></td>
               </tr>
               {% else %}
-              <tr><td colspan="6" class="text-ink-faint text-center" style="padding:22px;">No lots yet.</td></tr>
+              <tr><td colspan="7" class="text-ink-faint text-center" style="padding:22px;">No lots yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>

@@ -47,8 +47,17 @@ def _warehouse(branch_id, wtype):
     return warehouse
 
 
-def post_output(output, order):
-    """RM use + FG / Scrap stock. InventoryError uthata hai (caller rollback karta hai)."""
+def fg_warehouse_for(order):
+    """Is order ka Good maal jis FG warehouse me jayega (RM ki WIP warehouse ki branch ka). Form ko rack ki list dikhane ke liye bhi yahi chahiye."""
+    rows = wip_lines(order)
+    if not rows:
+        raise InventoryError("No material is in production for this order, so there is nothing to use up.")
+    wip = wip_warehouse_for(rm_warehouse_of(rows[0][0].lot))
+    return _warehouse(wip.branch_id, "FG")
+
+
+def post_output(output, order, rack_id=None):
+    """RM use + FG / Scrap stock. InventoryError uthata hai (caller rollback karta hai). rack_id = Good batch ka rack (optional)."""
     db.session.flush()
     rows = wip_lines(order)
     if not rows:
@@ -72,7 +81,7 @@ def post_output(output, order):
     output.unit_cost = round(total_value / output.good_qty, 4) if output.good_qty else 0
 
     batch = FGBatch(batch_no=output.batch_no, kind="FG", product_id=order.product_id, production_order_id=order.id, output=output,
-                    mfg_date=output.output_date, unit_cost=output.unit_cost)
+                    mfg_date=output.output_date, unit_cost=output.unit_cost, rack_id=rack_id)
     db.session.add(batch)
     db.session.flush()
     db.session.add(FGMovement(batch_id=batch.id, warehouse_id=fg_warehouse.id, movement_date=output.output_date, movement_type="OUTPUT_IN",

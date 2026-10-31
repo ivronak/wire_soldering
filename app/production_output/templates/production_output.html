@@ -180,8 +180,10 @@
               <div><label class="ou-label">Process loss</label><input type="number" step="any" min="0" name="loss_qty" id="ou-loss" value="0" class="ou-input big" />
                 <p class="ou-help">Tiny loss (fumes, trimming). Only noted.</p></div>
             </div>
-            <div class="grid gap-3 sm:grid-cols-3 mt-3">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-3">
               <div><label class="ou-label">Output date *</label><input type="date" name="output_date" id="ou-date" class="ou-input" required /></div>
+              <div><label class="ou-label">Rack</label><select name="rack_id" id="ou-rack" class="ou-input"><option value="">No rack</option></select>
+                <p class="ou-help">Where the good goods are kept in the finished goods warehouse.</p></div>
               <div><label class="ou-label">Recorded by</label><input type="text" name="recorded_by" id="ou-by" maxlength="60" class="ou-input" /></div>
               <div><label class="ou-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="ou-input" /></div>
             </div>
@@ -258,6 +260,10 @@
     document.getElementById('ou-scrap').value = current.scrap;
     document.getElementById('ou-loss').value = current.loss || 0;
     document.getElementById('ou-by').value = current.operator || '';
+    // Rack dropdown: is order ke FG warehouse ke racks (optional)
+    document.getElementById('ou-rack').innerHTML = '<option value="">No rack</option>' + (current.racks || []).map(function (r) {
+      return '<option value="' + r.id + '">' + esc(r.name) + '</option>';
+    }).join('');
     var date = document.getElementById('ou-date');
     date.value = {{ today|tojson }};
     if (current.min_date) date.min = current.min_date;
