@@ -2,10 +2,11 @@
 # yahan sab ek jagah dikhta hai: kahan, kitna, kis kisam ka, abhi kahan hai (floor / scrap yard). Stock sirf Production output post hone par banta hai.
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
 from app.models import FGBatch, ProductionOrder, ProductionOrderStage, ScrapType
+from app.scrap.barcode import code128_svg
 
 scrap_bp = Blueprint("scrap", __name__, template_folder="templates")
 
@@ -74,6 +75,22 @@ def scrap_list():
            "rate": round(100 * total_scrap / batch_kg, 1) if batch_kg else 0}
     return render_template("scrap.html", active_nav="scrap", tab=tab, kind=kind, events=shown, all_count=len(events), yard=yard,
                            kpi=kpi, by_type=_bars(by_type), by_stage=_bars(by_stage))
+
+
+# ---------------- Scrap label + barcode (client change #8) ----------------
+@scrap_bp.route("/scrap/label/<int:batch_id>")
+def scrap_label(batch_id):
+    # Scrap batch ka label: barcode (batch no) + kis stage / type / operator se kitna aaya, taaki bori par chipka ke traceability rahe
+    batch = FGBatch.query.filter_by(id=batch_id, kind="SCRAP").first_or_404()
+    output = batch.output
+    if output is None or output.is_deleted or output.status != "Posted":
+        abort(404)
+    qty, _value = batch.balance
+    rows = [{"stage": st.stage_name, "type": st.scrap_type.name if st.scrap_type else "Not set", "qty": st.scrap_qty, "operator": st.operator or "",
+             "when": st.completed_at}
+            for st in batch.production_order.stages if st.scrap_qty and st.scrap_kind != "Process loss"]
+    return render_template("scrap_label.html", batch=batch, order=batch.production_order, qty=qty, rows=rows,
+                           barcode=code128_svg(batch.batch_no, height=70, module=2))
 
 
 # ---------------- Scrap types (master) ----------------

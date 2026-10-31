@@ -107,7 +107,8 @@
     <div><div class="sc-qty">{{ '%g'|format(r.qty) }} <span class="text-[12px] font-semibold text-ink-faint">KG</span></div><div class="sc-meta">in the yard now</div></div>
     <div class="flex flex-wrap gap-1.5">{% for name, q in r.types.items() %}<span class="sc-chip type"><i></i>{{ name }} · {{ '%g'|format(q) }}</span>{% endfor %}</div>
     <div class="sc-meta">Kept in<div class="text-[13px] text-ink">{{ r.where }}</div></div>
-    <div>{% if r.qty > 0.00005 %}<span class="sc-chip ok"><i></i>In stock</span>{% else %}<span class="sc-chip gone"><i></i>Used up</span>{% endif %}</div>
+    <div>{% if r.qty > 0.00005 %}<span class="sc-chip ok"><i></i>In stock</span>{% else %}<span class="sc-chip gone"><i></i>Used up</span>{% endif %}
+      <div class="mt-1.5"><a href="{{ url_for('scrap.scrap_label', batch_id=r.batch.id) }}" target="_blank" class="sc-btn" style="padding:4px 10px;font-size:12px">Print label</a></div></div>
   </div></article>
   {% else %}
   <div class="sc-empty"><h3>The scrap yard is empty</h3><p>Saleable scrap arrives here when an order's production output is recorded. Selling scrap will come with Sales.</p></div>
