@@ -41,6 +41,19 @@ def material_table(order):
     return table
 
 
+def packed_lines(order):
+    # Spooling / Packing stage me jo packing material (spool, box ...) gina gaya: [{name, unit, qty}]. Ye FG ki ginti dikhane ke liye hai
+    # (jaise "1000 PCS spool, 20 BOX"); stock ka hisaab material_table / post_output se hi hota hai.
+    rows = []
+    for order_line in order.lines:
+        if not order_line.is_packing or order_line.used_qty is None:
+            continue
+        rm = order_line.raw_material
+        rows.append({"name": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "", "qty": order_line.used_qty,
+                     "kg_per_pack": order_line.kg_per_pack})
+    return rows
+
+
 def leftover_rows(order):
     # [(order_line, qty)] — stage me use likhne ke baad bhi production (WIP) me bacha maal. Output se pehle ye store me wapas aana chahiye.
     # Jis line ki use likhi nahi (purane orders / maal baad me issue hua) uska kuch nahi maanga jaata: pehle jaisa, output par saara use.

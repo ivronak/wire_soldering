@@ -9,7 +9,7 @@ from app.extensions import db
 from app.inventory.posting import InventoryError
 from app.models import FGBatch, ProductionOrder, ProductionOutput, Rack
 from app.production_orders.scheduler import persist_schedule, renumber_queue
-from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, material_table, post_output, wip_lines
+from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, material_table, packed_lines, post_output, wip_lines
 from app.routing.routes import order_summary, side_stage_info
 
 production_output_bp = Blueprint("production_output", __name__, template_folder="templates")
@@ -43,9 +43,15 @@ def output_plan(order):
     metal = [s for s in stages if side_stage_info(order, s) is None]
     scrap = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind != "Process loss") / weight, 4)
     loss = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind == "Process loss") / weight, 4)
+    unit = order.product.base_unit.code if order.product and order.product.base_unit else ""
+    packed = packed_lines(order)
+    # PCS wale product me asli ginti spool ki hoti hai: Spooling stage me jo spool gine (product ki unit wali packing line), wahi Good ka suggest
+    counted = next((p["qty"] for p in packed if p["unit"] == unit and unit.upper() not in ("KG", "KGS")), None)
+    if counted is not None:
+        good = round(counted, 4)
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
-        "unit": order.product.base_unit.code if order.product and order.product.base_unit else "",
+        "unit": unit, "packed": packed, "counted_from_packing": counted is not None, "unit_weight": weight,
         "planned": order.planned_qty, "good": good, "scrap": scrap, "loss": loss, "rework": 0,
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
@@ -200,9 +206,14 @@ def finished_goods_list():
         qty, value = batch.balance
         first_wh = next((m.warehouse for m in batch.movements if m.warehouse is not None), None)
         where = first_wh.name if first_wh else ""
+        order = batch.production_order
+        # PCS wale product: batch kitne KG ke barabar hai, aur kitne spool / box me bana (production me gine hue)
+        count_unit = batch.unit_code.upper() not in ("KG", "KGS", "")
         rows.append({"batch": batch, "qty": qty, "value": value, "made": sum(m.qty for m in batch.movements if m.movement_type == "OUTPUT_IN" and m.reverses_movement_id is None),
-                     "where": where, "where_type": first_wh.warehouse_type if first_wh else "", "order": batch.production_order,
-                     "rack": batch.rack.name if batch.rack else ""})
+                     "where": where, "where_type": first_wh.warehouse_type if first_wh else "", "order": order,
+                     "rack": batch.rack.name if batch.rack else "",
+                     "kg": round(qty * (order.unit_weight or 1), 2) if count_unit and kind == "FG" else None,
+                     "packs": [p for p in packed_lines(order) if p["unit"] != batch.unit_code] if kind == "FG" else []})
     fg_in_stock = [r for r in rows if r["qty"] > 0.00005] if tab == "fg" else []
     kpi = {"batches": len([r for r in rows if r["qty"] > 0.00005]), "qty": round(sum(r["qty"] for r in rows), 4), "value": round(sum(r["value"] for r in rows), 2)}
     groups = fg_groups(rows) if tab == "fg" else []
@@ -219,6 +230,8 @@ def fg_groups(rows):
         group = by_product.setdefault(key, {"product": product, "qty": 0.0, "value": 0.0, "batches": []})
         group["qty"] += r["qty"]
         group["value"] += r["value"]
+        if r.get("kg") is not None:
+            group["kg"] = group.get("kg", 0.0) + r["kg"]
         group["batches"].append(r)
     groups = []
     for group in by_product.values():
@@ -238,6 +251,7 @@ def fg_groups(rows):
         category = product.category if product else None
         group.update(icon=category.icon if category else None, category=category.name if category else "",
                      low=getattr(product, "min_stock", None), high=getattr(product, "max_stock", None))
+        group.update(kg=round(group["kg"], 2) if "kg" in group else None)
         group.update(qty=qty, value=round(group["value"], 2), alert=alert, in_stock=len([r for r in group["batches"] if r["qty"] > 0.00005]),
                      unit=group["batches"][0]["batch"].unit_code)
         groups.append(group)

@@ -94,6 +94,7 @@
       </div>
       <div>
         <div class="text-[13px]">Routing says about <b>{{ '%g'|format(plan.good) }} {{ plan.unit }}</b> came out{% if plan.scrap %} and <b>{{ '%g'|format(plan.scrap) }}</b> was scrap{% endif %}.</div>
+        {% if plan.packed %}<div class="ou-meta mt-1">Counted in production: {% for p in plan.packed %}<b>{{ '%g'|format(p.qty) }} {{ p.unit }}</b> {{ p.name }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
         <div class="ou-meta mt-1">{{ sm.actual_h }} h worked (plan {{ sm.planned_h }} h){% if plan.machines %} · last stage {{ plan.last_stage }} on {{ plan.machines }}{% endif %}</div>
       </div>
       <div>{% set bad = plan.materials | selectattr('issued', 'le', 0) | list %}
@@ -173,7 +174,7 @@
             <p class="sub">We filled this from the routing. Change it if the real count is different. Use the same unit as the order (<b id="ou-unit">KG</b>).</p>
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div><label class="ou-label">Good *</label><input type="number" step="any" min="0" name="good_qty" id="ou-good" class="ou-input big" required />
-                <p class="ou-help">Ready to sell. This becomes finished goods stock.</p></div>
+                <p class="ou-help" id="ou-good-help">Ready to sell. This becomes finished goods stock.</p></div>
               <div><label class="ou-label">Rework</label><input type="number" step="any" min="0" name="rework_qty" id="ou-rework" value="0" class="ou-input big" />
                 <p class="ou-help">Needs to be redone. Only noted for now.</p></div>
               <div><label class="ou-label">Scrap</label><input type="number" step="any" min="0" name="scrap_qty" id="ou-scrap" value="0" class="ou-input big" />
@@ -257,6 +258,10 @@
     document.getElementById('ou-sub').textContent = current.prod_no + ' · ' + current.product;
     document.getElementById('ou-unit').textContent = current.unit;
     document.getElementById('ou-good').value = current.good;
+    // PCS product: Good = Spooling me gine hue spool; ye bhi dikhao ki kitne KG ke barabar hai
+    document.getElementById('ou-good-help').textContent = current.counted_from_packing
+      ? 'Filled from the ' + current.unit + ' counted at the spooling stage. Ready to sell; this becomes finished goods stock.'
+      : 'Ready to sell. This becomes finished goods stock.';
     document.getElementById('ou-rework').value = 0;
     document.getElementById('ou-scrap').value = current.scrap;
     document.getElementById('ou-loss').value = current.loss || 0;
