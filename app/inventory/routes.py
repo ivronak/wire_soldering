@@ -49,7 +49,7 @@ def stock_list():
 
     lot_rows = []
     for lot in StockLot.query.order_by(StockLot.id.desc()).all():
-        row = {"lot": lot, "unit": lot_unit(lot), "waiting": 0, "available": 0, "rejected": 0, "wip": 0, "scrap": 0, "transit": 0, "value": 0, "where": []}
+        row = {"lot": lot, "unit": lot_unit(lot), "waiting": 0, "available": 0, "rejected": 0, "wip": 0, "scrap": 0, "transit": 0, "value": 0, "where": [], "wh": {}}
         has_qc = lot.grn_line.final_qc is not None if lot.grn_line else False
         for warehouse_id, qty, value in sums.get(lot.id, []):
             if abs(qty) < 0.00005:
@@ -57,21 +57,31 @@ def stock_list():
             warehouse = warehouses.get(warehouse_id)
             row["where"].append(warehouse.name if warehouse else "?")
             row["value"] += value
+            wname = warehouse.name if warehouse else "?"
+            wh_info = {"id": warehouse.id if warehouse else None, "name": wname, "type": warehouse.warehouse_type if warehouse else ""}
+            # Har state ka warehouse naam (lot ek se zyada warehouse me ho sakta hai: jaise Available store me, Rejected QC Hold me)
             if warehouse is not None and warehouse.warehouse_type == "WIP":
                 row["wip"] += qty
+                row["wh"]["wip"] = wh_info
             elif warehouse is not None and warehouse.warehouse_type == "SCRAP":
                 row["scrap"] += qty
+                row["wh"]["scrap"] = wh_info
             elif warehouse is not None and warehouse.warehouse_type == "QC_HOLD":
                 if has_qc:
                     row["rejected"] += qty
+                    row["wh"]["rejected"] = wh_info
                 else:
                     row["waiting"] += qty
+                    row["wh"]["waiting"] = wh_info
             else:
                 row["available"] += qty
+                row["wh"]["available"] = wh_info
         for t_qty, t_value in transit.get(lot.id, []):
             row["transit"] += t_qty
             row["value"] += t_value
         row["value"] = round(row["value"], 2)
+        # Poora use ho chuka lot (kisi bhi warehouse me kuch nahi bacha): list me default chhupa rehta hai, history ke liye rehta hai
+        row["used_up"] = not (row["available"] > 0 or row["waiting"] > 0 or row["rejected"] > 0 or row["wip"] > 0 or row["transit"] > 0 or row["scrap"] > 0)
         lot_rows.append(row)
 
     # Material-wise jod (material + unit ek saath: alag units ka qty jodna galat hota)
@@ -246,5 +256,20 @@ def stock_valuation():
     rows = [row for row in all_rows if wanted == "all" or row["type"] == wanted]
     total_value = round(sum(row["value"] for row in all_rows), 2)
     transit_value = round(sum(row["value"] for row in all_rows if row["type"] == "TRANSIT"), 2)
-    return render_template("stock_valuation.html", active_nav="valuation", rows=rows, types=types, wanted=wanted,
+
+    # Material-wise card: ek material = ek card, uske andar jagah-wise (warehouse) hissa. Bada value pehle.
+    mats = {}
+    for row in rows:
+        key = (row["material"].id if row["material"] else 0, row["unit"])
+        item = mats.setdefault(key, {"material": row["material"], "unit": row["unit"], "qty": 0, "value": 0, "places": []})
+        item["qty"] += row["qty"]
+        item["value"] += row["value"]
+        item["places"].append(row)
+    materials = sorted(mats.values(), key=lambda m: -m["value"])
+    # "Paisa kahan pada hai": warehouse type-wise value (upar ki rangeen patti)
+    by_type = {}
+    for row in all_rows:
+        by_type[row["type"]] = by_type.get(row["type"], 0) + row["value"]
+    by_type = sorted(([t, round(v, 2)] for t, v in by_type.items() if v > 0), key=lambda x: -x[1])
+    return render_template("stock_valuation.html", active_nav="valuation", materials=materials, types=types, wanted=wanted, by_type=by_type,
                            total_value=total_value, transit_value=transit_value, item_count=len({(r["material"].id if r["material"] else 0) for r in all_rows}))

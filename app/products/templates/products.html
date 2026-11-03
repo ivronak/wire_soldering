@@ -305,7 +305,8 @@
                 </td>
                 <td class="cell-left"><span class="inline-block max-w-full truncate align-middle font-mono text-[12.5px] font-bold text-ink bg-mist border border-slate-200 rounded-md px-2 py-1">{{ p.code }}</span></td>
                 <td class="cell-left">
-                  <div class="flex items-center min-w-0">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    {{ icon_tile(p.category.icon if p.category else None, 34) }}
                     <div class="min-w-0">
                       <div class="flex items-center gap-2 min-w-0">
                         <span class="font-semibold text-ink truncate">{{ p.name }}</span>
@@ -380,7 +381,7 @@
                       data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
                       data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }}}{% if not loop.last %},{% endif %}{% endfor %}]'
-                      data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
+                      data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }},"stage":{{ k.work_stage_id or 'null' }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
                     <form method="post" action="{{ url_for('products.products_delete', p_id=p.id) }}" class="inline-flex js-confirm-submit"
@@ -613,14 +614,14 @@
         <hr class="border-slate-200" />
         <div id="packing-section">
           <p class="form-section-title">Packing material</p>
-          <p class="text-[12px] text-ink-faint -mt-1 mb-2">Spool, sleeve and box used for this product. Enter how many KG of finished wire go into <b>one</b> pack — a 1 KG spool is 1, a 20 KG box is 20. A 500 KG order then needs 500 spools and 25 boxes automatically.</p>
+          <p class="text-[12px] text-ink-faint -mt-1 mb-2">Spool, sleeve and box used for this product. Enter how many KG of finished wire go into <b>one</b> pack — a 1 KG spool is 1, a 500 g spool is 0.5, a 20 KG box is 20. A 500 KG order then needs 500 spools and 25 boxes automatically. Choose the <b>stage</b> where it is used (spool: Spooling, box: Packing): at that stage the number of packs made is worked out from the output KG.</p>
           {% if not packing_materials %}
           <p class="text-[13px] text-ink bg-mist border border-slate-200 rounded px-3 py-2">No packing materials yet. Open Raw Materials and set the role <b>Packing</b> on the spool, sleeve and box first.</p>
           {% endif %}
           <div class="overflow-x-auto border border-slate-200 rounded">
             <table class="w-full text-[13px]">
               <thead class="bg-mist text-left text-[11.5px] uppercase tracking-wide text-ink-faint">
-                <tr><th class="px-2 py-2">Packing material</th><th class="px-2 py-2 w-40">KG per pack</th><th class="px-2 py-2 w-16"></th></tr>
+                <tr><th class="px-2 py-2">Packing material</th><th class="px-2 py-2 w-32">KG per pack</th><th class="px-2 py-2 w-44">Used in stage</th><th class="px-2 py-2 w-12"></th></tr>
               </thead>
               <tbody id="packing-body"></tbody>
             </table>
@@ -930,7 +931,7 @@
   // ---- Packing material lines (Product form) ----
   var packingData = [];
   try { packingData = JSON.parse(document.getElementById('packing-materials-data').textContent || '[]'); } catch (err) { packingData = []; }
-  function addPackingLine(rmId, kg) {
+  function addPackingLine(rmId, kg, stageId) {
     var body = document.getElementById('packing-body');
     if (!body) return;
     var tr = document.createElement('tr');
@@ -939,20 +940,29 @@
     }).join('');
     tr.innerHTML = '<td class="px-2 py-1.5"><select name="packing_rm_id[]" class="w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + opts + '</select></td>' +
       '<td class="px-2 py-1.5"><input type="number" name="packing_kg[]" min="0.001" step="0.001" placeholder="e.g. 1 or 20" value="' + (kg || '') + '" class="w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-1.5"><select name="packing_stage[]" class="packing-stage w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + stageOptionsHtml() + '</select></td>' +
       '<td class="px-2 py-1.5 text-center"><button type="button" class="packing-remove text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove">&times;</button></td>';
+    if (stageId) tr.querySelector('.packing-stage').value = String(stageId);
     body.appendChild(tr);
   }
   function fillPackingLines(lines) {
     var body = document.getElementById('packing-body');
     if (!body) return;
     body.innerHTML = '';
-    (lines || []).forEach(function (l) { addPackingLine(l.id, l.kg); });
+    (lines || []).forEach(function (l) { addPackingLine(l.id, l.kg, l.stage); });
+    if (typeof refreshRecipe === 'function') refreshRecipe();
   }
   document.addEventListener('click', function (e) {
-    if (e.target.closest('#btn-add-packing-line')) addPackingLine();
+    if (e.target.closest('#btn-add-packing-line')) { addPackingLine(); refreshRecipe(); }
     var rm = e.target.closest('.packing-remove');
-    if (rm) rm.closest('tr').remove();
+    if (rm) { rm.closest('tr').remove(); refreshRecipe(); }
   });
+  // Packing ki line badle to Flow check turant badle (spool / box ki ginti)
+  var packBodyEl = document.getElementById('packing-body');
+  if (packBodyEl) {
+    packBodyEl.addEventListener('input', function () { refreshRecipe(); });
+    packBodyEl.addEventListener('change', function () { refreshRecipe(); });
+  }
 
   function resetVariantSection() {
     fillPackingLines([]);
@@ -1587,6 +1597,23 @@
         preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums text-ink">' + need.toFixed(2) + ' ' + (unit !== '—' ? unit : 'KG') + '</strong></li>');
       }
     });
+
+    // Packing material (spool / sleeve / box): har kg_per_pack KG par 1 pack, upar round (500 KG / 0.5 = 1000 spool, 500 / 20 = 25 box)
+    var packBody = document.getElementById('packing-body');
+    if (packBody) {
+      packBody.querySelectorAll('tr').forEach(function (row) {
+        var psel = row.querySelector('select[name="packing_rm_id[]"]');
+        var kgEl = row.querySelector('input[name="packing_kg[]"]');
+        var stSel = row.querySelector('.packing-stage');
+        var kgPer = parseFloat(kgEl ? kgEl.value : '') || 0;
+        if (!psel || !psel.value || kgPer <= 0 || totalBatchKg <= 0) return;
+        var pdata = packingData.filter(function (m) { return String(m.id) === String(psel.value); })[0];
+        var packs = Math.ceil(Math.round(totalBatchKg / kgPer * 1e6) / 1e6);
+        var stageName = stSel && stSel.value ? stSel.options[stSel.selectedIndex].textContent : '';
+        preview.push('<li>' + (pdata ? pdata.code + ' — ' + pdata.name : 'Packing') + ' · 1 per ' + kgPer + ' KG → <strong class="tabular-nums text-ink">' + packs + ' ' + (pdata ? pdata.unit : 'PCS') + '</strong>' +
+          (stageName ? ' <span class="text-ink-faint">(' + stageName + ')</span>' : '') + '</li>');
+      });
+    }
 
     var balance = document.getElementById('recipe-balance');
     var metalsOk = Math.abs(baseTotal - 100) < 0.05;

@@ -209,8 +209,9 @@ def products_add():
     
     pk_rms = request.form.getlist('packing_rm_id[]')
     pk_kgs = request.form.getlist('packing_kg[]')
+    pk_stages = request.form.getlist('packing_stage[]')
     seen_pk = set()
-    for rm_id_str, kg_str in zip(pk_rms, pk_kgs):
+    for pk_idx, (rm_id_str, kg_str) in enumerate(zip(pk_rms, pk_kgs)):
         try:
             rm = RawMaterial.query.get(int((rm_id_str or '').strip()))
             kg = float((kg_str or '').strip())
@@ -219,7 +220,13 @@ def products_add():
         if not rm or rm.is_deleted or not rm.is_packing or kg <= 0 or rm.id in seen_pk:
             continue
         seen_pk.add(rm.id)
-        db.session.add(ProductPackingItem(product_id=product.id, raw_material_id=rm.id, kg_per_pack=kg))
+        # Is packing material ka stage (Spooling / Packing ...): khaali ho to kisi stage se bandha nahi
+        pk_stage_id = None
+        raw_stage = (pk_stages[pk_idx] if pk_idx < len(pk_stages) else "").strip()
+        if raw_stage.isdigit():
+            pk_stage = WorkStage.query.get(int(raw_stage))
+            pk_stage_id = pk_stage.id if pk_stage and not pk_stage.is_deleted else None
+        db.session.add(ProductPackingItem(product_id=product.id, raw_material_id=rm.id, kg_per_pack=kg, work_stage_id=pk_stage_id))
 
     if cat:
         fields = list(cat.attribute_fields or [])
@@ -334,8 +341,9 @@ def products_edit(p_id):
     ProductPackingItem.query.filter_by(product_id=p.id).delete()
     pk_rms = request.form.getlist('packing_rm_id[]')
     pk_kgs = request.form.getlist('packing_kg[]')
+    pk_stages = request.form.getlist('packing_stage[]')
     seen_pk = set()
-    for rm_id_str, kg_str in zip(pk_rms, pk_kgs):
+    for pk_idx, (rm_id_str, kg_str) in enumerate(zip(pk_rms, pk_kgs)):
         try:
             rm = RawMaterial.query.get(int((rm_id_str or '').strip()))
             kg = float((kg_str or '').strip())
@@ -344,7 +352,13 @@ def products_edit(p_id):
         if not rm or rm.is_deleted or not rm.is_packing or kg <= 0 or rm.id in seen_pk:
             continue
         seen_pk.add(rm.id)
-        db.session.add(ProductPackingItem(product_id=p.id, raw_material_id=rm.id, kg_per_pack=kg))
+        # Is packing material ka stage (Spooling / Packing ...): khaali ho to kisi stage se bandha nahi
+        pk_stage_id = None
+        raw_stage = (pk_stages[pk_idx] if pk_idx < len(pk_stages) else "").strip()
+        if raw_stage.isdigit():
+            pk_stage = WorkStage.query.get(int(raw_stage))
+            pk_stage_id = pk_stage.id if pk_stage and not pk_stage.is_deleted else None
+        db.session.add(ProductPackingItem(product_id=p.id, raw_material_id=rm.id, kg_per_pack=kg, work_stage_id=pk_stage_id))
 
     if cat:
         fields = list(cat.attribute_fields or [])

@@ -3,26 +3,51 @@
 
 {% block page_css %}
 <style>
-  .sv-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 14px 16px; }
-  .sv-big { font-size: 26px; font-weight: 700; line-height: 1.1; }
-  .sv-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .sv-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 11px 10px; text-align: right; border-bottom: 1px solid #D1D9D8; }
-  .sv-table thead th.left, .sv-table tbody td.left { text-align: left; }
-  .sv-table tbody td { padding: 11px 10px; font-size: 13.5px; border-bottom: 1px solid #E2E8E7; text-align: right; vertical-align: middle; }
-  .sv-table tbody tr.main:hover { background: #FBF4EE; }
-  .sv-layers td { background: #F8FAF9; font-size: 12.5px; padding: 6px 10px; }
-  .sv-pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; border: 1px solid #D1D9D8; background: #fff; color: #3D5A5D; }
+  .sv-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 10px 14px; }
+  .sv-big { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .sv-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; font-size: 12.5px; border: 1px solid #D1D9D8; background: #fff; color: #3D5A5D; }
   .sv-pill.on { background: #B5672C; border-color: #B5672C; color: #fff; font-weight: 600; }
+  .sv-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
+  /* Warehouse type ke rang (Stock page jaise) */
+  .t-RM { --c: #2E9E68; --bg: #E6F5EC; --fg: #1F7A4D; --bd: #B7E0C7; }
+  .t-QC_HOLD { --c: #E0A04A; --bg: #FFF4E5; --fg: #8A4A1C; --bd: #F5D9B5; }
+  .t-WIP { --c: #5B8DD6; --bg: #EAF1FB; --fg: #2B5FA8; --bd: #C9D8F0; }
+  .t-SCRAP { --c: #D9534F; --bg: #FDECEC; --fg: #B42318; --bd: #F8CFCB; }
+  .t-FG { --c: #1B9AA5; --bg: #E8F3F4; --fg: #0F6B73; --bd: #BFDDE0; }
+  .t-TRANSIT { --c: #98A5A4; --bg: #F5F7F7; --fg: #3D5A5D; --bd: #D1D9D8; }
+  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--bd, #D1D9D8); background: var(--bg, #F5F7F7); color: var(--fg, #3D5A5D); white-space: nowrap; }
+  /* Table jaisa column alignment, par har material ek card-jaisa block (Stock page ka look) */
+  .sv-cols { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 12px; align-items: center; }
+  .sv-head { padding: 8px 14px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #3D5A5D; background: #EEF2F1; border: 1px solid #D1D9D8; border-radius: 10px; margin-bottom: 8px; }
+  .sv-head .num, .sv-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .sv-group { background: #fff; border: 1px solid #D1D9D8; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .sv-group:hover { border-color: #C9B8A6; }
+  .sv-gh { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; padding: 10px 14px 8px; }
+  .sv-row { padding: 6px 14px; font-size: 13.5px; border-top: 1px solid #EEF2F1; }
+  .sv-row.place:hover { background: #FBF4EE; }
+  /* Cost layers (lots): warehouse ke rang ki patti ke saath andar ka chhota table */
+  .sv-layers { background: #F7FAF9; border-top: 1px solid #E2E8E7; border-left: 4px solid var(--c, #98A5A4); }
+  .sv-lhead { padding: 6px 14px 2px 22px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7C8D8B; }
+  .sv-row.layer { font-size: 13px; color: #3D5A5D; padding: 5px 14px 5px 22px; border-top: 1px dashed #E2E8E7; }
+  .sv-lhead + .sv-row.layer { border-top: 0; }
+  .lot-chip { font-family: ui-monospace, Consolas, monospace; font-size: 12px; font-weight: 700; color: #0F2F32; background: #fff; border: 1px solid #D1D9D8; border-radius: 6px; padding: 0 7px; margin-right: 6px; }
+  .lay-btn { font-size: 12px; font-weight: 600; color: #8A4A1C; background: none; border: 0; cursor: pointer; padding: 0 2px; }
+  .lay-btn:hover { text-decoration: underline; }
 </style>
 {% endblock %}
 
 {% block content %}
+      {% set labels = {'RM': 'Store (RM)', 'QC_HOLD': 'QC Hold', 'WIP': 'In production (WIP)', 'FG': 'Finished goods', 'SCRAP': 'Scrap', 'TRANSIT': 'In transit'} %}
       <div class="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock valuation</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Stock valuation</h1>
           <p class="text-[12.5px] text-ink-faint">What your stock is worth, material by material and place by place.</p>
         </div>
+        <details class="text-[12.5px] text-copper-text">
+          <summary class="font-semibold cursor-pointer hover:underline">How is it valued? ▾</summary>
+          <div class="mt-1.5 max-w-sm text-ink-muted leading-snug bg-white border border-slate-200 rounded-lg p-3 shadow-sm">Each lot keeps its own purchase cost (PO rate). The unit cost shown for a place is the average of the lots in that place. Click a material to see every lot's cost.</div>
+        </details>
       </div>
 
       <div class="flex-1 overflow-auto min-h-0 space-y-4">
@@ -30,61 +55,100 @@
           <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Total stock value</div><div class="sv-big text-ink mt-1">₹{{ total_value|inr }}</div></div>
           <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Materials valued</div><div class="sv-big text-ink mt-1">{{ item_count }}</div></div>
           <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">In transit</div><div class="sv-big text-ink mt-1">₹{{ transit_value|inr }}</div></div>
-          <div class="sv-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">How it is valued</div><div class="text-[13px] text-ink-muted mt-1 leading-snug">Each lot keeps its own purchase cost (PO rate). The unit cost below is the average of the lots in that place.</div></div>
+          <div class="sv-card">
+            <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Where the value sits</div>
+            {% if by_type and total_value > 0 %}
+            <div class="flex h-2.5 rounded-full overflow-hidden bg-slate-100 mt-2" aria-hidden="true">
+              {% for t, v in by_type %}<div class="t-{{ t }}" style="width:{{ (v / total_value * 100)|round(1) }}%;background:var(--c)" title="{{ labels.get(t, t) }}"></div>{% endfor %}
+            </div>
+            <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11.5px] text-ink-muted">
+              {% for t, v in by_type %}<span class="t-{{ t }}"><span class="sv-dot" style="background:var(--c)"></span> {{ labels.get(t, t) }} <b class="text-ink">{{ ((v / total_value * 100)|round(0))|int }}%</b></span>{% endfor %}
+            </div>
+            {% else %}<div class="text-[12.5px] text-ink-faint mt-1">No stock yet.</div>{% endif %}
+          </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5">
           <span class="text-[12.5px] text-ink-faint mr-1">Show:</span>
           <a href="{{ url_for('inventory.stock_valuation') }}" class="sv-pill {{ 'on' if wanted == 'all' else '' }}">All</a>
           {% for t in types %}
-          <a href="{{ url_for('inventory.stock_valuation', type=t) }}" class="sv-pill {{ 'on' if wanted == t else '' }}">{{ {'RM': 'Store (RM)', 'QC_HOLD': 'QC Hold', 'WIP': 'In production (WIP)', 'FG': 'Finished goods', 'SCRAP': 'Scrap', 'TRANSIT': 'In transit'}.get(t, t) }}</a>
+          <a href="{{ url_for('inventory.stock_valuation', type=t) }}" class="sv-pill {{ 'on' if wanted == t else '' }} t-{{ t }}">{% if wanted != t %}<span class="sv-dot" style="background:var(--c)"></span>{% endif %}{{ labels.get(t, t) }}</a>
           {% endfor %}
+          {% if materials %}<button type="button" id="lay-all" class="sv-pill ml-auto" data-open="0">Show all lots</button>{% endif %}
         </div>
 
-        <section class="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
-          <table class="sv-table">
-            <colgroup><col style="width:26%"><col style="width:20%"><col style="width:15%"><col style="width:17%"><col style="width:22%"></colgroup>
-            <thead><tr><th class="left">Material</th><th class="left">Where</th><th>Quantity</th><th>Unit cost (avg)</th><th>Value</th></tr></thead>
-            <tbody>
-              {% for row in rows %}
-              <tr class="main">
-                <td class="left"><div class="font-medium text-ink">{{ row.material.name if row.material else '—' }}</div>
-                  <details class="text-[12px]"><summary class="cursor-pointer text-copper-text hover:underline">Cost layers ({{ row.layers|length }} lot{{ '' if row.layers|length == 1 else 's' }})</summary></details></td>
-                <td class="left">{{ row.place }}</td>
-                <td class="tabular-nums">{{ row.qty|qty }} {{ row.unit }}</td>
-                <td class="tabular-nums">₹{{ (row.value / row.qty if row.qty else 0)|inr }}</td>
-                <td class="tabular-nums font-semibold text-ink">₹{{ row.value|inr }}</td>
-              </tr>
-              {% for layer in row.layers %}
-              <tr class="sv-layers layer-row hidden-layer" style="display:none">
-                <td class="left" style="padding-left:28px">{{ layer.lot }}{% if layer.batch %} · batch {{ layer.batch }}{% endif %}</td>
-                <td class="left">{{ layer.date.strftime('%d %b %Y') if layer.date else '' }}</td>
-                <td class="tabular-nums">{{ layer.qty|qty }} {{ row.unit }}</td>
-                <td class="tabular-nums">₹{{ layer.cost|inr }}</td>
-                <td class="tabular-nums">₹{{ layer.value|inr }}</td>
-              </tr>
+        {% if materials %}
+        <div>
+          <div class="sv-cols sv-head" aria-hidden="true"><div>Material / place</div><div class="num">Quantity</div><div class="num">Unit cost (avg)</div><div class="num">Value</div></div>
+          {% for m in materials %}
+          {% set mid = loop.index %}
+          <div class="sv-group">
+            <div class="sv-gh">
+              <div class="min-w-0" style="flex:1 1 240px">
+                <div class="text-[15px] font-semibold text-ink leading-tight">{{ m.material.name if m.material else '—' }} <span class="text-[11.5px] text-ink-faint font-mono font-normal ml-1">{{ m.material.code if m.material else '' }}</span></div>
+                <div class="text-[12.5px] text-ink-muted mt-0.5"><b class="text-ink tabular-nums">{{ m.qty|qty }} {{ m.unit }}</b> in all · avg ₹{{ (m.value / m.qty if m.qty else 0)|inr }} per {{ m.unit }}</div>
+                {% if m.value > 0 %}
+                <div class="flex h-1.5 rounded-full overflow-hidden bg-slate-100 mt-1.5" style="max-width:300px" aria-hidden="true">
+                  {% for p in m.places if p.value > 0 %}<div class="t-{{ p.type }}" style="width:{{ (p.value / m.value * 100)|round(1) }}%;background:var(--c)" title="{{ p.place }}"></div>{% endfor %}
+                </div>
+                {% endif %}
+              </div>
+              <div class="text-right">
+                <div class="sv-big tabular-nums text-ink">₹{{ m.value|inr }}</div>
+                {% if total_value > 0 %}<div class="text-[11.5px] text-ink-faint">{{ (m.value / total_value * 100)|round(1) }}% of stock value</div>{% endif %}
+              </div>
+            </div>
+            {% for p in m.places %}
+            {% set pid = mid ~ '-' ~ loop.index %}
+            <div class="sv-cols sv-row place">
+              <div><span class="t-{{ p.type }}"><span class="wh-badge">{{ p.place }}</span></span> <button type="button" class="lay-btn" data-target="{{ pid }}" aria-expanded="false">▸ {{ p.layers|length }} lot{{ '' if p.layers|length == 1 else 's' }}</button></div>
+              <div class="num">{{ p.qty|qty }} {{ p.unit }}</div>
+              <div class="num text-ink-muted">₹{{ (p.value / p.qty if p.qty else 0)|inr }}</div>
+              <div class="num font-semibold text-ink">₹{{ p.value|inr }}</div>
+            </div>
+            <div class="sv-layers t-{{ p.type }}" data-for="{{ pid }}" style="display:none">
+              <div class="sv-cols sv-lhead" aria-hidden="true"><div>Lot · batch · received</div><div class="num">Quantity</div><div class="num">Unit cost</div><div class="num">Value</div></div>
+              {% for layer in p.layers %}
+              <div class="sv-cols sv-row layer">
+                <div class="first min-w-0">
+                  <span class="lot-chip">{{ layer.lot }}</span>
+                  <span class="text-ink-muted">{% if layer.batch %}Batch {{ layer.batch }}{% endif %}</span>
+                  <div class="text-ink-faint text-[11.5px] mt-0.5">Received {{ layer.date.strftime('%d %b %Y') if layer.date else '—' }}</div>
+                </div>
+                <div class="num">{{ layer.qty|qty }} {{ p.unit }}</div>
+                <div class="num">₹{{ layer.cost|inr }}</div>
+                <div class="num font-medium text-ink">₹{{ layer.value|inr }}</div>
+              </div>
               {% endfor %}
-              {% else %}
-              <tr><td colspan="5" class="text-ink-faint" style="text-align:center;padding:26px;">No stock to value{{ ' in this view' if wanted != 'all' else ' yet' }}.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </section>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="sv-card text-center text-ink-faint" style="padding:26px;">No stock to value{{ ' in this view' if wanted != 'all' else ' yet' }}.</div>
+        {% endif %}
       </div>
 {% endblock %}
 
 {% block page_js %}
 <script>
-  // "Cost layers" kholne par us row ke neeche ke lot-wise bhaav dikhte hain
-  document.querySelectorAll('tr.main details').forEach(function (d) {
-    d.addEventListener('toggle', function () {
-      var row = d.closest('tr');
-      var next = row.nextElementSibling;
-      while (next && next.classList.contains('layer-row')) {
-        next.style.display = d.open ? '' : 'none';
-        next = next.nextElementSibling;
-      }
+  // "▸ n lots" par click: us jagah ke lot-wise bhaav (cost layers) usi ke neeche khulte hain
+  document.querySelectorAll('.lay-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.textContent = (open ? '▾ ' : '▸ ') + btn.textContent.slice(2);
+      document.querySelectorAll('.sv-layers[data-for="' + btn.getAttribute('data-target') + '"]').forEach(function (box) { box.style.display = open ? '' : 'none'; });
     });
+  });
+  // Sab lots ek saath kholne / band karne ke liye
+  var allBtn = document.getElementById('lay-all');
+  if (allBtn) allBtn.addEventListener('click', function () {
+    var open = allBtn.getAttribute('data-open') !== '1';
+    allBtn.setAttribute('data-open', open ? '1' : '0');
+    allBtn.textContent = open ? 'Hide all lots' : 'Show all lots';
+    document.querySelectorAll('.lay-btn').forEach(function (b) { if ((b.getAttribute('aria-expanded') === 'true') !== open) b.click(); });
   });
 </script>
 {% endblock %}

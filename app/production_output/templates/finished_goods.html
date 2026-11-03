@@ -3,43 +3,73 @@
 
 {% block page_css %}
 <style>
-  .fg-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .fg-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
   .fg-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .fg-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .fg-kpi .v { font-size: 22px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
   .fg-kpi .h { font-size: 12px; color: #6B7F82; }
   .fg-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
   .fg-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
   .fg-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .fg-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; }
-  .fg-row { display: grid; grid-template-columns: minmax(210px, 1.4fr) minmax(190px, 1.2fr) minmax(130px, .8fr) minmax(170px, 1fr) minmax(130px, .8fr); gap: 16px; align-items: center; padding: 13px 16px; }
-  .fg-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .fg-prod { font-size: 13.5px; color: #1C2B2D; }
+  .fg-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; }
+  .fgp { padding: 12px 14px; cursor: pointer; }
+  .fgp:hover { border-color: #C9B8A6; box-shadow: 0 1px 4px rgba(15, 47, 50, .08); }
+  .fgp:focus-visible { outline: 2px solid #C77B1B; outline-offset: 2px; }
+  .fgp.is-open { border-color: #C77B1B; box-shadow: 0 0 0 2px #F5D9B5; }
+  .fgp.alert-bad { border-left: 4px solid #B42318; }
+  .fgp.alert-warn { border-left: 4px solid #C77B1B; }
+  .fg-qty { font-size: 24px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .fg-meta { font-size: 12px; color: #6B7F82; }
-  .fg-qty { font-size: 22px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .fg-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .fg-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .fg-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .fg-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .fg-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
   .fg-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .fg-chip.bad { background: #FDECEA; color: #B42318; border-color: #F4C7C2; }
   .fg-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
   .fg-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
-  .fg-chip.bad { background: #FDECEA; color: #B42318; border-color: #F4C7C2; }
-  .fg-group > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 22px minmax(220px, 2fr) minmax(130px, 1fr) minmax(150px, 1fr) minmax(130px, .8fr); gap: 16px; align-items: center; padding: 13px 16px; }
-  .fg-group > summary::-webkit-details-marker { display: none; }
-  .fg-group .arrow { color: #6B7F82; transition: transform .15s; display: inline-block; }
-  .fg-group[open] .arrow { transform: rotate(90deg); }
-  .fg-group .inner { border-top: 1px solid #E4EAE9; background: #FAFBFB; border-radius: 0 0 12px 12px; }
-  .fg-group .inner .fg-row { padding: 10px 16px 10px 38px; border-bottom: 1px solid #EEF2F1; }
-  .fg-group .inner .fg-row:last-child { border-bottom: 0; }
-  @media (max-width: 1100px) { .fg-row { grid-template-columns: 1fr 1fr; } }
+  /* Min / max stock ki patti: kitna maal hai us hisaab se (max tak) */
+  .fg-gauge { position: relative; height: 6px; border-radius: 999px; background: #E8EEED; margin-top: 8px; }
+  .fg-gauge > i { display: block; height: 100%; border-radius: 999px; }
+  .fg-gauge > b { position: absolute; top: -3px; width: 2px; height: 12px; background: #3D5A5D; border-radius: 1px; }
+  /* Batch table (panel / scrap tab) */
+  .fg-table { width: 100%; border-collapse: collapse; }
+  .fg-table thead th { background: #EEF2F1; color: #3D5A5D; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 8px 12px; text-align: left; border-bottom: 1px solid #D1D9D8; white-space: nowrap; }
+  .fg-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fg-table tbody td { padding: 9px 12px; font-size: 13.5px; border-bottom: 1px solid #EEF2F1; vertical-align: middle; }
+  .fg-table tbody tr:last-child td { border-bottom: 0; }
+  .fg-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 13.5px; color: #0F2F32; }
+  /* Warehouse badge: warehouse type ke rang me (Stock page jaisa) */
+  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid #D1D9D8; background: #F5F7F7; color: #3D5A5D; white-space: nowrap; }
+  .wh-badge.wh-RM { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .wh-badge.wh-QC_HOLD { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .wh-badge.wh-WIP { background: #EAF1FB; color: #2B5FA8; border-color: #C9D8F0; }
+  .wh-badge.wh-SCRAP { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .wh-badge.wh-FG { background: #E8F3F4; color: #0F6B73; border-color: #BFDDE0; }
+  .rack-tag { font-size: 12px; font-weight: 600; color: #0F2F32; background: #fff; border: 1px dashed #98A5A4; border-radius: 6px; padding: 0 7px; margin-left: 4px; }
 </style>
 {% endblock %}
 
 {% block content %}
+{% macro batch_row(r) %}
+  {% set b = r.batch %}
+  <tr class="fg-brow {{ 'used-up' if r.qty <= 0.00005 else '' }}">
+    <td><div class="fg-no">{{ b.batch_no }}</div>
+      {% if r.qty > 0.00005 %}<span class="fg-chip ok"><i></i>In stock</span>{% else %}<span class="fg-chip gone"><i></i>Used up</span>{% endif %}</td>
+    <td><div class="text-ink">{{ r.order.prod_no }}</div><div class="fg-meta">made {{ b.mfg_date.strftime('%d %b %Y') }}</div></td>
+    <td class="num"><div class="font-bold text-ink text-[15px]">{{ '%g'|format(r.qty) }} {{ b.unit_code }}</div><div class="fg-meta">{{ '%g'|format(r.made) }} made</div></td>
+    <td class="num">₹{{ b.unit_cost|inr }}</td>
+    <td class="num font-semibold text-ink">₹{{ r.value|inr }}</td>
+    <td>{% if r.where %}<span class="wh-badge wh-{{ r.where_type }}">{{ r.where }}</span>{% if r.rack %}<span class="rack-tag">Rack {{ r.rack }}</span>{% endif %}{% else %}—{% endif %}</td>
+  </tr>
+{% endmacro %}
+{% macro batch_head() %}
+  <thead><tr><th>Batch</th><th>From order</th><th class="num">In stock</th><th class="num">Cost per unit</th><th class="num">Stock value</th><th>Kept in</th></tr></thead>
+{% endmacro %}
+
 <div class="shrink-0">
   <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Finished goods</div>
   <h1 class="text-[22px] font-bold text-ink leading-tight">Finished goods</h1>
-  <p class="text-[13px] text-ink-faint">Goods that production has made. Each product shows its total quantity; click it to see the batches. Each batch comes from one production order and keeps its own cost. Sales will take goods from these batches.</p>
+  <p class="text-[13px] text-ink-faint">Goods that production has made, product by product. Click a product to see its batches. Each batch comes from one production order and keeps its own cost.</p>
 </div>
 
 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 shrink-0">
@@ -56,52 +86,118 @@
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
-  {% macro batch_row(r) %}
-  {% set b = r.batch %}
-    <div class="fg-row">
-      <div>
-        <div class="flex items-center gap-2 flex-wrap"><span class="fg-no">{{ b.batch_no }}</span>
-          {% if r.qty > 0.00005 %}<span class="fg-chip ok"><i></i>In stock</span>{% else %}<span class="fg-chip gone"><i></i>Used up</span>{% endif %}</div>
-        <div class="fg-prod mt-0.5">{{ b.product.name if b.product else '—' }}</div>
-        <div class="fg-meta">From {{ r.order.prod_no }} · made {{ b.mfg_date.strftime('%d %b %Y') }}</div>
-      </div>
-      <div><div class="fg-qty">{{ '%g'|format(r.qty) }} <span class="text-[13px] font-semibold text-ink-faint">{{ b.unit_code }}</span></div>
-        <div class="fg-meta">{{ '%g'|format(r.made) }} {{ b.unit_code }} were made</div></div>
-      <div><div class="fg-meta">Cost per {{ b.unit_code or 'unit' }}</div><div class="text-[14px] font-semibold">₹{{ b.unit_cost|inr }}</div></div>
-      <div><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold">₹{{ r.value|inr }}</div></div>
-      <div><div class="fg-meta">Kept in</div><div class="text-[13px]">{{ r.where }}{% if r.rack %} · Rack {{ r.rack }}{% endif %}</div></div>
-    </div>
-  {% endmacro %}
   {% if tab == 'fg' %}
-  {# Tally jaisa: product + total quantity; click karo to batch-wise detail #}
-  {% for g in groups %}
-  <details class="fg-card fg-group">
-    <summary>
-      <span class="arrow">▶</span>
-      <div><div class="text-[15px] font-bold text-ink">{{ g.product.name if g.product else '—' }}</div>
-        <div class="fg-meta">{{ g.in_stock }} batch{{ '' if g.in_stock == 1 else 'es' }} in stock{% if g.batches|length > g.in_stock %} · {{ g.batches|length - g.in_stock }} used up{% endif %}</div></div>
-      <div><div class="fg-qty">{{ '%g'|format(g.qty) }} <span class="text-[13px] font-semibold text-ink-faint">{{ g.unit }}</span></div><div class="fg-meta">total in stock</div></div>
-      <div><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold">₹{{ g.value|inr }}</div></div>
-      <div>{% if g.alert %}<span class="fg-chip {{ g.alert[1] }}"><i></i>{{ g.alert[0] }}</span>{% else %}<span class="fg-chip ok"><i></i>In stock</span>{% endif %}</div>
-    </summary>
-    <div class="inner">{% for r in g.batches %}{{ batch_row(r) }}{% endfor %}</div>
-  </details>
+  {% if groups %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+    {% for g in groups %}
+    <div class="fg-card fgp {{ 'alert-bad' if g.alert and g.alert[1] == 'bad' else ('alert-warn' if g.alert else '') }}" role="button" tabindex="0"
+         data-key="{{ loop.index }}" data-name="{{ g.product.name if g.product else '—' }}" data-live="{{ g.in_stock }}">
+      <div class="flex items-start gap-3">
+        {{ icon_tile(g.icon, 44) }}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-[14.5px] font-bold text-ink leading-tight">{{ g.product.name if g.product else '—' }}</div>
+              <div class="fg-meta">{{ g.category or 'No category' }}</div>
+            </div>
+            {% if g.alert %}<span class="fg-chip {{ g.alert[1] }}"><i></i>{{ g.alert[0] }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="flex items-end justify-between gap-2 mt-2.5">
+        <div><div class="fg-meta" style="text-transform:uppercase;font-weight:700;letter-spacing:.04em;font-size:10.5px">In stock</div>
+          <div class="fg-qty">{{ '%g'|format(g.qty) }} <span class="text-[13px] font-semibold text-ink-faint">{{ g.unit }}</span></div></div>
+        <div class="text-right"><div class="fg-meta">Stock value</div><div class="text-[14px] font-semibold text-ink tabular-nums">₹{{ g.value|inr }}</div></div>
+      </div>
+      {% if g.high or g.low %}
+      {% set top = (g.high or ((g.low or 0) * 2)) %}
+      <div class="fg-gauge" aria-hidden="true">
+        <i style="width:{{ [(g.qty / top * 100) if top else 0, 100]|min|round(1) }}%;background:{{ '#B42318' if g.alert and g.alert[1] == 'bad' else ('#C77B1B' if g.alert else '#2E9E68') }}"></i>
+        {% if g.low %}<b style="left:{{ [(g.low / top * 100), 99]|min|round(1) }}%" title="Minimum {{ '%g'|format(g.low) }}"></b>{% endif %}
+      </div>
+      <div class="fg-meta mt-1">{% if g.low %}Min {{ '%g'|format(g.low) }}{% endif %}{% if g.low and g.high %} · {% endif %}{% if g.high %}Max {{ '%g'|format(g.high) }}{% endif %} {{ g.unit }}</div>
+      {% endif %}
+      <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[12px]">
+        <span class="fg-meta">{{ g.in_stock }} batch{{ '' if g.in_stock == 1 else 'es' }} in stock{% if g.batches|length > g.in_stock %} · {{ g.batches|length - g.in_stock }} used up{% endif %}</span>
+        <span class="font-semibold text-copper-text">View batches ▾</span>
+      </div>
+    </div>
+    <template data-for="{{ loop.index }}">{% for r in g.batches %}{{ batch_row(r) }}{% endfor %}</template>
+    {% endfor %}
+    {# Batches ka panel: product card par click karne par yahin (saare cards ke neeche) khulta hai #}
+    <div id="fg-panel" class="hidden fg-panel" style="grid-column: 1 / -1">
+      <div class="bg-white rounded-lg overflow-hidden" style="border: 1px solid #C77B1B">
+        <div class="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2" style="background:#FFF8EF;border-bottom:1px solid #F5D9B5">
+          <div><span id="fg-title" class="text-[15px] font-bold text-ink">Batches</span> <span class="fg-meta">— each batch keeps its own cost</span></div>
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-[13px] text-ink-muted cursor-pointer"><input type="checkbox" id="fg-showused" /> <span>Show used-up batches <span id="fg-usedcount" class="text-ink-faint"></span></span></label>
+            <button type="button" id="fg-close" class="px-2.5 py-1 text-[12.5px] font-semibold text-ink-muted border border-slate-300 rounded hover:bg-mist">Close ✕</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto"><table class="fg-table">{{ batch_head() }}<tbody id="fg-body"></tbody></table></div>
+        <p id="fg-empty" class="hidden text-center text-ink-faint py-5 text-[13.5px]">No batches to show.</p>
+      </div>
+    </div>
+  </div>
   {% else %}
   <div class="fg-empty">
     <h3>No finished goods yet</h3>
     <p>Record a production output and the good goods will appear here as a batch.</p>
     <p class="mt-3"><a href="{{ url_for('production_output.production_output_list') }}" class="text-copper-text font-semibold hover:underline">Go to Production output →</a></p>
   </div>
-  {% endfor %}
+  {% endif %}
   {% else %}
-  {% for r in rows %}
-  <article class="fg-card">{{ batch_row(r) }}</article>
+  {% if rows %}
+  <div class="fg-card overflow-hidden"><div class="overflow-x-auto"><table class="fg-table">{{ batch_head() }}<tbody>{% for r in rows %}{{ batch_row(r) }}{% endfor %}</tbody></table></div></div>
   {% else %}
   <div class="fg-empty">
     <h3>No scrap recorded yet</h3>
     <p>Scrap from production outputs is listed here.</p>
   </div>
-  {% endfor %}
+  {% endif %}
   {% endif %}
 </div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  // Product card par click -> uske batches saare cards ke neeche ke panel me (dobara click / Close / Esc se band)
+  var fgPanel = document.getElementById('fg-panel'), fgBody = document.getElementById('fg-body'), fgOpen = null;
+  var fgShowUsed = document.getElementById('fg-showused');
+  function fgFilter() {
+    var any = false;
+    fgBody.querySelectorAll('tr.fg-brow').forEach(function (tr) {
+      var ok = fgShowUsed.checked || !tr.classList.contains('used-up');
+      tr.style.display = ok ? '' : 'none';
+      any = any || ok;
+    });
+    document.getElementById('fg-empty').classList.toggle('hidden', any);
+  }
+  function fgClose() { if (!fgPanel) return; fgPanel.classList.add('hidden'); if (fgOpen) fgOpen.classList.remove('is-open'); fgOpen = null; }
+  function fgShow(card) {
+    if (fgOpen === card) { fgClose(); return; }
+    var tpl = document.querySelector('template[data-for="' + card.getAttribute('data-key') + '"]');
+    if (!tpl) return;
+    if (fgOpen) fgOpen.classList.remove('is-open');
+    fgOpen = card; card.classList.add('is-open');
+    document.getElementById('fg-title').textContent = 'Batches · ' + card.getAttribute('data-name');
+    fgBody.innerHTML = '';
+    fgBody.appendChild(tpl.content.cloneNode(true));
+    var used = fgBody.querySelectorAll('tr.used-up').length;
+    document.getElementById('fg-usedcount').textContent = used ? '(' + used + ')' : '';
+    fgShowUsed.checked = parseInt(card.getAttribute('data-live') || '0', 10) === 0;       // sab batch khatam ho chuke to wahi dikhao
+    fgFilter();
+    fgPanel.classList.remove('hidden');
+    fgPanel.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  if (fgPanel) {
+    document.querySelectorAll('.fgp').forEach(function (card) {
+      card.addEventListener('click', function () { fgShow(card); });
+      card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fgShow(card); } });
+    });
+    fgShowUsed.addEventListener('change', fgFilter);
+    document.getElementById('fg-close').addEventListener('click', fgClose);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fgClose(); });
+  }
+</script>
 {% endblock %}

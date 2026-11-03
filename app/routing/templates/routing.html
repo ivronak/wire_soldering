@@ -375,10 +375,10 @@
       var mats = a.materials || [];
       document.getElementById('rt-mat-box').style.display = mats.length ? 'block' : 'none';
       document.getElementById('rt-mats').innerHTML = mats.map(function (m) {
-        return '<tr><td class="py-1">' + esc(m.name) + '</td>' +
+        return '<tr><td class="py-1">' + esc(m.name) + (m.kgpp ? '<div class="text-[11px] text-ink-faint">1 pack per ' + m.kgpp + ' KG of output</div>' : '') + '</td>' +
           '<td class="py-1 text-right tabular-nums">' + m.needed + (m.spare ? ' <span class="text-ink-faint">+' + m.spare + '</span>' : '') + ' ' + esc(m.unit) + '</td>' +
           '<td class="py-1 text-right tabular-nums">' + m.issued + '</td>' +
-          '<td class="py-1"><input type="number" step="any" min="0" max="' + m.issued + '" name="used_' + m.id + '" value="' + m.default + '" data-counts="' + (m.counts ? 1 : 0) + '" required class="rt-input rt-used" /></td></tr>';
+          '<td class="py-1"><input type="number" step="any" min="0" max="' + m.issued + '" name="used_' + m.id + '" value="' + m.default + '" data-counts="' + (m.counts ? 1 : 0) + '"' + (m.kgpp ? ' data-kgpp="' + m.kgpp + '"' : '') + ' required class="rt-input rt-used" /></td></tr>';
       }).join('');
       STARTED = a.started_iso || ''; HOURS_EDITED = false;
       autoHours();
@@ -421,13 +421,22 @@
     document.getElementById('rt-qty-in').textContent = Math.round(cameIn * 10000) / 10000;
     document.getElementById('rt-prev-type').required = prevScrap > 0;
     var good = Math.max(cameIn - scrapNow, 0);
+    // Packing material (spool / box): is stage ka good output KG se pack ginti (jab tak operator khud badal na de)
+    document.querySelectorAll('#rt-mats .rt-used[data-kgpp]').forEach(function (i) {
+      if (i.getAttribute('data-edited') === '1') return;
+      var per = parseFloat(i.getAttribute('data-kgpp'));
+      if (per > 0) i.value = Math.min(Math.floor(good / per + 1e-9), parseFloat(i.max));
+    });
     document.getElementById('rt-qty-out').textContent = (Math.round(good * 10000) / 10000);
     var has = scrapNow > 0;
     document.getElementById('rt-scrap-box').style.display = has ? 'block' : 'none';
     document.getElementById('rt-scrap-type').required = has;
   }
   document.getElementById('rt-scrap').addEventListener('input', syncScrap);
-  document.getElementById('rt-mats').addEventListener('input', function () { syncScrap(); checkUsed(); });
+  document.getElementById('rt-mats').addEventListener('input', function (e) {
+    if (e.isTrusted && e.target.hasAttribute('data-kgpp')) e.target.setAttribute('data-edited', '1');      // operator ne khud likha: ab auto nahi badlega
+    syncScrap(); checkUsed();
+  });
   document.getElementById('rt-prev-scrap').addEventListener('input', syncScrap);
   function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });

@@ -162,6 +162,8 @@ class ProductCategories(CreatedAtMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(255), nullable=True)
     attribute_fields = db.Column(db.JSON, nullable=True)
+    # Flat icon ka key (app/icons.py). Is category ke har product ke saath wahi icon dikhta hai (Finished goods, Product master). Khaali = default.
+    icon = db.Column(db.String(30), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -248,6 +250,9 @@ class ProductPackingItem(CreatedAtMixin, db.Model):
     raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
 
     kg_per_pack = db.Column(db.Float, nullable=False)
+    # Ye packing material kis stage me lagta hai (spool -> Spooling, box / sleeve -> Packing). Khaali = kisi stage se bandha nahi.
+    work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=True)
+    work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
 
 
 class Branch(CreatedAtMixin, db.Model):
@@ -805,6 +810,8 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
     # Extra material allowance (%): har RM ka apna % (order banate waqt). Itna extra issue ho sakta hai (kharab / bacha maal ke liye);
     # zaroori nahi: jo use na ho wo output se pehle store me wapas aata hai.
     allowance_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)
+    # Packing line ho to "har kg_per_pack KG par 1 pack" (product ki packing item se copy). Routing me KG se pack ginti isi se nikalti hai.
+    kg_per_pack = db.Column(db.Float, nullable=True)
 
     @property
     def allowance_qty(self):

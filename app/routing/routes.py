@@ -82,6 +82,7 @@ def stage_material_rows(order, stage):
         rm = line.raw_material
         rows.append({"id": line.id, "name": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
                      "needed": round(line.required_qty, 4), "spare": line.allowance_qty, "issued": line.issued_qty,
+                     "kgpp": line.kg_per_pack if line.is_packing else None,
                      "default": round(min(line.required_qty, line.issued_qty), 4), "counts": counts_to_input(line, side_stage_info(order, stage) is not None)})
     return rows
 

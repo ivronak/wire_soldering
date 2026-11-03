@@ -13,7 +13,19 @@
   .sc-chip.zero { background: #F5F7F7; color: #98A5A4; border-color: #E4EAE9; font-weight: 500; }
   /* Compact material cards: pehle jaisa grid, par chhota; sirf kaam ki cheezein dikhti hain (zero wale chip nahi) */
   .sm-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 10px 12px; }
+  .sm-card { cursor: pointer; }
+  /* Warehouse badge: warehouse type ke rang me (RM store hara, QC Hold orange, WIP neela, Scrap lal, FG teal) */
+  .lot-line { min-height: 26px; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
+  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid #D1D9D8; background: #F5F7F7; color: #3D5A5D; white-space: nowrap; }
+  .wh-badge.wh-RM { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .wh-badge.wh-QC_HOLD { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .wh-badge.wh-WIP { background: #EAF1FB; color: #2B5FA8; border-color: #C9D8F0; }
+  .wh-badge.wh-SCRAP { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .wh-badge.wh-FG { background: #E8F3F4; color: #0F6B73; border-color: #BFDDE0; }
+  .rack-tag { font-size: 12px; font-weight: 600; color: #0F2F32; background: #fff; border: 1px dashed #98A5A4; border-radius: 6px; padding: 0 7px; }
+  .sm-card:focus-visible { outline: 2px solid #C77B1B; outline-offset: 2px; }
   .sm-card:hover { border-color: #C9B8A6; box-shadow: 0 1px 4px rgba(15, 47, 50, .08); }
+  .sm-card.is-open { border-color: #C77B1B; box-shadow: 0 0 0 2px #F5D9B5; }
   .sm-card.is-alert { border-left: 4px solid #B42318; }
   .sm-card.is-alert.warn { border-left: 4px solid #C77B1B; }
   /* Needs attention: band + drawer */
@@ -74,7 +86,7 @@
         <section>
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h2 class="text-[15px] font-semibold text-ink">By material</h2>
-            <input type="search" id="stock-search" placeholder="Search material or lot…" class="w-64 max-w-full px-3 py-1.5 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+            <input type="search" id="stock-search" placeholder="Search material, lot, batch or rack…" class="w-64 max-w-full px-3 py-1.5 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
           </div>
           {% if summary_rows %}
           <p class="text-[12px] text-ink-faint mb-2">Each box shows <b>everything you hold</b> of a material, split by state. The big number is only the part that is <b>ready to use</b>; rejected, waiting and in-production quantities are <b>separate</b> (not inside the big number). Rejected goods stay with you until a Purchase Return sends them back to the vendor.</p>
@@ -82,7 +94,11 @@
             {% for item in summary_rows %}
             {% set al = alert_by.get(item.material.id) if item.material else None %}
             {% set has_extra = item.waiting > 0 or item.rejected > 0 or item.wip > 0 or item.transit > 0 or item.scrap > 0 %}
-            <div class="sm-card stock-card {{ 'is-alert' if al else '' }} {{ 'warn' if al and al.status in ('low', 'over') else '' }}" data-search="{{ ((item.material.name if item.material else '') ~ ' ' ~ (item.material.code if item.material else ''))|lower }}">
+            {% set lots = lot_rows | selectattr('lot.raw_material_id', 'equalto', item.material.id) | selectattr('unit', 'equalto', item.unit) | list if item.material else [] %}
+            {% set live = lots | rejectattr('used_up') | list %}
+            {% set ns = namespace(text='') %}
+            {% for r in lots %}{% set ns.text = ns.text ~ ' ' ~ r.lot.lot_code ~ ' ' ~ (r.lot.vendor_batch_no or '') ~ ' ' ~ (r.lot.grn_line.grn.grn_no if r.lot.grn_line and r.lot.grn_line.grn else '') ~ ' ' ~ (r.lot.rack.name if r.lot.rack else '') %}{% endfor %}
+            <div class="sm-card stock-card {{ 'is-alert' if al else '' }} {{ 'warn' if al and al.status in ('low', 'over') else '' }}" role="button" tabindex="0" data-mid="{{ item.material.id if item.material else '' }}" data-name="{{ item.material.name if item.material else '' }}" data-code="{{ item.material.code if item.material else '' }}" data-live="{{ live|length }}" data-search="{{ ((item.material.name if item.material else '') ~ ' ' ~ (item.material.code if item.material else '') ~ ns.text)|lower }}">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="text-[14px] font-semibold text-ink leading-tight">{{ item.material.name if item.material else '—' }}</div>
@@ -120,51 +136,71 @@
                 {% if item.scrap > 0 %}<div class="text-[11.5px] text-ink-faint mt-1">Scrap {{ item.scrap|qty }} {{ item.unit }} (not counted above)</div>{% endif %}
               </div>
               {% endif %}
+              <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[12px]">
+                <span class="text-ink-faint">{{ live|length }} lot{{ '' if live|length == 1 else 's' }} with stock{% if lots|length > live|length %} · {{ lots|length - live|length }} used up{% endif %}</span>
+                <span class="font-semibold text-copper-text">View lots ▾</span>
+              </div>
             </div>
             {% endfor %}
+            {# Lots ka panel: card par click karne par yahin (saare boxes ke neeche, purani By lot ki jagah) khulta hai #}
+            <div id="lot-panel" class="hidden" style="grid-column: 1 / -1">
+              <div class="bg-white rounded-lg overflow-hidden" style="border: 1px solid #C77B1B">
+                <div class="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2" style="background:#FFF8EF;border-bottom:1px solid #F5D9B5">
+                  <div><span id="lot-title" class="text-[15px] font-bold text-ink">Lots</span> <span id="lot-sub" class="text-[12px] text-ink-faint"></span></div>
+                  <div class="flex flex-wrap items-center gap-3">
+                    <input type="search" id="lot-find" placeholder="Find a lot, batch, GRN or rack…" class="w-60 max-w-full px-3 py-1 text-[13px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+                    <label class="flex items-center gap-2 text-[13px] text-ink-muted cursor-pointer"><input type="checkbox" id="lot-showused" /> <span>Show used-up lots <span id="lot-usedcount" class="text-ink-faint"></span></span></label>
+                    <button type="button" id="lot-close" class="px-2.5 py-1 text-[12.5px] font-semibold text-ink-muted border border-slate-300 rounded hover:bg-mist">Close ✕</button>
+                  </div>
+                </div>
+                <table class="st-table" style="table-layout:auto">
+                  <thead><tr><th>Lot</th><th>Where it is now</th><th>Warehouse · Rack</th><th>Value</th><th></th></tr></thead>
+                  <tbody id="lot-body"></tbody>
+                </table>
+                <p id="lot-empty" class="hidden text-center text-ink-faint py-5 text-[13.5px]">No lots to show.</p>
+              </div>
+            </div>
           </div>
+          <p id="stock-empty" class="hidden text-center text-ink-faint py-4 text-[13.5px]">Nothing matches your search.</p>
           {% else %}
           <div class="sc-card text-center text-ink-faint" style="padding:28px;">No stock yet. Stock appears when a goods receipt (GRN) is posted.</div>
           {% endif %}
         </section>
 
-        <section class="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200">
-            <h2 class="text-[15px] font-semibold text-ink">By lot</h2>
-            <p class="text-[12px] text-ink-faint">Each lot is one batch from one goods receipt. Open <strong>History</strong> to see everything that happened to it.</p>
-          </div>
-          <table class="st-table">
-            <colgroup><col style="width:9%"><col style="width:16%"><col style="width:13%"><col style="width:28%"><col style="width:8%"><col style="width:16%"><col style="width:10%"></colgroup>
-            <thead><tr><th>Lot</th><th>Material</th><th>From</th><th>Where it is now</th><th>Rack</th><th>Value</th><th></th></tr></thead>
-            <tbody>
-              {% for row in lot_rows %}
-              {% set lot = row.lot %}
-              <tr class="lot-row" data-search="{{ ((lot.raw_material.name if lot.raw_material else '') ~ ' ' ~ lot.lot_code ~ ' ' ~ (lot.vendor_batch_no or '') ~ ' ' ~ (lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else '') ~ ' ' ~ (lot.rack.name if lot.rack else ''))|lower }}">
-                <td class="font-mono font-semibold text-ink">{{ lot.lot_code }}</td>
-                <td>{{ lot.raw_material.name if lot.raw_material else '—' }}</td>
-                <td><div class="font-mono text-[12px]">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else 'Opening stock' }}</div><div class="text-[11px] text-ink-faint">Batch {{ lot.vendor_batch_no or '—' }}</div></td>
-                <td>
-                  <div class="flex flex-wrap gap-1.5">
-                    {% if row.available > 0 %}<span class="sc-chip good">Available {{ row.available|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if row.waiting > 0 %}<span class="sc-chip wait">Waiting for QC {{ row.waiting|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if row.rejected > 0 %}<span class="sc-chip bad">Rejected {{ row.rejected|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if row.wip > 0 %}<span class="sc-chip wip">In production {{ row.wip|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if row.transit > 0 %}<span class="sc-chip wip">In transit {{ row.transit|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if row.scrap > 0 %}<span class="sc-chip bad">Scrap {{ row.scrap|qty }} {{ row.unit }}</span>{% endif %}
-                    {% if not (row.available > 0 or row.waiting > 0 or row.rejected > 0 or row.wip > 0 or row.transit > 0 or row.scrap > 0) %}<span class="sc-chip zero">Empty</span>{% endif %}
-                  </div>
-                </td>
-                <td>{{ lot.rack.name if lot.rack else '—' }}</td>
-                <td class="tabular-nums">₹{{ row.value|inr }}</td>
-                <td><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2.5 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">History</a></td>
-              </tr>
-              {% else %}
-              <tr><td colspan="7" class="text-ink-faint text-center" style="padding:22px;">No lots yet.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <p id="stock-empty" class="hidden text-center text-ink-faint py-6 text-[13.5px]">Nothing matches your search.</p>
-        </section>
+        {# Lot ki list ab alag table me nahi: material ke box par click karo to uske saare lot drawer me khulte hain. Rows <template> me (page me chhupe nahi). #}
+        {% for item in summary_rows if item.material %}
+        <template id="lots-{{ item.material.id }}-{{ loop.index }}" data-for="{{ item.material.id }}">
+          {% for row in lot_rows if row.lot.raw_material_id == item.material.id and row.unit == item.unit %}
+          {% set lot = row.lot %}
+          <tr class="lot-row {{ 'used-up' if row.used_up else '' }}">
+            <td><div class="font-mono font-semibold text-ink">{{ lot.lot_code }}</div><div class="text-[11.5px] text-ink-faint">{{ lot.grn_line.grn.grn_no if lot.grn_line and lot.grn_line.grn else 'Opening stock' }} · Batch {{ lot.vendor_batch_no or '—' }}</div></td>
+            <td>
+              <div class="flex flex-col">
+                {% if row.available > 0 %}<div class="lot-line"><span class="sc-chip good">Available {{ row.available|qty }} {{ row.unit }}</span></div>{% endif %}
+                {% if row.waiting > 0 %}<div class="lot-line"><span class="sc-chip wait">Waiting for QC {{ row.waiting|qty }} {{ row.unit }}</span></div>{% endif %}
+                {% if row.rejected > 0 %}<div class="lot-line"><span class="sc-chip bad">Rejected {{ row.rejected|qty }} {{ row.unit }}</span></div>{% endif %}
+                {% if row.wip > 0 %}<div class="lot-line"><span class="sc-chip wip">In production {{ row.wip|qty }} {{ row.unit }}</span></div>{% endif %}
+                {% if row.transit > 0 %}<div class="lot-line"><span class="sc-chip wip">In transit {{ row.transit|qty }} {{ row.unit }}</span></div>{% endif %}
+                {% if row.scrap > 0 %}<div class="lot-line"><span class="sc-chip bad">Scrap {{ row.scrap|qty }} {{ row.unit }}</span></div>{% endif %}
+                {% if row.used_up %}<div class="lot-line"><span class="sc-chip zero" title="All of this lot has been used or sent out">Used up</span></div>{% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="flex flex-col">
+                {% for key in ['available', 'waiting', 'rejected', 'wip', 'scrap'] if row[key] > 0 %}
+                {% set w = row.wh[key] %}
+                <div class="lot-line"><span class="wh-badge wh-{{ w.type }}">{{ w.name }}</span>{% if lot.rack and lot.rack.warehouse_id == w.id %}<span class="rack-tag">Rack {{ lot.rack.name }}</span>{% endif %}</div>
+                {% endfor %}
+                {% if row.transit > 0 %}<div class="lot-line"><span class="wh-badge">On the way</span></div>{% endif %}
+                {% if row.used_up %}<div class="lot-line"><span class="text-ink-faint">—</span></div>{% endif %}
+              </div>
+            </td>
+            <td class="tabular-nums">₹{{ row.value|inr }}</td>
+            <td class="text-right"><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2.5 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">History</a></td>
+          </tr>
+          {% endfor %}
+        </template>
+        {% endfor %}
       </div>
 {% endblock %}
 
@@ -212,15 +248,63 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
   })();
   var stockSearch = document.getElementById('stock-search');
+  // Search: material boxes (naam / code / lot / batch / GRN / rack)
   stockSearch.addEventListener('input', function () {
     var q = stockSearch.value.trim().toLowerCase();
     var shown = 0;
-    document.querySelectorAll('.stock-card, .lot-row').forEach(function (el) {
+    document.querySelectorAll('.stock-card').forEach(function (el) {
       var match = !q || (el.getAttribute('data-search') || '').indexOf(q) !== -1;
       el.style.display = match ? '' : 'none';
       if (match) shown += 1;
     });
     document.getElementById('stock-empty').classList.toggle('hidden', shown > 0);
   });
+
+  // Material box par click -> pehle jahan "By lot" table thi (saare boxes ke neeche) wahin uske lots khulte hain (dobara click / Close / Esc se band)
+  var panel = document.getElementById('lot-panel'), lotBody = document.getElementById('lot-body');
+  var showUsed = document.getElementById('lot-showused'), lotFind = document.getElementById('lot-find');
+  var openCard = null;
+  function applyLotFilter() {
+    var q = lotFind.value.trim().toLowerCase(), any = false;
+    lotBody.querySelectorAll('tr.lot-row').forEach(function (tr) {
+      var ok = (showUsed.checked || !tr.classList.contains('used-up')) && (!q || tr.textContent.toLowerCase().indexOf(q) !== -1);
+      tr.style.display = ok ? '' : 'none';
+      any = any || ok;
+    });
+    document.getElementById('lot-empty').classList.toggle('hidden', any);
+  }
+  function closeLots() {
+    panel.classList.add('hidden');
+    if (openCard) openCard.classList.remove('is-open');
+    openCard = null;
+  }
+  function openLots(card) {
+    if (openCard === card) { closeLots(); return; }
+    var tpl = document.querySelector('template[data-for="' + card.getAttribute('data-mid') + '"]');
+    if (!tpl) return;
+    if (openCard) openCard.classList.remove('is-open');
+    openCard = card;
+    card.classList.add('is-open');
+    document.getElementById('lot-title').textContent = card.getAttribute('data-name') + ' · ' + card.getAttribute('data-code');
+    lotBody.innerHTML = '';
+    lotBody.appendChild(tpl.content.cloneNode(true));
+    var total = lotBody.querySelectorAll('tr.lot-row').length, used = lotBody.querySelectorAll('tr.used-up').length;
+    document.getElementById('lot-sub').textContent = '— ' + total + ' lot' + (total === 1 ? '' : 's') + '. Open History to see everything that happened to a lot.';
+    document.getElementById('lot-usedcount').textContent = used ? '(' + used + ')' : '';
+    showUsed.checked = parseInt(card.getAttribute('data-live') || '0', 10) === 0;      // sab lot khatam ho chuke to wahi dikhao
+    lotFind.value = '';
+    applyLotFilter();
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  document.querySelectorAll('.stock-card').forEach(function (card) {
+    card.addEventListener('click', function () { openLots(card); });
+    card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLots(card); } });
+  });
+  showUsed.addEventListener('change', applyLotFilter);
+  lotFind.addEventListener('input', applyLotFilter);
+  document.getElementById('lot-close').addEventListener('click', closeLots);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLots(); });
+  stockSearch.addEventListener('input', closeLots);
 </script>
 {% endblock %}

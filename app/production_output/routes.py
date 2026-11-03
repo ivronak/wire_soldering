@@ -198,9 +198,11 @@ def finished_goods_list():
         if output is None or output.is_deleted or output.status != "Posted":
             continue
         qty, value = batch.balance
-        where = next((m.warehouse.name for m in batch.movements if m.warehouse is not None), "")
+        first_wh = next((m.warehouse for m in batch.movements if m.warehouse is not None), None)
+        where = first_wh.name if first_wh else ""
         rows.append({"batch": batch, "qty": qty, "value": value, "made": sum(m.qty for m in batch.movements if m.movement_type == "OUTPUT_IN" and m.reverses_movement_id is None),
-                     "where": where, "order": batch.production_order, "rack": batch.rack.name if batch.rack else ""})
+                     "where": where, "where_type": first_wh.warehouse_type if first_wh else "", "order": batch.production_order,
+                     "rack": batch.rack.name if batch.rack else ""})
     fg_in_stock = [r for r in rows if r["qty"] > 0.00005] if tab == "fg" else []
     kpi = {"batches": len([r for r in rows if r["qty"] > 0.00005]), "qty": round(sum(r["qty"] for r in rows), 4), "value": round(sum(r["value"] for r in rows), 2)}
     groups = fg_groups(rows) if tab == "fg" else []
@@ -233,6 +235,9 @@ def fg_groups(rows):
                 alert = ("Overstock", "warn")
         # Pehle jinme maal bacha hai (naya upar), used-up batch neeche
         group["batches"].sort(key=lambda r: (r["qty"] <= 0.00005, -r["batch"].id))
+        category = product.category if product else None
+        group.update(icon=category.icon if category else None, category=category.name if category else "",
+                     low=getattr(product, "min_stock", None), high=getattr(product, "max_stock", None))
         group.update(qty=qty, value=round(group["value"], 2), alert=alert, in_stock=len([r for r in group["batches"] if r["qty"] > 0.00005]),
                      unit=group["batches"][0]["batch"].unit_code)
         groups.append(group)

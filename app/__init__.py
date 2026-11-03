@@ -63,6 +63,11 @@ def create_app():
     app.add_template_filter(format_ist, "ist")
     from datetime import date as _date
     app.add_template_global(lambda: _date.today(), "today_date")
+    # Category ke flat icons (app/icons.py): {{ icon_tile(product.category.icon, 40) }}
+    from app.icons import icon_choices, icon_svg, icon_tile
+    app.add_template_global(icon_tile, "icon_tile")
+    app.add_template_global(icon_svg, "icon_svg")
+    app.add_template_global(icon_choices, "icon_choices")
 
     db.init_app(app)
     migrate.init_app(app, db)

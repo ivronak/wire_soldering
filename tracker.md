@@ -10,6 +10,15 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **2026-10-19 — PROJECT KI SACHI STHITI + ROADMAP (user: "tracker, memory, development md check karo, update na ho to update karo").** Neeche ka phase-wise table aur roadmap ab sahi hai; iske neeche ke purane dated notes history hain. **Decision: auth / user-role (Phase 0) Sales tak ke modules ke baad.** BOM / Recipe ka sidebar link hata diya (recipe Product par hi hai).
 
+### 2026-11-03 — STOCK / VALUATION / FINISHED GOODS UI + CATEGORY ICON (local, committed, deploy nahi)
+- **Stock ledger:** material boxes compact (Ready to use + rangeen patti + "Total = ready + rejected ..."), Needs attention = band + drawer, box par click -> lots panel neeche (Warehouse badge + Rack, used-up lots default chhupe). **Stock valuation:** table-alignment + card-look blocks (warehouse badges, patti, cost layers lots ke saath). **Finished goods:** product cards (icon, qty, value, min/max gauge, alert) + batches panel neeche (Kept in = warehouse badge + rack).
+- **Product Category icon:** `product_categories.icon` (migration `e4b7d2a9c6f1`), 15 flat icons ki fixed library `app/icons.py`; category form me picker; icon Finished goods card, Product master aur Category list me dikhta hai (icon na ho to default box).
+- Demo tour: stock lot steps (`st-open`) aur FG selectors (`.fgp`, `.fg-panel .fg-brow`) badle.
+- **Packing material ko stage se jodna:** `product_packing_items.work_stage_id` (migration `f2c8a5e1b7d3`). Product form ki Packing table me "Used in stage" (Spooling / Packing). Production order line me stage + `kg_per_pack` copy hota hai. Routing me us stage ke Complete par packing line "used" me aati hai; **Spooling complete par spool count = good output KG / kg_per_pack** (auto, edit ho sakta hai).
+- **Product form Flow check** ab packing lines bhi dikhata hai (jaise 500 KG -> 1000 PCS spool, 20 BOX) aur packing table badalte hi refresh hota hai.
+- **New production order form:** PCS wale product me "Kilograms in one PCS" ke neeche live total ("1000 PCS x 0.5 KG = 500.00 KG in total").
+- **Abhi baaki:** FG abhi KG me hai; spool/box ki ginti sirf "used" me dikhti hai, FG PCS stock nahi banta (agla feature: FG in spool/PCS, batch par "N spool, M box").
+
 ### 2026-11-02 — ALLOWANCE % + RM USED (ek hi entry per stage) + LEFTOVER RETURN (local, abhi commit / deploy nahi)
 - **Allowance har RM ka alag (2026-11-03 change):** production order form ke Raw material table me har material (recipe + packing) ke saamne **Spare %** (0-100). Pehle poore order par ek % tha; ab `production_order_lines.allowance_percent` (migration `d1f6b3a8c2e9`, purana order % lines par copy hua, order ka column hata). Extra (other) materials par allowance nahi.
 - **Material issue:** "Needed" aur "Spare" alag dikhte hain; issue limit = needed + spare; "Fill needed" / "Fill with spare" buttons. Sirf needed issue ho to order "Fully issued" hi maana jaata hai. **Material plan** ki demand = needed + spare (stage ki use likh di gayi to 0, wapas kiya spare dobara demand nahi banta).

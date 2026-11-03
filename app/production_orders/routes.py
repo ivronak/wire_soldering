@@ -430,6 +430,8 @@ def production_orders_add():
             is_flux=False,
             is_extra=False,
             is_packing=True,
+            work_stage_id=k.work_stage_id,
+            kg_per_pack=k.kg_per_pack,
             allowance_percent=allowances.get(k.raw_material_id, 0),
         ))
 

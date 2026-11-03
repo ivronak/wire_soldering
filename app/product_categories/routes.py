@@ -1,4 +1,5 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash
+from app.icons import clean_icon
 from app.models import ProductCategories
 from app.extensions import db
 
@@ -62,6 +63,7 @@ def product_categories_add():
             existing.name = name
             existing.description = description
             existing.attribute_fields = read_attributes_fields()
+            existing.icon = clean_icon(request.form.get('icon'))
             existing.is_active = True
 
             db.session.commit()
@@ -76,6 +78,7 @@ def product_categories_add():
         name=name,
         description=description,
         attribute_fields=read_attributes_fields(),
+        icon=clean_icon(request.form.get('icon')),
         is_active=True,
         is_deleted=False,
     ))
@@ -108,6 +111,7 @@ def product_categories_edit(c_id):
     c.name = name
     c.description = description
     c.attribute_fields = read_attributes_fields()
+    c.icon = clean_icon(request.form.get('icon'))
     c.is_deleted = False
 
     db.session.commit()
