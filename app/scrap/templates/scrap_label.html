@@ -15,6 +15,7 @@
       <div><span class="lbl">Packed on</span><span class="val">{{ batch.mfg_date.strftime('%d %b %Y') }}</span></div>
       <div><span class="lbl">Production order</span><span class="val">{{ order.prod_no }}</span></div>
       <div><span class="lbl">Product</span><span class="val">{{ batch.product.name if batch.product else '—' }}</span></div>
+      {% if pack %}<div><span class="lbl">Packed in</span><span class="val">{{ pack.pack_no }}</span></div>{% endif %}
     </div>
     <div class="sec">Where this scrap came from</div>
     <table class="lines">

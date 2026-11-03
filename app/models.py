@@ -331,6 +331,9 @@ class Vendor(CreatedAtMixin, db.Model):
     ledger_id = db.Column(db.Integer, db.ForeignKey("ledgers.id"), nullable=False)
     ledger = db.relationship("Ledger", foreign_keys=[ledger_id])
 
+    # Order dene se maal aane tak ke din (client change #3: 15-20 din). Material plan "PO kab tak dalo" isi se nikalta hai. Khaali = pata nahi.
+    lead_time_days = db.Column(db.Integer, nullable=True)
+
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -796,6 +799,16 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
     # Recipe se copy: ye material kis stage me jaata hai (order par freeze; master badle to purana order na badle)
     work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=True)
     work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
+    # Stage complete par likhi gayi asli RM use (ek hi baar, rounds nahi). None = abhi likhi nahi (purane orders me bhi None: output par
+    # WIP ka saara maal use ginte hain, pehle jaisa).
+    used_qty = db.Column(db.Float, nullable=True)
+    # Extra material allowance (%): har RM ka apna % (order banate waqt). Itna extra issue ho sakta hai (kharab / bacha maal ke liye);
+    # zaroori nahi: jo use na ho wo output se pehle store me wapas aata hai.
+    allowance_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)
+
+    @property
+    def allowance_qty(self):
+        return round((self.required_qty or 0) * (self.allowance_percent or 0) / 100, 4)
 
     @property
     def issued_qty(self):
@@ -811,7 +824,30 @@ class ProductionOrderLine(CreatedAtMixin, db.Model):
 
     @property
     def remaining_qty(self):
+        # Zaroorat ka wo hissa jo abhi issue hona baaki hai (allowance alag). Stage ki RM use likh di gayi ho to aur kuch issue nahi hona.
+        if self.used_qty is not None:
+            return 0
         return max(round(self.required_qty - self.issued_qty, 4), 0)
+
+    @property
+    def allowance_remaining_qty(self):
+        # Allowance ka wo hissa jo abhi issue ho sakta hai: (zaroorat + allowance) - ab tak issue, par zaroorat wale hisse ke baad ka
+        if self.used_qty is not None:
+            return 0
+        total_left = round(self.required_qty + self.allowance_qty - self.issued_qty, 4)
+        return max(round(total_left - self.remaining_qty, 4), 0)
+
+    @property
+    def open_demand_qty(self):
+        # Material plan / alerts ke liye: abhi aur kitna maal chahiye hoga (zaroorat + allowance), stage ki use likh di ho to 0
+        return round(self.remaining_qty + self.allowance_remaining_qty, 4)
+
+    @property
+    def leftover_qty(self):
+        # Stage me use likhne ke baad jo issued maal production me bacha hai (output se pehle wapas karna hai); use likhi na ho to 0
+        if self.used_qty is None:
+            return 0
+        return max(round(self.issued_qty - self.used_qty, 4), 0)
 
 
 class PaymentTerm(CreatedAtMixin, db.Model):
@@ -1743,10 +1779,14 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     scrap_type = db.relationship("ScrapType", foreign_keys=[scrap_type_id])
     scrap_kind = db.Column(db.String(12), default="Saleable", server_default="Saleable", nullable=False)
     notes = db.Column(db.String(255), nullable=True)
+    # Operator ne complete par asli kaam ke ghante likhe ho (stage do baar chala, beech me ruka) to wahi; warna start se end tak
+    work_hours = db.Column(db.Float, nullable=True)
 
     @property
     def actual_hours(self):
         # Asli lage ghante (start se end tak wall-clock). Abhi chal raha ho to start se ab tak nahi — sirf poora hone par
+        if self.work_hours is not None and self.completed_at:
+            return round(self.work_hours, 2)
         if self.started_at and self.completed_at:
             return round((self.completed_at - self.started_at).total_seconds() / 3600, 2)
         return None
@@ -1899,3 +1939,34 @@ class Rack(CreatedAtMixin, db.Model):
     warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class ScrapPack(CreatedAtMixin, db.Model):
+    # Scrap pack (client change #8): ek din ka scrap (kai orders ke scrap batches) ek bori / drum me, ek barcode (SCP-YYYYMMDD-001) ke saath.
+    # Pack khud stock nahi badalta: stock scrap batch (FGBatch kind SCRAP) me hi rehta hai, pack unhe sirf jodta hai. Unpack = soft (is_deleted), batch wapas free.
+    __tablename__ = "scrap_packs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    pack_no = db.Column(db.String(20), unique=True, nullable=False)
+    pack_date = db.Column(db.Date, nullable=False)                 # kis din ka scrap (batch ki mfg_date)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def batches(self):
+        return [item.batch for item in self.items]
+
+    @property
+    def weight(self):
+        # Pack ka vajan = uske batches ka abhi ka balance (live: output cancel / scrap bik jaye to apne aap badalta hai)
+        return round(sum(batch.balance[0] for batch in self.batches), 4)
+
+
+class ScrapPackItem(CreatedAtMixin, db.Model):
+    # Pack me kaun sa scrap batch. Ek batch ek chalte (is_deleted nahi) pack me hi ho sakta hai (routes.py me jaanch).
+    __tablename__ = "scrap_pack_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    pack_id = db.Column(db.Integer, db.ForeignKey("scrap_packs.id"), nullable=False)
+    pack = db.relationship("ScrapPack", foreign_keys=[pack_id], backref="items")
+    batch_id = db.Column(db.Integer, db.ForeignKey("fg_batches.id"), nullable=False)
+    batch = db.relationship("FGBatch", foreign_keys=[batch_id])

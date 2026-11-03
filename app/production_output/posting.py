@@ -34,9 +34,36 @@ def material_table(order):
             wip = wip_warehouse_for(rm_warehouse_of(lot))
             wq, wv = balance(lot.id, wip.id)
             value += value_for_out(wq, wv, n)
+        left = round(max(net - order_line.used_qty, 0), 4) if order_line.used_qty is not None else 0
         table.append({"name": rm.name if rm else "", "code": rm.code if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
-                      "planned": order_line.required_qty, "issued": round(net, 4), "value": q2(value)})
+                      "planned": order_line.required_qty, "issued": round(net, 4), "value": q2(value),
+                      "used": order_line.used_qty, "leftover": left if left > 0.00005 else 0})
     return table
+
+
+def leftover_rows(order):
+    # [(order_line, qty)] — stage me use likhne ke baad bhi production (WIP) me bacha maal. Output se pehle ye store me wapas aana chahiye.
+    # Jis line ki use likhi nahi (purane orders / maal baad me issue hua) uska kuch nahi maanga jaata: pehle jaisa, output par saara use.
+    rows = []
+    for order_line in order.lines:
+        if order_line.used_qty is None:
+            continue
+        net = sum(n for line, n in wip_lines(order) if line.production_order_line_id == order_line.id)
+        extra = round(net - order_line.used_qty, 4)
+        if extra > 0.00005:
+            rows.append((order_line, extra))
+    return rows
+
+
+def leftover_message(order):
+    # Output rokne ka saaf sandesh (khaali string = koi leftover nahi)
+    parts = []
+    for order_line, extra in leftover_rows(order):
+        rm = order_line.raw_material
+        parts.append(f"{extra:g} {rm.base_unit.code if rm and rm.base_unit else ''} of {rm.name if rm else 'material'}".replace("  ", " "))
+    if not parts:
+        return ""
+    return ("Return the unused material to the store before recording the output (Material issue, Return): " + "; ".join(parts) + ".")
 
 
 def _warehouse(branch_id, wtype):
@@ -62,6 +89,9 @@ def post_output(output, order, rack_id=None):
     rows = wip_lines(order)
     if not rows:
         raise InventoryError("No material is in production for this order, so there is nothing to use up.")
+    blocked = leftover_message(order)
+    if blocked:
+        raise InventoryError(blocked)
     total_value = 0.0
     branch_id = None
     for line, net in rows:

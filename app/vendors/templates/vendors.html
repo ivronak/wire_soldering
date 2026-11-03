@@ -155,6 +155,7 @@
                       data-gstin="{{ v.gstin or '' }}"
                       data-pan="{{ v.pan or '' }}"
                       data-terms="{{ v.payment_terms.name if v.payment_terms else '' }}"
+                      data-lead="{{ (v.lead_time_days ~ ' days') if v.lead_time_days is not none else '' }}"
                       data-opening="{% if v.ledger %}₹{{ '%.2f'|format(v.ledger.opening_balance) }} {{ v.ledger.opening_balance_type }}{% endif %}"
                       data-current-balance="{% if v.ledger %}₹{{ '%.2f'|format(v.ledger.current_balance|abs) }} {{ 'Cr' if v.ledger.current_balance >= 0 else 'Dr' }}{% endif %}"
                       data-bank-name="{{ v.bank_name or '' }}"
@@ -177,6 +178,7 @@
                       data-gstin="{{ v.gstin or '' }}"
                       data-pan="{{ v.pan or '' }}"
                       data-terms="{{ v.payment_terms_id or '' }}"
+                      data-lead="{{ v.lead_time_days if v.lead_time_days is not none else '' }}"
                       data-opening-amount="{{ v.ledger.opening_balance if v.ledger else '' }}"
                       data-opening-type="{{ v.ledger.opening_balance_type if v.ledger else 'Cr' }}"
                       data-bank-name="{{ v.bank_name or '' }}"
@@ -306,6 +308,12 @@
             <option value="{{ pt.id }}">{{ pt.name }}</option>
             {% endfor %}
           </select>
+        </div>
+        <div>
+          <label for="vendor-lead" class="block text-[12.5px] font-semibold text-ink mb-1">Lead time (days)</label>
+          <input type="number" id="vendor-lead" name="lead_time_days" min="0" max="365" step="1" placeholder="e.g. 15 (optional)"
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <p class="text-[11.5px] text-ink-faint mt-1">Days from placing the order to the goods arriving. The material plan uses it to say when to place a PO.</p>
         </div>
         <div>
           <label class="block text-[12.5px] font-semibold text-ink mb-1">Opening balance (₹)</label>
@@ -482,6 +490,7 @@
     document.getElementById('vendor-gstin').value = btn.getAttribute('data-gstin') || '';
     document.getElementById('vendor-pan').value = btn.getAttribute('data-pan') || '';
     document.getElementById('vendor-terms').value = btn.getAttribute('data-terms') || '';
+    document.getElementById('vendor-lead').value = btn.getAttribute('data-lead') || '';
     document.getElementById('vendor-opening-balance').value = btn.getAttribute('data-opening-amount') || '';
     document.getElementById('vendor-opening-balance-type').value = btn.getAttribute('data-opening-type') || 'Cr';
     document.getElementById('vendor-bank-name').value = btn.getAttribute('data-bank-name') || '';
@@ -507,6 +516,7 @@
       viewField('GSTIN', btn.getAttribute('data-gstin')) +
       viewField('PAN', btn.getAttribute('data-pan')) +
       viewField('Payment terms', btn.getAttribute('data-terms')) +
+      viewField('Lead time', btn.getAttribute('data-lead')) +
       viewField('Vendor type', btn.getAttribute('data-vendor-type')) +
       '</div>' +
       '<div class="pt-2">' + viewField('Address', btn.getAttribute('data-address')) + '</div>' +

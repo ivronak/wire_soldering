@@ -138,7 +138,7 @@
 
     <div class="rt-detail">
       <table class="rt-dl">
-        <thead><tr><th>Stage</th><th>Plan</th><th>Actual</th><th>Quantity (KG)</th><th></th></tr></thead>
+        <thead><tr><th>Stage</th><th>Plan</th><th>Actual</th><th>Quantity</th><th></th></tr></thead>
         <tbody>
           {% for st in sm.stages %}
           <tr>
@@ -177,7 +177,7 @@
               {% if st.notes %}<div class="rt-meta">Note: {{ st.notes }}</div>{% endif %}
               {% endif %}
             </td>
-            <td>{% if st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}
+            <td>{% if st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} {{ stage_unit(o, st) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}
               {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(st.scrap_qty) }}{% if st.scrap_type %} · {{ st.scrap_type.name }}{% endif %} · {{ st.scrap_kind }}</div>{% endif %}
               {% if st.qty_out is not none and st.qty_in %}<div class="rt-meta">Yield {{ '%.1f'|format(100 * st.qty_out / st.qty_in) }}%</div>{% endif %}
               {% else %}<span class="rt-meta">—</span>{% endif %}</td>
@@ -276,22 +276,37 @@
             <label class="flex items-start gap-2 text-[13.5px] mb-1"><input type="radio" name="prev_scrap_kind" value="Saleable" checked class="mt-1"> <span><b>Saleable scrap</b></span></label>
             <label class="flex items-start gap-2 text-[13.5px]"><input type="radio" name="prev_scrap_kind" value="Process loss" class="mt-1"> <span><b>Process loss</b> — only recorded, not stocked.</span></label></div>
         </div>
+        {# Is stage ka RM: ek hi baar asli use likhni hai (stage do baar chala ho tab bhi total ek entry) #}
+        <div class="rt-box" id="rt-mat-box" style="display:none">
+          <label class="rt-label">Raw material used *</label>
+          <table class="w-full text-[13px]">
+            <thead><tr class="text-left text-ink-faint text-[11.5px]"><th class="font-medium pb-1">Material</th><th class="font-medium pb-1 text-right">Needed</th><th class="font-medium pb-1 text-right">Issued</th><th class="font-medium pb-1" style="width:30%">Used</th></tr></thead>
+            <tbody id="rt-mats"></tbody>
+          </table>
+          <p class="text-[11.5px] text-ink-faint mt-2">Enter the total used in this stage, even if it ran more than once. You cannot use more than was issued. Whatever was issued but not used must be returned to the store before the output is recorded.</p>
+        </div>
         <div class="rt-box grid grid-cols-2 gap-3">
-          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> KG</div>
+          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> <span class="rt-unit">KG</span></div>
           {# Sirf scrap likhna hai; good output = aaya hua - scrap, system khud nikaalta hai (client change 8) #}
-          <div id="rt-scrap-wrap"><label class="rt-label">Scrap (KG)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
+          <div id="rt-scrap-wrap"><label class="rt-label">Scrap (<span class="rt-unit">KG</span>)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
           <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none">Scrap of this stage is entered when the next stage is completed (after the crucible is emptied).</div>
-          <div><label class="rt-label">Good output (KG)</label><div id="rt-qty-out" class="rt-input" style="background:#F3F4F6;font-weight:600">0</div></div>
+          <div><label class="rt-label">Good output (<span class="rt-unit">KG</span>)</label><div id="rt-qty-out" class="rt-input" style="background:#F3F4F6;font-weight:600">0</div></div>
           <div class="col-span-2 text-[11.5px] text-ink-faint">Enter only the scrap. Good output is worked out for you: came in − scrap.</div>
         </div>
         <div class="rt-box space-y-3" id="rt-scrap-box" style="display:none">
           <div class="text-[12.5px] text-ink-muted"><b>About the scrap</b> — so it can be tracked and later sold.</div>
           <div><label class="rt-label">Type of scrap *</label>
             <select name="scrap_type_id" id="rt-scrap-type" class="rt-input"><option value="">Select type</option>{% for t in scrap_types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
-          <div><label class="rt-label">Can it be sold? *</label>
+          <div id="rt-kind-side" class="text-[12px] text-ink-muted" style="display:none">Waste of this stage is only recorded (not stocked).</div>
+          <div id="rt-kind-wrap"><label class="rt-label">Can it be sold? *</label>
             <label class="flex items-start gap-2 text-[13.5px] mb-1"><input type="radio" name="scrap_kind" value="Saleable" checked class="mt-1"> <span><b>Saleable scrap</b> — goes to the scrap yard when the order's output is recorded.</span></label>
             <label class="flex items-start gap-2 text-[13.5px]"><input type="radio" name="scrap_kind" value="Process loss" class="mt-1"> <span><b>Process loss</b> — tiny loss (fumes, trimming). Only recorded, not stocked.</span></label></div>
         </div>
+      </div>
+      <div class="rt-box" id="rt-hours-box">
+        <label class="rt-label">Working hours (optional)</label>
+        <input type="number" step="any" min="0" name="work_hours" id="rt-hours" class="rt-input" placeholder="Hours" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Filled automatically from start to finish time. Change it if the stage ran in more than one sitting or stopped in between.</p>
       </div>
       <div class="rt-box">
         <label class="rt-label">Notes</label>
@@ -299,6 +314,7 @@
       </div>
     </form>
     <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+      <span id="rt-used-warn" class="mr-auto text-[12.5px]" style="color:#B42318;display:none">Used is more than issued. Issue the extra in <a href="/material_issues" class="underline">Material issue</a> first.</span>
       <button type="button" id="rt-cancel" class="rt-btn ghost">Cancel</button>
       <button type="submit" form="rt-form" id="rt-submit" class="rt-btn primary" style="padding:8px 20px">Start stage</button>
     </div>
@@ -331,11 +347,18 @@
     when.value = NOW;
     document.getElementById('rt-when-label').textContent = start ? 'Started at' : 'Finished at';
     document.getElementById('rt-notes').value = '';
+    document.getElementById('rt-submit').disabled = false;
+    document.getElementById('rt-used-warn').style.display = 'none';
+    document.getElementById('rt-hours-box').style.display = 'none';        // sirf complete par
     if (!start) {
       document.getElementById('rt-qty-in').textContent = a.qty_in;
       QTY_IN = a.qty_in;
       DEFER_PREV = a.defer_prev;
       DEFER_SELF = !!a.defer_self;
+      // Flux jaise stage ki apni unit (LTR ...) aur waste hamesha "process loss"
+      document.querySelectorAll('.rt-unit').forEach(function (u) { u.textContent = a.unit || 'KG'; });
+      document.getElementById('rt-kind-wrap').style.display = a.side ? 'none' : 'block';
+      document.getElementById('rt-kind-side').style.display = a.side ? 'block' : 'none';
       document.getElementById('rt-scrap').value = 0;
       document.getElementById('rt-scrap').disabled = DEFER_SELF;       // disabled field submit nahi hota, server 0 maanta hai
       document.getElementById('rt-scrap-wrap').style.display = DEFER_SELF ? 'none' : 'block';
@@ -349,7 +372,18 @@
         document.getElementById('rt-prev-scrap').value = DEFER_PREV.scrap;
         document.getElementById('rt-prev-type').value = DEFER_PREV.type_id;
       }
-      syncScrap();
+      var mats = a.materials || [];
+      document.getElementById('rt-mat-box').style.display = mats.length ? 'block' : 'none';
+      document.getElementById('rt-mats').innerHTML = mats.map(function (m) {
+        return '<tr><td class="py-1">' + esc(m.name) + '</td>' +
+          '<td class="py-1 text-right tabular-nums">' + m.needed + (m.spare ? ' <span class="text-ink-faint">+' + m.spare + '</span>' : '') + ' ' + esc(m.unit) + '</td>' +
+          '<td class="py-1 text-right tabular-nums">' + m.issued + '</td>' +
+          '<td class="py-1"><input type="number" step="any" min="0" max="' + m.issued + '" name="used_' + m.id + '" value="' + m.default + '" data-counts="' + (m.counts ? 1 : 0) + '" required class="rt-input rt-used" /></td></tr>';
+      }).join('');
+      STARTED = a.started_iso || ''; HOURS_EDITED = false;
+      autoHours();
+      document.getElementById('rt-hours-box').style.display = 'block';
+      syncScrap(); checkUsed();
       document.getElementById('rt-machines').innerHTML = a.machines.map(function (m) {
         return '<label class="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="machine_ids" value="' + m.id + '"' + (m.planned ? ' checked' : '') + '> ' + esc(m.name) +
           (m.planned ? '' : ' <span class="text-[11.5px] text-ink-faint">(not in plan)</span>') + '</label>';
@@ -357,12 +391,33 @@
     }
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
-  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false;
+  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false, STARTED = '', HOURS_EDITED = false;
+  // Working hours: start se finish tak khud nikalta hai; operator badal sakta hai (tab auto band)
+  function autoHours() {
+    if (HOURS_EDITED || !STARTED || !when.value) return;
+    var h = (new Date(when.value) - new Date(STARTED)) / 3600000;
+    document.getElementById('rt-hours').value = h > 0 ? Math.round(h * 100) / 100 : '';
+  }
+  document.getElementById('rt-hours').addEventListener('input', function () { HOURS_EDITED = true; });
+  when.addEventListener('input', autoHours);
+  function checkUsed() {
+    var bad = false;
+    document.querySelectorAll('#rt-mats .rt-used').forEach(function (i) {
+      var over = (parseFloat(i.value) || 0) > parseFloat(i.max) + 0.00005;
+      i.style.borderColor = over ? '#B42318' : '';
+      bad = bad || over;
+    });
+    document.getElementById('rt-used-warn').style.display = bad ? 'inline' : 'none';
+    document.getElementById('rt-submit').disabled = bad;
+  }
   function syncScrap() {
     var scrapNow = DEFER_SELF ? 0 : (parseFloat(document.getElementById('rt-scrap').value) || 0);
     // Pichhle stage ka scrap ghata ke hi is stage me aaya maal nikalta hai
     var prevScrap = DEFER_PREV ? (parseFloat(document.getElementById('rt-prev-scrap').value) || 0) : 0;
     var cameIn = DEFER_PREV ? Math.max(DEFER_PREV.qty_in - prevScrap, 0) : QTY_IN;
+    // Input = asli use hua maal (jab RM-used rows hon); phir usme se scrap minus
+    var usedRows = document.querySelectorAll('#rt-mats .rt-used[data-counts="1"]');
+    if (!DEFER_PREV && usedRows.length) { cameIn = 0; usedRows.forEach(function (i) { cameIn += parseFloat(i.value) || 0; }); }
     document.getElementById('rt-qty-in').textContent = Math.round(cameIn * 10000) / 10000;
     document.getElementById('rt-prev-type').required = prevScrap > 0;
     var good = Math.max(cameIn - scrapNow, 0);
@@ -372,6 +427,7 @@
     document.getElementById('rt-scrap-type').required = has;
   }
   document.getElementById('rt-scrap').addEventListener('input', syncScrap);
+  document.getElementById('rt-mats').addEventListener('input', function () { syncScrap(); checkUsed(); });
   document.getElementById('rt-prev-scrap').addEventListener('input', syncScrap);
   function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });

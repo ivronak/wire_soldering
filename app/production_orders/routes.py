@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from flask import abort, Blueprint, flash, redirect, render_template, request, url_for
 from app.extensions import db
-from app.models import (Machines, Product, ProductCategories, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
+from app.models import (Machines, Product, ProductCategories, ProductionLine, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
 from app.production_orders.planning import plan_stages
 from app.production_lines.status import line_board
@@ -23,6 +23,23 @@ def _is_kg(machine):
     return bool(machine.capacity_per_hour) and unit in ("KG", "KGS")
 
 
+def _machine_row(m):
+    # Planner ke liye machine ka data. line_id / line: machine kis Production Line ki hai (form me us line ki machines hi tick hoti hain)
+    return {"id": m.id, "name": m.name, "per_hour": m.capacity_per_hour or 0, "hours_per_day": m.hours_per_day or 8,
+            "ok": _is_kg(m), "line_id": m.line_id, "line": m.line.name if m.line else ""}
+
+
+def _read_line():
+    # Order form ki Production Line (optional). (line, None) ya (None, "error"); khaali ho to (None, None)
+    line_id = request.form.get("line_id", type=int)
+    if not line_id:
+        return None, None
+    line = db.session.get(ProductionLine, line_id)
+    if line is None or line.is_deleted or not line.is_active:
+        return None, "Choose an active production line."
+    return line, None
+
+
 def _routing_for(product):
     # Product ke default stages (Work Stage ke order me) aur har stage ki active machines — form ke plan section ke liye
     stages = []
@@ -35,17 +52,15 @@ def _routing_for(product):
         stages.append({
             "stage_id": stage.id,
             "name": stage.name,
-            "machines": [{
-                "id": m.id, "name": m.name, "per_hour": m.capacity_per_hour or 0, "hours_per_day": m.hours_per_day or 8,
-                "ok": _is_kg(m),
-            } for m in machines],
+            "machines": [_machine_row(m) for m in machines],
         })
     return stages
 
 
-def read_plan(product, batch_kg, order_date, routing=None):
+def read_plan(product, batch_kg, order_date, routing=None, line=None):
     """Form se production plan padho: har stage ki chuni hui machines aur start date. (plan, error) wapas deta hai.
-    Product ka routing na ho to (None, None): order bina plan ke ban jaata hai. Server khud hisaab lagata hai (JS ke dikhaye par bharosa nahi)."""
+    Product ka routing na ho to (None, None): order bina plan ke ban jaata hai. Server khud hisaab lagata hai (JS ke dikhaye par bharosa nahi).
+    line = order ki Production Line (ho to sirf usi line ki machines chun sakte hain)."""
     if routing is None:
         routing = _routing_for(product)
     if not routing:
@@ -63,6 +78,8 @@ def read_plan(product, batch_kg, order_date, routing=None):
             machine = db.session.get(Machines, machine_id)
             if machine is None or machine.is_deleted or machine.status != "active" or machine.work_stage_id != stage["stage_id"]:
                 return None, f"A chosen machine is not available for {stage['name']}."
+            if line is not None and machine.line_id != line.id:
+                return None, f"{machine.name} is not on {line.name}. Choose only the machines of the production line."
             if not _is_kg(machine):
                 return None, f"{machine.name} has no output per hour in KG. Set it in Machines first."
             if machine.id in [x["id"] for x in machines]:
@@ -100,6 +117,25 @@ def _read_needed_by():
         return datetime.strptime(raw, "%Y-%m-%d").date(), None
     except ValueError:
         return None, "Enter a valid 'needed by' date."
+
+
+def _read_allowances(product):
+    # Har RM ka apna allowance %: form field allowance_rm_<rm_id> (recipe + packing materials). 0 se 100; khaali = 0.
+    # ({rm_id: percent}, None) ya (None, "error")
+    ids = {r.raw_material_id for r in product.recipe_items} | {k.raw_material_id for k in product.packing_items}
+    result = {}
+    for rm_id in ids:
+        raw = (request.form.get(f"allowance_rm_{rm_id}") or "").strip()
+        if not raw:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            return None, "Enter a valid allowance percent."
+        if value < 0 or value > 100:
+            return None, "The allowance must be between 0 and 100 percent."
+        result[rm_id] = round(value, 2)
+    return result, None
 
 
 def _save_plan(order, plan):
@@ -227,15 +263,14 @@ def production_orders_list():
             for st in o.stages:
                 machines = Machines.query.filter(Machines.work_stage_id == st.work_stage_id, Machines.is_deleted == False,
                                                  Machines.status == "active").order_by(Machines.code).all()
-                routing.append({"stage_id": st.work_stage_id, "name": st.stage_name, "machines": [{
-                    "id": m.id, "name": m.name, "per_hour": m.capacity_per_hour or 0, "hours_per_day": m.hours_per_day or 8,
-                    "ok": _is_kg(m)} for m in machines]})
+                routing.append({"stage_id": st.work_stage_id, "name": st.stage_name, "machines": [_machine_row(m) for m in machines]})
             chosen = {str(st.work_stage_id): [m.machine_id for m in st.machines] for st in o.stages}
         else:
             routing = _routing_for(o.product) if o.product else []
             chosen = {}
         earliest = o.earliest_start_date or o.planned_start_date or o.order_date
         resched[str(o.id)] = {"prod_no": o.prod_no, "batch_kg": o.planned_qty * o.unit_weight, "routing": routing, "chosen": chosen,
+                              "line_id": o.line_id, "line": o.line.name if o.line else "",
                               "start": earliest.isoformat(), "needed_by": o.needed_by_date.isoformat() if o.needed_by_date else ""}
     categories = (
         ProductCategories.query.filter(
@@ -329,13 +364,21 @@ def production_orders_add():
             return redirect(url_for("production_orders.production_orders_list"))
 
     batch_kg = planned_qty * unit_weight
-    plan, plan_error = read_plan(product, batch_kg, order_date)
+    line, line_error = _read_line()
+    if line_error:
+        flash(line_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    plan, plan_error = read_plan(product, batch_kg, order_date, line=line)
     if plan_error:
         flash(plan_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
     needed_by, needed_error = _read_needed_by()
     if needed_error:
         flash(needed_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    allowances, allowance_error = _read_allowances(product)
+    if allowance_error:
+        flash(allowance_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
     year = order_date.year
     count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
@@ -350,6 +393,7 @@ def production_orders_add():
         status="Draft",
         remarks=remarks,
         is_deleted=False,
+        line_id=line.id if line else None,        # planner me chuni line; Start par yahi line chalti hai
         needed_by_date=needed_by,
         earliest_start_date=plan["earliest_start"] if plan else order_date,
         queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
@@ -371,6 +415,7 @@ def production_orders_add():
             is_flux=bool(r.is_flux),
             is_extra=False,
             work_stage_id=r.work_stage_id,
+            allowance_percent=allowances.get(r.raw_material_id, 0),
         ))
 
     # Packing Material (spool / sleeve / box): har kg_per_pack KG par 1 pack, upar round (500 KG / 20 = 25 box). Master badle to purana order na badle.
@@ -385,6 +430,7 @@ def production_orders_add():
             is_flux=False,
             is_extra=False,
             is_packing=True,
+            allowance_percent=allowances.get(k.raw_material_id, 0),
         ))
 
     # Packaging / extra RM recipe ka percent nahi. User jo qty type kare wahi save.
@@ -501,7 +547,13 @@ def production_orders_reschedule(order_id):
     if not routing:
         flash("This product has no production stages. Set them in Product Master first.", "error")
         return redirect(url_for("production_orders.production_orders_list"))
-    plan, plan_error = read_plan(order.product, order.planned_qty * order.unit_weight, order.order_date, routing)
+    # Line badal sakte hain (spec 28.1: dusri line me move possible). Form me line na aaye to order ki purani line; us line ki machines hi chun sakte hain.
+    line, line_error = _read_line()
+    if line_error:
+        flash(line_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    line = line or order.line
+    plan, plan_error = read_plan(order.product, order.planned_qty * order.unit_weight, order.order_date, routing, line=line)
     if plan_error:
         flash(plan_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
@@ -510,6 +562,7 @@ def production_orders_reschedule(order_id):
         flash(needed_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
     order.needed_by_date = needed_by
+    order.line_id = line.id if line else None
     _save_plan(order, plan)
     persist_schedule()
     db.session.commit()
@@ -577,9 +630,11 @@ def production_orders_start(order_id):
     # Production line: lines bani hon to chunna zaroori (client change #1); koi line nahi to pehle jaisa chalta hai
     board = line_board(today)
     if board:
-        line_id = request.form.get("line_id", type=int)
+        # Order banate waqt line chuni thi (machines usi ki) to wahi; warna Start ke form se (purane orders)
+        line_id = order.line_id or request.form.get("line_id", type=int)
         if line_id not in {row["id"] for row in board}:
-            flash("Choose the production line for this order.", "error")
+            flash("The production line of this order is not active any more. Turn it on in Production Lines first." if order.line_id
+                  else "Choose the production line for this order.", "error")
             return redirect(url_for("production_orders.production_orders_list"))
         order.line_id = line_id
         # Line ki daily capacity se kam kaam (is order + us line par baaki chalte orders) ho to wajah likhna zaroori

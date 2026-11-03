@@ -181,12 +181,13 @@
     </div>
     <div class="mi-detail">
       <table class="mi-dl">
-        <thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th><th class="r">Still needed</th><th class="r">In store</th><th>Status</th></tr></thead>
+        <thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Spare (allowance)</th><th class="r">Issued</th><th class="r">Still needed</th><th class="r">In store</th><th>Status</th></tr></thead>
         <tbody>
           {% for l in plan.lines %}
           <tr>
             <td class="font-semibold text-ink">{{ l.name }}<div class="mi-meta font-normal">{{ l.code }}</div></td>
             <td class="r">{{ '%g'|format(l.required) }} {{ l.unit }}</td>
+            <td class="r text-ink-faint">{{ ('%g'|format(l.spare_total)) if l.spare_total else '—' }}</td>
             <td class="r">{{ '%g'|format(l.issued) }}</td>
             <td class="r font-semibold">{{ '%g'|format(l.remaining) }}</td>
             <td class="r {{ 'text-stop' if l.short else '' }}">{{ '%g'|format(l.available) }}</td>
@@ -203,7 +204,28 @@
   {% endfor %}
   {% endif %}
 
-  {% if not to_issue and not draft_issues %}
+  {% if extra_orders %}
+  <div class="mi-group">Running orders with everything issued <b>{{ extra_orders|length }}</b></div>
+  {% for order in extra_orders %}
+  {% set plan = plans[order.id] %}
+  <article class="mi-card is-run">
+    <div class="mi-row">
+      <div class="mi-pos">{{ order.queue_position }}<small>queue</small></div>
+      <div style="min-width:0">
+        <div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ order.prod_no }}</span><span class="mi-chip run"><i></i>In production</span></div>
+        <div class="mi-prod mt-0.5">{{ order.product.name if order.product else '—' }}</div>
+      </div>
+      <div><span class="mi-chip ok"><i></i>Fully issued</span><div class="mi-meta mt-1">Need more material on the floor? Issue extra and write the reason in Remarks.</div></div>
+      <div class="mi-act">
+        <button type="button" class="btn-issue mi-btn ghost" data-plan='{{ plan|tojson }}'>Issue extra material</button>
+        {% if return_plans.get(order.id) %}<button type="button" class="btn-return mi-btn ghost" data-plan='{{ return_plans[order.id]|tojson }}'>Return material</button>{% endif %}
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+  {% endif %}
+
+  {% if not to_issue and not draft_issues and not extra_orders %}
   <div class="mi-empty"><h3>Nothing to issue</h3><p>Release a production order and it will appear here, in queue order.</p></div>
   {% endif %}
 
@@ -291,12 +313,13 @@
       </section>
       <section class="mi-step">
         <div class="flex items-center justify-between gap-2 mb-2">
-          <p class="text-[12.5px] text-ink-faint">Type how much of each material to issue now. It is taken from the store, oldest lot first. You cannot issue more than is still needed or more than the store has free.</p>
-          <button type="button" id="mi-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Fill all available</button>
+          <p class="text-[12.5px] text-ink-faint">Type how much of each material to issue now. It is taken from the store, oldest lot first. Spare is the order's extra allowance for wastage: issue it only if you want it on the floor; what is not used must come back before the output. For a running order you can issue more than this if you write the reason in Remarks.</p>
+          <span class="flex gap-2"><button type="button" id="mi-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Fill needed</button>
+            <button type="button" id="mi-fill-spare" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Fill with spare</button></span>
         </div>
         <div class="overflow-x-auto rounded-lg">
           <table class="lines-table">
-            <thead><tr><th style="width:30%">Material</th><th>Needed</th><th>Issued</th><th>Still needed</th><th>In store</th><th style="width:15%">Issue now</th></tr></thead>
+            <thead><tr><th style="width:28%">Material</th><th>Needed</th><th>Spare</th><th>Issued</th><th>Still needed</th><th>In store</th><th style="width:15%">Issue now</th></tr></thead>
             <tbody id="mi-lines"></tbody>
           </table>
         </div>
@@ -381,14 +404,15 @@
     document.getElementById('mi-date').value = TODAY;
     var html = '';
     (plan.lines || []).forEach(function (l, i) {
-      var can = l.remaining > 0 && l.available > 0;
+      var can = (l.remaining > 0 || l.spare > 0 || l.extra_ok) && l.available > 0;
       html += '<tr><td><div class="font-semibold">' + esc(l.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(l.code) + '</div><input type="hidden" name="line_id_' + i + '" value="' + l.id + '"></td>' +
         '<td class="text-right tabular-nums">' + fmt(l.required) + ' ' + esc(l.unit) + '</td>' +
+        '<td class="text-right tabular-nums text-ink-faint">' + (l.spare_total ? fmt(l.spare_total) : '—') + '</td>' +
         '<td class="text-right tabular-nums">' + fmt(l.issued) + '</td>' +
         '<td class="text-right tabular-nums">' + fmt(l.remaining) + '</td>' +
         '<td class="text-right tabular-nums' + (l.available < l.remaining ? ' text-stop' : '') + '">' + fmt(l.available) + '</td>' +
-        '<td>' + (can ? '<input type="number" class="mi-qty" data-max="' + l.suggest + '" name="qty_' + i + '" min="0" max="' + l.suggest + '" step="any" value="' + l.suggest + '">'
-                      : '<span class="text-[12px] text-ink-faint">' + (l.remaining <= 0 ? 'Done' : 'No stock') + '</span>') + '</td></tr>';
+        '<td>' + (can ? '<input type="number" class="mi-qty" data-max="' + l.suggest + '" data-maxall="' + l.suggest_all + '" name="qty_' + i + '" min="0" max="' + (l.extra_ok ? l.available : l.suggest_all) + '" step="any" value="' + l.suggest + '">'
+                      : '<span class="text-[12px] text-ink-faint">' + ((l.remaining <= 0 && !l.extra_ok) ? 'Done' : 'No stock in store') + '</span>') + '</td></tr>';
     });
     document.getElementById('mi-lines').innerHTML = html;
     show(miModal);
@@ -396,6 +420,9 @@
   document.querySelectorAll('.btn-issue').forEach(function (b) { b.addEventListener('click', function () { openIssue(b); }); });
   document.getElementById('mi-fill').addEventListener('click', function () {
     document.querySelectorAll('#mi-lines .mi-qty').forEach(function (i) { i.value = i.getAttribute('data-max'); });
+  });
+  document.getElementById('mi-fill-spare').addEventListener('click', function () {
+    document.querySelectorAll('#mi-lines .mi-qty').forEach(function (i) { i.value = i.getAttribute('data-maxall'); });
   });
   ['mi-close', 'mi-cancel', 'mi-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(miModal); }); });
 

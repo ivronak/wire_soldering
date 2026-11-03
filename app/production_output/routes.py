@@ -9,8 +9,8 @@ from app.extensions import db
 from app.inventory.posting import InventoryError
 from app.models import FGBatch, ProductionOrder, ProductionOutput, Rack
 from app.production_orders.scheduler import persist_schedule, renumber_queue
-from app.production_output.posting import cancel_output, fg_warehouse_for, material_table, post_output, wip_lines
-from app.routing.routes import order_summary
+from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, material_table, post_output, wip_lines
+from app.routing.routes import order_summary, side_stage_info
 
 production_output_bp = Blueprint("production_output", __name__, template_folder="templates")
 
@@ -39,8 +39,10 @@ def output_plan(order):
     weight = order.unit_weight or 1
     good = round((last.qty_out or 0) / weight, 4)
     # Scrap routing me stage-wise likhi hoti hai: Saleable -> Scrap yard, Process loss -> sirf record
-    scrap = round(sum(s.scrap_qty or 0 for s in stages if s.scrap_kind != "Process loss") / weight, 4)
-    loss = round(sum(s.scrap_qty or 0 for s in stages if s.scrap_kind == "Process loss") / weight, 4)
+    # Flux jaise side stage (alag unit) ka waste product ke KG totals me nahi judta
+    metal = [s for s in stages if side_stage_info(order, s) is None]
+    scrap = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind != "Process loss") / weight, 4)
+    loss = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind == "Process loss") / weight, 4)
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": order.product.base_unit.code if order.product and order.product.base_unit else "",
@@ -48,6 +50,7 @@ def output_plan(order):
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
+        "leftover_note": leftover_message(order),
         "racks": [{"id": rack.id, "name": rack.name} for rack in fg_racks_for(order)],
     }
 
@@ -104,6 +107,9 @@ def _read_form():
         return None, f"Good + rework + scrap + loss ({good + rework + scrap + loss:g}) is more than 10% above the ordered quantity ({order.planned_qty:g}). Check the numbers."
     if not wip_lines(order):
         return None, "No material is in production for this order. Issue material first."
+    blocked = leftover_message(order)
+    if blocked:
+        return None, blocked
     # Rack optional; chuna ho to order ke FG warehouse ka chalu rack hona chahiye (backend pe bhi jaanch, sirf dropdown pe bharosa nahi)
     rack_raw = (request.form.get("rack_id") or "").strip()
     rack_id = int(rack_raw) if rack_raw.isdigit() else None

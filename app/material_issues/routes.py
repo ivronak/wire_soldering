@@ -13,7 +13,7 @@ from app.inventory.posting import rm_warehouse_of, wip_warehouse_for, available_
 from app.models import MaterialIssue, MaterialIssueLine, MaterialReturn, MaterialReturnLine, ProductionOrder, ProductionOrderLine
 from app.production_orders.scheduler import live_schedule
 
-RETURN_REASONS = ["Not needed (excess)", "Wrong material issued", "Order changed", "Other"]
+RETURN_REASONS = ["Unused spare (allowance)", "Not needed (excess)", "Wrong material issued", "Order changed", "Other"]
 
 material_issues_bp = Blueprint("material_issues", __name__, template_folder="templates")
 
@@ -68,6 +68,8 @@ def issue_plan(order):
         remaining = line.remaining_qty
         available = round(free, 4)
         suggest = round(min(remaining, available), 4)          # default "Issue now": jitna baaki, par store ke free se zyada nahi
+        spare = line.allowance_remaining_qty                   # order ka allowance: issue kar sakte ho par zaroori nahi
+        suggest_all = round(min(remaining + spare, available), 4)
         lines.append({
             "id": line.id,
             "material": (material.code + " " + material.name) if material else "",
@@ -77,6 +79,7 @@ def issue_plan(order):
             "issued": line.issued_qty,
             "remaining": remaining,
             "available": available,
+            "extra_ok": order.status == "In production", "spare": spare, "spare_total": line.allowance_qty, "suggest_all": suggest_all,
             "suggest": suggest, "can_all": suggest > 0, "short": remaining > 0 and available + 0.00005 < remaining,
             "frac": min(line.issued_qty / line.required_qty, 1) if line.required_qty else 0,
         })
@@ -115,6 +118,8 @@ def material_issues_list():
     # Queue order me (pehle chal rahe, phir priority se) + raw material ka queue-aware haal (Need to buy / PO coming ...)
     queue, materials, schedule = live_schedule()
     to_issue = [o for o in queue if o.status in ("Released", "In production") and o.issue_status != "Fully issued"]
+    # Chalte order ka maal pura issue ho chuka ho tab bhi extra maal (naya maal process me) issue karne ka rasta chahiye
+    extra_orders = [o for o in queue if o.status == "In production" and o.issue_status == "Fully issued"]
     can_return = [o for o in queue if o.status in ("Released", "In production") and return_plan(o)["lines"]]
 
     base = MaterialIssue.query.filter(MaterialIssue.is_deleted == False)
@@ -152,7 +157,7 @@ def material_issues_list():
            "returnable": len(can_return)}
     return render_template(
         "material_issues.html", active_nav="material_issues", tab=tab,
-        to_issue=to_issue, plans={order.id: issue_plan(order) for order in to_issue},
+        to_issue=to_issue, extra_orders=extra_orders, plans={order.id: issue_plan(order) for order in to_issue + extra_orders},
         return_plans={order.id: return_plan(order) for order in can_return},
         materials=materials, schedule=schedule,
         draft_issues=draft_issues, issues=issues, returns=returns,
@@ -196,8 +201,14 @@ def read_issue_form():
             return None, "A material line does not belong to this production order."
         name = line.raw_material.name if line.raw_material else "Material"
         unit = line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""
-        if round(qty, 4) > line.remaining_qty:
-            return None, f"{name}: only {line.remaining_qty:g} {unit} is still to be issued ({line.required_qty:g} needed, {line.issued_qty:g} already issued)."
+        can_issue = round(line.remaining_qty + line.allowance_remaining_qty, 4)          # zaroorat + bacha hua allowance
+        extra_ok = order.status == "In production" and bool(remarks)       # chalte order me naya maal laana ho to remark ke saath cap se zyada bhi
+        if round(qty, 4) > can_issue and not extra_ok:
+            if order.status == "In production":
+                return None, f"{name}: {can_issue:g} {unit} can be issued normally. To issue more for a running order, write the reason in Remarks (for example 'extra flux brought in')."
+            if not line.allowance_qty:
+                return None, f"{name}: only {can_issue:g} {unit} is still to be issued ({line.required_qty:g} needed, {line.issued_qty:g} already issued)."
+            return None, f"{name}: only {can_issue:g} {unit} can still be issued ({line.required_qty:g} needed + {line.allowance_qty:g} spare, {line.issued_qty:g} already issued)."
         wanted.append((line, q4(qty), name, unit))
     if not wanted:
         return None, "Enter a quantity for at least one material."
@@ -337,6 +348,12 @@ def read_return_form():
         unit = line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""
         if round(qty, 4) > line.returnable_qty:
             return None, f"{name} ({line.lot.lot_code}): only {line.returnable_qty:g} {unit} can be returned ({line.qty:g} issued, {line.returned_qty:g} already returned)."
+        order_line = line.production_order_line
+        if order_line.used_qty is not None:
+            # Stage ki use likh di gayi: use hua maal wapas nahi ho sakta, sirf bacha hua (issued - use)
+            already = sum(q for ol, q in wanted if ol.production_order_line_id == order_line.id)
+            if round(already + qty, 4) > order_line.leftover_qty + 0.00005:
+                return None, f"{name}: {order_line.used_qty:g} {unit} was used in production, so only {order_line.leftover_qty:g} {unit} can go back to the store."
         if return_date < line.issue.issue_date:
             return None, f"The return date cannot be before the issue date ({line.issue.issue_date.strftime('%d %b %Y')})."
         wanted.append((line, q4(qty)))
@@ -379,7 +396,7 @@ def material_returns_cancel(return_id):
     # Return cancel karne se maal wapas order me ginta hai. Agar wo qty is beech dobara issue ho chuki hai to order ki zaroorat se zyada ho jaayegi — rok do.
     for return_line in ret.lines:
         order_line = return_line.issue_line.production_order_line
-        if order_line.issued_qty + return_line.qty > order_line.required_qty + 0.00005:
+        if order_line.issued_qty + return_line.qty > order_line.required_qty + order_line.allowance_qty + 0.00005:
             name = return_line.raw_material.name if return_line.raw_material else "Material"
             flash(f"Cannot cancel: {name} was issued again after this return, so taking {return_line.qty:g} back would go over what the order needs. Cancel the newer issue first.", "error")
             return redirect(list_url("returns"))

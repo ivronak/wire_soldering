@@ -14,6 +14,17 @@ def generate_next_vendor_code():
     return f"V-{next_row:04d}"
 
 
+def read_lead_time():
+    # Lead time (din) optional: khaali = None. Diya ho to 0 se 365 ke beech poora number. (value, None) ya (None, "error")
+    raw = (request.form.get('lead_time_days') or "").strip()
+    if not raw:
+        return None, None
+    if not raw.isdigit() or int(raw) > 365:
+        return None, "Lead time must be a whole number of days between 0 and 365."
+    return int(raw), None
+
+
+
 @vendors_bp.route("/vendors")
 def vendors_list():
     vendors = Vendor.query.filter(Vendor.is_deleted == False).order_by(Vendor.code).all()
@@ -75,6 +86,11 @@ def vendors_add():
         flash("Please select valid payment terms.", "error")
         return redirect(url_for('vendors.vendors_list'))
 
+    lead_time_days, lead_error = read_lead_time()
+    if lead_error:
+        flash(lead_error, "error")
+        return redirect(url_for('vendors.vendors_list'))
+
     # Step 1: "Sundry Creditors" group dhoondo — na mile to pehli baar bana do
     group = ChartOfAccountsGroup.query.filter(ChartOfAccountsGroup.name == "Sundry Creditors").first()
     if not group:
@@ -108,6 +124,7 @@ def vendors_add():
         gstin=gstin or None,
         pan=pan or None,
         payment_terms_id=payment_terms_id,
+        lead_time_days=lead_time_days,
         vendor_type_id=vendor_type_id,
         bank_name=bank_name,
         bank_ifsc=bank_ifsc,
@@ -169,6 +186,11 @@ def vendors_edit(v_id):
         flash("Please select valid payment terms.", "error")
         return redirect(url_for('vendors.vendors_list'))
 
+    lead_time_days, lead_error = read_lead_time()
+    if lead_error:
+        flash(lead_error, "error")
+        return redirect(url_for('vendors.vendors_list'))
+
     ledger = v.ledger
 
     def signed_ammount(bal, bal_type):
@@ -193,6 +215,7 @@ def vendors_edit(v_id):
     v.gstin=gstin or None
     v.pan=pan or None
     v.payment_terms_id=payment_terms_id
+    v.lead_time_days=lead_time_days
     v.vendor_type_id=vendor_type_id
     v.bank_name=bank_name
     v.bank_ifsc=bank_ifsc

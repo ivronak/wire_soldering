@@ -174,7 +174,7 @@
         {% elif sc %}
         <div class="po-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
         <div class="po-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · ~{{ (o.planned_hours or 0)|round(0)|int }} h</div>
-        {% if o.line and o.status in ('In production', 'Completed') %}<div class="po-meta mt-1">{{ o.line.name }}{% if o.under_capacity_kg %} · <span style="color:#8A4A1C">{{ '%g'|format(o.under_capacity_kg) }} KG capacity unused: {{ o.under_capacity_reason }}</span>{% endif %}</div>{% endif %}
+        {% if o.line and o.status in ('Draft', 'Released', 'In production', 'Completed') %}<div class="po-meta mt-1">{{ o.line.name }}{% if o.under_capacity_kg %} · <span style="color:#8A4A1C">{{ '%g'|format(o.under_capacity_kg) }} KG capacity unused: {{ o.under_capacity_reason }}</span>{% endif %}</div>{% endif %}
         {% if o.status == 'In production' %}
         {% set sn = stage_now.get(o.id) %}
         <div class="po-bar" title="{{ progress.get(o.id, 0) }}%"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>
@@ -196,7 +196,7 @@
         {% elif o.status == 'Released' %}
         {% if line_board %}
         {# Lines bani hain: Start par pehle line chunni padti hai (live status ke saath) #}
-        <button type="button" class="po-btn primary btn-start-line" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" data-kg="{{ '%g'|format(o.planned_qty * o.unit_weight) }}">Start</button>
+        <button type="button" class="po-btn primary btn-start-line" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" data-line="{{ o.line_id or '' }}" data-kg="{{ '%g'|format(o.planned_qty * o.unit_weight) }}">Start</button>
         {% else %}
         <form method="post" action="{{ url_for('production_orders.production_orders_start', order_id=o.id) }}" class="js-confirm-submit"
               data-confirm-title="Start production" data-confirm-ok="Start" data-confirm-message="Start {{ o.prod_no }} now? Its dates are fixed from today and other orders in the queue are planned around it.">
@@ -252,7 +252,7 @@
           {% set ml = mat.lines[loop.index0] if mat else None %}
           <div class="po-mat">
             <div style="min-width:0"><div class="font-semibold text-ink">{{ line.raw_material.name if line.raw_material else '—' }}{% if line.is_extra %} <span class="po-meta">(added)</span>{% elif line.is_packing %} <span class="po-meta">(packing)</span>{% endif %}</div>
-              <div class="po-meta">{{ line.raw_material.code if line.raw_material else '' }} · need {{ '%.2f'|format(line.required_qty) }} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}{% if line.issued_qty > 0 %} · issued {{ '%.2f'|format(line.issued_qty) }}{% endif %}</div></div>
+              <div class="po-meta">{{ line.raw_material.code if line.raw_material else '' }} · need {{ '%.2f'|format(line.required_qty) }}{% if line.allowance_qty > 0 %} + {{ '%.2f'|format(line.allowance_qty) }} spare{% endif %} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}{% if line.issued_qty > 0 %} · issued {{ '%.2f'|format(line.issued_qty) }}{% endif %}</div></div>
             {% if o.status != 'Cancelled' and ml %}
               {% if ml.issued_all %}<span class="po-chip ok"><i></i>Issued</span>
               {% elif ml.buy > 0.000001 %}<span class="po-chip bad" title="{% for po in ml.from_po %}{{ po[0] }} {{ '%.2f'|format(po[1]) }}; {% endfor %}"><i></i>Buy {{ '%.2f'|format(ml.buy) }}</span>
@@ -449,15 +449,26 @@
 
           <section class="po-step">
             <div class="po-step-h"><span class="po-step-n">3</span><div><h3>Stages and machines</h3><p>Tick the machines to use at each stage. More machines means less time. Timings come from each machine's KG per hour.</p></div></div>
+            {% if line_board %}
+            {# Line pehle: us line ki machines hi tick hoti hain (dusri line ki machine disabled). Start par yahi line chalti hai #}
+            <div class="mb-3 max-w-sm">
+              <label for="mo-line" class="po-label">Production line *</label>
+              <select id="mo-line" name="line_id" required class="po-input bg-white">
+                <option value="">Choose a line</option>
+                {% for ln in line_board %}<option value="{{ ln.id }}">{{ ln.name }} · {{ '%g'|format(ln.capacity) }} KG/day · {{ ln.machines }} machines</option>{% endfor %}
+              </select>
+              <p class="text-[11.5px] text-ink-faint mt-1">Only the machines of this line can be used. The order will run on this line.</p>
+            </div>
+            {% endif %}
             <div id="mo-plan" class="text-[13px] text-ink-faint">Select a product to see its stages.</div>
           </section>
 
           <section class="po-step">
-            <div class="po-step-h"><span class="po-step-n">4</span><div><h3>Raw material</h3><p>From the product recipe. <span id="mo-summary" class="font-mono"></span></p></div></div>
+            <div class="po-step-h"><span class="po-step-n">4</span><div><h3>Raw material</h3><p>From the product recipe. <span id="mo-summary" class="font-mono"></span> Spare % is extra material for wastage, set for each material. Unused spare goes back to the store.</p></div></div>
             <div class="overflow-x-auto rounded-lg">
               <table class="lines-table">
-                <thead><tr><th>Material</th><th style="text-align:right">Required</th><th style="text-align:right">In store</th><th>Status</th></tr></thead>
-                <tbody id="mo-lines"><tr><td colspan="4" class="text-ink-faint">Select a product.</td></tr></tbody>
+                <thead><tr><th>Material</th><th style="text-align:right">Required</th><th style="text-align:right">In store</th><th>Status</th><th style="text-align:right">Spare %</th></tr></thead>
+                <tbody id="mo-lines"><tr><td colspan="5" class="text-ink-faint">Select a product.</td></tr></tbody>
               </table>
             </div>
             <div class="flex items-center justify-between gap-2 mt-4">
@@ -511,6 +522,14 @@
       <div class="po-step grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label for="rs-start" class="po-label">Earliest start date</label><input type="date" id="rs-start" name="start_date" class="po-input" /></div>
         <div><label for="rs-needed" class="po-label">Needed by (optional)</label><input type="date" id="rs-needed" name="needed_by" class="po-input" /></div>
+        {% if line_board %}
+        {# Order ko dusri line me bhi daal sakte hain: line badalte hi us line ki machines tick hoti hain #}
+        <div class="sm:col-span-2"><label for="rs-line" class="po-label">Production line *</label>
+          <select id="rs-line" name="line_id" required class="po-input bg-white">
+            <option value="">Choose a line</option>
+            {% for ln in line_board %}<option value="{{ ln.id }}">{{ ln.name }} · {{ '%g'|format(ln.capacity) }} KG/day</option>{% endfor %}
+          </select></div>
+        {% endif %}
       </div>
       <div class="po-step"><div id="rs-plan" class="text-[13px] text-ink-faint"></div></div>
     </form>
@@ -877,17 +896,22 @@
       box.className = 'text-[13px] text-ink-faint';
       box.textContent = text;
     };
-    w.render = function (routing, chosen) {
+    w.render = function (routing, chosen, lineId) {
       // chosen: {stage_id: [machine ids]} ya null (sab usable machines tick)
+      // lineId: order ki Production Line. Ho to sirf usi line ki machines tick / chunne layak; dusri line ki disabled. Lines hain par line nahi chuni (lineId == '') to koi tick nahi.
+      var linesOn = lineId !== undefined && lineId !== null;
       box.className = 'space-y-2';
       var html = '<div class="overflow-x-auto border border-slate-200 rounded"><table class="lines-table"><thead><tr><th style="width:4%">#</th><th style="width:22%">Stage</th><th>Machines to use</th><th style="width:12%">Time</th></tr></thead><tbody>';
       routing.forEach(function (stage, index) {
         var picked = chosen && chosen[String(stage.stage_id)];
         var boxes = stage.machines.length ? stage.machines.map(function (m) {
-          var on = m.ok && (!picked || picked.indexOf(m.id) !== -1);
-          return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (m.ok ? 'text-ink' : 'text-ink-faint') + '">' +
+          var inLine = !linesOn || (lineId !== '' && String(m.line_id) === String(lineId));
+          var usable = m.ok && inLine;
+          var on = usable && (!picked || picked.indexOf(m.id) !== -1);
+          var note = !m.ok ? 'set output per hour in Machines' : (!inLine ? (lineId === '' ? 'choose a line first' : (m.line ? m.line + ' (not this line)' : 'not on any line')) : m.per_hour + ' KG/hr' + (linesOn && m.line ? ' · ' + esc(m.line) : ''));
+          return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (usable ? 'text-ink' : 'text-ink-faint') + '">' +
             '<input type="checkbox" class="plan-machine" name="machines_' + stage.stage_id + '" value="' + m.id + '" data-stage="' + stage.stage_id + '" data-name="' + esc(m.name) + '" data-per-hour="' + m.per_hour + '" data-hours="' + m.hours_per_day + '"' +
-            (on ? ' checked' : '') + (m.ok ? '' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + (m.ok ? m.per_hour + ' KG/hr' : 'set output per hour in Machines') + '</span></label>';
+            (on ? ' checked' : '') + (usable ? '' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + note + '</span></label>';
         }).join('') : '<span class="text-ink-faint">No active machine for this stage. Add one in Machines.</span>';
         html += '<tr><td class="text-ink-faint tabular-nums">' + (index + 1) + '</td><td class="font-semibold">' + esc(stage.name) + '</td><td>' + boxes + '</td>' +
           '<td class="plan-time tabular-nums text-right">—</td></tr>';
@@ -905,16 +929,18 @@
         return { stage_id: stage.stage_id, name: stage.name, machines: machines };
       });
     };
-    w.sync = function (key, routing, chosenMap, batchKg, ownOrder) {
-      if (String(w.key) !== String(key)) {
-        w.key = key;
+    w.sync = function (key, routing, chosenMap, batchKg, ownOrder, lineId) {
+      // key me line bhi: line badalte hi tick naye sire se (us line ki machines)
+      var fullKey = String(key) + '|' + String(lineId);
+      if (String(w.key) !== fullKey) {
+        w.key = fullKey;
         if (!routing.length) {
           w.clash = false;
           box.className = 'text-[13px] text-ink-faint';
           box.textContent = 'No production stages are set for this product, so there is no time plan. Set them with the Production stages button in Product Master.';
           return;
         }
-        w.render(routing, chosenMap);
+        w.render(routing, chosenMap, lineId);
       }
       if (!routing.length) return;
       var chosen = w.chosen(routing);
@@ -940,6 +966,7 @@
     return w;
   }
   var mainPlan = makePlanWidget(planBox, startInput);
+  var lineSel = document.getElementById('mo-line');      // lines bani na ho to select hi nahi hota (null)
 
   // ---------- Form ka right side "Order summary" card ----------
   function renderSide(product, batchKg) {
@@ -978,6 +1005,7 @@
     document.getElementById('mo-date').value = todayIso();
     startInput.value = todayIso();
     document.getElementById('mo-needed').value = '';
+    if (lineSel) lineSel.value = '';
     mainPlan.reset('Select a product to see its stages.');
     categorySel.value = '';
     fillProducts();
@@ -998,7 +1026,7 @@
       qtyLabel.textContent = 'Quantity to make *';
       weightBox.classList.add('hidden');
       summary.textContent = '';
-      linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint">Select a product.</td></tr>';
+      linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">Select a product.</td></tr>';
       renderSide(null, 0);
       return;
     }
@@ -1014,12 +1042,12 @@
     var qty = parseFloat(qtyInput.value) || 0;
     var weight = isKg ? 1 : (parseFloat(weightInput.value) || 0);
     var batchKg = qty * weight;
-    mainPlan.sync(product.id, product.routing || [], null, batchKg, null);
+    mainPlan.sync(product.id, product.routing || [], null, batchKg, null, lineSel ? lineSel.value : undefined);
     summary.textContent = isKg
       ? 'Making ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.'
       : (qty + ' ' + unitName + ' × ' + weight + ' KG each = ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.');
     if (!product.recipe.length) {
-      linesBody.innerHTML = '<tr><td colspan="4" class="text-ink-faint">This product has no recipe.</td></tr>';
+      linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">This product has no recipe.</td></tr>';
       renderSide(product, batchKg);
       return;
     }
@@ -1032,9 +1060,9 @@
         : '<span class="po-chip bad"><i></i>Short ' + short.toFixed(2) + '</span>';
       return '<tr>' +
         '<td><div class="font-semibold text-ink">' + esc(line.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(line.code) + ' · ' + Number(line.ratio).toFixed(1) + '% · ' + (line.is_flux ? 'core flux' : 'base metal') + '</div></td>' +
-        '<td class="font-mono font-semibold text-right">' + need.toFixed(2) + ' ' + esc(line.unit || '') + '</td>' +
+        '<td class="font-mono font-semibold text-right">' + need.toFixed(2) + ' ' + esc(line.unit || '') + spareNote(line.rm_id, need, 2) + '</td>' +
         '<td class="font-mono text-right text-ink-muted">' + have.toFixed(2) + '</td>' +
-        '<td>' + status + '</td>' +
+        '<td>' + status + '</td>' + spareCell(line.rm_id) +
         '</tr>';
     }).join('') + (product.packing || []).map(function (k) {
       var need = Math.ceil(Math.round(batchKg / k.kg_per_pack * 1e6) / 1e6);
@@ -1045,14 +1073,35 @@
         : '<span class="po-chip bad"><i></i>Short ' + short.toFixed(0) + '</span>';
       return '<tr>' +
         '<td><div class="font-semibold text-ink">' + esc(k.name) + '</div><div class="font-mono text-[11.5px] text-ink-faint">' + esc(k.code) + ' · packing · 1 per ' + Number(k.kg_per_pack) + ' KG</div></td>' +
-        '<td class="font-mono font-semibold text-right">' + need.toFixed(0) + ' ' + esc(k.unit || '') + '</td>' +
+        '<td class="font-mono font-semibold text-right">' + need.toFixed(0) + ' ' + esc(k.unit || '') + spareNote(k.rm_id, need, 0) + '</td>' +
         '<td class="font-mono text-right text-ink-muted">' + have.toFixed(0) + '</td>' +
-        '<td>' + status + '</td>' +
+        '<td>' + status + '</td>' + spareCell(k.rm_id) +
         '</tr>';
     }).join('');
     renderSide(product, batchKg);
   }
 
+  // Har RM ka apna spare % (allowance). Table qty badalne par dobara banti hai, isliye likha hua % ALLOW me yaad rakhte hain.
+  var ALLOW = {};
+  function spareNote(rmId, need, dec) {
+    var pct = parseFloat(ALLOW[rmId]) || 0;
+    return '<span class="text-ink-faint font-normal" data-spare-for="' + rmId + '" data-need="' + need + '" data-dec="' + dec + '">' + (pct > 0 ? ' + ' + (need * pct / 100).toFixed(dec) + ' spare' : '') + '</span>';
+  }
+  function spareCell(rmId) {
+    return '<td class="text-right"><input type="number" name="allowance_rm_' + rmId + '" data-rm="' + rmId + '" min="0" max="100" step="0.1" value="' + (ALLOW[rmId] || 0) + '" class="po-input mo-spare" style="width:84px;text-align:right" /></td>';
+  }
+  linesBody.addEventListener('input', function (event) {
+    var input = event.target.closest('.mo-spare');
+    if (!input) return;
+    ALLOW[input.getAttribute('data-rm')] = input.value;
+    var note = linesBody.querySelector('[data-spare-for="' + input.getAttribute('data-rm') + '"]');
+    if (note) {
+      var pct = parseFloat(input.value) || 0;
+      note.textContent = pct > 0 ? ' + ' + (parseFloat(note.getAttribute('data-need')) * pct / 100).toFixed(parseInt(note.getAttribute('data-dec'))) + ' spare' : '';
+    }
+  });
+  productSel.addEventListener('change', function () { ALLOW = {}; });
+  document.getElementById('btn-add-mo').addEventListener('click', function () { ALLOW = {}; });
   document.getElementById('btn-add-mo').addEventListener('click', openModal);
   document.getElementById('btn-close-mo').addEventListener('click', closeModal);
   document.getElementById('btn-cancel-mo').addEventListener('click', closeModal);
@@ -1062,6 +1111,7 @@
     refreshPlan();
   });
   productSel.addEventListener('change', refreshPlan);
+  if (lineSel) lineSel.addEventListener('change', refreshPlan);
   document.getElementById('btn-add-extra').addEventListener('click', addExtraLine);
   qtyInput.addEventListener('input', refreshPlan);
   weightInput.addEventListener('input', refreshPlan);
@@ -1076,7 +1126,11 @@
   var rsCurrent = null;
   function rsRefresh() {
     if (!rsCurrent) return;
-    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, rsCurrent.data.chosen, rsCurrent.data.batch_kg, rsCurrent.data.prod_no);
+    // Chuni hui line ki machines tick. Line wahi hai jo order ki thi to purani chuni machines, badli to us line ki sab machines
+    var rsLineSel = document.getElementById('rs-line');
+    var same = !rsLineSel || String(rsCurrent.data.line_id || '') === rsLineSel.value;
+    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, same ? rsCurrent.data.chosen : null, rsCurrent.data.batch_kg, rsCurrent.data.prod_no,
+      rsLineSel ? rsLineSel.value : undefined);
   }
   function rsClose() { rsModal.style.display = 'none'; rsModal.setAttribute('aria-hidden', 'true'); rsCurrent = null; }
   document.querySelectorAll('.btn-resched').forEach(function (btn) {
@@ -1086,8 +1140,9 @@
       if (!data) return;
       rsCurrent = { id: id, data: data };
       rsForm.action = '/production_orders/reschedule/' + id;
-      document.getElementById('rs-no').textContent = data.prod_no;
+      document.getElementById('rs-no').textContent = data.prod_no + (data.line ? ' · ' + data.line : '');
       rsStart.value = data.start;
+      if (document.getElementById('rs-line')) document.getElementById('rs-line').value = data.line_id || '';
       document.getElementById('rs-needed').value = data.needed_by || '';
       rsPlan.reset('');
       rsModal.style.display = 'flex'; rsModal.setAttribute('aria-hidden', 'false');
@@ -1095,6 +1150,7 @@
     });
   });
   rsStart.addEventListener('input', rsRefresh);
+  if (document.getElementById('rs-line')) document.getElementById('rs-line').addEventListener('change', rsRefresh);
   rsBox.addEventListener('change', function (event) {
     if (event.target.classList.contains('plan-machine')) rsRefresh();
   });
@@ -1131,6 +1187,13 @@
         document.getElementById('start-kg').textContent = kg;
         form.reset();
         modal.setAttribute('data-kg', kg);
+        // Order ki line planner me chuni thi: wahi tick, baaki lines disabled (machines usi line ki chuni hain)
+        var fixed = btn.getAttribute('data-line');
+        form.querySelectorAll('input[name=line_id]').forEach(function (r) {
+          r.disabled = !!fixed && r.value !== fixed;
+          r.checked = !!fixed && r.value === fixed;
+          r.closest('.start-line').style.opacity = r.disabled ? '0.45' : '1';
+        });
         refreshUnder();
         modal.querySelectorAll('.start-line').forEach(function (card) {
           var cap = parseFloat(card.getAttribute('data-cap')) || 0;

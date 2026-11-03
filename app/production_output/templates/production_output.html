@@ -98,7 +98,8 @@
       </div>
       <div>{% set bad = plan.materials | selectattr('issued', 'le', 0) | list %}
         <div class="ou-meta">Material in production</div>
-        <div class="text-[13px] font-semibold">₹{{ (plan.materials | sum(attribute='value'))|inr }}</div></div>
+        <div class="text-[13px] font-semibold">₹{{ (plan.materials | sum(attribute='value'))|inr }}</div>
+        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first</div>{% endif %}</div>
       <div><button type="button" class="ou-act ou-btn primary" data-plan='{{ plan|tojson }}'>Record output</button></div>
     </div>
   </article>
@@ -193,7 +194,7 @@
             <h3>2. Raw material used</h3>
             <p class="sub">Everything that was given to production for this order is marked as used when you record the output. If some material was not used, return it to the store first (Material issue → Return).</p>
             <div class="overflow-x-auto rounded-lg"><table class="ou-table">
-              <thead><tr><th>Material</th><th style="text-align:right">Planned</th><th style="text-align:right">Given to production</th><th>Check</th></tr></thead>
+              <thead><tr><th>Material</th><th style="text-align:right">Planned</th><th style="text-align:right">Used in production</th><th>Check</th></tr></thead>
               <tbody id="ou-mats"></tbody></table></div>
           </section>
         </div>
@@ -269,11 +270,11 @@
     if (current.min_date) date.min = current.min_date;
     date.max = {{ today|tojson }};
     document.getElementById('ou-mats').innerHTML = current.materials.map(function (m) {
-      var diff = m.issued - m.planned;
+      var diff = (m.used != null ? m.used : m.issued) - m.planned;
       var tol = Math.max(m.planned * 0.05, 0.0001);
       var chip = diff > tol ? '<span class="ou-chip warn"><i></i>' + fmt(diff) + ' more than planned</span>'
                : (diff < -tol ? '<span class="ou-chip warn"><i></i>' + fmt(-diff) + ' less than planned</span>' : '<span class="ou-chip ok"><i></i>As planned</span>');
-      return '<tr><td><b>' + esc(m.name) + '</b><div class="ou-meta">' + esc(m.code) + '</div></td><td style="text-align:right">' + fmt(m.planned) + ' ' + esc(m.unit) + '</td><td style="text-align:right"><b>' + fmt(m.issued) + '</b> ' + esc(m.unit) + '</td><td>' + chip + '</td></tr>';
+      return '<tr><td><b>' + esc(m.name) + '</b><div class="ou-meta">' + esc(m.code) + '</div></td><td style="text-align:right">' + fmt(m.planned) + ' ' + esc(m.unit) + '</td><td style="text-align:right"><b>' + fmt(m.used != null ? m.used : m.issued) + '</b> ' + esc(m.unit) + (m.leftover ? '<div class="ou-meta" style="color:#B42318">' + fmt(m.leftover) + ' still to return</div>' : '') + '</td><td>' + (m.leftover ? '<span class="ou-chip warn"><i></i>Return ' + fmt(m.leftover) + ' to store</span>' : chip) + '</td></tr>';
     }).join('');
     refresh();
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');

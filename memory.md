@@ -260,6 +260,12 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ## Key Decisions
 
+### Decision: Allowance % + RM used ek hi entry + leftover output se pehle wapas
+**Date:** 2026-11-02
+**Kya:** Har RM ka apna allowance % (order form me per-material Spare %; pehle order par ek tha, 2026-11-03 badla). Material issue me needed aur spare alag. Stage complete par us stage ke issued RM ki asli use ek hi baar (rounds nahi) + optional working hours. Bacha hua (issued - used) Output se pehle Material return se store me jaana zaroori. Output sirf used maal consume karta hai.
+**Kyun:** Flux jaisa maal kharab ho to extra round / extra issue / naya PO ka jhanjhat nahi; cost aur variance asli use se; unused spare WIP me phansa na rahe.
+**Dhyan:** Jis line ki use likhi nahi, wahan purana tareeka (output par saara WIP use). Material plan me demand = needed + spare jab tak stage ki use na likhi ho.
+
 ### Decision: Flask feature ke saath related HTML/Jinja bhi sikhao — chupke template mat badlo
 **Date:** 2026-09-19
 **Kya:** Part 2 me jab koi feature develop/seekhai ho (search, filter, form, toggle), AI sirf Python mat sikhayega / HTML khud silent edit nahi karega. Har aise step me CONCEPT + TYPE THIS me **Flask aur related HTML dono** — taaki user ko pata ho “backend change → template me yahan `name` / form / button / value”.
@@ -482,6 +488,12 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Date:** 2026-10-31
 **Kya:** Client change #10 ka Rack master: ek rack ek warehouse ka hota hai, sirf naam (A, B, C / 1, 2, 3) + auto code RK-xxxx, capacity nahi. Same naam alag warehouse me chal sakta hai, ek warehouse me nahi. Soft-delete.
 **Kyun:** Client ne bas itna kaha ki GRN / FG receipt par poochho "kis rack me" taaki lot hamesha mile; capacity ki zaroorat nahi boli. Khule sawaal ka recommended default liya (user ne "Rack master next" kaha); capacity baad me jod sakte hain.
+
+### Decision: Material plan (30-din MRP) ke hisaab ke rules (2026-10-31)
+**Date:** 2026-10-31
+**Kya:** Client change #3 page `/material_plan` (sidebar Manufacturing -> Material plan), sirf padhta hai. Rules: (1) horizon 30 din (aaj se); (2) starting = **store (RM) stock** hi, WIP me gaya maal nahi; (3) aamad = Open / Partial PO ki baaki qty us din jis din PO ki expected date; **bina date wala PO ginta nahi** (alag "PO without date" warning), **beeti date wala PO aaj aaya maana** (overdue note); (4) zaroorat = queue ke orders ki baaki (issue na hui) qty, us **stage ki start date** par jisse recipe line juda hai (nahi to order ki start date); 30 din ke baad ka kuch nahi ginta; (5) lead time **Vendor par** (`vendors.lead_time_days`, optional, 0-365), material ka supplier = us material ke **sabse naye (Cancelled nahi) PO ka vendor**; (6) "PO kab tak dalo" = pehli kami ki date - lead time; late / soon (7 din) / plan; lead time na ho to "Set vendor lead time".
+**Kyun:** Spec §28.3: queue ke 30 din ka stock + PO - orders = kami, aur per-supplier lead time (15-20 din) se "PO before <date>". Material-vendor ka alag link master abhi nahi, isliye last PO ka vendor supplier maana (simple, baad me material-wise preferred vendor jod sakte hain).
+**Baaki:** "ek consolidated PO kai orders ke liye" button abhi nahi bana (alag step).
 **How to apply:** Rack chunna GRN aur Production output (FG receipt) me jodna hai; lot / batch par rack_id nullable rakho (purane lots bina rack ke). Capacity maange to Rack me ek nullable column jodo.
 
 ### Decision: Client Round 3 (2026-10-26) — nayi business rules jo kabhi todni nahi (2026-10-27)

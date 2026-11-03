@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Material plan{% endblock %}
+
+{% block page_css %}
+<style>
+  .mp-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .mp-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .mp-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .mp-kpi .h { font-size: 12px; color: #6B7F82; }
+  .mp-kpi.bad { background: #FFF5F4; border-color: #F3C9C4; } .mp-kpi.bad .v { color: #B42318; }
+  .mp-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .mp-kpi.warn .v { color: #8A4A1C; }
+  .mp-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .mp-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .mp-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .mp-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; }
+  .mp-head { display: grid; grid-template-columns: minmax(180px, 1.2fr) repeat(4, minmax(90px, .6fr)) minmax(200px, 1.3fr); gap: 12px; align-items: center; padding: 12px 16px; }
+  .mp-name { font-size: 14.5px; font-weight: 700; color: #0F2F32; }
+  .mp-meta { font-size: 12px; color: #6B7F82; }
+  .mp-num { font-size: 17px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .mp-num.neg { color: #B42318; }
+  .mp-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .mp-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .mp-chip.bad { background: #FDECEA; color: #B42318; border-color: #F3C9C4; }
+  .mp-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .mp-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .mp-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .mp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .mp-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 7px 10px; border: 1px solid #D1D9D8; text-align: left; }
+  .mp-table td { padding: 6px 10px; border: 1px solid #E2E8E7; }
+  .mp-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .mp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .mp-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  details.mp-det > summary { list-style: none; cursor: pointer; padding: 6px 16px 10px; font-size: 12.5px; font-weight: 600; color: #8A4A1C; }
+  details.mp-det > summary::-webkit-details-marker { display: none; }
+  @media (max-width: 1100px) { .mp-head { grid-template-columns: 1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Material plan</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Material plan: next {{ horizon }} days</h1>
+  <p class="text-[13px] text-ink-faint">What is in the store, plus what is coming on open purchase orders, minus what the production queue will use, day by day until {{ plan.end.strftime('%d %b %Y') }}. Where it runs short, you see the date it runs out and when to place the PO.</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
+  <div class="mp-kpi {{ 'bad' if plan.kpi.late else '' }}"><span class="k">Place PO now</span><span class="v">{{ plan.kpi.late }}</span><span class="h">already past the "place by" date</span></div>
+  <div class="mp-kpi {{ 'warn' if plan.kpi.soon else '' }}"><span class="k">Place PO soon</span><span class="v">{{ plan.kpi.soon }}</span><span class="h">within the next 7 days</span></div>
+  <div class="mp-kpi {{ 'warn' if plan.kpi.no_lead else '' }}"><span class="k">Short, no lead time</span><span class="v">{{ plan.kpi.no_lead }}</span><span class="h">set the vendor's lead time</span></div>
+  <div class="mp-kpi {{ 'warn' if plan.kpi.undated else '' }}"><span class="k">PO without date</span><span class="v">{{ plan.kpi.undated }}</span><span class="h">goods on order, no expected date</span></div>
+  <div class="mp-kpi {{ 'bad' if plan.kpi.overdue else '' }}"><span class="k">Overdue PO</span><span class="v">{{ plan.kpi.overdue }}</span><span class="h">expected date passed, goods not received</span></div>
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+  <div class="mp-tabs">
+    <a href="{{ url_for('material_plan.material_plan_page', view='short') }}" class="{{ 'on' if view == 'short' else '' }}">Needs attention</a>
+    <a href="{{ url_for('material_plan.material_plan_page', view='all') }}" class="{{ 'on' if view == 'all' else '' }}">All materials ({{ plan.kpi.materials }})</a>
+  </div>
+  <div class="text-[12.5px] text-ink-faint">{{ plan.kpi.orders }} order{{ '' if plan.kpi.orders == 1 else 's' }} in the queue · store stock only (material already given to production is not counted)</div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {# Kami wale materials vendor ke hisaab se: ek vendor = ek PO (kai orders ka maal ek saath). Draft banta hai, Purchase orders page par confirm hota hai #}
+  {% if plan.suggested %}
+  <div class="mp-card mb-3" style="padding:14px 16px">
+    <div class="mp-name">Suggested purchase orders</div>
+    <p class="mp-meta mb-2">One PO per vendor for everything that runs short, so several orders are bought together. Change the quantities if you want, then create the draft. It is saved as a Draft on the Purchase orders page; the rate, tax and unit are taken from the last PO of that material.</p>
+    {% for g in plan.suggested %}
+    <form method="post" action="{{ url_for('material_plan.material_plan_create_po') }}" class="border border-slate-200 rounded-lg p-3 mb-2">
+      <input type="hidden" name="vendor_id" value="{{ g.vendor.id }}" />
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div><span class="mp-name">{{ g.vendor.name }}</span>
+          <span class="mp-meta">· {% if g.vendor.lead_time_days is not none %}lead time {{ g.vendor.lead_time_days }} days, goods about {{ g.expected.strftime('%d %b') }}{% else %}lead time not set{% endif %}</span></div>
+        {% if g.late %}<span class="mp-chip bad"><i></i>Will arrive after some materials run short</span>{% endif %}
+      </div>
+      <div class="overflow-x-auto">
+        <table class="mp-table">
+          <thead><tr><th>Material</th><th style="width:16%">Runs short from</th><th style="width:22%">For orders</th><th class="r" style="width:12%">Rate</th><th class="r" style="width:16%">Quantity</th></tr></thead>
+          <tbody>
+            {% for line in g.open_lines %}
+            <tr>
+              <td><b>{{ line.row.material.name }}</b> <span class="mp-meta">{{ line.row.material.code }}</span>
+                <input type="hidden" name="material_id_{{ loop.index0 }}" value="{{ line.row.material.id }}" /></td>
+              <td>{{ line.row.short_date.strftime('%d %b') }}</td>
+              <td class="mp-meta">{{ line.row.orders|join(', ') }}</td>
+              <td class="r">₹{{ '%g'|format(line.row.last_line.rate) }}</td>
+              <td class="r"><input type="number" name="qty_{{ loop.index0 }}" value="{{ '%g'|format(line.qty) }}" min="0" step="any" class="w-24 px-2 py-1 text-[13px] border border-slate-300 rounded text-right" /> {{ line.row.unit }}</td>
+            </tr>
+            {% endfor %}
+            {% for line in g.lines if line.draft_po %}
+            <tr style="color:#6B7F82">
+              <td><b>{{ line.row.material.name }}</b> <span class="mp-meta">{{ line.row.material.code }}</span></td>
+              <td>{{ line.row.short_date.strftime('%d %b') }}</td>
+              <td colspan="3">Already in draft {{ line.draft_po }}. Confirm that PO instead.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if g.open_lines %}
+      <div class="mt-2 text-right"><button type="submit" class="px-3.5 py-2 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Create draft PO for {{ g.vendor.name }}</button></div>
+      {% endif %}
+    </form>
+    {% endfor %}
+    {% if plan.no_supplier %}
+    <p class="mp-meta">No supplier yet (never bought before): {{ plan.no_supplier|map(attribute='material.name')|join(', ') }}. Raise these POs by hand on the Purchase orders page.</p>
+    {% endif %}
+  </div>
+  {% elif plan.no_supplier %}
+  <div class="mp-card mb-3" style="padding:12px 16px"><p class="mp-meta">No supplier yet (never bought before): {{ plan.no_supplier|map(attribute='material.name')|join(', ') }}. Raise these POs by hand on the Purchase orders page.</p></div>
+  {% endif %}
+  {% for r in rows %}
+  <article class="mp-card">
+    <div class="mp-head">
+      <div><div class="mp-name">{{ r.material.name }}</div><div class="mp-meta">{{ r.material.code }} · {{ r.unit }}</div></div>
+      <div><div class="mp-meta">In store</div><div class="mp-num">{{ '%g'|format(r.have) }}</div></div>
+      <div><div class="mp-meta">Needed ({{ horizon }} d)</div><div class="mp-num">{{ '%g'|format(r.need) }}</div></div>
+      <div><div class="mp-meta">Coming (PO)</div><div class="mp-num">{{ '%g'|format(r.coming) }}</div></div>
+      <div><div class="mp-meta">After {{ horizon }} days</div><div class="mp-num {{ 'neg' if r.end_balance < 0 else '' }}">{{ '%g'|format(r.end_balance) }}</div></div>
+      <div>
+        {% if r.short_date %}
+          <span class="mp-chip bad"><i></i>Short {{ '%g'|format(r.shortage) }} {{ r.unit }} from {{ r.short_date.strftime('%d %b') }}</span>
+          <div class="mt-1">
+            {% if r.urgency == 'late' %}<span class="mp-chip bad"><i></i>Place PO now · {{ r.days_late }} day{{ '' if r.days_late == 1 else 's' }} late</span>
+            {% elif r.urgency == 'soon' %}<span class="mp-chip warn"><i></i>Place PO before {{ r.place_by.strftime('%d %b') }}</span>
+            {% elif r.urgency == 'plan' %}<span class="mp-chip gone"><i></i>Place PO before {{ r.place_by.strftime('%d %b') }}</span>
+            {% else %}<span class="mp-chip warn"><i></i>Set vendor lead time</span>{% endif %}
+          </div>
+        {% else %}
+          <span class="mp-chip ok"><i></i>Enough for {{ horizon }} days</span>
+        {% endif %}
+        <div class="mp-meta mt-1">
+          {% if r.vendor %}{{ r.vendor.name }}{% if r.lead is not none %} · lead time {{ r.lead }} days{% else %} · lead time not set{% endif %}{% else %}No purchase order yet, so no supplier{% endif %}
+        </div>
+        {% if r.undated > 0 %}<div class="mp-meta">{{ '%g'|format(r.undated) }} {{ r.unit }} on order has no expected date, so it is not counted.</div>{% endif %}
+        {% if r.overdue %}<div class="mp-chip bad mt-1"><i></i>Overdue: {{ r.overdue|join(', ') }}</div><div class="mp-meta">Expected date passed, goods not received. Counted as arriving today, so chase the vendor.</div>{% endif %}
+      </div>
+    </div>
+    <details class="mp-det">
+      <summary>Day-by-day ▾</summary>
+      <div class="px-4 pb-3 overflow-x-auto">
+        <table class="mp-table">
+          <thead><tr><th style="width:14%">Date</th><th>What</th><th class="r" style="width:16%">Quantity</th><th class="r" style="width:16%">Balance</th></tr></thead>
+          <tbody>
+            {% for e in r.timeline %}
+            <tr>
+              <td>{{ e.date.strftime('%d %b') }}</td>
+              <td>{% if e.kind == 'stock' %}In the store now{% elif e.kind == 'arrive' %}Arrives on {{ e.ref }}{% else %}Needed by {{ e.ref }}{% endif %}</td>
+              <td class="r">{{ '%+g'|format(e.qty) if e.kind != 'stock' else '%g'|format(e.qty) }}</td>
+              <td class="r" {% if e.balance < 0 %}style="color:#B42318;font-weight:700"{% endif %}>{{ '%g'|format(e.balance) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </article>
+  {% else %}
+  <div class="mp-empty"><h3>{{ 'Nothing needs attention' if view == 'short' else 'No material is used in the next ' ~ horizon ~ ' days' }}</h3>
+    <p>{% if plan.kpi.orders == 0 %}There are no orders in the production queue, so nothing will be used. Add production orders to see the plan.
+      {% elif view == 'short' %}Every material in the queue is covered by the store stock and the purchase orders on the way for the next {{ horizon }} days.
+      {% else %}Add production orders to the queue to see the plan.{% endif %}</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

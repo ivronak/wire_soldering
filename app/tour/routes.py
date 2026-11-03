@@ -9,9 +9,9 @@ import os
 from flask import Blueprint, current_app, jsonify, render_template, request
 
 from app.extensions import db
-from app.models import Product, ProductionOrder, StageLabQC, Vendor, Warehouse, WorkStage
+from app.models import Product, ProductionLine, ProductionOrder, Rack, StageLabQC, Vendor, Warehouse, WorkStage
 from app.production_orders.scheduler import now_ist
-from app.routing.routes import order_batch_kg
+from app.routing.routes import order_batch_kg, side_stage_info
 
 tour_bp = Blueprint("tour", __name__, template_folder="templates")
 
@@ -35,9 +35,46 @@ def tour_info():
         recipe.append({"rm_id": item.raw_material_id, "code": rm.code if rm else "", "name": rm.name if rm else "",
                        "unit": rm.base_unit.code if rm and rm.base_unit else "", "ratio": item.ratio_percent})
     lab_qc = WorkStage.query.filter_by(is_deleted=False, is_active=True, requires_lab_qc=True).first() is not None
+    # Naye features ke steps (Line, Rack, Scrap later, Wire Drawing 3) tabhi dikhte hain jab master me wo set ho
+    scrap_later = WorkStage.query.filter_by(is_deleted=False, is_active=True, scrap_after_next=True).first() is not None
+    wd_split = WorkStage.query.filter_by(is_deleted=False, is_active=True, name="Wire Drawing 3").first() is not None
+    racks = bool(store) and Rack.query.filter_by(warehouse_id=store.id, is_active=True, is_deleted=False).first() is not None
+    lines = ProductionLine.query.filter_by(is_active=True, is_deleted=False).first() is not None
     return jsonify({"ok": True, "product": {"id": product.id, "name": product.name, "category_id": product.category_id, "recipe": recipe},
                     "store_warehouse_id": store.id if store else None,
-                    "vendor_id": vendor.id if vendor else None, "lab_qc": lab_qc})
+                    "vendor_id": vendor.id if vendor else None, "lab_qc": lab_qc,
+                    "scrap_later": scrap_later, "wd_split": wd_split, "racks": racks, "lines": lines})
+
+
+@tour_bp.route("/tour/shortage_order", methods=["POST"])
+def tour_shortage_order():
+    # Demo shortcut (Material plan ke liye): ek bada Draft order jiska maal stock me nahi, taaki plan me "kami" aur PO suggestion dikhe.
+    # Asli order ki tarah /production_orders/add se banta hai (pehli line ki machines, jo line hai to).
+    from app.models import Machines
+    product = None
+    for candidate in Product.query.filter_by(is_deleted=False, is_active=True).order_by(Product.id).all():
+        if candidate.recipe_items and candidate.routing_stages:
+            product = candidate
+            break
+    if product is None:
+        return jsonify({"ok": False, "message": "No product with a recipe and routing stages was found."}), 400
+    line = ProductionLine.query.filter_by(is_active=True, is_deleted=False).order_by(ProductionLine.id).first()
+    data = [("order_date", now_ist().date().isoformat()), ("product_id", str(product.id)), ("planned_qty", "1500"), ("unit_weight", "1"),
+            ("start_date", now_ist().date().isoformat()), ("remarks", "Demo: material plan")]
+    if line is not None:
+        data.append(("line_id", str(line.id)))
+    for row in product.routing_stages:
+        machines = Machines.query.filter_by(work_stage_id=row.work_stage_id, is_deleted=False, status="active")
+        if line is not None:
+            machines = machines.filter_by(line_id=line.id)
+        data += [(f"machines_{row.work_stage_id}", str(m.id)) for m in machines.all()]
+    from werkzeug.datastructures import MultiDict
+    before = ProductionOrder.query.count()
+    current_app.test_client().post("/production_orders/add", data=MultiDict(data))
+    order = ProductionOrder.query.order_by(ProductionOrder.id.desc()).first()
+    if ProductionOrder.query.count() == before or order is None:
+        return jsonify({"ok": False, "message": "The demo order could not be created."}), 400
+    return jsonify({"ok": True, "prod_no": order.prod_no})
 
 
 @tour_bp.route("/tour/finish_stages/<int:order_id>", methods=["POST"])
@@ -49,22 +86,24 @@ def tour_finish_stages(order_id):
     if not pending:
         return jsonify({"ok": True, "message": "All stages are already done."})
     done = [s for s in order.stages if s.status == "Done"]
-    qty = done[-1].qty_out if done else order_batch_kg(order)
+    metal_done = [s for s in done if side_stage_info(order, s) is None]
+    qty = metal_done[-1].qty_out if metal_done else order_batch_kg(order)
     now = now_ist().replace(second=0, microsecond=0)
     t0 = max([now - timedelta(hours=10)] + ([done[-1].completed_at + timedelta(minutes=5)] if done and done[-1].completed_at else []))
     window = (now - timedelta(minutes=5)) - t0
     slot = window / len(pending) if window.total_seconds() > 0 else timedelta(minutes=2)
     cursor = t0
     for stage in pending:
+        side = side_stage_info(order, stage)                 # flux stage: apni qty, metal chain se alag
         if stage.status == "Pending":
             stage.status = "In progress"
             stage.started_at = cursor
             stage.operator = stage.operator or "Demo operator"
-            stage.qty_in = qty
+            stage.qty_in = side["qty"] if side else qty
         stage.completed_at = max(cursor + slot * 0.9, stage.started_at + timedelta(minutes=1))
         for machine in stage.machines:
             machine.used = bool(machine.is_planned)
-        stage.qty_out = qty
+        stage.qty_out = (stage.qty_in if side else qty)
         stage.scrap_qty = 0
         stage.scrap_type_id = None
         stage.scrap_kind = "Saleable"

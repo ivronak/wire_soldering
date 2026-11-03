@@ -168,6 +168,16 @@ def grns_add():
         if not po_line_id_raw:
             break
 
+        try:
+            qty_is_zero = bool(received_qty_raw) and float(received_qty_raw) == 0
+        except ValueError:
+            qty_is_zero = False
+        if qty_is_zero and not batch_raw:
+            received_qty_raw = ""                     # 0 qty aur batch khaali = is line me kuch nahi aaya, chhod do
+        if bool(received_qty_raw) != bool(batch_raw):
+            db.session.rollback()
+            flash("For each line you receive, enter both the quantity and the vendor batch / lot, or leave the line empty.", "error")
+            return redirect(url_for('grns.grns_list'))
         if received_qty_raw and batch_raw:
             po_line_id = int(po_line_id_raw)
             received_qty = float(received_qty_raw)

@@ -539,9 +539,9 @@
             '<td><input type="text" readonly value="' + line.material_name + '" /></td>' +
             '<td><input type="text" readonly class="tabular-nums text-center" value="' + line.po_qty + '" /></td>' +
             '<td><input type="text" readonly class="tabular-nums text-center" value="' + line.prev_received + '" /></td>' +
-            '<td><input type="number" required class="line-recv tabular-nums" min="0" step="0.01" data-material="' + line.material_code + '" data-name="' + (line.material_name || '').replace(/"/g, '&quot;') + '" data-unit="' + (line.unit_code || '') + '" data-poqty="' + line.po_qty + '" data-prev="' + line.prev_received + '" /></td>' +
+            '<td><input type="number" class="line-recv tabular-nums" min="0" step="0.01" data-material="' + line.material_code + '" data-name="' + (line.material_name || '').replace(/"/g, '&quot;') + '" data-unit="' + (line.unit_code || '') + '" data-poqty="' + line.po_qty + '" data-prev="' + line.prev_received + '" /></td>' +
             '<td><input type="text" readonly class="text-center" value="' + line.unit_code + '" /></td>' +
-            '<td><input type="text" required class="line-batch font-mono text-[12px]" placeholder="Batch/lot" /></td>' +
+            '<td><input type="text" class="line-batch font-mono text-[12px]" placeholder="Batch/lot" /></td>' +
             '<td><input type="date" class="line-mfg" /></td>' +
             '<td>' + rackSelect + '</td>' +
             '</tr>';
@@ -552,6 +552,26 @@
         receiptTbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-stop text-[13px]">Could not load PO lines.</td></tr>';
       });
   }
+
+
+  // Ek GRN me sab items ka maal aana zaroori nahi (kisi item ka pura maal pehle aa chuka ya baad ke GRN me aayega).
+  // Jis line me kuch nahi bhara wo chhod di jaati hai. Qty ya batch me se ek bhara ho to dusra bhi chahiye; kam se kam ek line bhari honi chahiye.
+  function checkReceiptLines() {
+    var anyLine = false, firstQty = null;
+    receiptTbody.querySelectorAll('tr').forEach(function (row) {
+      var qty = row.querySelector('.line-recv'), batch = row.querySelector('.line-batch');
+      if (!qty || !batch) return;
+      if (!firstQty) firstQty = qty;
+      var hasQty = qty.value.trim() !== '' && parseFloat(qty.value) !== 0, hasBatch = batch.value.trim() !== '';
+      qty.setCustomValidity(''); batch.setCustomValidity('');
+      if (hasQty || hasBatch) anyLine = true;
+      if (hasQty && !hasBatch) batch.setCustomValidity('Enter the vendor batch / lot for this line, or clear its quantity.');
+      if (hasBatch && !hasQty) qty.setCustomValidity('Enter the received quantity for this line, or clear its batch.');
+    });
+    if (!anyLine && firstQty) firstQty.setCustomValidity('Enter the received quantity and batch for at least one line.');
+  }
+  receiptTbody.addEventListener('input', checkReceiptLines);
+  grnForm.addEventListener('submit', checkReceiptLines, true);
 
   // Har row ke inputs ko index ke hisaab se naam do (Flask ke liye)
   function renumberReceiptLines() {

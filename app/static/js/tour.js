@@ -71,6 +71,12 @@
   }
   function inRow(sel, key, inner) { return function () { var r = rowOf(sel, key); return r ? $(inner, r) : null; }; }
 
+  // Naye features ke steps tabhi jab /tour/info ka flag (lines / racks / scrap_later / wd_split) true ho
+  function flag(name) { return function () { return !!(infoCache && infoCache[name]); }; }
+  function tableOrTitle() { return $('main table') || $('main h1'); }
+  // Material plan / Scrap page ke dabbe (class same hai, isliye likhe hue text se pehchano)
+  function boxWith(sel, text) { var b = $$(sel).filter(function (x) { return x.textContent.indexOf(text) !== -1; })[0]; return b || null; }
+
   // ---------------------------------------------------------------- chapters (Gujarati)
   var CH = [];
 
@@ -82,8 +88,34 @@
         warn: 'ધ્યાન: ટૂર <b>સાચી એન્ટ્રીઓ</b> બનાવશે (સ્ટોક, ઓર્ડર વગેરે). તેથી ટ્રેનિંગ / ડેમો માટે જ ચલાવો.' },
       { id: 'sidebar', type: 'info', target: 'aside', title: 'ડાબી બાજુનું મેનુ',
         text: 'આખું ERP આ મેનુમાંથી ચાલે છે. ત્રણ ભાગ છે:<ul><li><b>Procurement</b> — ખરીદી (PO, GRN, QC, બિલ)</li><li><b>Inventory</b> — સ્ટોક</li><li><b>Manufacturing</b> — ઉત્પાદન</li></ul>આપણે <b>Procurement (ખરીદી)</b> થી શરૂ કરીશું.' },
+      { id: 'ch-overview', type: 'info', title: 'ક્લાયન્ટના ફેરફારો: પહેલા અને હવે',
+        text: '<ul><li><b>Production Line</b> — પહેલા ફક્ત મશીનો; હવે Line 1 / Line 2, દરેકની પોતાની મશીનો અને રોજની ક્ષમતા</li><li><b>Packing material</b> — recipe માં સ્પૂલ, સ્લીવ, બોક્સ</li><li><b>30 દિવસનો Material plan</b> — PO ક્યાં સુધીમાં નાખવો તે અગાઉથી</li><li><b>Flux અને Melting અલગ</b>, <b>Lab QC + TC</b> વગર આગળ નહિ</li><li><b>Scrap</b> — ફક્ત scrap લખવાનું, barcode, દિવસનું પેક</li><li><b>Rack</b> અને <b>Tally જેવો તૈયાર માલ</b> (ઓછા / વધુ સ્ટોકની ચેતવણી)</li><li><b>Spare %</b> દરેક કાચા માલનું, <b>વપરાયેલો માલ</b> સ્ટેજ પૂરું કરતાં એક જ એન્ટ્રી, બચેલો માલ આઉટપુટ પહેલાં <b>પાછો</b></li></ul>આખી ટૂરમાં દરેક પેજ પર આ ફેરફાર <b>જાતે ચલાવીને</b> બતાવીશું.' },
       { id: 'howto', type: 'info', title: 'ટૂર કેવી રીતે વાપરવી',
         text: '<ul><li><b>આગળ</b> — વાંચીને આગળ વધો</li><li>જ્યારે કહ્યું હોય કે <b>"ક્લિક કરો"</b>, ત્યારે ચમકતી જગ્યાએ જાતે ક્લિક કરો — પછી ટૂર આપોઆપ આગળ જશે</li><li><b>ડેમો વેલ્યુ ભરો</b> બટન ફોર્મ ઝડપથી ભરી આપે છે (તમે બદલી પણ શકો)</li><li>અટકી જાઓ તો <b>પગલું છોડો</b> કે <b>પાછળ</b> દબાવો; ગમે ત્યારે <b>બહાર નીકળો</b></li></ul>' }
+    ]
+  });
+
+  CH.push({
+    id: 'masters', title: 'નવા અને બદલાયેલા માસ્ટર', desc: 'Production line, Machine, Work stage, Rack, Vendor lead time, Product — પહેલા શું હતું અને હવે શું.',
+    steps: [
+      { id: 'ma-line-link', type: 'click', target: navLink('/production_lines'), title: 'Production lines ખોલો', text: 'સૌથી પહેલા નવો માસ્ટર: <b>Production lines</b>.', todo: 'ક્લિક કરો: Production lines' },
+      { id: 'ma-line-info', type: 'info', path: '/production_lines', target: tableOrTitle, title: 'Production line (નવું)',
+        text: '<b>પહેલા:</b> મશીનોની ફક્ત યાદી; ઓર્ડર કઈ લાઇનમાં ચાલશે તે ખબર નહિ.<br><b>હવે:</b> <b>Line 1</b> અને <b>Line 2</b>. દરેક લાઇન પાસે બધા સ્ટેજનો પોતાનો પૂરો સેટ, પોતાની મશીનો, <b>રોજની ક્ષમતા (KG/દિવસ)</b> અને <b>handler</b>. એક મશીન ફક્ત એક જ લાઇનની.' },
+      { id: 'ma-mc-link', type: 'click', target: navLink('/machines'), title: 'Machines ખોલો', text: 'હવે <b>Machines</b>.', todo: 'ક્લિક કરો: Machines' },
+      { id: 'ma-mc-info', type: 'info', path: '/machines', target: tableOrTitle, title: 'Machines — લાઇન પ્રમાણે',
+        text: '<b>પહેલા:</b> દરેક સ્ટેજની એક મશીન, કોઈ લાઇન સાથે નહિ.<br><b>હવે:</b> દરેક સ્ટેજમાં <b>2 મશીન</b> — એક Line 1 ની, એક Line 2 ની. ક્ષમતા <b>KG/કલાક</b> માં, જેથી ઓર્ડરનો સમય આપમેળે નીકળે. (ક્ષમતા હાલ અંદાજ છે — પ્લાન્ટ પાસેથી પાક્કી કરવાની.)' },
+      { id: 'ma-ws-link', type: 'click', target: navLink('/work_stages'), title: 'Work stages ખોલો', text: 'હવે <b>Work stages</b>.', todo: 'ક્લિક કરો: Work stages' },
+      { id: 'ma-ws-info', type: 'info', path: '/work_stages', target: tableOrTitle, title: 'Work stage — નવા નિશાન',
+        text: '<b>પહેલા:</b> Wire Drawing એક જ સ્ટેજ.<br><b>હવે:</b> ક્લાયન્ટની 3 મશીન એક લાઇનમાં છે, એટલે <b>Wire Drawing 1 / 2 / 3</b> — દરેક પાસનો ઓપરેટર અને scrap અલગ.<br><b>Melting &amp; Alloying</b> પર 3 નિશાન: <b>Batch</b> (ભઠ્ઠીની ક્ષમતા મુજબ લોટ), <b>Lab QC</b> (TC વગર આગળ નહિ), <b>Scrap later</b> (scrap ઇન્ગોટ કાસ્ટિંગ પછી લખાય).' },
+      { id: 'ma-rack-link', type: 'click', target: navLink('/racks'), title: 'Racks ખોલો', text: 'હવે નવો માસ્ટર <b>Racks</b>.', todo: 'ક્લિક કરો: Racks' },
+      { id: 'ma-rack-info', type: 'info', path: '/racks', target: tableOrTitle, title: 'Rack (નવું)',
+        text: '<b>પહેલા:</b> માલ ગોડાઉનમાં ક્યાં પડ્યો તે ખબર નહિ.<br><b>હવે:</b> દરેક ગોડાઉનની અંદર રેક — <b>A, B, C</b> કે <b>1, 2, 3</b>. ફક્ત નામ, ક્ષમતા નહિ. GRN અને તૈયાર માલ વખતે રેક ચૂંટાય, એટલે દરેક લોટ / બેચ હંમેશા મળે.' },
+      { id: 'ma-vendor-link', type: 'click', target: navLink('/vendors'), title: 'Vendors ખોલો', text: 'હવે <b>Vendors</b>.', todo: 'ક્લિક કરો: Vendors' },
+      { id: 'ma-vendor-info', type: 'info', path: '/vendors', target: tableOrTitle, title: 'Vendor — Lead time',
+        text: '<b>પહેલા:</b> માલ કેટલા દિવસે આવે તે ક્યાંય નહિ.<br><b>હવે:</b> દરેક vendor માં <b>Lead time (days)</b> — Edit માં ભરાય (15–20 દિવસ). Material plan તેના પરથી કહેશે કે <b>PO ક્યાં સુધીમાં નાખવો</b>.' },
+      { id: 'ma-prod-link', type: 'click', target: navLink('/products'), title: 'Products ખોલો', text: 'હવે <b>Product master</b>.', todo: 'ક્લિક કરો: Products' },
+      { id: 'ma-prod-info', type: 'info', path: '/products', target: tableOrTitle, title: 'Product — 3 નવી વાત',
+        text: '<b>૧.</b> Recipe માં <b>stage</b>: Tin / Lead = Melting, ફક્ત Flux = Flux Preparation.<br><b>૨.</b> <b>Packing material</b> (સ્પૂલ, બોક્સ) — ઓર્ડરમાં આપમેળે ગણાય.<br><b>૩.</b> <b>Min / Max stock</b> — તૈયાર માલમાં ઓછા / વધુ સ્ટોકની ચેતવણી.' }
     ]
   });
 
@@ -126,6 +158,8 @@
       { id: 'pr-grn-fill', type: 'fill', path: '/grns', target: '#grn-form', title: 'શું આવ્યું તે ભરો',
         text: 'તારીખ, vendor નો <b>challan નંબર</b>, ગાડી / ટ્રાન્સપોર્ટરની વિગત, અને દરેક material માટે <b>ખરેખર આવેલી quantity</b> તથા <b>Batch / Lot નંબર</b> ભરો. Lot નંબર vendor ના માલ પર લખેલો હોય છે — એનાથી પછી પણ ખબર પડે કે માલ ક્યાંથી આવ્યો.',
         prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillGRN } },
+      { id: 'pr-grn-rack', type: 'info', path: '/grns', target: '#grn-form .line-rack', title: 'Rack (નવું)',
+        text: '<b>પહેલા:</b> માલ ફક્ત ગોડાઉનમાં આવતો.<br><b>હવે:</b> દરેક લાઇનમાં <b>Rack</b> ચૂંટાય — QC પાસ પછી માલ તે ગોડાઉનના કયા રેકમાં મૂકવો. ફરજિયાત નથી.' },
       { id: 'pr-grn-post', type: 'submit', path: '/grns', target: '#grn-form', submitter: 'post', retryTo: 'pr-grn-recv', title: 'Post GRN',
         text: 'હવે <b>Post GRN</b> દબાવો. માલ સ્ટોકમાં આવી જાય છે, પણ <b>QC Hold</b> ગોડાઉનમાં — એટલે ચકાસણી પૂરી ન થાય ત્યાં સુધી ઉત્પાદનમાં વાપરી શકાતો નથી.', todo: 'ક્લિક કરો: Post GRN' },
       { id: 'pr-grn-done', type: 'info', path: '/grns', target: 'main h1', title: 'GRN પોસ્ટ થઈ ✅',
@@ -180,6 +214,8 @@
         text: 'દરેક material નું કાર્ડ: <ul><li><b>Available</b> — વાપરવા લાયક માલ (સ્ટોરમાં)</li><li><b>Waiting for QC</b> — ખરીદી આવી, QC બાકી</li><li><b>In production</b> — ઉત્પાદનમાં (WIP) ગયેલો માલ</li><li><b>Rejected</b> — QC માં નાપાસ</li></ul>' },
       { id: 'st-lot', type: 'info', path: '/inventory/stock', target: '.lot-row', title: 'લોટ (Lot) એટલે શું?',
         text: 'દરેક <b>લોટ</b> = માલનો એક જથ્થો (<code>LOT-0001</code>). Opening stock અને દરેક ખરીદીનો પોતાનો લોટ બને છે, જેથી <b>કયો માલ ક્યાંથી આવ્યો અને ક્યાં ગયો</b> તે હંમેશા ખબર પડે (traceability).' },
+      { id: 'st-rack', type: 'info', path: '/inventory/stock', target: function () { var r = $('.lot-row'); return r ? r.children[4] : null; }, title: 'Rack કૉલમ (નવું)',
+        text: '<b>પહેલા:</b> લોટ મળતો, પણ ક્યાં પડ્યો તે નહિ.<br><b>હવે:</b> દરેક લોટની સામે <b>Rack</b> લખેલો દેખાય છે, અને તેનાથી શોધી પણ શકાય.' },
       { id: 'st-hist', type: 'click', path: '/inventory/stock', target: '.lot-row a[href*="/inventory/stock/"]', title: 'લોટની History જુઓ', text: 'આ લોટની પાસબુક ખોલો.', todo: 'ક્લિક કરો: History' },
       { id: 'st-hist-info', type: 'info', path: /^\/inventory\/stock\/\d+$/, target: 'main', title: 'લોટની પાસબુક',
         text: 'બેંક પાસબુકની જેમ આ લોટની <b>દરેક હલચલ</b> લખાઈ છે — આવ્યો, QC પાસ થયો, ઉત્પાદનમાં ગયો, પાછો આવ્યો વગેરે. આ ખાતાની એન્ટ્રી <b>ક્યારેય ભૂંસાતી નથી</b>; ભૂલ થાય તો સામી (ઉલટી) એન્ટ્રી પડે.' },
@@ -207,8 +243,12 @@
         text: 'બધા ઓર્ડર <b>કતારમાં</b> (queue) હોય છે — #1 પહેલો ચાલે. ઉપરના કાર્ડ: કેટલા ઓર્ડર કતારમાં, કેટલા <b>ચાલુ</b>, કેટલાને <b>માલ જોઈએ</b> અને કેટલા <b>મોડા</b> છે.' },
       { id: 'po-new', type: 'click', path: '/production_orders', target: '#btn-add-mo', title: 'નવો ઓર્ડર', text: 'ઉપર જમણે <b>New production order</b> બટન.', todo: 'ક્લિક કરો: New production order' },
       { id: 'po-fill', type: 'fill', path: '/production_orders', target: '#mo-form', title: 'ઓર્ડર ભરો',
-        text: '<b>૧.</b> Product category પસંદ કરો, પછી attributes (Alloy, Thickness…) એક પછી એક — ફક્ત મળતા options જ દેખાય.<br><b>૨.</b> કેટલું બનાવવું (Quantity).<br>નીચેનું બટન ડેમો માટે <b>100 KG</b> ભરી આપશે.',
+        text: '<b>૧.</b> Product category પસંદ કરો, પછી attributes (Alloy, Thickness…) એક પછી એક — ફક્ત મળતા options જ દેખાય.<br><b>૨.</b> કેટલું બનાવવું (Quantity).<br><b>૩.</b> <b>Production line</b> ચૂંટો (નવું!).<br>નીચેનું બટન ડેમો માટે <b>100 KG</b> ભરી આપશે.',
         prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillOrder } },
+      { id: 'po-line', type: 'info', path: '/production_orders', target: '#mo-line', when: flag('lines'), title: 'Production line — ઓર્ડર બનાવતાં જ',
+        text: '<b>પહેલા:</b> લાઇન ફક્ત Start વખતે ચૂંટાતી, અને પ્લાનરમાં બધી લાઇનની મશીનો સાથે ટિક થતી — એટલે સમય ખોટો (અડધો) દેખાતો.<br><b>હવે:</b> ઓર્ડર બનાવતાં જ <b>લાઇન ચૂંટો</b> — ફક્ત તે લાઇનની મશીનો ટિક, બીજી લાઇનની ઝાંખી (disabled). ઓર્ડર પછી <b>Reschedule</b> માં બીજી લાઇનમાં પણ ખસેડી શકાય.' },
+      { id: 'po-allow', type: 'info', path: '/production_orders', target: '#mo-lines', title: 'Spare % — દરેક માલનું અલગ',
+        text: '<b>પહેલા:</b> બગાડ માટે વધારાનો માલ ગણવાનો કોઈ રસ્તો નહિ; ખૂટે તો નવો issue / PO.<br><b>હવે:</b> દરેક કાચા માલની સામે <b>Spare %</b> — જેમ કે Tin 10%, Lead 0%, Flux 25%. એટલો વધારાનો માલ issue થઈ શકે; <b>વપરાય નહિ તો store માં પાછો</b>. (ડેમો ઓર્ડરમાં spare 0 રાખ્યું છે.)' },
       { id: 'po-plan', type: 'info', path: '/production_orders', target: '#mo-plan', title: 'Stages અને Machines',
         text: 'આ product કયા <b>સ્ટેજમાંથી</b> પસાર થશે અને દરેકમાં <b>કયા મશીન</b> વાપરવા તે અહીં છે (✓ ટિક કરેલા). વધુ મશીન = ઓછો સમય. <b>Time</b> દરેક મશીનની ક્ષમતા (KG/કલાક) પરથી આપોઆપ નીકળે છે.' },
       { id: 'po-side', type: 'info', path: '/production_orders', target: '.po-side', title: 'Order summary',
@@ -256,6 +296,8 @@
       { id: 'mi-all', type: 'click', path: '/material_issues', target: inCard('.mi-card', 'form[action*="/material_issues/add"] button'), title: 'Issue all available',
         text: 'આ બટન <b>એક ક્લિકમાં</b> બાકી રહેલો બધો માલ (જે સ્ટોરમાં છે તેટલો) આપી દે છે.', todo: 'ક્લિક કરો: Issue all available' },
       { id: 'mi-all-ok', type: 'click', target: '#erp-confirm-root.is-open .erp-confirm__btn--ok', retryTo: 'mi-all', title: 'પુષ્ટિ', text: '<b>Issue now</b> દબાવો.', todo: 'ક્લિક કરો: Issue now' },
+      { id: 'mi-extra', type: 'info', path: '/material_issues', target: 'main h1', title: 'Spare અને Extra issue',
+        text: '<b>પહેલા:</b> જેટલો જોઈએ તેટલો જ issue, પછી રસ્તો બંધ.<br><b>હવે:</b> ૧) <b>Needed</b> અને <b>Spare</b> અલગ દેખાય; spare લેવો જરૂરી નથી (<b>Fill with spare</b>). ૨) ચાલુ ઓર્ડરનો બધો માલ અપાઈ ગયો હોય તોય <b>Issue extra material</b> બટન મળે — જરૂરી + spare થી વધુ આપવો હોય તો <b>Remarks</b> માં કારણ લખવાનું.' },
       { id: 'mi-end', type: 'info', path: '/material_issues', target: 'main h1', title: 'માલ પૂરો અપાઈ ગયો ✅', text: 'હવે ઓર્ડરને ઉત્પાદનમાં <b>Start</b> કરી શકાય.' }
     ]
   });
@@ -269,20 +311,26 @@
       { id: 'st-line', type: 'submit', path: '/production_orders', target: '#start-form', retryTo: 'st-start',
         when: function () { var m = $('#start-modal'); return !!m && !m.classList.contains('hidden'); },
         title: 'Production line ચૂંટો',
-        text: 'જ્યારે <b>Production lines</b> બનેલી હોય, ત્યારે ઓર્ડર કઈ લાઇનમાં ચલાવવો તે અહીં ચૂંટવાનું. દરેક લાઇન પર <b>હાલ કયો ઓર્ડર ચાલે છે</b>, કેટલો માલ બાકી છે અને લાઇન <b>ક્યારથી ખાલી</b> થશે તે દેખાય છે.',
-        prefill: { label: 'પહેલી લાઇન ચૂંટો', run: function () { var r = $('#start-form input[name=line_id]'); if (r) { r.checked = true; r.dispatchEvent(new ctx.win.Event('change', { bubbles: true })); } return sleep(150).then(function () { var t = $('#start-reason'); if (t && !t.closest('.hidden')) setVal(t, 'Demo order - no other order waiting'); }); } } },
+        text: 'ઓર્ડર બનાવતાં ચૂંટેલી <b>Production line</b> અહીં પહેલેથી ચૂંટાયેલી છે (બીજી લાઇનો ઝાંખી). દરેક લાઇન પર <b>હાલ કયો ઓર્ડર ચાલે છે</b>, કેટલો માલ બાકી છે અને લાઇન <b>ક્યારથી ખાલી</b> થશે તે દેખાય છે.',
+        prefill: { label: 'પહેલી લાઇન ચૂંટો', run: function () { var r = $('#start-form input[name=line_id]:checked') || $('#start-form input[name=line_id]:not(:disabled)'); if (r) { r.checked = true; r.dispatchEvent(new ctx.win.Event('change', { bubbles: true })); } return sleep(150).then(function () { var t = $('#start-reason'); if (t && !t.closest('.hidden')) setVal(t, 'Demo order - no other order waiting'); }); } } },
       { id: 'st-start-ok', type: 'click', when: function () { return !!$('#erp-confirm-root.is-open'); }, target: '#erp-confirm-root.is-open .erp-confirm__btn--ok', retryTo: 'st-start', title: 'પુષ્ટિ', text: '<b>Start</b> દબાવો.', todo: 'ક્લિક કરો: Start (પુષ્ટિ)' },
       { id: 'st-run', type: 'info', path: '/production_orders', target: function () { return orderCard('.po-card'); }, title: 'ઓર્ડર ચાલુ થઈ ગયો ✅',
         text: 'Status <b>In production</b>. હવે તેને Move/Cancel/Reschedule થઈ ન શકે (તારીખો ફિક્સ). ઉત્પાદનમાં દરેક સ્ટેજનું કામ <b>Routing</b> માં નોંધાય છે.' },
       { id: 'rt-link', type: 'click', target: navLink('/routing'), title: 'Routing / stages', text: 'સ્ટેજ-વાર ખરું કામ અહીં નોંધાય.', todo: 'ક્લિક કરો: Routing / stages' },
       { id: 'rt-pipe', type: 'info', path: '/routing', target: inCard('.rt-card', '.rt-pipe'), title: 'સ્ટેજની પાઇપલાઇન',
         text: 'ઓર્ડર જે સ્ટેજમાંથી પસાર થવાનો તે હરોળમાં છે: <b>✓ Done</b> (લીલું), <b>In progress</b> (નારંગી), <b>Pending</b> (રાખોડી). દરેકમાં આયોજિત કલાક અને પછી <b>ખરા કલાક</b> દેખાશે. સ્ટેજ <b>એક પછી એક</b> જ ચાલે.' },
+      { id: 'rt-wd', type: 'info', path: '/routing', target: inCard('.rt-card', '.rt-pipe'), when: flag('wd_split'), title: 'Wire Drawing — 3 સ્ટેજ',
+        text: '<b>પહેલા:</b> Wire Drawing એક સ્ટેજ (8 સ્ટેજ).<br><b>હવે:</b> પાઇપલાઇનમાં <b>Wire Drawing 1 → 2 → 3</b> (કુલ 10 સ્ટેજ). ત્રણ મશીન એક લાઇનમાં, એક પછી એક પાસ — દરેકનો ઓપરેટર અને scrap અલગ નોંધાય.' },
       { id: 'rt-start', type: 'click', path: '/routing', target: inCard('.rt-card', '.rt-act'), title: 'પહેલું સ્ટેજ Start કરો', text: 'કાર્ડના જમણે નારંગી <b>Start …</b> બટન.', todo: 'ક્લિક કરો: Start (સ્ટેજ)' },
       { id: 'rt-start-fill', type: 'fill', path: '/routing', target: '#rt-form', title: 'ઓપરેટર અને સમય',
         text: '<b>Operator</b> — આ સ્ટેજ કોણ ચલાવે છે તેનું નામ. <b>Started at</b> — ડિફોલ્ટ હમણાંનો સમય (મોડું નોંધતા હો તો બદલી શકાય).',
         prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#rt-operator'), 'રમેશભાઈ'); return Promise.resolve(); } } },
       { id: 'rt-start-post', type: 'submit', path: '/routing', target: '#rt-form', retryTo: 'rt-start', title: 'Start stage', text: '<b>Start stage</b> દબાવો.', todo: 'ક્લિક કરો: Start stage' },
       { id: 'rt-comp', type: 'click', path: '/routing', target: inCard('.rt-card', '.rt-act'), title: 'સ્ટેજ પૂરું કરો', text: 'હવે એ જ જગ્યાએ <b>Complete …</b> બટન છે.', todo: 'ક્લિક કરો: Complete (સ્ટેજ)' },
+      { id: 'rt-used', type: 'info', path: '/routing', target: '#rt-mat-box', when: function () { var b = $('#rt-mat-box'); return !!(b && b.offsetParent); }, title: 'Raw material used — એક જ એન્ટ્રી',
+        text: '<b>પહેલા:</b> સ્ટેજમાં કાચો માલ કેટલો વપર્યો તે ક્યાંય નહિ; Output વખતે બધો માલ વપરાયેલો ગણાતો.<br><b>હવે:</b> આ સ્ટેજમાં ખરેખર વપરાયેલો માલ <b>એક જ વાર</b> લખવાનો (સ્ટેજ બે વાર ચાલ્યું તોય કુલ એક એન્ટ્રી). Issued થી વધુ લખાય નહિ — વધુ જોઈએ તો પહેલાં <b>Material issue</b>. નીચે <b>Came into this stage</b> વપરાયેલા માલ પ્રમાણે બને, પછી scrap બાદ થઈ Good output.' },
+      { id: 'rt-hours', type: 'info', path: '/routing', target: '#rt-hours-box', title: 'Working hours',
+        text: 'Start થી Finish સુધીના <b>કલાક આપોઆપ</b> ભરાય છે. સ્ટેજ વચ્ચે અટક્યું હોય તો આંકડો <b>બદલી</b> શકાય.' },
       { id: 'rt-comp-fill', type: 'fill', path: '/routing', target: '#rt-form', title: 'પૂરું કરવાની વિગત',
         text: '<ul><li><b>Machines used</b> — ખરેખર કયા મશીન ચાલ્યા (ન ચાલ્યું તે અનટિક કરો)</li><li><b>Good output</b> — આપોઆપ ગણાય છે (આવેલો માલ − scrap), લખવાનું નથી</li><li><b>Scrap</b> — ફક્ત આ જ લખવાનું: કેટલો બગડ્યો; બગડ્યો હોય તો <b>પ્રકાર</b> અને <b>વેચી શકાય (Saleable)</b> કે <b>Process loss</b> પસંદ કરો</li></ul>ડેમો માટે 1 KG scrap (Metal slag) ભરાશે.',
         prefill: { label: 'ડેમો વેલ્યુ ભરો', run: prefillStageComplete } },
@@ -290,10 +338,12 @@
       { id: 'rt-done1', type: 'info', path: '/routing', target: inCard('.rt-card', '.rt-head'), title: 'પહેલું સ્ટેજ પૂરું ✅',
         text: 'પ્રગતિ-બાર વધ્યો. <b>Behind / On track</b> ચિપ કહે છે કે આયોજન કરતાં મોડા છો કે નહિ, અને <b>Forecast</b> કહે છે કે ઓર્ડર ક્યારે પૂરો થવાની શક્યતા છે. કાર્ડ ખોલશો તો સ્ટેજ-વાર ખરા કલાક, ઓપરેટર, મશીન અને yield % દેખાય.' },
       { id: 'rt-shortcut', type: 'action', path: '/routing', target: inCard('.rt-card', '.rt-pipe'), title: 'બાકીના સ્ટેજ (ડેમો શૉર્ટકટ)',
-        text: 'બાકીના 7 સ્ટેજ પણ આ જ રીતે (Start → Complete) થાય. ટૂરનો સમય બચાવવા આ <b>ડેમો શૉર્ટકટ</b> બટન બાકીના બધા સ્ટેજ આપમેળે પૂરા કરી દેશે.',
+        text: 'બાકીના બધા સ્ટેજ પણ આ જ રીતે (Start → Complete) થાય. ટૂરનો સમય બચાવવા આ <b>ડેમો શૉર્ટકટ</b> બટન બાકીના બધા સ્ટેજ આપમેળે પૂરા કરી દેશે.',
         button: { label: 'બાકીના સ્ટેજ આપમેળે પૂરા કરો', run: finishStagesDemo } },
       { id: 'rt-labqc', type: 'info', when: function () { return !!(infoCache && infoCache.lab_qc); }, title: 'Lab QC અને TC',
         text: 'મેલ્ટિંગ પછી તરત <b>Lab QC</b>: સેમ્પલ લેબમાં જાય, અને <b>Pass</b> થાય ત્યારે <b>Test Certificate (TC)</b> અપલોડ કરવું પડે. <b>TC વગર આગળનું સ્ટેજ (Ingot Casting) શરૂ થઈ શકતું નથી.</b> આ TC હંમેશા આ ઓર્ડર અને લોટ સાથે જોડાયેલું રહે છે. ડેમો શૉર્ટકટે આપણા માટે એક Pass ટેસ્ટ અને TC નાખી દીધું છે.' },
+      { id: 'rt-scraplater', type: 'info', when: flag('scrap_later'), title: 'Melting નો scrap — પછીથી લખાય',
+        text: '<b>પહેલા:</b> દરેક સ્ટેજમાં આવેલો-ગયેલો બંને લખવો પડતો.<br><b>હવે:</b> ફક્ત <b>scrap</b> લખવાનો; Good output આપમેળે (આવેલો − scrap). Melting નો scrap (dross / slag) ભઠ્ઠી ખાલી થયા પછી, એટલે <b>Ingot Casting પૂરું કરતી વખતે</b> લખાય — ફોર્મમાં અલગ ખાનું આવે, અને Melting નો output અને Casting નો input આપમેળે સુધરે.' },
       { id: 'rt-alldone', type: 'info', path: '/routing', target: '.rt-tabs', title: 'બધા સ્ટેજ પૂરા ✅',
         text: 'ઓર્ડર <b>Running</b> ટૅબમાંથી નીકળીને <b>All stages done</b> માં ગયો. હવે તૈયાર થયેલા માલની (output) નોંધ કરવાની.' },
       { id: 'rt-tab', type: 'click', path: '/routing', target: '.rt-tabs a[href*="tab=done"]', title: 'All stages done', text: 'આ ટૅબ ખોલો.', todo: 'ક્લિક કરો: All stages done' },
@@ -309,15 +359,22 @@
       { id: 'ou-open', type: 'click', path: '/production_output', target: inCard('.ou-card', '.ou-act'), title: 'Record output', text: 'તમારા ઓર્ડરના કાર્ડમાં <b>Record output</b>.', todo: 'ક્લિક કરો: Record output' },
       { id: 'ou-fill', type: 'fill', path: '/production_output', target: '#ou-form', title: 'શું બન્યું?',
         text: 'Routing માંથી આંકડા પહેલેથી ભર્યા છે:<ul><li><b>Good</b> — વેચાણ લાયક (તૈયાર માલમાં જશે)</li><li><b>Rework</b> — ફરી કામ કરવું પડે (હાલ ફક્ત નોંધ)</li><li><b>Scrap</b> — વેચી શકાય તેવો કચરો (Scrap yard માં)</li><li><b>Process loss</b> — નાનું નુકસાન (ફક્ત નોંધ)</li></ul>જમણે લખ્યું છે કે Record કરતાં શું થશે.',
-        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#ou-by'), 'સુરેશભાઈ'); return Promise.resolve(); } } },
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#ou-by'), 'સુરેશભાઈ'); var rk = $('#ou-rack'); if (rk && rk.options.length > 1) setVal(rk, rk.options[1].value); return Promise.resolve(); } } },
+      { id: 'ou-rack', type: 'info', path: '/production_output', target: '#ou-rack', title: 'Rack (નવું)',
+        text: '<b>પહેલા:</b> તૈયાર માલ ફક્ત ગોડાઉનમાં જતો.<br><b>હવે:</b> <b>Rack</b> ચૂંટો — Good માલ FG ગોડાઉનના કયા રેકમાં મૂક્યો. એટલે તૈયાર માલ પણ હંમેશા શોધી શકાય.' },
       { id: 'ou-side', type: 'info', path: '/production_output', target: '.ou-side', title: '"Record કરતાં શું થશે?"',
         text: '૧) ઉત્પાદનમાં આપેલો <b>કાચો માલ "વપરાયો"</b> ગણાશે, ૨) <b>Good</b> તૈયાર માલમાં (batch નંબર સાથે), ૩) <b>Scrap</b> Scrap yard માં, ૪) ઓર્ડર <b>Completed</b>. નીચે <b>અંદાજિત ખર્ચ</b> પણ છે: કાચા માલની કિંમત ÷ Good જથ્થો.' },
+      { id: 'ou-return', type: 'info', path: '/production_output', target: '#ou-form', title: 'બચેલો માલ પહેલાં પાછો',
+        text: '<b>નવો નિયમ:</b> issue થયો પણ <b>વપરાયો નહિ</b> (બચેલું spare) તે Output પહેલાં <b>Material return</b> થી store માં પાછો જવો જોઈએ — નહિ તો Output નોંધાતું નથી. Output માં ફક્ત <b>ખરેખર વપરાયેલો</b> માલ ગણાય, એટલે તૈયાર માલની <b>કિંમત</b> અને <b>Variance</b> સાચા આવે.' },
       { id: 'ou-post', type: 'submit', path: '/production_output', target: '#ou-form', retryTo: 'ou-open', title: 'Record output', text: 'નીચે <b>Record output</b> દબાવો.', todo: 'ક્લિક કરો: Record output' },
       { id: 'ou-done', type: 'info', path: '/production_output', target: '.ou-card', title: 'Output નોંધાયું ✅',
         text: 'આ <b>Recorded</b> ટૅબ છે. અહીં <b>OUT નંબર, Batch નંબર</b> (<code>BATCH-WS-તારીખ-001</code>), Good/Rework/Scrap અને <b>પ્રતિ યુનિટ ખર્ચ</b> દેખાય છે. <b>Print batch slip</b> થી બેચ-સ્લિપ નીકળે. ભૂલ હોય તો <b>Cancel</b> (જ્યાં સુધી માલ વેચાયો ન હોય).' },
       { id: 'fg-link', type: 'click', target: navLink('/finished_goods'), title: 'Finished goods', text: 'તૈયાર માલનો સ્ટોક.', todo: 'ક્લિક કરો: Finished goods' },
       { id: 'fg-info', type: 'info', path: '/finished_goods', target: '.fg-card', title: 'તૈયાર માલની બેચ',
-        text: 'દરેક <b>બેચ</b> એક ઓર્ડરનો Good માલ છે: કેટલો બચ્યો, <b>પ્રતિ યુનિટ ખર્ચ</b>, કુલ કિંમત અને કયા ગોડાઉનમાં. આગળ <b>Sales</b> માં આ બેચમાંથી જ માલ ગ્રાહકને જશે.' },
+        text: '<b>પહેલા:</b> દરેક બેચ અલગ લાઇનમાં, લાંબી યાદી.<br><b>હવે (Tally જેવું):</b> <b>પ્રોડક્ટ દીઠ એક લાઇન</b> — કુલ જથ્થો અને કિંમત. સાથે ચેતવણી: <b>Out of stock</b>, <b>Below minimum</b>, <b>Overstock</b>.' },
+      { id: 'fg-expand', type: 'click', path: '/finished_goods', target: '.fg-group summary', title: 'પ્રોડક્ટ ખોલો', text: 'પ્રોડક્ટની લાઇન પર ક્લિક કરો — તેની <b>બેચ</b> ખુલશે.', todo: 'ક્લિક કરો: પ્રોડક્ટ' },
+      { id: 'fg-batch', type: 'info', path: '/finished_goods', target: '.fg-group .fg-row', title: 'બેચ-વાર વિગત',
+        text: 'દરેક બેચ: <b>કયા ઓર્ડરનો</b>, કેટલો બચ્યો, પ્રતિ યુનિટ ખર્ચ, કુલ કિંમત, <b>કયા ગોડાઉન અને કયા Rack માં</b>. આગળ <b>Sales</b> માં આ બેચમાંથી જ માલ ગ્રાહકને જશે.' },
       { id: 'fg-scrap', type: 'click', path: '/finished_goods', target: '.fg-tabs a[href*="tab=scrap"]', title: 'Scrap yard', text: 'બીજું ટૅબ <b>Scrap yard</b> ખોલો.', todo: 'ક્લિક કરો: Scrap yard' },
       { id: 'fg-scrap-info', type: 'info', path: '/finished_goods', target: '.fg-card', title: 'Scrap નો સ્ટોક', text: 'Output માં નોંધેલો <b>વેચી શકાય તેવો scrap</b> અહીં સ્ટોક તરીકે આવ્યો (કિંમત શૂન્ય ગણાય). આ ભવિષ્યમાં Sales માં વેચી શકાશે.' },
       { id: 'sc-link', type: 'click', target: navLink('/scrap'), title: 'Scrap / waste', text: 'બધા scrap નો હિસાબ.', todo: 'ક્લિક કરો: Scrap / waste' },
@@ -326,6 +383,17 @@
       { id: 'sc-box', type: 'info', path: '/scrap', target: '.sc-box', title: 'ક્યાં સૌથી વધુ બગાડ?',
         text: 'બાર-ચાર્ટ કહે છે <b>કયા પ્રકારનો</b> scrap વધુ છે અને <b>કયું સ્ટેજ</b> સૌથી વધુ બગાડે છે — સુધારા માટે સીધો સંકેત.' },
       { id: 'sc-reg', type: 'info', path: '/scrap', target: '.sc-card', title: 'Scrap register', text: 'દરેક scrap: કયો ઓર્ડર, કયું સ્ટેજ, શું પ્રકાર, કેટલો, અને <b>અત્યારે ક્યાં</b> છે (Floor / Scrap yard / Not stocked).' },
+      { id: 'sc-yard', type: 'click', path: '/scrap', target: '.sc-tabs a[href*="tab=yard"]', title: 'Scrap yard ટૅબ', text: '<b>Scrap yard</b> ટૅબ ખોલો.', todo: 'ક્લિક કરો: Scrap yard' },
+      { id: 'sc-packbox', type: 'info', path: '/scrap', target: function () { return boxWith('.sc-box', "Pack a day"); }, title: 'દિવસનું Scrap pack (નવું)',
+        text: '<b>પહેલા:</b> scrap દરેક ઓર્ડરનો અલગ.<br><b>હવે:</b> એક દિવસનો <b>બધા ઓર્ડરનો scrap એક થેલીમાં</b>, <b>એક barcode</b> સાથે. અહીં દેખાય છે કે કયા દિવસનો કેટલો scrap હજી પેક નથી થયો.' },
+      { id: 'sc-pack', type: 'submit', path: '/scrap', target: function () { var b = boxWith('.sc-box', "Pack a day"); return b ? $('form', b) : null; }, retryTo: 'sc-yard', title: 'Pack this day', text: '<b>Pack this day</b> દબાવો.', todo: 'ક્લિક કરો: Pack this day' },
+      { id: 'sc-packs', type: 'info', path: '/scrap', target: function () { return boxWith('.sc-box', "Scrap packs"); }, title: 'Pack બની ગયું ✅',
+        text: 'Pack નંબર <b>SCP-તારીખ-001</b>. <b>Print label</b> થી થેલી પર ચોંટાડવાનું લેબલ. ખોટું હોય તો <b>Open pack</b> — સ્ટોકમાં કંઈ ફેરફાર થતો નથી.' },
+      { id: 'sc-scan', type: 'submit', path: '/scrap', target: 'form[action*="/scrap/scan"]', title: 'Barcode scan', text: 'ઉપરના <b>Scan or type barcode</b> બોક્સમાં barcode scan કરો (અથવા નંબર લખો) — લેબલ ખુલે.', todo: 'barcode નંબર લખો અને Find દબાવો',
+        prefill: { label: 'Pack નંબર ભરો', run: function () { var b = boxWith('.sc-box', "Scrap packs"); var no = b && $('.sc-no', b); setVal($('form[action*="/scrap/scan"] input[name=code]'), no ? no.textContent.trim() : ''); return Promise.resolve(); } } },
+      { id: 'sc-label', type: 'info', path: /^\/scrap\/pack\/label\/\d+$/, target: '.sheet', title: 'Pack લેબલ',
+        text: 'ઉપર <b>barcode</b>, કુલ વજન, તારીખ. નીચે દરેક <b>ઓર્ડર, સ્ટેજ, scrap નો પ્રકાર, ઓપરેટર</b> — scrap ક્યાંથી આવ્યો તે બધું ટ્રેસ થાય.' },
+      { id: 'sc-label-back', type: 'click', path: /^\/scrap\/pack\/label\/\d+$/, target: '.toolbar a[href*="/scrap"]', title: 'પાછા', text: '<b>Back</b> દબાવો.', todo: 'ક્લિક કરો: Back' },
       { id: 'cv-link', type: 'click', target: navLink('/consumption_variance'), title: 'Consumption variance', text: 'કાચો માલ <b>આયોજન મુજબ</b> વપરાયો કે નહિ?', todo: 'ક્લિક કરો: Consumption variance' },
       { id: 'cv-view', type: 'click', path: '/consumption_variance', target: inCard('.cv-card', '.cv-view'), title: 'તફાવત જુઓ', text: 'તમારા ઓર્ડરના કાર્ડમાં <b>View details</b>.', todo: 'ક્લિક કરો: View details' },
       { id: 'cv-info', type: 'info', path: '/consumption_variance', target: '#cv-body', title: 'Planned vs Actual',
@@ -334,10 +402,26 @@
         text: 'તફાવત જોઈ લીધા પછી તમારું નામ લખીને <b>Mark reviewed</b> દબાવો.', todo: 'ક્લિક કરો: Mark reviewed',
         prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#cv-body [name=reviewed_by]'), 'મેનેજર'); setVal($('#cv-body [name=review_note]'), 'ડેમો ટૂર'); return Promise.resolve(); } } },
       { id: 'cv-done', type: 'info', path: '/consumption_variance', target: '.cv-card', title: 'Reviewed ✅', text: 'કાર્ડ પર <b>Reviewed</b> દેખાય છે અને "not reviewed" ગણતરી ઘટી.' },
+      { id: 'mp-seed', type: 'action', path: '/production_orders', target: 'main h1', title: 'ડેમો: મોટો ઓર્ડર',
+        text: 'Material plan બતાવવા ડેમો માટે <b>1500 KG નો એક મોટો ઓર્ડર</b> કતારમાં મૂકીએ — જેનો માલ સ્ટોકમાં પૂરતો નથી.',
+        button: { label: 'ડેમો ઓર્ડર બનાવો', run: function () { return fetch('/tour/shortage_order', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (j) { if (!j.ok) throw new Error(j.message); return j; }); } } },
+      { id: 'mp-link', type: 'click', target: navLink('/material_plan'), title: 'Material plan ખોલો', text: '<b>Manufacturing</b> હેઠળ <b>Material plan</b>.', todo: 'ક્લિક કરો: Material plan' },
+      { id: 'mp-kpi', type: 'info', path: '/material_plan', target: '.mp-kpi', title: 'Material plan — 30 દિવસ',
+        text: '<b>પહેલા:</b> દરેક ઓર્ડરનું અલગ ચેક, અને ફક્ત આજનો સ્ટોક.<br><b>હવે:</b> આખી કતારના <b>આવતા 30 દિવસ</b>નો હિસાબ: સ્ટોર + PO થી આવનાર − કતારના ઓર્ડરની જરૂર. ઉપર: <b>Place PO now</b>, <b>soon</b>, <b>lead time નથી</b>, <b>તારીખ વગરનો PO</b>.' },
+      { id: 'mp-card', type: 'info', path: '/material_plan', target: 'article.mp-card', title: 'દરેક માલનું કાર્ડ',
+        text: 'સ્ટોરમાં કેટલો, 30 દિવસમાં કેટલો જોઈએ, PO થી કેટલો આવે, 30 દિવસ પછી કેટલો બચે. <b>કમી</b> હોય તો <b>કઈ તારીખથી, કેટલી</b>, અને <b>"Place PO before …"</b> — vendor ના lead time મુજબ.' },
+      { id: 'mp-days', type: 'click', path: '/material_plan', target: 'article.mp-card details.mp-det summary', title: 'Day-by-day', text: '<b>Day-by-day</b> ખોલો.', todo: 'ક્લિક કરો: Day-by-day' },
+      { id: 'mp-days-info', type: 'info', path: '/material_plan', target: 'article.mp-card details.mp-det table', title: 'તારીખ પ્રમાણે હિસાબ',
+        text: 'ક્યારે માલ આવે છે (PO), કયો ઓર્ડર ક્યારે વાપરે છે, અને <b>બેલેન્સ ક્યારે માઇનસ</b> થાય છે — લાલ રંગમાં.' },
+      { id: 'mp-sugg', type: 'info', path: '/material_plan', when: function () { return !!$('form[action*="create_po"]'); }, target: 'form[action*="create_po"]', title: 'Suggested purchase orders',
+        text: '<b>પહેલા:</b> દરેક માલનો PO અલગ હાથે.<br><b>હવે:</b> કમી વાળા બધા માલ <b>vendor પ્રમાણે ભેગા</b> — કતારના ઘણા ઓર્ડરનો માલ <b>એક જ PO</b> માં. જથ્થો બદલી શકાય. ભાવ, ટેક્સ, યુનિટ તે માલના છેલ્લા PO માંથી.' },
+      { id: 'mp-create', type: 'submit', path: '/material_plan', when: function () { return !!$('form[action*="create_po"]'); }, target: 'form[action*="create_po"]', title: 'Draft PO બનાવો', text: '<b>Create draft PO</b> દબાવો.', todo: 'ક્લિક કરો: Create draft PO' },
+      { id: 'mp-created', type: 'info', path: '/material_plan', when: function () { return !!(infoCache && infoCache.ok); }, target: 'main h1', title: 'Draft PO બન્યો ✅',
+        text: 'PO <b>Draft</b> માં બન્યો. Purchase orders પેજ પર ભાવ તપાસીને, vendor નું બિલ જોડીને <b>Confirm</b> કરવાનો. Draft ગણતરીમાં આવતો નથી — Confirm પછી જ માલ "આવનાર" ગણાય.' },
       { id: 'po-final', type: 'click', target: navLink('/production_orders'), title: 'છેલ્લું: Production order', text: 'ઓર્ડર હવે કતારમાં નથી — <b>Completed</b> ટૅબમાં છે.', todo: 'ક્લિક કરો: Production order' },
       { id: 'po-final-tab', type: 'click', path: '/production_orders', target: '.po-tabs a[href*="tab=completed"]', title: 'Completed ટૅબ', text: 'આ ટૅબ ખોલો.', todo: 'ક્લિક કરો: Completed' },
       { id: 'end', type: 'info', path: '/production_orders', target: function () { return orderCard('.po-card'); }, title: 'અભિનંદન! 🎉 ટૂર પૂરી',
-        text: 'તમે જાતે આખું ચક્ર કર્યું: <b>Purchase order → GRN → QC → Bill → સ્ટોક → Production order → માલ આપવો/પાછો → Start → Routing → Output → તૈયાર માલ → Scrap → Variance</b>.<br>ઓર્ડર <b>Completed</b> છે અને તેનો <b>Batch નંબર, ખર્ચ</b> અહીં દેખાય છે.<br><br>આગળ આવશે: <b>Sales</b> (Quotation → Order → Delivery → Invoice) અને Login/Roles.' }
+        text: 'આખું ચક્ર જોયું, સાથે ક્લાયન્ટના બધા ફેરફારો: <b>Production Line, Rack, Wire Drawing 1-3, Lab QC + TC, ફક્ત-scrap લખવાનું, Scrap pack + barcode, Tally જેવો તૈયાર માલ, 30 દિવસનો Material plan અને Draft PO</b>.<br>ઓર્ડર <b>Completed</b> છે અને તેનો <b>Batch નંબર, ખર્ચ</b> અહીં દેખાય છે.<br><br>આગળ આવશે: <b>Sales</b> (Quotation → Order → Delivery → Invoice), Login / Roles અને ખર્ચ ગુપ્ત રાખવું.' }
     ]
   });
 
@@ -407,9 +491,11 @@
       var batches = $$('.line-batch', form);
       $$('.line-recv', form).forEach(function (inp, i) {
         var left = (parseFloat(inp.getAttribute('data-poqty')) || 0) - (parseFloat(inp.getAttribute('data-prev')) || 0);
+        if (left <= 0) return;                                        // is item ka maal pehle aa chuka — line khaali chhodo
         setVal(inp, String(left));                                    // poora baaki maal aaya
         setVal(batches[i], 'DEMO-LOT-' + stamp + '-' + (i + 1));
       });
+      $$('.line-rack', form).forEach(function (sel) { if (sel.options.length > 1) setVal(sel, sel.options[1].value); });   // પહેલો rack
       setVal($('#grn-challan', form), 'DC-' + stamp);
       setVal($('#grn-transporter', form), 'Demo Transport');
       setVal($('#grn-vehicle', form), 'GJ-01-AB-1234');
@@ -518,6 +604,8 @@
       }
       setVal($('#mo-qty'), '100');
       setVal($('#mo-remarks'), 'Demo tour');
+      var line = $('#mo-line');                                         // lines bani hon to pehli line (us line ki machines tick ho jaati hain)
+      if (line && !line.value && line.options.length > 1) setVal(line, line.options[1].value);
     });
   }
 

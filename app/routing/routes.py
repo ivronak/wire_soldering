@@ -26,6 +26,66 @@ def order_batch_kg(order):
     return round(order.planned_qty * order.unit_weight, 4)
 
 
+def side_stage_info(order, stage):
+    """Flux Preparation jaisa "side" stage: iski saari material lines flux ki hon to iska maal metal chain me nahi jaata. Iski apni qty
+    (flux ki recipe qty) aur apni unit (jaise LTR) hoti hai, product ke KG totals me nahi judti. Nahi to None."""
+    lines = [l for l in order.lines if l.work_stage_id and l.work_stage_id == stage.work_stage_id]
+    if not lines or not all(l.is_flux for l in lines):
+        return None
+    units = {l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else "KG" for l in lines}
+    return {"qty": round(sum(l.required_qty for l in lines), 4), "unit": units.pop() if len(units) == 1 else "KG"}
+
+
+def stage_unit(order, stage):
+    info = side_stage_info(order, stage)
+    return info["unit"] if info else "KG"
+
+
+def main_input(order, stage):
+    # Metal chain ka input: pichhle (side nahi) stage ka output; koi nahi to batch KG (Tin + Lead)
+    for earlier in reversed([s for s in order.stages if s.sort_order < stage.sort_order]):
+        if side_stage_info(order, earlier) is None:
+            return earlier.qty_out if earlier.qty_out is not None else order_batch_kg(order)
+    return order_batch_kg(order)
+
+
+def stage_lines(order, stage):
+    # Is stage me jaane wali order ki material lines (recipe me jis stage ka material hai)
+    return [l for l in order.lines if l.work_stage_id and l.work_stage_id == stage.work_stage_id]
+
+
+def counts_to_input(line, side):
+    # Kaunsi line ki use stage ka input banati hai: flux stage me sab; metal stage me flux ke bina KG wali
+    if side:
+        return True
+    unit = line.raw_material.base_unit.code.upper() if line.raw_material and line.raw_material.base_unit else ""
+    return (not line.is_flux) and unit in ("KG", "KGS")
+
+
+def used_input(order, stage, used_map):
+    side = side_stage_info(order, stage)
+    total, found = 0.0, False
+    for line in stage_lines(order, stage):
+        if line.id in used_map and counts_to_input(line, side):
+            total += used_map[line.id]
+            found = True
+    return round(total, 4) if found else None
+
+
+def stage_material_rows(order, stage):
+    # Complete form ke liye: jin lines ka maal production ko mil chuka (issued > 0) unki asli use likhni hai. Issued nahi to puchte nahi
+    # (maal baad me issue hua to purana tareeka chalta hai: output par WIP ka saara maal use).
+    rows = []
+    for line in stage_lines(order, stage):
+        if line.issued_qty <= 0.00005:
+            continue
+        rm = line.raw_material
+        rows.append({"id": line.id, "name": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
+                     "needed": round(line.required_qty, 4), "spare": line.allowance_qty, "issued": line.issued_qty,
+                     "default": round(min(line.required_qty, line.issued_qty), 4), "counts": counts_to_input(line, side_stage_info(order, stage) is not None)})
+    return rows
+
+
 def stage_plan(order, stage):
     """Is stage me kaunsa material kitna jaata hai, aur batch stage (furnace) ho to kitne lot (client change #6).
     Material = order ki wo lines jinka work_stage_id is stage ka hai. Lot = machine capacity (KG/hr) ke hisaab se, har lot me material
@@ -76,7 +136,7 @@ def order_summary(order, today):
         "pct": int(round(100 * len(done) / len(stages))) if stages else 0,
         "delay": delay, "forecast": forecast, "planned_end": planned_end,
         "planned_h": round(planned_h, 1), "actual_h": round(actual_h, 1),
-        "scrap": round(sum(s.scrap_qty or 0 for s in done), 2),
+        "scrap": round(sum(s.scrap_qty or 0 for s in done if side_stage_info(order, s) is None), 2),
         "yield_pct": round(100 * done[-1].qty_out / order_batch_kg(order), 1) if done and done[-1].qty_out and order_batch_kg(order) else None,
     }
 
@@ -116,13 +176,15 @@ def routing_list():
         cur = sm["current"]
         if cur is None:
             continue
-        prev = [s for s in sm["stages"] if s.sort_order < cur.sort_order]
-        qty_in = (prev[-1].qty_out if prev else order_batch_kg(o))
+        side = side_stage_info(o, cur)
+        qty_in = side["qty"] if side else main_input(o, cur)
         actions[str(cur.id)] = {
+            "unit": side["unit"] if side else "KG", "side": bool(side), "materials": stage_material_rows(o, cur),
             "stage_id": cur.id, "order": o.prod_no, "stage": cur.stage_name, "status": cur.status,
-            "operator": cur.operator or "", "qty_in": cur.qty_in if cur.qty_in is not None else qty_in,
+            "operator": cur.operator or "", "qty_in": qty_in if side else (cur.qty_in if cur.qty_in is not None else qty_in),
             "planned_hours": cur.planned_hours, "machines": _machine_choices(cur),
             "started_at": cur.started_at.strftime("%d %b %H:%M") if cur.started_at else "",
+            "started_iso": cur.started_at.strftime("%Y-%m-%dT%H:%M") if cur.started_at else "",
             "defer_self": bool(cur.work_stage and cur.work_stage.scrap_after_next),
             "defer_prev": None,
         }
@@ -136,7 +198,7 @@ def routing_list():
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
-        operators=operators, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
+        operators=operators, stage_unit=stage_unit, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"),
     )
 
@@ -209,7 +271,8 @@ def routing_start(stage_id):
     stage.status = "In progress"
     stage.started_at = started_at
     stage.operator = operator
-    stage.qty_in = previous[-1].qty_out if previous else order_batch_kg(order)
+    side = side_stage_info(order, stage)
+    stage.qty_in = side["qty"] if side else main_input(order, stage)       # flux stage: flux ki apni qty; baaki: metal chain
     stage.notes = (request.form.get("notes") or "").strip()[:255] or None
     db.session.commit()
     flash(f"{stage.stage_name} started for {order.prod_no}.", "success")
@@ -235,7 +298,9 @@ def routing_complete(stage_id):
     # Single-entry scrap (client change 8): operator sirf scrap likhta hai, good output = aaya hua maal - scrap system nikaalta hai
     # (form ka purana qty_out field ab ignore hota hai — ek hi jagah se number aaye taaki in/out/scrap kabhi na ladein)
     scrap = request.form.get("scrap_qty", type=float) or 0.0
-    qty_in = stage.qty_in or 0
+    side = side_stage_info(order, stage)
+    unit = side["unit"] if side else "KG"
+    qty_in = side["qty"] if side else (stage.qty_in or 0)          # flux stage: hamesha flux ki qty (purane galat 1500 par nahi)
     if scrap < 0:
         flash("Scrap cannot be negative.", "error")
         return _back()
@@ -267,8 +332,42 @@ def routing_complete(stage_id):
                 return _back()
         # Casting me aane wala maal = Melting me gaya maal - Melting ka scrap
         qty_in = round((deferred.qty_in or 0) - prev_scrap, 4)
+    # RM used (ek hi baar, rounds nahi): jin lines ka maal issue ho chuka unki asli use. Field na aaye to purana tareeka (use None).
+    used_map = {}
+    for line in stage_lines(order, stage):
+        raw = request.form.get(f"used_{line.id}")
+        if raw is None or raw.strip() == "":
+            continue
+        try:
+            used = float(raw)
+        except ValueError:
+            flash("Enter a valid quantity for the raw material used.", "error")
+            return _back()
+        name = line.raw_material.name if line.raw_material else "Material"
+        mat_unit = line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""
+        if used < 0:
+            flash(f"{name}: the quantity used cannot be negative.", "error")
+            return _back()
+        if used > line.issued_qty + EPS:
+            flash(f"{name}: {used:g} {mat_unit} used is more than what was issued to production ({line.issued_qty:g} {mat_unit}). Issue the extra material first.", "error")
+            return _back()
+        used_map[line.id] = round(used, 4)
+    work_hours = None
+    hours_raw = (request.form.get("work_hours") or "").strip()
+    if hours_raw:
+        try:
+            work_hours = float(hours_raw)
+        except ValueError:
+            work_hours = -1
+        if work_hours < 0 or work_hours > 2000:
+            flash("Enter the working hours as a number (for example 6.5).", "error")
+            return _back()
+    # Output "used" ke hisaab se: is stage ka input = asli use hua maal (flux stage me flux, metal stage me Tin + Lead KG). Phir usme se scrap minus.
+    eff_in = used_input(order, stage, used_map)
+    if eff_in is not None and deferred is None:
+        qty_in = eff_in
     if scrap > qty_in + EPS:
-        flash(f"Scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} KG).", "error")
+        flash(f"Scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} {unit}).", "error")
         return _back()
     qty_out = max(qty_in - scrap, 0.0)
     if qty_out <= EPS:
@@ -278,7 +377,7 @@ def routing_complete(stage_id):
     scrap_type = None
     scrap_kind = "Saleable"
     if scrap > 0:
-        scrap_kind = (request.form.get("scrap_kind") or "Saleable").strip()
+        scrap_kind = "Process loss" if side else (request.form.get("scrap_kind") or "Saleable").strip()      # flux ka waste stock nahi banta
         if scrap_kind not in ("Saleable", "Process loss"):
             flash("Choose whether the scrap is saleable or a process loss.", "error")
             return _back()
@@ -318,6 +417,12 @@ def routing_complete(stage_id):
         deferred.scrap_kind = prev_kind
         deferred.qty_out = round(qty_in, 4)
         stage.qty_in = round(qty_in, 4)
+    if side or (eff_in is not None and deferred is None):
+        stage.qty_in = round(qty_in, 4)
+    for line in stage_lines(order, stage):
+        if line.id in used_map:
+            line.used_qty = used_map[line.id]
+    stage.work_hours = round(work_hours, 2) if work_hours is not None else None
     stage.status = "Done"
     stage.completed_at = completed_at
     stage.qty_out = round(qty_out, 4)
@@ -355,6 +460,9 @@ def routing_reopen(stage_id):
             db.session.delete(row)          # chalte waqt jodi gayi machine hata do; plan wali rehti hain
         else:
             row.used = False
+    for line in stage_lines(order, stage):
+        line.used_qty = None              # RM use dobara likhi jayegi
+    stage.work_hours = None
     stage.status = "In progress"
     stage.completed_at = None
     stage.qty_out = None

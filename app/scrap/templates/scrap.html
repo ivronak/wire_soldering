@@ -48,7 +48,14 @@
     <h1 class="text-[22px] font-bold text-ink leading-tight">Scrap / waste</h1>
     <p class="text-[13px] text-ink-faint">Scrap is noted when a stage is completed in Routing. Saleable scrap goes to the scrap yard when the order's output is recorded; a tiny process loss is only recorded.</p>
   </div>
-  <a href="{{ url_for('scrap.scrap_types_list') }}" class="sc-btn">Manage scrap types</a>
+  <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+    {# Barcode scanner keyboard jaisa hai: code type / scan karke Enter -> pack ya batch ka label khulta hai #}
+    <form method="get" action="{{ url_for('scrap.scrap_scan') }}" class="flex gap-1.5 w-full sm:w-auto">
+      <input type="text" name="code" placeholder="Scan or type barcode" autocomplete="off" class="px-2.5 py-1.5 text-[13px] border border-slate-300 rounded-lg font-mono w-full min-w-0 sm:w-56 focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+      <button type="submit" class="sc-btn">Find</button>
+    </form>
+    <a href="{{ url_for('scrap.scrap_types_list') }}" class="sc-btn">Manage scrap types</a>
+  </div>
 </div>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
@@ -100,6 +107,32 @@
     <p>When a stage is completed in Routing with some scrap, it is listed here with its type and where it is now.</p></div>
   {% endfor %}
 {% else %}
+  {# Din-wise pack: ek din ke saare batch ek bori me, ek barcode #}
+  {% if to_pack %}
+  <div class="sc-box mb-3"><h3>Pack a day's scrap</h3><p class="sub">Put all the scrap of one day (from every order) in one bag with one barcode. Each batch keeps its own stage, type and operator record.</p>
+    {% for d in to_pack %}
+    <form method="post" action="{{ url_for('scrap.scrap_pack_create') }}" class="flex flex-wrap items-center justify-between gap-2 py-1.5 border-t border-slate-100 first:border-t-0">
+      <input type="hidden" name="pack_date" value="{{ d.date.isoformat() }}" />
+      <div class="text-[13.5px]"><b>{{ d.date.strftime('%d %b %Y') }}</b> <span class="sc-meta">· {{ d.count }} batch{{ '' if d.count == 1 else 'es' }} · {{ '%g'|format(d.qty) }} KG not packed yet</span></div>
+      <button type="submit" class="sc-btn" style="padding:4px 12px;font-size:12.5px">Pack this day</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if packs %}
+  <div class="sc-box mb-3"><h3>Scrap packs</h3><p class="sub">Print the label and stick it on the bag. Scanning its barcode (box at the top) opens the same label.</p>
+    {% for pk in packs %}
+    <div class="flex flex-wrap items-center justify-between gap-2 py-1.5 border-t border-slate-100 first:border-t-0">
+      <div><span class="sc-no">{{ pk.pack_no }}</span> <span class="sc-meta">· {{ pk.pack_date.strftime('%d %b %Y') }} · {{ pk.items|length }} batch{{ '' if pk.items|length == 1 else 'es' }} · {{ '%g'|format(pk.weight) }} KG now</span></div>
+      <div class="flex gap-1.5">
+        <a href="{{ url_for('scrap.scrap_pack_label', pack_id=pk.id) }}" target="_blank" class="sc-btn" style="padding:4px 10px;font-size:12px">Print label</a>
+        <form method="post" action="{{ url_for('scrap.scrap_pack_remove', pack_id=pk.id) }}" class="js-confirm-submit" data-confirm-title="Open pack" data-confirm-ok="Open pack" data-confirm-message="Open {{ pk.pack_no }}? Its batches go back to unpacked. Stock does not change.">
+          <button type="submit" class="sc-btn" style="padding:4px 10px;font-size:12px">Open pack</button></form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% for r in yard %}
   <article class="sc-card"><div class="sc-row">
     <div><span class="sc-no">{{ r.batch.batch_no }}</span><div class="sc-prod">{{ r.batch.product.name if r.batch.product else '' }}</div>
@@ -108,6 +141,7 @@
     <div class="flex flex-wrap gap-1.5">{% for name, q in r.types.items() %}<span class="sc-chip type"><i></i>{{ name }} · {{ '%g'|format(q) }}</span>{% endfor %}</div>
     <div class="sc-meta">Kept in<div class="text-[13px] text-ink">{{ r.where }}</div></div>
     <div>{% if r.qty > 0.00005 %}<span class="sc-chip ok"><i></i>In stock</span>{% else %}<span class="sc-chip gone"><i></i>Used up</span>{% endif %}
+      {% if r.pack %}<div class="mt-1.5"><span class="sc-chip type"><i></i>In {{ r.pack.pack_no }}</span></div>{% endif %}
       <div class="mt-1.5"><a href="{{ url_for('scrap.scrap_label', batch_id=r.batch.id) }}" target="_blank" class="sc-btn" style="padding:4px 10px;font-size:12px">Print label</a></div></div>
   </div></article>
   {% else %}

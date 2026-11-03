@@ -1,0 +1,31 @@
+{% extends "print_base.html" %}
+{# Scrap pack label: ek din ka scrap (kai orders), ek barcode. Bori par chipkane ke liye; har batch / order / stage ka source neeche #}
+{% set doc_title = 'Scrap pack ' ~ pack.pack_no %}
+{% set back_url = url_for('scrap.scrap_list', tab='yard') %}
+{% set eyebrow = 'Scrap pack · label' %}
+{% set docno = pack.pack_no %}
+{% set status = 'In stock' if weight > 0.00005 else 'Used up' %}
+{% block sheet_body %}
+    <div style="text-align:center;margin:14px 0 6px">
+      {{ barcode|safe }}
+      <div style="font:600 14px ui-monospace,Consolas,monospace;letter-spacing:.12em;margin-top:4px">{{ pack.pack_no }}</div>
+    </div>
+    <div class="meta">
+      <div><span class="lbl">Pack weight</span><span class="val">{{ '%g'|format(weight) }} KG</span></div>
+      <div><span class="lbl">Scrap of the day</span><span class="val">{{ pack.pack_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Batches in this pack</span><span class="val">{{ pack.items|length }}</span></div>
+      <div><span class="lbl">Orders</span><span class="val">{{ rows|map(attribute='order.prod_no')|unique|join(', ') or '—' }}</span></div>
+    </div>
+    <div class="sec">Where this scrap came from</div>
+    <table class="lines">
+      <thead><tr><th>Order</th><th>Batch</th><th>Stage</th><th>Type of scrap</th><th>Operator</th><th>Finished</th><th class="num">Quantity</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td class="mat-name">{{ r.order.prod_no }}</td><td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">{{ r.batch.batch_no }}</td><td>{{ r.stage }}</td><td>{{ r.type }}</td><td>{{ r.operator or '—' }}</td>
+            <td>{{ r.when.strftime('%d %b %H:%M') if r.when else '—' }}</td><td class="num">{{ '%g'|format(r.qty) }} KG</td></tr>
+        {% else %}
+        <tr><td colspan="7">No stage-wise scrap is recorded for this pack.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+{% endblock %}
