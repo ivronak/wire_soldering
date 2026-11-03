@@ -10,7 +10,7 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **2026-10-19 — PROJECT KI SACHI STHITI + ROADMAP (user: "tracker, memory, development md check karo, update na ho to update karo").** Neeche ka phase-wise table aur roadmap ab sahi hai; iske neeche ke purane dated notes history hain. **Decision: auth / user-role (Phase 0) Sales tak ke modules ke baad.** BOM / Recipe ka sidebar link hata diya (recipe Product par hi hai).
 
-### 2026-11-03 — STOCK / VALUATION / FINISHED GOODS UI + CATEGORY ICON (local, committed, deploy nahi)
+### 2026-11-03 — STOCK / VALUATION / FINISHED GOODS UI + CATEGORY ICON (committed + LIVE deployed 2026-11-03, commit 6b028ec; live par demo entries bhi jodi: PROD-2026-003 = 200 PCS / 4 BOX, PROD-2026-004 queued)
 - **Stock ledger:** material boxes compact (Ready to use + rangeen patti + "Total = ready + rejected ..."), Needs attention = band + drawer, box par click -> lots panel neeche (Warehouse badge + Rack, used-up lots default chhupe). **Stock valuation:** table-alignment + card-look blocks (warehouse badges, patti, cost layers lots ke saath). **Finished goods:** product cards (icon, qty, value, min/max gauge, alert) + batches panel neeche (Kept in = warehouse badge + rack).
 - **Product Category icon:** `product_categories.icon` (migration `e4b7d2a9c6f1`), 15 flat icons ki fixed library `app/icons.py`; category form me picker; icon Finished goods card, Product master aur Category list me dikhta hai (icon na ho to default box).
 - Demo tour: stock lot steps (`st-open`) aur FG selectors (`.fgp`, `.fg-panel .fg-brow`) badle.
