@@ -7,9 +7,9 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 
 from app.extensions import db
 from app.inventory.posting import InventoryError
-from app.models import FGBatch, ProductionOrder, ProductionOutput, Rack
+from app.models import FGBatch, Product, ProductCategories, ProductionOrder, ProductionOutput, Rack
 from app.production_orders.scheduler import persist_schedule, renumber_queue
-from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, material_table, packed_lines, post_output, wip_lines
+from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, leftover_rows, material_table, packed_lines, post_output, wip_lines
 from app.routing.routes import order_summary, side_stage_info
 
 production_output_bp = Blueprint("production_output", __name__, template_folder="templates")
@@ -57,6 +57,8 @@ def output_plan(order):
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
         "leftover_note": leftover_message(order),
+        "leftover": [{"id": line.id, "name": line.raw_material.name if line.raw_material else "", "qty": qty,
+                      "unit": line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""} for line, qty in leftover_rows(order)],
         "racks": [{"id": rack.id, "name": rack.name} for rack in fg_racks_for(order)],
     }
 
@@ -217,7 +219,40 @@ def finished_goods_list():
     fg_in_stock = [r for r in rows if r["qty"] > 0.00005] if tab == "fg" else []
     kpi = {"batches": len([r for r in rows if r["qty"] > 0.00005]), "qty": round(sum(r["qty"] for r in rows), 4), "value": round(sum(r["value"] for r in rows), 2)}
     groups = fg_groups(rows) if tab == "fg" else []
-    return render_template("finished_goods.html", active_nav="finished_goods", tab=tab, rows=rows, kpi=kpi, fg_in_stock=fg_in_stock, groups=groups)
+    categories = fg_categories(groups) if tab == "fg" else []
+    return render_template("finished_goods.html", active_nav="finished_goods", tab=tab, rows=rows, kpi=kpi, fg_in_stock=fg_in_stock, groups=groups, categories=categories)
+
+
+def fg_categories(groups):
+    """Client meeting 2 (#3): pehle category block (Solder Wire, Solder Stick ...), uspe click karne par products, product par click karne par batches.
+    Har group ko ek 'key' milti hai (template ke batch rows ke liye). Block par qty unit ke hisaab se alag (KG + PCS ko jodte nahi)."""
+    by_category = {}
+    for key, group in enumerate(groups, start=1):
+        group["key"] = key
+        category = group["product"].category if group["product"] else None
+        cat_id = category.id if category else 0
+        entry = by_category.setdefault(cat_id, {"id": cat_id, "name": category.name if category else "No category", "icon": category.icon if category else None, "groups": []})
+        entry["groups"].append(group)
+    # Jis category ke product hain par abhi koi FG nahi, uska bhi block dikhao (0 stock) taaki saari categories ek nazar me dikhein
+    for category in ProductCategories.query.filter_by(is_deleted=False, is_active=True).all():
+        if category.id not in by_category and Product.query.filter_by(category_id=category.id, is_deleted=False).first():
+            by_category[category.id] = {"id": category.id, "name": category.name, "icon": category.icon, "groups": []}
+    result = []
+    for entry in by_category.values():
+        per_unit = {}
+        for group in entry["groups"]:
+            per_unit[group["unit"]] = per_unit.get(group["unit"], 0) + group["qty"]
+        entry.update(
+            qty_text=" + ".join(f"{qty:g} {unit}" for unit, qty in per_unit.items() if qty > 0.00005) or "No stock",
+            value=round(sum(g["value"] for g in entry["groups"]), 2),
+            products=len(entry["groups"]),
+            batches=sum(g["in_stock"] for g in entry["groups"]),
+            alerts=len([g for g in entry["groups"] if g["alert"]]),
+            worst="bad" if any(g["alert"] and g["alert"][1] == "bad" for g in entry["groups"]) else ("warn" if any(g["alert"] for g in entry["groups"]) else ""),
+        )
+        result.append(entry)
+    result.sort(key=lambda e: e["name"].lower())
+    return result
 
 
 def fg_groups(rows):

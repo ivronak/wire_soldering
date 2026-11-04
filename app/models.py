@@ -95,6 +95,12 @@ class WorkStage(CreatedAtMixin, db.Model):
     requires_lab_qc = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     # Is stage (jaise Melting) ka scrap abhi nahi likhte: kadhai khali hone par agle stage (Ingot Casting) ke complete par likhte hain (client change #8)
     scrap_after_next = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    # Ingot Casting jaisa stage (client meeting 2, #13): scrap likhne ki jagah operator "kitne lattha (billet) bane" likhta hai;
+    # scrap = aaya maal - (lattha x billet_weight) apne aap. billet_weight (KG) yahin ek baar saved rehta hai, complete form me badal sakte hain.
+    is_billet_stage = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    billet_weight = db.Column(db.Float, nullable=True)
+    # Is stage me scrap hota hi nahi (Extrusion, Wire Drawing): complete form me scrap box nahi aata, scrap hamesha 0
+    no_scrap = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
 
 class RmCategories(CreatedAtMixin, db.Model):
     __tablename__='rm_categories'
@@ -190,6 +196,10 @@ class Product(CreatedAtMixin, db.Model):
     min_stock = db.Column(db.Integer, nullable=True)
     max_stock = db.Column(db.Integer, nullable=True)
 
+    # 1 piece (spool / roll) ka KG me weight — product ki unit KG na ho tabhi bhari jaati hai (client meeting 2, #4).
+    # Order form me ye box nahi aata: qty x unit_weight = KG seedha is se banta hai. Khaali = KG wala product.
+    unit_weight = db.Column(db.Float, nullable=True)
+
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -235,7 +245,9 @@ class VariantRecipeItem(CreatedAtMixin, db.Model):
     # Ye material kis stage me daalna hai (Flux -> Flux Preparation, Tin / Lead -> Melting). Khaali = kisi khaas stage se bandha nahi.
     work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=True)
     work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
-    
+    # Is material ka spare % (wastage ke liye extra, 0-100). Product me ek baar set hota hai; order banate waqt har line par copy hota hai
+    spare_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)
+
 
 class ProductPackingItem(CreatedAtMixin, db.Model):
     # Product ka Packing Material: "har kg_per_pack KG tayyar maal ke liye 1 pack" (1 KG spool -> 1, 20 KG box -> 20).
@@ -253,6 +265,7 @@ class ProductPackingItem(CreatedAtMixin, db.Model):
     # Ye packing material kis stage me lagta hai (spool -> Spooling, box / sleeve -> Packing). Khaali = kisi stage se bandha nahi.
     work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=True)
     work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
+    spare_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)       # recipe jaisa: product me ek baar, order line par copy
 
 
 class Branch(CreatedAtMixin, db.Model):
@@ -1553,6 +1566,25 @@ class MaterialReturn(CreatedAtMixin, db.Model):
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
 
+class MaterialWriteOff(CreatedAtMixin, db.Model):
+    # Production ko diya hua maal jo na use hua na wapas mila (jaise 80 khali spool kho gaye): "missing" likha jaata hai (client meeting 2, #14).
+    # Qty line ki used_qty me jud jaati hai, isliye output par ye WIP se consume hoti hai (cost FG me jaati hai) aur Consumption variance me dikhti hai.
+    # Yahan sirf record: kisne likha, kyun, kitna (mismatch list ke liye).
+    __tablename__ = "material_write_offs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=False)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id], backref="write_offs")
+    order_line_id = db.Column(db.Integer, db.ForeignKey("production_order_lines.id"), nullable=False)
+    order_line = db.relationship("ProductionOrderLine", foreign_keys=[order_line_id], backref="write_offs")
+    raw_material_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=False)
+    raw_material = db.relationship("RawMaterial", foreign_keys=[raw_material_id])
+    qty = db.Column(db.Float, nullable=False)
+    reason = db.Column(db.String(255), nullable=False)
+    written_off_by = db.Column(db.String(60), nullable=False)
+    write_off_date = db.Column(db.Date, nullable=False)
+
+
 class MaterialReturnLine(CreatedAtMixin, db.Model):
     # Kis issue line (yaani kis lot) ka kitna hissa wapas aaya
     __tablename__ = "material_return_lines"
@@ -1788,6 +1820,10 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     notes = db.Column(db.String(255), nullable=True)
     # Operator ne complete par asli kaam ke ghante likhe ho (stage do baar chala, beech me ruka) to wahi; warna start se end tak
     work_hours = db.Column(db.Float, nullable=True)
+    # Billet (lattha) wale stage me: kitne lattha bane, ek lattha kitne KG ka (us waqt ka), aur scrap ka proof photo (uploads ke andar ka path)
+    billet_count = db.Column(db.Integer, nullable=True)
+    billet_weight = db.Column(db.Float, nullable=True)
+    scrap_photo = db.Column(db.String(255), nullable=True)
 
     @property
     def actual_hours(self):

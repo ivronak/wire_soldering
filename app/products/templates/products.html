@@ -379,9 +379,10 @@
                       data-tax-rate-id="{{ p.tax_rate_id or '' }}"
                       data-min-stock="{{ p.min_stock if p.min_stock is not none else '' }}"
                       data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}"
+                      data-unit-weight="{{ p.unit_weight if p.unit_weight is not none else '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
-                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }}}{% if not loop.last %},{% endif %}{% endfor %}]'
-                      data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }},"stage":{{ k.work_stage_id or 'null' }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
+                      data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }},"spare":{{ r.spare_percent or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]'
+                      data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }},"stage":{{ k.work_stage_id or 'null' }},"spare":{{ k.spare_percent or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
                     <form method="post" action="{{ url_for('products.products_delete', p_id=p.id) }}" class="inline-flex js-confirm-submit"
@@ -547,6 +548,13 @@
             class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
         </div>
       </div>
+      {# PCS / ROLL jaisi unit me 1 piece ka weight yahin ek baar fix hota hai — order form me ye box nahi aata (client meeting 2, #4) #}
+      <div id="product-weight-box" class="hidden rounded border border-copper-border bg-copper-soft px-3 py-2.5">
+        <label for="product-unit-weight" id="product-unit-weight-label" class="block text-[12.5px] font-semibold text-ink mb-1">Kilograms in one unit *</label>
+        <input type="number" id="product-unit-weight" name="unit_weight" min="0.001" step="0.001" placeholder="e.g. 1, 0.5 or 0.25"
+          class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Fixed for this product (a 1 KG spool is 1, a 500 g spool is 0.5). Orders are placed in pieces and the KG is worked out from this.</p>
+      </div>
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
           <label for="product-tax-rate" class="text-[12.5px] font-semibold text-ink">Tax rate *</label>
@@ -600,6 +608,7 @@
                   <th class="px-2 py-2 w-28">Type</th>
                   <th class="px-2 py-2 w-20">Unit</th>
                   <th class="px-2 py-2 w-28">Ratio %</th>
+                  <th class="px-2 py-2 w-24" title="Extra material kept for wastage, in % of the needed quantity">Spare %</th>
                   <th class="px-2 py-2 w-40">Used in stage</th>
                   <th class="px-2 py-2 w-16"></th>
                 </tr>
@@ -621,7 +630,7 @@
           <div class="overflow-x-auto border border-slate-200 rounded">
             <table class="w-full text-[13px]">
               <thead class="bg-mist text-left text-[11.5px] uppercase tracking-wide text-ink-faint">
-                <tr><th class="px-2 py-2">Packing material</th><th class="px-2 py-2 w-32">KG per pack</th><th class="px-2 py-2 w-44">Used in stage</th><th class="px-2 py-2 w-12"></th></tr>
+                <tr><th class="px-2 py-2">Packing material</th><th class="px-2 py-2 w-32">KG per pack</th><th class="px-2 py-2 w-24" title="Extra packs kept for wastage, in %">Spare %</th><th class="px-2 py-2 w-44">Used in stage</th><th class="px-2 py-2 w-12"></th></tr>
               </thead>
               <tbody id="packing-body"></tbody>
             </table>
@@ -649,13 +658,6 @@
                 Order qty (<span id="recipe-preview-unit-label" class="font-mono text-copper">KG</span>)
               </label>
               <input type="number" id="recipe-preview-qty" min="0" step="1" value="500"
-                class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
-            </div>
-
-            <!-- Agar product Roll/Pcs me hai, toh per-unit weight yahan dikhega -->
-            <div id="recipe-unit-weight-box" class="hidden">
-              <label class="block text-[12px] font-semibold text-ink mb-1">Weight per unit (KG)</label>
-              <input type="number" id="recipe-unit-weight" min="0.001" step="0.001" value="0.5"
                 class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
             </div>
           </div>
@@ -931,7 +933,7 @@
   // ---- Packing material lines (Product form) ----
   var packingData = [];
   try { packingData = JSON.parse(document.getElementById('packing-materials-data').textContent || '[]'); } catch (err) { packingData = []; }
-  function addPackingLine(rmId, kg, stageId) {
+  function addPackingLine(rmId, kg, stageId, spare) {
     var body = document.getElementById('packing-body');
     if (!body) return;
     var tr = document.createElement('tr');
@@ -940,6 +942,7 @@
     }).join('');
     tr.innerHTML = '<td class="px-2 py-1.5"><select name="packing_rm_id[]" class="w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + opts + '</select></td>' +
       '<td class="px-2 py-1.5"><input type="number" name="packing_kg[]" min="0.001" step="0.001" placeholder="e.g. 1 or 20" value="' + (kg || '') + '" class="w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-1.5"><input type="number" name="packing_spare[]" min="0" max="100" step="0.1" placeholder="0" value="' + (spare || '') + '" class="packing-spare w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
       '<td class="px-2 py-1.5"><select name="packing_stage[]" class="packing-stage w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + stageOptionsHtml() + '</select></td>' +
       '<td class="px-2 py-1.5 text-center"><button type="button" class="packing-remove text-ink-faint hover:text-stop text-lg leading-none" aria-label="Remove">&times;</button></td>';
     if (stageId) tr.querySelector('.packing-stage').value = String(stageId);
@@ -949,7 +952,7 @@
     var body = document.getElementById('packing-body');
     if (!body) return;
     body.innerHTML = '';
-    (lines || []).forEach(function (l) { addPackingLine(l.id, l.kg, l.stage); });
+    (lines || []).forEach(function (l) { addPackingLine(l.id, l.kg, l.stage, l.spare); });
     if (typeof refreshRecipe === 'function') refreshRecipe();
   }
   document.addEventListener('click', function (e) {
@@ -1015,6 +1018,7 @@
     document.getElementById('product-tax-rate').value = btn.getAttribute('data-tax-rate-id') || '';
     document.getElementById('product-min-stock').value = btn.getAttribute('data-min-stock') || '';
     document.getElementById('product-max-stock').value = btn.getAttribute('data-max-stock') || '';
+    document.getElementById('product-unit-weight').value = btn.getAttribute('data-unit-weight') || '';
     var attrs = {};
     var recipe = [];
     try { attrs = JSON.parse(btn.getAttribute('data-attributes') || '{}'); } catch (err) { attrs = {}; }
@@ -1040,7 +1044,7 @@
       return;
     }
     lines.forEach(function (line) {
-      addRecipeLine(line.id, line.ratio, line.stage);
+      addRecipeLine(line.id, line.ratio, line.stage, line.spare);
     });
   }
 
@@ -1501,7 +1505,7 @@
   function stageOptionsHtml() {
     return '<option value="">Not tied to a stage</option>' + stageOptions.map(function (st) { return '<option value="' + st.id + '">' + st.name + '</option>'; }).join('');
   }
-  function addRecipeLine(rmId, ratio, stageId) {
+  function addRecipeLine(rmId, ratio, stageId, spare) {
     var body = document.getElementById('recipe-body');
     if (!body) return;
     var tr = document.createElement('tr');
@@ -1512,11 +1516,13 @@
       '<td class="px-2 py-2 text-ink-muted recipe-type">—</td>' +
       '<td class="px-2 py-2 font-mono text-[12px] text-ink-muted recipe-unit">—</td>' +
       '<td class="px-2 py-2"><input type="number" name="recipe_ratio[]" min="0" step="0.1" placeholder="0" class="recipe-ratio w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
+      '<td class="px-2 py-2"><input type="number" name="recipe_spare[]" min="0" max="100" step="0.1" placeholder="0" class="recipe-spare w-full px-2 py-1.5 text-[13px] tabular-nums border border-slate-300 rounded" /></td>' +
       '<td class="px-2 py-2"><select name="recipe_stage[]" class="recipe-stage w-full px-2 py-1.5 text-[13px] border border-slate-300 rounded bg-white">' + stageOptionsHtml() + '</select></td>' +
       '<td class="px-2 py-2 text-right"><button type="button" class="recipe-remove text-[12px] text-stop hover:underline">Remove</button></td>';
     body.appendChild(tr);
     if (rmId) tr.querySelector('.recipe-rm').value = String(rmId);
     if (stageId) tr.querySelector('.recipe-stage').value = String(stageId);
+    if (spare) tr.querySelector('.recipe-spare').value = spare;
     if (ratio !== undefined && ratio !== null && ratio !== '') tr.querySelector('.recipe-ratio').value = ratio;
     renumberRecipe();
   }
@@ -1541,20 +1547,21 @@
     var unitLabel = document.getElementById('recipe-preview-unit-label');
     if (unitLabel) unitLabel.textContent = selectedUnitText;
 
-    // 2. Agar unit KG nahi hai (jaise ROLL ya PCS hai), toh Weight per unit box show karna
-    var weightBox = document.getElementById('recipe-unit-weight-box');
+    // 2. Agar unit KG nahi hai (jaise ROLL ya PCS hai), toh product ka "Kilograms in one unit" box show karna (ye asli field hai, order form me nahi aata)
+    var weightBox = document.getElementById('product-weight-box');
+    var weightInput = document.getElementById('product-unit-weight');
     var isWeightBased = (selectedUnitText.toUpperCase() === 'KG' || selectedUnitText.toUpperCase() === 'KGS');
-    
+    var hasUnit = !!(baseUnitSelect && baseUnitSelect.value);
+
     if (weightBox) {
-      if (!isWeightBased && selectedUnitText !== '') {
-        weightBox.classList.remove('hidden');
-      } else {
-        weightBox.classList.add('hidden');
-      }
+      var needWeight = hasUnit && !isWeightBased;
+      weightBox.classList.toggle('hidden', !needWeight);
+      weightInput.required = needWeight;
+      document.getElementById('product-unit-weight-label').textContent = 'Kilograms in one ' + selectedUnitText + ' *';
     }
 
     var orderQty = parseFloat(document.getElementById('recipe-preview-qty').value) || 0;
-    var unitWeight = isWeightBased ? 1.0 : (parseFloat(document.getElementById('recipe-unit-weight').value) || 1.0);
+    var unitWeight = isWeightBased ? 1.0 : (parseFloat(weightInput.value) || 1.0);
     
     // Total manufacturing weight (in KG)
     var totalBatchKg = orderQty * unitWeight;
@@ -1574,6 +1581,7 @@
       var role = opt ? opt.getAttribute('data-role') : '';
       var unit = opt ? opt.getAttribute('data-unit') : 'KG';
       var ratio = parseFloat(row.querySelector('.recipe-ratio').value) || 0;
+      var spare = parseFloat(row.querySelector('.recipe-spare').value) || 0;
       var typeCell = row.querySelector('.recipe-type');
       var unitCell = row.querySelector('.recipe-unit');
 
@@ -1594,7 +1602,8 @@
       if (sel.value && ratio > 0) {
         // Asli formula: Total Batch KG * Ratio %
         var need = totalBatchKg * ratio / 100;
-        preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums text-ink">' + need.toFixed(2) + ' ' + (unit !== '—' ? unit : 'KG') + '</strong></li>');
+        preview.push('<li>' + opt.textContent + ' · ' + ratio + '% → <strong class="tabular-nums text-ink">' + need.toFixed(2) + ' ' + (unit !== '—' ? unit : 'KG') + '</strong>' +
+          (spare > 0 ? ' <span class="text-ink-faint">+ ' + (need * spare / 100).toFixed(2) + ' spare</span>' : '') + '</li>');
       }
     });
 
@@ -1610,7 +1619,9 @@
         var pdata = packingData.filter(function (m) { return String(m.id) === String(psel.value); })[0];
         var packs = Math.ceil(Math.round(totalBatchKg / kgPer * 1e6) / 1e6);
         var stageName = stSel && stSel.value ? stSel.options[stSel.selectedIndex].textContent : '';
+        var packSpare = parseFloat((row.querySelector('.packing-spare') || {}).value) || 0;
         preview.push('<li>' + (pdata ? pdata.code + ' — ' + pdata.name : 'Packing') + ' · 1 per ' + kgPer + ' KG → <strong class="tabular-nums text-ink">' + packs + ' ' + (pdata ? pdata.unit : 'PCS') + '</strong>' +
+          (packSpare > 0 ? ' <span class="text-ink-faint">+ ' + (packs * packSpare / 100).toFixed(0) + ' spare</span>' : '') +
           (stageName ? ' <span class="text-ink-faint">(' + stageName + ')</span>' : '') + '</li>');
       });
     }
@@ -1666,8 +1677,8 @@
     var baseUnitEl = document.getElementById('product-base-unit');
     if (baseUnitEl) baseUnitEl.addEventListener('change', refreshRecipe);
 
-    // Weight per roll change hone par live update
-    var unitWeightEl = document.getElementById('recipe-unit-weight');
+    // Product ka "Kilograms in one unit" badalne par live update
+    var unitWeightEl = document.getElementById('product-unit-weight');
     if (unitWeightEl) unitWeightEl.addEventListener('input', refreshRecipe);
     resetVariantSection();
   }

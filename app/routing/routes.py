@@ -188,6 +188,9 @@ def routing_list():
             "started_iso": cur.started_at.strftime("%Y-%m-%dT%H:%M") if cur.started_at else "",
             "defer_self": bool(cur.work_stage and cur.work_stage.scrap_after_next),
             "defer_prev": None,
+            # Ingot Casting jaisa stage: lattha ginti (weight stage master se); Extrusion jaisa stage: scrap box nahi
+            "billet": {"weight": cur.work_stage.billet_weight} if cur.work_stage and cur.work_stage.is_billet_stage and not side else None,
+            "no_scrap": bool(cur.work_stage and cur.work_stage.no_scrap),
         }
         deferred = deferred_scrap_stage(o, cur)
         if deferred is not None:
@@ -308,13 +311,52 @@ def routing_complete(stage_id):
     # "Scrap baad me" wala stage (Melting): uska apna scrap yahan nahi, agle stage (Casting) ke complete par likha jaata hai
     if stage.work_stage and stage.work_stage.scrap_after_next:
         scrap = 0.0
+    # Extrusion / Wire Drawing jaisa stage: scrap hota hi nahi (Work Stage master me "No scrap") — form me kuch aaye to bhi 0
+    if stage.work_stage and stage.work_stage.no_scrap:
+        scrap = 0.0
     # Pichhla stage (Melting) ka scrap abhi likhna hai: kadhai molds me khali ho chuki, ab dross / slag pata hai
     deferred = deferred_scrap_stage(order, stage)
+    # Billet (lattha) wala stage (Ingot Casting, client meeting 2 #13): operator lattha ginta hai, scrap = aaya maal - lattha x weight apne aap
+    billet = None
+    if stage.work_stage and stage.work_stage.is_billet_stage and not side:
+        try:
+            billet_weight = float((request.form.get("billet_weight") or "").strip())
+            billet_count = int(float((request.form.get("billet_count") or "").strip()))
+        except ValueError:
+            billet_weight, billet_count = 0.0, 0
+        if billet_weight <= 0 or billet_count <= 0:
+            flash("Enter the billet weight (KG) and how many billets were made.", "error")
+            return _back()
+        base_in = (deferred.qty_in or 0) if deferred is not None else (stage.qty_in or 0)
+        made = round(billet_count * billet_weight, 4)
+        if made > base_in + EPS:
+            flash(f"{billet_count} billets x {billet_weight:g} KG = {made:g} KG is more than the {base_in:g} KG that came in. Check the count or the billet weight.", "error")
+            return _back()
+        billet = {"weight": billet_weight, "count": billet_count, "scrap": round(max(base_in - made, 0.0), 4), "photo": None}
+        if billet["scrap"] > EPS:
+            # Chori / gadbad rokne ke liye: auto nikle scrap ka proof photo zaroori
+            photo = request.files.get("scrap_photo")
+            if not photo or not photo.filename:
+                flash(f"Scrap of {billet['scrap']:g} KG came out of the billet count. Upload a proof photo of the scrap.", "error")
+                return _back()
+            photo_ext = photo.filename.rsplit(".", 1)[1].lower() if "." in photo.filename else ""
+            if photo_ext not in ALLOWED_PHOTO_EXT:
+                flash("The proof must be a PNG, JPG or WEBP photo.", "error")
+                return _back()
+            photo.stream.seek(0, os.SEEK_END)
+            photo_size = photo.stream.tell()
+            photo.stream.seek(0)
+            if photo_size > MAX_TC_BYTES:
+                flash("The proof photo is too large (maximum 5 MB).", "error")
+                return _back()
+            billet["photo"] = photo
+        if deferred is None:
+            scrap = billet["scrap"]
     prev_scrap = 0.0
     prev_type = None
     prev_kind = "Saleable"
     if deferred is not None:
-        prev_scrap = request.form.get("prev_scrap_qty", type=float) or 0.0
+        prev_scrap = billet["scrap"] if billet else (request.form.get("prev_scrap_qty", type=float) or 0.0)
         if prev_scrap < 0:
             flash("Scrap cannot be negative.", "error")
             return _back()
@@ -322,11 +364,13 @@ def routing_complete(stage_id):
             flash(f"{deferred.stage_name} scrap ({prev_scrap:g}) cannot be more than what came into {deferred.stage_name} ({(deferred.qty_in or 0):g} KG).", "error")
             return _back()
         if prev_scrap > 0:
-            prev_kind = (request.form.get("prev_scrap_kind") or "Saleable").strip()
+            # Billet stage me type / kind wahi standard fields se aate hain (scrap box ek hi hai); warna "pichhle stage ka scrap" wale fields se
+            kind_field, type_field = ("scrap_kind", "scrap_type_id") if billet else ("prev_scrap_kind", "prev_scrap_type_id")
+            prev_kind = (request.form.get(kind_field) or "Saleable").strip()
             if prev_kind not in ("Saleable", "Process loss"):
                 flash("Choose whether the scrap is saleable or a process loss.", "error")
                 return _back()
-            prev_type_id = request.form.get("prev_scrap_type_id", type=int)
+            prev_type_id = request.form.get(type_field, type=int)
             prev_type = db.session.get(ScrapType, prev_type_id) if prev_type_id else None
             if prev_type is None or prev_type.is_deleted or not prev_type.is_active:
                 flash(f"Choose the type of the {deferred.stage_name} scrap.", "error")
@@ -335,6 +379,7 @@ def routing_complete(stage_id):
         qty_in = round((deferred.qty_in or 0) - prev_scrap, 4)
     # RM used (ek hi baar, rounds nahi): jin lines ka maal issue ho chuka unki asli use. Field na aaye to purana tareeka (use None).
     used_map = {}
+    extra_issues = []         # (packing line, kitna extra, kisne liya, reason) — validation ke baad hi store se issue hote hain
     for line in stage_lines(order, stage):
         raw = request.form.get(f"used_{line.id}")
         if raw is None or raw.strip() == "":
@@ -350,8 +395,17 @@ def routing_complete(stage_id):
             flash(f"{name}: the quantity used cannot be negative.", "error")
             return _back()
         if used > line.issued_qty + EPS:
-            flash(f"{name}: {used:g} {mat_unit} used is more than what was issued to production ({line.issued_qty:g} {mat_unit}). Issue the extra material first.", "error")
-            return _back()
+            if line.is_packing:
+                # Spool / box jyada bane (520 bane, 500 diye the): store se ek click me extra issue, kisne liya uska naam zaroori (client meeting 2, #14)
+                taken_by = (request.form.get(f"extra_by_{line.id}") or "").strip()[:60]
+                if not taken_by:
+                    flash(f"{name}: {used:g} {mat_unit} were made but only {line.issued_qty:g} {mat_unit} were issued. Write who took the extra {used - line.issued_qty:g} {mat_unit} from the store.", "error")
+                    return _back()
+                reason = (request.form.get(f"extra_reason_{line.id}") or "").strip()[:200] or "More made than issued"
+                extra_issues.append((line, round(used - line.issued_qty, 4), taken_by, reason))
+            else:
+                flash(f"{name}: {used:g} {mat_unit} used is more than what was issued to production ({line.issued_qty:g} {mat_unit}). Issue the extra material first.", "error")
+                return _back()
         used_map[line.id] = round(used, 4)
     work_hours = None
     hours_raw = (request.form.get("work_hours") or "").strip()
@@ -408,6 +462,17 @@ def routing_complete(stage_id):
         db.session.add(ProductionOrderStageMachine(stage_id=stage.id, machine_id=machine.id, machine_name=machine.name,
                                                    capacity_per_hour=machine.capacity_per_hour or 0, hours_per_day=machine.hours_per_day or 8,
                                                    is_planned=False, used=True))
+    # Jyada bane packing (spool / box) ka extra maal store se auto-issue: store me kam ho to kuch save nahi hota
+    if extra_issues:
+        from app.inventory.posting import InventoryError
+        from app.material_issues.routes import auto_issue_extra
+        for line, extra_qty, taken_by, reason in extra_issues:
+            try:
+                auto_issue_extra(order, line, extra_qty, taken_by, f"Auto-issued at {stage.stage_name}: {reason}")
+            except InventoryError as stock_error:
+                db.session.rollback()
+                flash(str(stock_error), "error")
+                return _back()
     operator = (request.form.get("operator") or "").strip()[:60]
     if operator:
         stage.operator = operator
@@ -424,6 +489,18 @@ def routing_complete(stage_id):
         if line.id in used_map:
             line.used_qty = used_map[line.id]
     stage.work_hours = round(work_hours, 2) if work_hours is not None else None
+    if billet is not None:
+        # Lattha ginti ka record + proof photo (uploads/scrap_proof/<stage id>/); billet weight stage master me default ban jaata hai
+        stage.billet_count = billet["count"]
+        stage.billet_weight = billet["weight"]
+        stage.scrap_photo = None
+        if billet["photo"] is not None:
+            folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "scrap_proof", str(stage.id))
+            os.makedirs(folder, exist_ok=True)
+            photo_name = secure_filename(billet["photo"].filename) or "scrap-proof.jpg"
+            billet["photo"].save(os.path.join(folder, photo_name))
+            stage.scrap_photo = "scrap_proof/" + str(stage.id) + "/" + photo_name          # DB me hamesha "/"
+        stage.work_stage.billet_weight = billet["weight"]
     stage.status = "Done"
     stage.completed_at = completed_at
     stage.qty_out = round(qty_out, 4)
@@ -464,6 +541,9 @@ def routing_reopen(stage_id):
     for line in stage_lines(order, stage):
         line.used_qty = None              # RM use dobara likhi jayegi
     stage.work_hours = None
+    stage.billet_count = None
+    stage.billet_weight = None
+    stage.scrap_photo = None
     stage.status = "In progress"
     stage.completed_at = None
     stage.qty_out = None
@@ -477,6 +557,7 @@ def routing_reopen(stage_id):
 
 # ---------------------------------------------------------------- Lab QC + TC (client change #7)
 ALLOWED_TC_EXT = {"pdf", "png", "jpg", "jpeg"}
+ALLOWED_PHOTO_EXT = {"png", "jpg", "jpeg", "webp"}
 MAX_TC_BYTES = 5 * 1024 * 1024
 
 
@@ -558,3 +639,12 @@ def routing_tc(qc_id):
     if row is None or not row.tc_file:
         abort(404)
     return send_from_directory(current_app.config["UPLOAD_FOLDER"], row.tc_file)
+
+
+@routing_bp.route("/routing/scrap_photo/<int:stage_id>")
+def routing_scrap_photo(stage_id):
+    # Billet (lattha) stage ke scrap ka proof photo kholna
+    stage = db.session.get(ProductionOrderStage, stage_id)
+    if stage is None or not stage.scrap_photo:
+        abort(404)
+    return send_from_directory(current_app.config["UPLOAD_FOLDER"], stage.scrap_photo)

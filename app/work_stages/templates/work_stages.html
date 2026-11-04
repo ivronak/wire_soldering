@@ -119,6 +119,8 @@
                   {% if s.requires_lab_qc %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border" title="Lab QC and test certificate needed before the next stage">Lab QC</span>{% endif %}
                   {% if s.scrap_after_next %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="Scrap of this stage is entered when the next stage is completed">Scrap later</span>{% endif %}
                   {% if s.is_batch %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
+                  {% if s.is_billet_stage %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="Billets are counted; scrap is worked out">Billets{% if s.billet_weight %} · {{ '%g'|format(s.billet_weight) }} KG{% endif %}</span>{% endif %}
+                  {% if s.no_scrap %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="No scrap is recorded at this stage">No scrap</span>{% endif %}
                 </td>
                 <td class="text-[13px] {% if s.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %} tabular-nums">
                   {{ s.sort_order }}
@@ -144,7 +146,10 @@
                       data-sort="{{ s.sort_order }}"
                       data-batch="{{ 1 if s.is_batch else 0 }}"
                       data-labqc="{{ 1 if s.requires_lab_qc else 0 }}"
-                      data-scraplater="{{ 1 if s.scrap_after_next else 0 }}">
+                      data-scraplater="{{ 1 if s.scrap_after_next else 0 }}"
+                      data-billet="{{ 1 if s.is_billet_stage else 0 }}"
+                      data-billetweight="{{ s.billet_weight if s.billet_weight is not none else '' }}"
+                      data-noscrap="{{ 1 if s.no_scrap else 0 }}">
                       Edit
                     </button>
                     {# Soft-delete — confirm popup = js-confirm-submit (erp-toast.js) #}
@@ -245,6 +250,26 @@
             <span class="block text-[12px] text-ink-faint">Use it on Melting: dross / slag is only known once the crucible is emptied into the molds, so it is entered when Ingot Casting is completed.</span></span>
         </label>
       </div>
+      <div>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" id="stage-billet" name="is_billet_stage" value="on" class="mt-1" />
+          <span><span class="block text-[13px] font-semibold text-ink">Count billets (lattha) instead of writing scrap</span>
+            <span class="block text-[12px] text-ink-faint">Use it on Ingot Casting. The operator writes how many billets were made; scrap is worked out as material in − billets × billet weight, and needs a type and a proof photo.</span></span>
+        </label>
+        <div id="stage-billet-weight-box" class="mt-2 ml-6 hidden">
+          <label for="stage-billet-weight" class="block text-[12.5px] font-semibold text-ink mb-1">Billet weight (KG)</label>
+          <input type="number" id="stage-billet-weight" name="billet_weight" min="0.001" step="0.001" placeholder="e.g. 5"
+            class="w-32 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <p class="text-[11.5px] text-ink-faint mt-1">One billet weighs this much. If empty, it is asked the first time a stage is completed. It can be changed any time.</p>
+        </div>
+      </div>
+      <div>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" id="stage-noscrap" name="no_scrap" value="on" class="mt-1" />
+          <span><span class="block text-[13px] font-semibold text-ink">No scrap at this stage</span>
+            <span class="block text-[12px] text-ink-faint">Use it on Extrusion and Wire Drawing: once the billet is made there is no scrap, only the hours. The scrap box is not shown when the stage is completed.</span></span>
+        </label>
+      </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
@@ -318,6 +343,17 @@
   var addAction = "{{ url_for('work_stages.work_stages_add') }}";
   var modalTitle = document.getElementById('modal-title');
 
+  // "Count billets" tick ho tabhi billet weight ka box dikhta hai (aur tab "No scrap" nahi lagta)
+  function syncBilletBox() {
+    var on = document.getElementById('stage-billet').checked;
+    document.getElementById('stage-billet-weight-box').classList.toggle('hidden', !on);
+    if (on) document.getElementById('stage-noscrap').checked = false;
+  }
+  document.getElementById('stage-billet').addEventListener('change', syncBilletBox);
+  document.getElementById('stage-noscrap').addEventListener('change', function () {
+    if (this.checked) { document.getElementById('stage-billet').checked = false; syncBilletBox(); }
+  });
+
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -328,6 +364,7 @@
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     form.reset();
+    syncBilletBox();
     form.action = addAction;
     modalTitle.textContent = 'Add work stage';
   }
@@ -336,6 +373,7 @@
     form.action = addAction;
     modalTitle.textContent = 'Add work stage';
     form.reset();
+    syncBilletBox();
     openModal();
   }
 
@@ -350,6 +388,10 @@
     document.getElementById('stage-batch').checked = btn.getAttribute('data-batch') === '1';
     document.getElementById('stage-labqc').checked = btn.getAttribute('data-labqc') === '1';
     document.getElementById('stage-scraplater').checked = btn.getAttribute('data-scraplater') === '1';
+    document.getElementById('stage-billet').checked = btn.getAttribute('data-billet') === '1';
+    document.getElementById('stage-billet-weight').value = btn.getAttribute('data-billetweight') || '';
+    document.getElementById('stage-noscrap').checked = btn.getAttribute('data-noscrap') === '1';
+    syncBilletBox();
     openModal();
   }
 

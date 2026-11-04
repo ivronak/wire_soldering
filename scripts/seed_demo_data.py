@@ -42,6 +42,10 @@ def stage_id(name):
 melting = stage_id("Melting & Alloying")
 c.execute("update work_stage set is_batch = 1, requires_lab_qc = 1, scrap_after_next = 1 where id = ?", (melting,))
 
+# ---- 1b. Client meeting 2 (#13): Ingot Casting me lattha (billet) ginti se scrap; Extrusion + Wire Drawing me scrap hota hi nahi ----
+c.execute("update work_stage set is_billet_stage = 1 where name = 'Ingot Casting' and is_deleted = 0")
+c.execute("update work_stage set no_scrap = 1 where name in ('Extrusion', 'Wire Drawing 1', 'Wire Drawing 2', 'Wire Drawing 3') and is_deleted = 0")
+
 # ---- 2. Recipe lines -> stage (sirf jahan abhi khaali hai) ----
 flux_stage = stage_id("Flux Preparation")
 c.execute("update variant_recipe_items set work_stage_id = ? where work_stage_id is null and is_flux = 1", (flux_stage,))

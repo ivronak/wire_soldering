@@ -100,7 +100,9 @@
       <div>{% set bad = plan.materials | selectattr('issued', 'le', 0) | list %}
         <div class="ou-meta">Material in production</div>
         <div class="text-[13px] font-semibold">₹{{ (plan.materials | sum(attribute='value'))|inr }}</div>
-        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first</div>{% endif %}</div>
+        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first (or written off)</div>
+        {% for l in plan.leftover %}<div class="ou-meta" style="color:#B42318"><b>{{ '%g'|format(l.qty) }} {{ l.unit }}</b> {{ l.name }} unaccounted for</div>{% endfor %}
+        <button type="button" class="ou-writeoff ou-btn ghost" style="margin-top:6px" data-plan='{{ plan|tojson }}'>Write off as missing</button>{% endif %}</div>
       <div><button type="button" class="ou-act ou-btn primary" data-plan='{{ plan|tojson }}'>Record output</button></div>
     </div>
   </article>
@@ -158,6 +160,19 @@
 {% endblock %}
 
 {% block modals %}
+{# Bacha hua maal (jaise khali spool) na mile to "missing" likhna: naam + reason zaroori (client meeting 2, #14) #}
+<div id="wo-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" aria-hidden="true">
+  <div id="wo-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <form method="post" action="{{ url_for('material_issues.material_writeoff_add') }}" class="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-200 p-5 space-y-3">
+    <div><h2 class="text-[17px] font-bold text-ink">Write off as missing</h2><p id="wo-sub" class="text-[12.5px] text-ink-faint"></p></div>
+    <input type="hidden" name="production_order_id" id="wo-order" />
+    <div id="wo-lines" class="space-y-2"></div>
+    <div><label class="ou-label">Who is responsible? *</label><input type="text" name="written_off_by" id="wo-by" maxlength="60" required class="ou-input" placeholder="Name of the person who took them" autocomplete="off" /></div>
+    <div><label class="ou-label">Reason *</label><input type="text" name="reason" maxlength="255" required minlength="3" class="ou-input" placeholder="e.g. 80 empty spools not found" autocomplete="off" /></div>
+    <p class="text-[12px] text-ink-faint">The quantity is counted as used by this order, so its cost goes into the finished goods cost, and it stays on record under the name above.</p>
+    <div class="flex justify-end gap-2"><button type="button" id="wo-cancel" class="ou-btn ghost">Cancel</button><button type="submit" class="ou-btn primary">Write off</button></div>
+  </form>
+</div>
 <div id="ou-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="ou-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-5xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
@@ -286,6 +301,21 @@
   }
   function closeOutput() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.ou-act').forEach(function (b) { b.addEventListener('click', function () { openOutput(b); }); });
+  // Write off as missing (bacha hua maal jo na use hua na wapas aaya)
+  var woModal = document.getElementById('wo-modal');
+  document.querySelectorAll('.ou-writeoff').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var plan = JSON.parse(b.getAttribute('data-plan'));
+      document.getElementById('wo-order').value = plan.order_id;
+      document.getElementById('wo-sub').textContent = plan.prod_no + ' · ' + plan.product;
+      document.getElementById('wo-lines').innerHTML = (plan.leftover || []).map(function (l, i) {
+        return '<div class="flex items-center gap-2"><input type="hidden" name="line_id_' + i + '" value="' + l.id + '"><div class="flex-1 text-[13.5px]"><b>' + esc(l.name) + '</b><div class="ou-meta">' + l.qty + ' ' + esc(l.unit) + ' unaccounted for</div></div>' +
+          '<input type="number" step="any" min="0" max="' + l.qty + '" name="qty_' + i + '" value="' + l.qty + '" class="ou-input" style="width:110px" /></div>';
+      }).join('');
+      woModal.classList.remove('hidden'); woModal.setAttribute('aria-hidden', 'false');
+    });
+  });
+  ['wo-cancel', 'wo-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { woModal.classList.add('hidden'); woModal.setAttribute('aria-hidden', 'true'); }); });
   ['ou-close', 'ou-cancel', 'ou-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeOutput); });
   ['ou-good', 'ou-rework', 'ou-scrap', 'ou-loss'].forEach(function (id) { document.getElementById(id).addEventListener('input', refresh); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeOutput(); });

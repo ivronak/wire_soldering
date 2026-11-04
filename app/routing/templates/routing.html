@@ -179,6 +179,7 @@
             </td>
             <td>{% if st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} {{ stage_unit(o, st) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}
               {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(st.scrap_qty) }}{% if st.scrap_type %} · {{ st.scrap_type.name }}{% endif %} · {{ st.scrap_kind }}</div>{% endif %}
+              {% if st.billet_count %}<div class="rt-meta">{{ st.billet_count }} billets × {{ '%g'|format(st.billet_weight) }} KG{% if st.scrap_photo %} · <a href="{{ url_for('routing.routing_scrap_photo', stage_id=st.id) }}" target="_blank" class="underline">scrap proof</a>{% endif %}</div>{% endif %}
               {% if st.qty_out is not none and st.qty_in %}<div class="rt-meta">Yield {{ '%.1f'|format(100 * st.qty_out / st.qty_in) }}%</div>{% endif %}
               {% else %}<span class="rt-meta">—</span>{% endif %}</td>
             <td style="text-align:right">
@@ -245,7 +246,7 @@
       <div><h2 id="rt-title" class="text-[17px] font-bold text-ink">Stage</h2><p id="rt-sub" class="text-[12.5px] text-ink-faint">—</p></div>
       <button type="button" id="rt-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
-    <form id="rt-form" method="post" class="flex-1 overflow-y-auto p-4 space-y-4">
+    <form id="rt-form" method="post" enctype="multipart/form-data" class="flex-1 overflow-y-auto p-4 space-y-4">
       <div class="rt-box space-y-3">
         <div id="rt-start-fields">
           <label class="rt-label">Operator *</label>
@@ -276,6 +277,15 @@
             <label class="flex items-start gap-2 text-[13.5px] mb-1"><input type="radio" name="prev_scrap_kind" value="Saleable" checked class="mt-1"> <span><b>Saleable scrap</b></span></label>
             <label class="flex items-start gap-2 text-[13.5px]"><input type="radio" name="prev_scrap_kind" value="Process loss" class="mt-1"> <span><b>Process loss</b> — only recorded, not stocked.</span></label></div>
         </div>
+        {# Ingot Casting jaisa stage (client meeting 2, #13): lattha (billet) ginti se scrap apne aap nikalta hai #}
+        <div class="rt-box space-y-3" id="rt-billet-box" style="display:none">
+          <div class="text-[12.5px] text-ink-muted"><b>Billets (lattha)</b> — count how many billets were made. The scrap is worked out for you.</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="rt-label">Billet weight (KG) *</label><input type="number" step="any" min="0.001" name="billet_weight" id="rt-billet-weight" class="rt-input" placeholder="e.g. 5" /></div>
+            <div><label class="rt-label">Billets made *</label><input type="number" step="1" min="1" name="billet_count" id="rt-billet-count" class="rt-input" placeholder="Count" /></div>
+          </div>
+          <div id="rt-billet-calc" class="text-[13px] text-ink"></div>
+        </div>
         {# Is stage ka RM: ek hi baar asli use likhni hai (stage do baar chala ho tab bhi total ek entry) #}
         <div class="rt-box" id="rt-mat-box" style="display:none">
           <label class="rt-label">Raw material used *</label>
@@ -289,14 +299,17 @@
           <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> <span class="rt-unit">KG</span></div>
           {# Sirf scrap likhna hai; good output = aaya hua - scrap, system khud nikaalta hai (client change 8) #}
           <div id="rt-scrap-wrap"><label class="rt-label">Scrap (<span class="rt-unit">KG</span>)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
-          <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none">Scrap of this stage is entered when the next stage is completed (after the crucible is emptied).</div>
+          <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none"></div>
           <div><label class="rt-label">Good output (<span class="rt-unit">KG</span>)</label><div id="rt-qty-out" class="rt-input" style="background:#F3F4F6;font-weight:600">0</div></div>
-          <div class="col-span-2 text-[11.5px] text-ink-faint">Enter only the scrap. Good output is worked out for you: came in − scrap.</div>
+          <div id="rt-good-note" class="col-span-2 text-[11.5px] text-ink-faint">Enter only the scrap. Good output is worked out for you: came in − scrap.</div>
         </div>
         <div class="rt-box space-y-3" id="rt-scrap-box" style="display:none">
           <div class="text-[12.5px] text-ink-muted"><b>About the scrap</b> — so it can be tracked and later sold.</div>
           <div><label class="rt-label">Type of scrap *</label>
             <select name="scrap_type_id" id="rt-scrap-type" class="rt-input"><option value="">Select type</option>{% for t in scrap_types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+          <div id="rt-photo-wrap" style="display:none"><label class="rt-label">Proof photo of the scrap *</label>
+            <input type="file" name="scrap_photo" id="rt-scrap-photo" accept="image/png,image/jpeg,image/webp" class="rt-input" />
+            <p class="text-[11.5px] text-ink-faint mt-1">Photo of the scrap (PNG / JPG / WEBP, up to 5 MB). It stays linked to this stage.</p></div>
           <div id="rt-kind-side" class="text-[12px] text-ink-muted" style="display:none">Waste of this stage is only recorded (not stocked).</div>
           <div id="rt-kind-wrap"><label class="rt-label">Can it be sold? *</label>
             <label class="flex items-start gap-2 text-[13.5px] mb-1"><input type="radio" name="scrap_kind" value="Saleable" checked class="mt-1"> <span><b>Saleable scrap</b> — goes to the scrap yard when the order's output is recorded.</span></label>
@@ -355,18 +368,32 @@
       QTY_IN = a.qty_in;
       DEFER_PREV = a.defer_prev;
       DEFER_SELF = !!a.defer_self;
+      BILLET = a.billet || null;
+      NO_SCRAP = !!a.no_scrap;
       // Flux jaise stage ki apni unit (LTR ...) aur waste hamesha "process loss"
       document.querySelectorAll('.rt-unit').forEach(function (u) { u.textContent = a.unit || 'KG'; });
       document.getElementById('rt-kind-wrap').style.display = a.side ? 'none' : 'block';
       document.getElementById('rt-kind-side').style.display = a.side ? 'block' : 'none';
       document.getElementById('rt-scrap').value = 0;
-      document.getElementById('rt-scrap').disabled = DEFER_SELF;       // disabled field submit nahi hota, server 0 maanta hai
-      document.getElementById('rt-scrap-wrap').style.display = DEFER_SELF ? 'none' : 'block';
-      document.getElementById('rt-defer-note').style.display = DEFER_SELF ? 'block' : 'none';
-      document.getElementById('rt-prev-box').style.display = DEFER_PREV ? 'block' : 'none';
-      document.getElementById('rt-prev-scrap').disabled = !DEFER_PREV;
-      document.getElementById('rt-prev-type').disabled = !DEFER_PREV;
-      document.querySelectorAll('input[name=prev_scrap_kind]').forEach(function (r) { r.disabled = !DEFER_PREV; r.checked = r.value === (DEFER_PREV ? DEFER_PREV.kind : 'Saleable'); });
+      var hideScrap = DEFER_SELF || NO_SCRAP || !!BILLET;               // in stages me scrap seedha nahi likhte
+      document.getElementById('rt-scrap').disabled = hideScrap;       // disabled field submit nahi hota, server 0 maanta hai
+      document.getElementById('rt-scrap-wrap').style.display = hideScrap ? 'none' : 'block';
+      var note = document.getElementById('rt-defer-note');
+      note.textContent = DEFER_SELF ? 'Scrap of this stage is entered when the next stage is completed (after the crucible is emptied).'
+        : (NO_SCRAP ? 'No scrap is recorded at this stage. Only the hours.' : '');
+      note.style.display = (DEFER_SELF || NO_SCRAP) ? 'block' : 'none';
+      // Billet stage me pichhle stage ka scrap bhi lattha ginti se hi nikalta hai, isliye alag "earlier stage scrap" box nahi
+      var prevOn = !!DEFER_PREV && !BILLET;
+      document.getElementById('rt-prev-box').style.display = prevOn ? 'block' : 'none';
+      document.getElementById('rt-prev-scrap').disabled = !prevOn;
+      document.getElementById('rt-prev-type').disabled = !prevOn;
+      document.querySelectorAll('input[name=prev_scrap_kind]').forEach(function (r) { r.disabled = !prevOn; r.checked = r.value === (DEFER_PREV ? DEFER_PREV.kind : 'Saleable'); });
+      document.getElementById('rt-billet-box').style.display = BILLET ? 'block' : 'none';
+      document.getElementById('rt-good-note').style.display = (BILLET || NO_SCRAP) ? 'none' : 'block';
+      ['rt-billet-weight', 'rt-billet-count'].forEach(function (id) { var el = document.getElementById(id); el.disabled = !BILLET; el.required = !!BILLET; });
+      document.getElementById('rt-billet-weight').value = BILLET && BILLET.weight ? BILLET.weight : '';
+      document.getElementById('rt-billet-count').value = '';
+      document.getElementById('rt-scrap-photo').value = '';
       if (DEFER_PREV) {
         document.getElementById('rt-prev-title').textContent = 'Scrap of ' + DEFER_PREV.name;
         document.getElementById('rt-prev-scrap').value = DEFER_PREV.scrap;
@@ -378,7 +405,13 @@
         return '<tr><td class="py-1">' + esc(m.name) + (m.kgpp ? '<div class="text-[11px] text-ink-faint">1 pack per ' + m.kgpp + ' KG of output</div>' : '') + '</td>' +
           '<td class="py-1 text-right tabular-nums">' + m.needed + (m.spare ? ' <span class="text-ink-faint">+' + m.spare + '</span>' : '') + ' ' + esc(m.unit) + '</td>' +
           '<td class="py-1 text-right tabular-nums">' + m.issued + '</td>' +
-          '<td class="py-1"><input type="number" step="any" min="0" max="' + m.issued + '" name="used_' + m.id + '" value="' + m.default + '" data-counts="' + (m.counts ? 1 : 0) + '"' + (m.kgpp ? ' data-kgpp="' + m.kgpp + '"' : '') + ' required class="rt-input rt-used" /></td></tr>';
+          '<td class="py-1"><input type="number" step="any" min="0"' + (m.kgpp ? '' : ' max="' + m.issued + '"') + ' name="used_' + m.id + '" value="' + m.default + '" data-id="' + m.id + '" data-issued="' + m.issued + '" data-counts="' + (m.counts ? 1 : 0) + '"' + (m.kgpp ? ' data-kgpp="' + m.kgpp + '"' : '') + ' required class="rt-input rt-used" /></td></tr>' +
+          (m.kgpp ? '<tr class="rt-avg" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-1 text-[12px]"></td></tr>' +
+            '<tr class="rt-extra" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-2"><div class="rounded-lg border border-copper-border bg-copper-soft px-3 py-2 space-y-2">' +
+            '<div class="text-[12.5px] rt-extra-msg"></div>' +
+            '<div class="grid grid-cols-2 gap-2"><div><label class="rt-label">Taken by *</label><input type="text" name="extra_by_' + m.id + '" maxlength="60" class="rt-input rt-extra-by" placeholder="Who took them from the store?" autocomplete="off" /></div>' +
+            '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. more spools wound" autocomplete="off" /></div></div>' +
+            '<div class="text-[11.5px] text-ink-faint">The extra ones are issued from the store automatically when you complete the stage.</div></div></td></tr>' : '');
       }).join('');
       STARTED = a.started_iso || ''; HOURS_EDITED = false;
       autoHours();
@@ -391,7 +424,7 @@
     }
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
-  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false, STARTED = '', HOURS_EDITED = false;
+  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false, BILLET = null, NO_SCRAP = false, BILLET_OVER = false, BILLET_USED_BAD = false, STARTED = '', HOURS_EDITED = false;
   // Working hours: start se finish tak khud nikalta hai; operator badal sakta hai (tab auto band)
   function autoHours() {
     if (HOURS_EDITED || !STARTED || !when.value) return;
@@ -403,15 +436,53 @@
   function checkUsed() {
     var bad = false;
     document.querySelectorAll('#rt-mats .rt-used').forEach(function (i) {
-      var over = (parseFloat(i.value) || 0) > parseFloat(i.max) + 0.00005;
+      var issued = parseFloat(i.getAttribute('data-issued'));
+      var used = parseFloat(i.value) || 0;
+      var over = used > issued + 0.00005;
+      if (i.hasAttribute('data-kgpp')) {
+        // Packing (spool / box): zyada bane to error nahi, extra auto-issue ka panel (naam zaroori)
+        var panel = document.querySelector('#rt-mats .rt-extra[data-for="' + i.getAttribute('data-id') + '"]');
+        if (panel) {
+          panel.style.display = over ? 'table-row' : 'none';
+          panel.querySelector('.rt-extra-by').required = over;
+          panel.querySelector('.rt-extra-msg').innerHTML = over ? '<b>' + Math.round((used - issued) * 10000) / 10000 + ' more</b> were made than issued (' + issued + '). Issue the extra from the store now.' : '';
+        }
+        over = false;
+      }
       i.style.borderColor = over ? '#B42318' : '';
       bad = bad || over;
     });
     document.getElementById('rt-used-warn').style.display = bad ? 'inline' : 'none';
-    document.getElementById('rt-submit').disabled = bad;
+    BILLET_USED_BAD = bad;
+    document.getElementById('rt-submit').disabled = bad || BILLET_OVER;
+  }
+  function syncBillet() {
+    // Lattha x weight = bana maal; aaya maal - bana maal = scrap (apne aap). Scrap > 0 ho to type + proof photo zaroori.
+    var base = DEFER_PREV ? DEFER_PREV.qty_in : QTY_IN;
+    var w = parseFloat(document.getElementById('rt-billet-weight').value) || 0;
+    var c = parseInt(document.getElementById('rt-billet-count').value, 10) || 0;
+    var made = Math.round(w * c * 10000) / 10000;
+    var scrap = made > 0 ? Math.round(Math.max(base - made, 0) * 10000) / 10000 : 0;
+    var over = made > base + 0.00005;
+    var calc = document.getElementById('rt-billet-calc');
+    calc.style.color = over ? '#B42318' : '';
+    calc.innerHTML = made > 0 ? (c + ' × ' + w + ' KG = <b>' + made + ' KG</b>. Material in ' + base + ' KG → scrap <b>' + scrap + ' KG</b> (worked out)' +
+      (over ? '<br>More than the material that came in. Check the count or the weight.' : '')) : 'Material in: ' + base + ' KG.';
+    document.getElementById('rt-qty-in').textContent = base;
+    document.getElementById('rt-qty-out').textContent = made > 0 && !over ? made : 0;
+    var has = scrap > 0.00005;
+    document.getElementById('rt-scrap-box').style.display = has ? 'block' : 'none';
+    document.getElementById('rt-scrap-type').required = has;
+    document.getElementById('rt-photo-wrap').style.display = has ? 'block' : 'none';
+    document.getElementById('rt-scrap-photo').required = has;
+    BILLET_OVER = over;
+    document.getElementById('rt-submit').disabled = over || BILLET_USED_BAD;
   }
   function syncScrap() {
-    var scrapNow = DEFER_SELF ? 0 : (parseFloat(document.getElementById('rt-scrap').value) || 0);
+    document.getElementById('rt-photo-wrap').style.display = 'none';
+    document.getElementById('rt-scrap-photo').required = false;
+    if (BILLET) { syncBillet(); return; }
+    var scrapNow = (DEFER_SELF || NO_SCRAP) ? 0 : (parseFloat(document.getElementById('rt-scrap').value) || 0);
     // Pichhle stage ka scrap ghata ke hi is stage me aaya maal nikalta hai
     var prevScrap = DEFER_PREV ? (parseFloat(document.getElementById('rt-prev-scrap').value) || 0) : 0;
     var cameIn = DEFER_PREV ? Math.max(DEFER_PREV.qty_in - prevScrap, 0) : QTY_IN;
@@ -425,19 +496,35 @@
     document.querySelectorAll('#rt-mats .rt-used[data-kgpp]').forEach(function (i) {
       if (i.getAttribute('data-edited') === '1') return;
       var per = parseFloat(i.getAttribute('data-kgpp'));
-      if (per > 0) i.value = Math.min(Math.floor(good / per + 1e-9), parseFloat(i.max));
+      if (per > 0) i.value = Math.floor(good / per + 1e-9);
+    });
+    // Har pack (spool) me average kitna KG: output KG / bane hue pack. Plan se zyada = har spool me jyada wire gaya; kam = free spool (fayda)
+    document.querySelectorAll('#rt-mats .rt-used[data-kgpp]').forEach(function (i) {
+      var row = document.querySelector('#rt-mats .rt-avg[data-for="' + i.getAttribute('data-id') + '"] td');
+      if (!row) return;
+      var per = parseFloat(i.getAttribute('data-kgpp')), made = parseFloat(i.value) || 0;
+      var tr = row.parentNode;
+      if (!(made > 0) || !(good > 0)) { tr.style.display = 'none'; return; }
+      var avg = good / made, diff = (avg - per) / per * 100;
+      tr.style.display = 'table-row';
+      var txt = 'Average <b>' + (Math.round(avg * 1000) / 1000) + ' KG</b> per pack (plan ' + per + ' KG): ' + Math.round(good * 10000) / 10000 + ' KG / ' + made + '.';
+      if (diff > 1) { row.style.color = '#B42318'; txt += ' More wire per pack than planned. Please re-check.'; }
+      else if (diff < -1) { row.style.color = '#1F7A4D'; txt += ' Less per pack than planned, so extra packs came out.'; }
+      else { row.style.color = ''; }
+      row.innerHTML = txt;
     });
     document.getElementById('rt-qty-out').textContent = (Math.round(good * 10000) / 10000);
     var has = scrapNow > 0;
     document.getElementById('rt-scrap-box').style.display = has ? 'block' : 'none';
     document.getElementById('rt-scrap-type').required = has;
   }
-  document.getElementById('rt-scrap').addEventListener('input', syncScrap);
+  document.getElementById('rt-scrap').addEventListener('input', function () { syncScrap(); checkUsed(); });
+  ['rt-billet-weight', 'rt-billet-count'].forEach(function (id) { document.getElementById(id).addEventListener('input', function () { syncScrap(); checkUsed(); }); });
   document.getElementById('rt-mats').addEventListener('input', function (e) {
     if (e.isTrusted && e.target.hasAttribute('data-kgpp')) e.target.setAttribute('data-edited', '1');      // operator ne khud likha: ab auto nahi badlega
     syncScrap(); checkUsed();
   });
-  document.getElementById('rt-prev-scrap').addEventListener('input', syncScrap);
+  document.getElementById('rt-prev-scrap').addEventListener('input', function () { syncScrap(); checkUsed(); });
   function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });
   ['rt-close', 'rt-cancel', 'rt-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeStage); });

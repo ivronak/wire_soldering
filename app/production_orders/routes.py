@@ -123,8 +123,14 @@ def _read_allowances(product):
     # Har RM ka apna allowance %: form field allowance_rm_<rm_id> (recipe + packing materials). 0 se 100; khaali = 0.
     # ({rm_id: percent}, None) ya (None, "error")
     ids = {r.raw_material_id for r in product.recipe_items} | {k.raw_material_id for k in product.packing_items}
+    # Product Master me jo Spare % set hai wahi default hai (client meeting 2, #4); form me field aaye to wahi (order ke liye badla hua)
+    defaults = {r.raw_material_id: r.spare_percent or 0 for r in product.recipe_items}
+    defaults.update({k.raw_material_id: k.spare_percent or 0 for k in product.packing_items})
     result = {}
     for rm_id in ids:
+        if f"allowance_rm_{rm_id}" not in request.form:
+            result[rm_id] = round(defaults.get(rm_id, 0), 2)
+            continue
         raw = (request.form.get(f"allowance_rm_{rm_id}") or "").strip()
         if not raw:
             continue
@@ -185,6 +191,7 @@ def _planner_products():
                 "unit": rm.base_unit.code if rm and rm.base_unit else "",
                 "ratio": r.ratio_percent,
                 "is_flux": bool(r.is_flux),
+                "spare": r.spare_percent or 0,
             })
         packing = []
         for k in p.packing_items:
@@ -195,6 +202,7 @@ def _planner_products():
                 "name": rm.name if rm else "",
                 "unit": rm.base_unit.code if rm and rm.base_unit else "",
                 "kg_per_pack": k.kg_per_pack,
+                "spare": k.spare_percent or 0,
             })
         planner.append({
             "id": p.id,
@@ -202,6 +210,7 @@ def _planner_products():
             "name": p.name,
             "category_id": p.category_id,
             "unit": p.base_unit.code if p.base_unit else "KG",
+            "unit_weight": p.unit_weight,
             "attributes": p.attributes or {},
             "routing": _routing_for(p),
             "recipe": lines,
@@ -354,13 +363,17 @@ def production_orders_add():
     is_kg = unit_code in ("KG", "KGS")
     if is_kg:
         unit_weight = 1.0
+    elif product.unit_weight:
+        # 1 piece ka weight Product Master me fix hai — order form se nahi poochte (client meeting 2, #4)
+        unit_weight = product.unit_weight
     else:
+        # Purana product jiska weight Product Master me nahi bhara: form ki value chalti hai (Product me bharne ko kehte hain)
         try:
             unit_weight = float(weight_raw)
         except ValueError:
             unit_weight = 0
         if unit_weight <= 0:
-            flash("Enter the weight per unit in KG.", "error")
+            flash("Enter the weight per unit in KG (or set it once in the Product master).", "error")
             return redirect(url_for("production_orders.production_orders_list"))
 
     batch_kg = planned_qty * unit_weight

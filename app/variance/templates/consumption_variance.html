@@ -60,6 +60,31 @@
   <div class="cv-kpi"><span class="k">Average yield</span><span class="v">{{ kpi.yield if kpi.yield is not none else '—' }}{{ '%' if kpi.yield is not none else '' }}</span><span class="h">good output vs ordered</span></div>
 </div>
 
+{% if packing_rows %}
+{# Spool / packing check (client meeting 2, #14): liye vs bane, aur farak kahan gaya #}
+<div class="shrink-0 rounded-lg border bg-white" style="border-color:#F8CFCB">
+  <div class="px-4 py-2.5" style="background:#FFF6F5;border-bottom:1px solid #F8CFCB"><span class="text-[14.5px] font-bold" style="color:#B42318">Spool / packing check</span>
+    <span class="text-[12.5px] text-ink-muted"> — material taken for production that was not used and not returned</span></div>
+  <div class="overflow-x-auto"><table class="w-full text-[13.5px]">
+    <thead><tr class="text-left text-[11.5px] uppercase tracking-wide text-ink-faint"><th class="px-4 py-2">Order</th><th class="px-2 py-2">Material</th><th class="px-2 py-2 text-right">Taken</th><th class="px-2 py-2 text-right">Made / used</th><th class="px-2 py-2 text-right">Not found</th><th class="px-2 py-2">Issued by</th><th class="px-2 py-2">Taken by</th><th class="px-2 py-2">Status</th></tr></thead>
+    <tbody>
+    {% for r in packing_rows %}
+      <tr class="border-t border-slate-100">
+        <td class="px-4 py-2 font-semibold">{{ r.order.prod_no }}</td>
+        <td class="px-2 py-2">{{ r.material }}</td>
+        <td class="px-2 py-2 text-right tabular-nums">{{ '%g'|format(r.issued) }} {{ r.unit }}</td>
+        <td class="px-2 py-2 text-right tabular-nums">{{ '%g'|format(r.made) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums font-bold" style="color:#B42318">{{ '%g'|format(r.unaccounted + r.written_off) }}</td>
+        <td class="px-2 py-2">{{ r.issued_by|join(', ') or '—' }}</td>
+        <td class="px-2 py-2">{{ r.taken_by|join(', ') or '—' }}</td>
+        <td class="px-2 py-2">{% if r.unaccounted > 0.00005 %}<span style="color:#B42318;font-weight:600">{{ '%g'|format(r.unaccounted) }} unaccounted — return or write off</span>{% endif %}
+          {% for w in r.write_offs %}<div class="text-[12.5px]"><b>{{ '%g'|format(w.qty) }} written off</b> by {{ w.written_off_by }} · {{ w.reason }} · {{ w.write_off_date.strftime('%d %b %Y') }}</div>{% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+</div>
+{% endif %}
+
 <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
   <div class="cv-tabs">
     <a href="{{ url_for('variance.variance_list', tab='done') }}" class="{{ 'on' if tab == 'done' else '' }}">Completed orders<span>{{ done_count }}</span></a>

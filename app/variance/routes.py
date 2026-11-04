@@ -104,6 +104,33 @@ def order_variance(order, output=None):
     return result
 
 
+def packing_check():
+    """Spool / packing ka mismatch (client meeting 2, #14): jitne liye aur jitne bane, farak kahan gaya. Do tarah ki rows:
+    - abhi bhi "unaccounted" (order chal raha, maal na use hua na wapas aaya) — jab tak wapas / write-off nahi
+    - "written off" (missing likha gaya) — naam + reason ke saath, hamesha record me. Kisne diya / kisne liya issue slips se."""
+    rows = []
+    orders = ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status.in_(("In production", "Completed"))).order_by(ProductionOrder.id.desc()).all()
+    for order in orders:
+        for line in order.lines:
+            if not line.is_packing:
+                continue
+            write_offs = sorted(line.write_offs, key=lambda w: w.id)
+            unaccounted = line.leftover_qty if order.status == "In production" else 0
+            if unaccounted <= 0.00005 and not write_offs:
+                continue
+            issues = [il.issue for il in line.issue_lines if not il.issue.is_deleted and il.issue.status != "Cancelled"]
+            rm = line.raw_material
+            written = round(sum(w.qty for w in write_offs), 4)
+            rows.append({
+                "order": order, "material": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
+                "issued": line.issued_qty, "made": round((line.used_qty or 0) - written, 4),
+                "unaccounted": unaccounted, "written_off": written, "write_offs": write_offs,
+                "issued_by": sorted({i.issued_by for i in issues if i.issued_by and i.issued_by != "Auto-issue"}),
+                "taken_by": sorted({i.received_by for i in issues if i.received_by}),
+            })
+    return rows
+
+
 @variance_bp.route("/consumption_variance")
 def variance_list():
     tab = request.args.get("tab", "done")
@@ -131,7 +158,7 @@ def variance_list():
         "yield": round(sum(r["v"]["output"]["yield_pct"] for r in done_rows) / len(done_rows), 1) if done_rows else None,
         "review": len([r for r in done_rows if r["output"].reviewed_at is None]),
     }
-    return render_template("consumption_variance.html", active_nav="variance", tab=tab, result_filter=result_filter, rows=shown, kpi=kpi,
+    return render_template("consumption_variance.html", active_nav="variance", tab=tab, result_filter=result_filter, rows=shown, kpi=kpi, packing_rows=packing_check(),
                            done_count=len(done_rows), running_count=len(running_rows), tolerance=TOLERANCE_PCT)
 
 

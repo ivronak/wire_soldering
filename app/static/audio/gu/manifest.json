@@ -350,9 +350,9 @@
   "chars": 47
  },
  "fg-info": {
-  "hash": "3f1ad5ac41d3",
-  "bytes": 183744,
-  "chars": 243
+  "hash": "69fece4fd04c",
+  "bytes": 100080,
+  "chars": 134
  },
  "fg-scrap": {
   "hash": "78ac047f6315",
@@ -818,5 +818,10 @@
   "hash": "977d068fc98e",
   "bytes": 98784,
   "chars": 154
+ },
+ "fg-cat": {
+  "hash": "09705ca1f3de",
+  "bytes": 147456,
+  "chars": 183
  }
 }

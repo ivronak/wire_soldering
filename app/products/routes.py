@@ -34,6 +34,29 @@ def read_min_max():
     return values[0], values[1], None
 
 
+def read_unit_weight(base_unit_id):
+    """1 piece ka KG me weight. KG wale product me nahi chahiye (None); PCS / ROLL jaisi unit me zaroori. Return (weight, error)."""
+    unit = db.session.get(Unit, base_unit_id) if base_unit_id else None
+    if unit is None or (unit.code or "").upper() in ("KG", "KGS"):
+        return None, None
+    try:
+        weight = float((request.form.get("unit_weight") or "").strip())
+    except ValueError:
+        weight = 0
+    if weight <= 0:
+        return None, f"Enter how many kilograms are in one {unit.code}."
+    return round(weight, 4), None
+
+
+def read_spare(values, index):
+    # Recipe / packing line ka spare % (0 se 100). Khaali ya galat ho to 0.
+    try:
+        percent = float((values[index] if index < len(values) else "") or 0)
+    except ValueError:
+        percent = 0.0
+    return round(min(max(percent, 0.0), 100.0), 2)
+
+
 @products_bp.route("/products")
 def products_list():
 
@@ -105,6 +128,10 @@ def products_add():
     if mm_error:
         flash(mm_error, "error")
         return redirect(url_for('products.products_list'))
+    unit_weight, weight_error = read_unit_weight(base_unit_id)
+    if weight_error:
+        flash(weight_error, "error")
+        return redirect(url_for('products.products_list'))
     cat = ProductCategories.query.get(category_id) if category_id else None
     attr_keys = request.form.getlist('attr_key_0[]')
     attr_values = request.form.getlist('attr_value_0[]')
@@ -145,6 +172,7 @@ def products_add():
             existing.hsn_code = hsn_code
             existing.min_stock = min_stock
             existing.max_stock = max_stock
+            existing.unit_weight = unit_weight
             existing.is_active = True
             db.session.commit()
             flash("A Product restored with this code.", "success")    
@@ -164,14 +192,16 @@ def products_add():
         hsn_code=hsn_code,
         min_stock=min_stock,
         max_stock=max_stock,
+        unit_weight=unit_weight,
         is_active=True,
         is_deleted=False,
     )
-    db.session.add(product)   
+    db.session.add(product)
     db.session.flush()
 
     recipe_rms = (request.form.getlist('recipe_rm_id[]'))
     recipe_ratios = (request.form.getlist('recipe_ratio[]'))
+    recipe_spares = request.form.getlist('recipe_spare[]')          # har recipe line ka spare % (khaali = 0)
 
     recipe_stages = request.form.getlist('recipe_stage[]')          # har recipe line ka "kis stage me" (khaali = koi nahi)
     for idx, (rm_id_str, ratio_str) in enumerate(zip(recipe_rms, recipe_ratios)):
@@ -199,8 +229,9 @@ def products_add():
                        product_id=product.id,
                        raw_material_id=rm.id,
                        ratio_percent=ratio,
-                       is_flux=is_flux, 
+                       is_flux=is_flux,
                        work_stage_id=stage_id,
+                       spare_percent=read_spare(recipe_spares, idx),
                     ))
             except (ValueError, TypeError):
                 continue
@@ -210,6 +241,7 @@ def products_add():
     pk_rms = request.form.getlist('packing_rm_id[]')
     pk_kgs = request.form.getlist('packing_kg[]')
     pk_stages = request.form.getlist('packing_stage[]')
+    pk_spares = request.form.getlist('packing_spare[]')
     seen_pk = set()
     for pk_idx, (rm_id_str, kg_str) in enumerate(zip(pk_rms, pk_kgs)):
         try:
@@ -226,7 +258,8 @@ def products_add():
         if raw_stage.isdigit():
             pk_stage = WorkStage.query.get(int(raw_stage))
             pk_stage_id = pk_stage.id if pk_stage and not pk_stage.is_deleted else None
-        db.session.add(ProductPackingItem(product_id=product.id, raw_material_id=rm.id, kg_per_pack=kg, work_stage_id=pk_stage_id))
+        db.session.add(ProductPackingItem(product_id=product.id, raw_material_id=rm.id, kg_per_pack=kg, work_stage_id=pk_stage_id,
+                                          spare_percent=read_spare(pk_spares, pk_idx)))
 
     if cat:
         fields = list(cat.attribute_fields or [])
@@ -263,6 +296,10 @@ def products_edit(p_id):
     if mm_error:
         flash(mm_error, "error")
         return redirect(url_for('products.products_list'))
+    unit_weight, weight_error = read_unit_weight(base_unit_id)
+    if weight_error:
+        flash(weight_error, "error")
+        return redirect(url_for('products.products_list'))
     cat = ProductCategories.query.get(category_id) if category_id else None
     attr_keys = request.form.getlist('attr_key_0[]')
     attr_values = request.form.getlist('attr_value_0[]')
@@ -297,12 +334,14 @@ def products_edit(p_id):
     p.hsn_code = hsn_code
     p.min_stock = min_stock
     p.max_stock = max_stock
+    p.unit_weight = unit_weight
     p.is_deleted = False
 
     VariantRecipeItem.query.filter_by(product_id=p.id).delete()
 
     recipe_rms = (request.form.getlist('recipe_rm_id[]'))
     recipe_ratios = (request.form.getlist('recipe_ratio[]'))
+    recipe_spares = request.form.getlist('recipe_spare[]')          # har recipe line ka spare % (khaali = 0)
 
     recipe_stages = request.form.getlist('recipe_stage[]')          # har recipe line ka "kis stage me" (khaali = koi nahi)
     for idx, (rm_id_str, ratio_str) in enumerate(zip(recipe_rms, recipe_ratios)):
@@ -330,8 +369,9 @@ def products_edit(p_id):
                        product_id=p.id,
                        raw_material_id=rm.id,
                        ratio_percent=ratio,
-                       is_flux=is_flux, 
+                       is_flux=is_flux,
                        work_stage_id=stage_id,
+                       spare_percent=read_spare(recipe_spares, idx),
                     ))
             except (ValueError, TypeError):
                 continue
@@ -342,6 +382,7 @@ def products_edit(p_id):
     pk_rms = request.form.getlist('packing_rm_id[]')
     pk_kgs = request.form.getlist('packing_kg[]')
     pk_stages = request.form.getlist('packing_stage[]')
+    pk_spares = request.form.getlist('packing_spare[]')
     seen_pk = set()
     for pk_idx, (rm_id_str, kg_str) in enumerate(zip(pk_rms, pk_kgs)):
         try:
@@ -358,7 +399,8 @@ def products_edit(p_id):
         if raw_stage.isdigit():
             pk_stage = WorkStage.query.get(int(raw_stage))
             pk_stage_id = pk_stage.id if pk_stage and not pk_stage.is_deleted else None
-        db.session.add(ProductPackingItem(product_id=p.id, raw_material_id=rm.id, kg_per_pack=kg, work_stage_id=pk_stage_id))
+        db.session.add(ProductPackingItem(product_id=p.id, raw_material_id=rm.id, kg_per_pack=kg, work_stage_id=pk_stage_id,
+                                          spare_percent=read_spare(pk_spares, pk_idx)))
 
     if cat:
         fields = list(cat.attribute_fields or [])

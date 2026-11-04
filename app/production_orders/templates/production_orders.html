@@ -1038,8 +1038,15 @@
     var isKg = unit === 'KG' || unit === 'KGS';
     weightBox.classList.toggle('hidden', isKg);
     qtyLabel.textContent = isKg ? 'How many KG to make *' : ('How many ' + unitName + ' to make *');
-    if (!isKg) {
-      weightNote.textContent = 'This product is in ' + unitName + ', not kilograms. The recipe is calculated in KG, so enter how many kilograms are in one ' + unitName + '.';
+    // 1 piece ka weight Product Master me fix ho to yahan box nahi (client meeting 2, #4); purane product me jiska weight nahi bhara wahan box chalta hai
+    var fixedWeight = !isKg && product.unit_weight ? product.unit_weight : 0;
+    weightLabel.classList.toggle('hidden', !!fixedWeight);
+    weightInput.classList.toggle('hidden', !!fixedWeight);
+    if (fixedWeight) {
+      weightInput.value = fixedWeight;
+      weightNote.textContent = '1 ' + unitName + ' = ' + fixedWeight + ' KG (fixed in the Product master). The recipe is calculated in KG.';
+    } else if (!isKg) {
+      weightNote.textContent = 'This product is in ' + unitName + ', not kilograms. The recipe is calculated in KG, so enter how many kilograms are in one ' + unitName + ' (or set it once in the Product master).';
       weightLabel.textContent = 'Kilograms in one ' + unitName + ' *';
     }
     var qty = parseFloat(qtyInput.value) || 0;
@@ -1056,6 +1063,7 @@
       return;
     }
     linesBody.innerHTML = product.recipe.map(function (line) {
+      if (ALLOW[line.rm_id] === undefined) ALLOW[line.rm_id] = line.spare || 0;          // Product Master ka Spare % pehle se bhara
       var need = batchKg * (line.ratio || 0) / 100;
       var have = STORE[String(line.rm_id)] || 0;
       var short = need - have;
@@ -1069,6 +1077,7 @@
         '<td>' + status + '</td>' + spareCell(line.rm_id) +
         '</tr>';
     }).join('') + (product.packing || []).map(function (k) {
+      if (ALLOW[k.rm_id] === undefined) ALLOW[k.rm_id] = k.spare || 0;
       var need = Math.ceil(Math.round(batchKg / k.kg_per_pack * 1e6) / 1e6);
       var have = STORE[String(k.rm_id)] || 0;
       var short = need - have;

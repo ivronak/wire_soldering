@@ -10,7 +10,7 @@ from flask import render_template, Blueprint, request, redirect, url_for, flash,
 from app.extensions import db
 from app.inventory.money import q4
 from app.inventory.posting import rm_warehouse_of, wip_warehouse_for, available_lots, issue_to_wip, issue_cancelled, material_return_post, material_return_cancel, InventoryError
-from app.models import MaterialIssue, MaterialIssueLine, MaterialReturn, MaterialReturnLine, ProductionOrder, ProductionOrderLine
+from app.models import MaterialIssue, MaterialIssueLine, MaterialReturn, MaterialReturnLine, MaterialWriteOff, ProductionOrder, ProductionOrderLine
 from app.production_orders.scheduler import live_schedule
 
 RETURN_REASONS = ["Unused spare (allowance)", "Not needed (excess)", "Wrong material issued", "Order changed", "Other"]
@@ -233,6 +233,35 @@ def read_issue_form():
     return {"order": order, "issue_date": issue_date, "remarks": remarks, "issued_by": issued_by, "received_by": received_by, "allocation": allocation}, None
 
 
+def auto_issue_extra(order, order_line, qty, received_by, remarks):
+    """Production ko store se ek click me extra maal (client meeting 2, #14): jaise 500 spool diye the par 520 bane to 20 aur.
+    Normal issue jaisa hi: FIFO lot, stock WIP me, naam + reason ke saath. Store me kam ho to InventoryError (kuch save nahi hota)."""
+    qty = q4(qty)
+    allocation = []
+    left = qty
+    for lot, free in free_lots(order_line.raw_material_id, order):
+        take = min(free, left)
+        allocation.append((lot, take))
+        left = round(left - take, 4)
+        if left <= 0.00005:
+            break
+    if left > 0.00005:
+        name = order_line.raw_material.name if order_line.raw_material else "Material"
+        raise InventoryError(f"{name}: {qty:g} more is needed but only {qty - left:g} is free in the store.")
+    today = date.today()
+    count = MaterialIssue.query.filter(MaterialIssue.issue_no.like(f"MI-{today.year}-%")).count()
+    issue = MaterialIssue(issue_no=f"MI-{today.year}-{count + 1:03d}", production_order=order, issue_date=today, status="Draft",
+                          remarks=remarks[:255], is_deleted=False, issued_by="Auto-issue", received_by=received_by[:60])
+    db.session.add(issue)
+    for lot, take in allocation:
+        db.session.add(MaterialIssueLine(issue=issue, production_order_line=order_line, raw_material_id=order_line.raw_material_id, lot=lot, qty=take))
+    issue_to_wip(issue)
+    issue.status = "Posted"
+    db.session.flush()
+    db.session.expire(order_line)            # issued_qty dobara nikle (nayi issue line ke saath)
+    return issue
+
+
 @material_issues_bp.route("/material_issues/add", methods=["POST"])
 def material_issues_add():
     data, error = read_issue_form()
@@ -385,6 +414,52 @@ def material_returns_add():
     db.session.commit()
     flash(f"Material return {return_no} posted: the material went from WIP back to the store.", "success")
     return redirect(list_url("returns"))
+
+
+@material_issues_bp.route("/material_issues/writeoff", methods=["POST"])
+def material_writeoff_add():
+    """Output se pehle bacha hua maal na mile (jaise 80 khali spool kho gaye) to "missing" likho: naam + reason zaroori (client meeting 2, #14).
+    Qty line ki used_qty me jud jaati hai (output par WIP se consume, cost FG me), aur record yahin rehta hai — mismatch list / variance me dikhta hai."""
+    order = db.session.get(ProductionOrder, request.form.get("production_order_id", type=int) or 0)
+    back = redirect(url_for("production_output.production_output_list", tab="ready"))
+    if order is None or order.is_deleted or order.status != "In production":
+        flash("Material can be written off only for an order that is in production.", "error")
+        return back
+    by = (request.form.get("written_off_by") or "").strip()[:60]
+    reason = (request.form.get("reason") or "").strip()[:255]
+    if not by or len(reason) < 3:
+        flash("Write who is responsible and the reason for the write-off.", "error")
+        return back
+    rows = []
+    i = 0
+    while True:
+        line_id = request.form.get(f"line_id_{i}", type=int)
+        if line_id is None:
+            break
+        qty = request.form.get(f"qty_{i}", type=float)
+        i += 1
+        if not qty:
+            continue
+        line = db.session.get(ProductionOrderLine, line_id)
+        name = line.raw_material.name if line and line.raw_material else "Material"
+        if line is None or line.production_order_id != order.id or qty < 0:
+            flash("A material line does not belong to this production order.", "error")
+            return back
+        if round(qty, 4) > line.leftover_qty + 0.00005:
+            flash(f"{name}: only {line.leftover_qty:g} is unaccounted for, so {qty:g} cannot be written off.", "error")
+            return back
+        rows.append((line, q4(qty)))
+    if not rows:
+        flash("Enter a quantity to write off.", "error")
+        return back
+    for line, qty in rows:
+        db.session.add(MaterialWriteOff(production_order=order, order_line_id=line.id, raw_material_id=line.raw_material_id, qty=qty,
+                                        reason=reason, written_off_by=by, write_off_date=date.today()))
+        line.used_qty = q4((line.used_qty or 0) + qty)
+    db.session.commit()
+    flash("Written off as missing: " + "; ".join(f"{q:g} {l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else ''} {l.raw_material.name if l.raw_material else ''}".replace("  ", " ") for l, q in rows)
+          + f". It is recorded under {by}.", "success")
+    return back
 
 
 @material_issues_bp.route("/material_issues/return/cancel/<int:return_id>", methods=["POST"])

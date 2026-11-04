@@ -29,6 +29,22 @@ def work_stages_list():
         result_count=total_count,
     )
 
+def read_billet_fields():
+    # (is_billet_stage, billet_weight, no_scrap). Billet stage me scrap auto nikalta hai, isliye "no scrap" tab nahi lagta.
+    is_billet = request.form.get('is_billet_stage') == 'on'
+    no_scrap = request.form.get('no_scrap') == 'on' and not is_billet
+    weight = None
+    raw = (request.form.get('billet_weight') or '').strip()
+    if raw:
+        try:
+            weight = float(raw)
+        except ValueError:
+            weight = None
+        if weight is not None and weight <= 0:
+            weight = None
+    return is_billet, (weight if is_billet else None), no_scrap
+
+
 @work_stages_bp.route('/work_stages/add', methods=['POST'])
 def work_stages_add():
     # Code ab auto-generated hai — form se nahi aata
@@ -38,6 +54,7 @@ def work_stages_add():
     is_batch = request.form.get('is_batch') == 'on'
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
     scrap_after_next = request.form.get('scrap_after_next') == 'on'
+    is_billet_stage, billet_weight, no_scrap = read_billet_fields()
 
     if not name:
         return redirect(url_for('work_stages.work_stages_list'))
@@ -52,6 +69,7 @@ def work_stages_add():
             existing.is_batch = is_batch
             existing.requires_lab_qc = requires_lab_qc
             existing.scrap_after_next = scrap_after_next
+            existing.is_billet_stage, existing.billet_weight, existing.no_scrap = is_billet_stage, billet_weight, no_scrap
             existing.is_active = True
             db.session.commit()
             flash("Work Stage restored with this code.","success")
@@ -67,6 +85,9 @@ def work_stages_add():
         is_batch=is_batch,
         requires_lab_qc=requires_lab_qc,
         scrap_after_next=scrap_after_next,
+        is_billet_stage=is_billet_stage,
+        billet_weight=billet_weight,
+        no_scrap=no_scrap,
         is_active=True,
         is_deleted=False,
     ))
@@ -83,6 +104,7 @@ def work_stages_edit(stage_id):
     is_batch = request.form.get('is_batch') == 'on'
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
     scrap_after_next = request.form.get('scrap_after_next') == 'on'
+    is_billet_stage, billet_weight, no_scrap = read_billet_fields()
 
     if not name:
         return redirect(url_for('work_stages.work_stages_list'))
@@ -93,6 +115,7 @@ def work_stages_edit(stage_id):
     s.is_batch = is_batch
     s.requires_lab_qc = requires_lab_qc
     s.scrap_after_next = scrap_after_next
+    s.is_billet_stage, s.billet_weight, s.no_scrap = is_billet_stage, billet_weight, no_scrap
     db.session.commit()
     flash("Work Stage Updated", "success")
     return redirect(url_for('work_stages.work_stages_list'))

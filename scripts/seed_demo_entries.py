@@ -69,6 +69,11 @@ if not ProductPackingItem.query.filter_by(product_id=product.id).first():
     db.session.add(ProductPackingItem(product_id=product.id, raw_material_id=carton.id, kg_per_pack=25, work_stage_id=stage_pack.id))
     product.base_unit_id = pcs.id
     say(f"{product.code} now in PCS: 1 spool per 0.5 KG (Spooling), 1 box per 25 KG (Packing)")
+# Spare % Product Master me (client meeting 2, #4): sab 0 ho tabhi demo value daalte hain (Tin / Lead 1%, Flux 5%)
+if all((item.spare_percent or 0) == 0 for item in product.recipe_items):
+    for item in product.recipe_items:
+        item.spare_percent = 5 if item.is_flux else 1
+    say(f"{product.code}: spare % set in the recipe (metals 1%, flux 5%)")
 db.session.commit()
 
 # ---- 4. Opening stock ----

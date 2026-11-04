@@ -314,8 +314,9 @@
       <section class="mi-step">
         <div class="flex items-center justify-between gap-2 mb-2">
           <p class="text-[12.5px] text-ink-faint">Type how much of each material to issue now. It is taken from the store, oldest lot first. Spare is the order's extra allowance for wastage: issue it only if you want it on the floor; what is not used must come back before the output. For a running order you can issue more than this if you write the reason in Remarks.</p>
-          <span class="flex gap-2"><button type="button" id="mi-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Fill needed</button>
-            <button type="button" id="mi-fill-spare" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Fill with spare</button></span>
+          {# Client (meeting 2, #8): "Fill needed" hi main button; spare wala chhota link, aur dabane par pehle confirm — taaki line wala bhool se na dabaye #}
+          <span class="flex flex-col items-end gap-1"><button type="button" id="mi-fill" class="mi-btn primary" style="padding:5px 12px;white-space:nowrap">Fill needed</button>
+            <button type="button" id="mi-fill-spare" class="text-[11.5px] text-ink-faint underline hover:text-ink" style="background:none;border:0;cursor:pointer;padding:0">with spare…</button></span>
         </div>
         <div class="overflow-x-auto rounded-lg">
           <table class="lines-table">
@@ -422,7 +423,12 @@
     document.querySelectorAll('#mi-lines .mi-qty').forEach(function (i) { i.value = i.getAttribute('data-max'); });
   });
   document.getElementById('mi-fill-spare').addEventListener('click', function () {
-    document.querySelectorAll('#mi-lines .mi-qty').forEach(function (i) { i.value = i.getAttribute('data-maxall'); });
+    window.showConfirm('Issue the spare too? What is not used must come back to the store before the output.', {
+      title: 'Fill with spare', confirmText: 'Yes, fill with spare', cancelText: 'Cancel', variant: 'warning'
+    }).then(function (ok) {
+      if (!ok) return;
+      document.querySelectorAll('#mi-lines .mi-qty').forEach(function (i) { i.value = i.getAttribute('data-maxall'); });
+    });
   });
   ['mi-close', 'mi-cancel', 'mi-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(miModal); }); });
 
