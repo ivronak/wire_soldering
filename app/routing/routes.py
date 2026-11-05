@@ -72,6 +72,16 @@ def used_input(order, stage, used_map):
     return round(total, 4) if found else None
 
 
+def _auto_extra_qty(line):
+    # Lab correction / complete form se auto-issue hua extra maal (slip "Auto-issue"): ye pakka lagta hai, isliye "used" ka default zaroorat + ye
+    total = 0.0
+    for issue_line in line.issue_lines:
+        issue = issue_line.issue
+        if not issue.is_deleted and issue.status == "Posted" and issue.issued_by == "Auto-issue":
+            total += issue_line.qty - issue_line.returned_qty
+    return total
+
+
 def stage_material_rows(order, stage):
     # Complete form ke liye: jin lines ka maal production ko mil chuka (issued > 0) unki asli use likhni hai. Issued nahi to puchte nahi
     # (maal baad me issue hua to purana tareeka chalta hai: output par WIP ka saara maal use).
@@ -83,7 +93,7 @@ def stage_material_rows(order, stage):
         rows.append({"id": line.id, "name": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
                      "needed": round(line.required_qty, 4), "spare": line.allowance_qty, "issued": line.issued_qty,
                      "kgpp": line.kg_per_pack if line.is_packing else None,
-                     "default": round(min(line.required_qty, line.issued_qty), 4), "counts": counts_to_input(line, side_stage_info(order, stage) is not None)})
+                     "default": round(min(line.required_qty + _auto_extra_qty(line), line.issued_qty), 4), "counts": counts_to_input(line, side_stage_info(order, stage) is not None)})
     return rows
 
 
@@ -156,6 +166,16 @@ def _machine_choices(stage):
     return choices
 
 
+def lab_lines(order, stage):
+    # Lab test form ke "Correction" rows ke liye: is stage ka material (Tin / Lead ...) — kitna chahiye, kitna issue ho chuka
+    rows = []
+    for line in stage_lines(order, stage):
+        rm = line.raw_material
+        rows.append({"id": line.id, "name": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
+                     "needed": round(line.required_qty, 4), "issued": line.issued_qty})
+    return rows
+
+
 @routing_bp.route("/routing")
 def routing_list():
     tab = request.args.get("tab", "running")
@@ -202,7 +222,7 @@ def routing_list():
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
-        operators=operators, stage_unit=stage_unit, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
+        operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"),
     )
 
@@ -395,17 +415,14 @@ def routing_complete(stage_id):
             flash(f"{name}: the quantity used cannot be negative.", "error")
             return _back()
         if used > line.issued_qty + EPS:
-            if line.is_packing:
-                # Spool / box jyada bane (520 bane, 500 diye the): store se ek click me extra issue, kisne liya uska naam zaroori (client meeting 2, #14)
-                taken_by = (request.form.get(f"extra_by_{line.id}") or "").strip()[:60]
-                if not taken_by:
-                    flash(f"{name}: {used:g} {mat_unit} were made but only {line.issued_qty:g} {mat_unit} were issued. Write who took the extra {used - line.issued_qty:g} {mat_unit} from the store.", "error")
-                    return _back()
-                reason = (request.form.get(f"extra_reason_{line.id}") or "").strip()[:200] or "More made than issued"
-                extra_issues.append((line, round(used - line.issued_qty, 4), taken_by, reason))
-            else:
-                flash(f"{name}: {used:g} {mat_unit} used is more than what was issued to production ({line.issued_qty:g} {mat_unit}). Issue the extra material first.", "error")
+            # Jyada laga (spool 520 bane / metal correction me zyada gaya): store se ek click me extra issue, kisne liya uska naam zaroori
+            # (client meeting 2, #14 spool, #12 sab material). Koi % cap nahi.
+            taken_by = (request.form.get(f"extra_by_{line.id}") or "").strip()[:60]
+            if not taken_by:
+                flash(f"{name}: {used:g} {mat_unit} used but only {line.issued_qty:g} {mat_unit} were issued. Write who took the extra {round(used - line.issued_qty, 4):g} {mat_unit} from the store.", "error")
                 return _back()
+            reason = (request.form.get(f"extra_reason_{line.id}") or "").strip()[:200] or "More used than issued"
+            extra_issues.append((line, round(used - line.issued_qty, 4), taken_by, reason))
         used_map[line.id] = round(used, 4)
     work_hours = None
     hours_raw = (request.form.get("work_hours") or "").strip()
@@ -596,9 +613,29 @@ def routing_lab_qc(stage_id):
     if not tested_by:
         flash("Enter who did the lab test.", "error")
         return _back()
-    if result not in ("Pass", "Fail"):
-        flash("Choose the lab result: Pass or Fail.", "error")
+    if result not in ("Pass", "Need correction", "Fail"):
+        flash("Choose the lab result: Pass, Need correction or Fail.", "error")
         return _back()
+    # Correction (client meeting 2, #12): lab ne kaha metal kam / zyada — jo extra metal dala wo yahin likho, store se apne aap issue ho jaata hai.
+    # Koi % cap nahi (2% sirf andaza). Naam zaroori; reason na likho to remarks / "Lab correction".
+    allowed_lines = {line.id: line for line in stage_lines(order, stage)}
+    wanted_extra = {}
+    index = 0
+    while f"extra_line_{index}" in request.form:
+        line_id = request.form.get(f"extra_line_{index}", type=int)
+        extra_qty = request.form.get(f"extra_qty_{index}", type=float)
+        index += 1
+        if not extra_qty:
+            continue
+        if extra_qty < 0 or line_id not in allowed_lines:
+            flash("Choose a material of this stage and a quantity above zero for the correction.", "error")
+            return _back()
+        wanted_extra[line_id] = round(wanted_extra.get(line_id, 0) + extra_qty, 4)
+    added_by = (request.form.get("extra_by") or "").strip()[:60]
+    if wanted_extra and not added_by:
+        flash("Write who added the extra material.", "error")
+        return _back()
+    extra_reason = (request.form.get("extra_reason") or "").strip()[:200] or remarks or "Lab correction"
     tc = request.files.get("tc_file")
     has_file = bool(tc and tc.filename)
     if result == "Pass" and not has_file:
@@ -615,7 +652,22 @@ def routing_lab_qc(stage_id):
         if size > MAX_TC_BYTES:
             flash("The test certificate file is too large (maximum 5 MB).", "error")
             return _back()
-    row = StageLabQC(stage_id=stage.id, tested_at=tested_at, tested_by=tested_by, result=result, remarks=remarks)
+    corrections = []
+    if wanted_extra:
+        from app.inventory.posting import InventoryError
+        from app.material_issues.routes import auto_issue_extra
+        for line_id, extra_qty in wanted_extra.items():
+            line = allowed_lines[line_id]
+            try:
+                issue = auto_issue_extra(order, line, extra_qty, added_by, f"Lab correction at {stage.stage_name}: {extra_reason}")
+            except InventoryError as stock_error:
+                db.session.rollback()
+                flash(str(stock_error), "error")
+                return _back()
+            rm = line.raw_material
+            corrections.append({"material": rm.name if rm else "", "qty": extra_qty, "unit": rm.base_unit.code if rm and rm.base_unit else "",
+                                "added_by": added_by, "reason": extra_reason, "issue_no": issue.issue_no})
+    row = StageLabQC(stage_id=stage.id, tested_at=tested_at, tested_by=tested_by, result=result, remarks=remarks, corrections=corrections or None)
     db.session.add(row)
     db.session.flush()                      # id chahiye: file ka folder QC id se banta hai
     if has_file:
@@ -625,10 +677,13 @@ def routing_lab_qc(stage_id):
         tc.save(os.path.join(folder, name))
         row.tc_file = "lab_qc/" + str(row.id) + "/" + name         # DB me hamesha "/"
     db.session.commit()
+    added_text = (" Extra issued from the store: " + ", ".join(f"{c['qty']:g} {c['unit']} {c['material']}".replace("  ", " ") for c in corrections) + ".") if corrections else ""
     if result == "Pass":
-        flash(f"Lab test passed for {stage.stage_name} ({order.prod_no}) and the TC is saved. The next stage can start.", "success")
+        flash(f"Lab test passed for {stage.stage_name} ({order.prod_no}) and the TC is saved. The next stage can start.{added_text}", "success")
+    elif result == "Need correction":
+        flash(f"Lab test for {stage.stage_name} ({order.prod_no}): correction needed.{added_text} Record the next test after the correction.", "success")
     else:
-        flash(f"Lab test failed for {stage.stage_name} ({order.prod_no}). Correct the batch and record the next test.", "success")
+        flash(f"Lab test failed for {stage.stage_name} ({order.prod_no}). Correct the batch and record the next test.{added_text}", "success")
     return _back()
 
 

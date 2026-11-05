@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash *wa_check.sh)",
+      "Bash(bash agent/deploy/vps_run.sh *)",
+      "Bash(bash *run_rosenthal_backups.sh)"
+    ]
+  }
+}

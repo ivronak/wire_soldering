@@ -157,10 +157,11 @@
               <div class="rt-labqc" style="margin-top:8px;padding:8px 10px;border:1px solid {{ '#B7E0C7' if lab_qc_passed(st) else '#F5D9B5' }};background:{{ '#F3FAF6' if lab_qc_passed(st) else '#FFF4E5' }};border-radius:8px">
                 <div style="font-weight:700;font-size:12.5px;color:{{ '#1F7A4D' if lab_qc_passed(st) else '#7A4A12' }}">Lab QC · {{ 'Passed — TC uploaded, next stage can start' if lab_qc_passed(st) else 'TC pending — next stage is blocked' }}</div>
                 {% for q in st.lab_qcs %}
-                <div class="rt-meta">{{ q.tested_at.strftime('%d %b %H:%M') }} · {{ q.tested_by }} · <b style="color:{{ '#1F7A4D' if q.result == 'Pass' else '#B42318' }}">{{ q.result }}</b>{% if q.tc_file %} · <a href="{{ url_for('routing.routing_tc', qc_id=q.id) }}" target="_blank" style="color:#8A4A1C;font-weight:600">View TC</a>{% endif %}{% if q.remarks %} · {{ q.remarks }}{% endif %}</div>
+                <div class="rt-meta">{{ q.tested_at.strftime('%d %b %H:%M') }} · {{ q.tested_by }} · <b style="color:{{ '#1F7A4D' if q.result == 'Pass' else ('#8A4A1C' if q.result == 'Need correction' else '#B42318') }}">{{ q.result }}</b>{% if q.tc_file %} · <a href="{{ url_for('routing.routing_tc', qc_id=q.id) }}" target="_blank" style="color:#8A4A1C;font-weight:600">View TC</a>{% endif %}{% if q.remarks %} · {{ q.remarks }}{% endif %}</div>
+                {% for c in (q.corrections or []) %}<div class="rt-meta" style="padding-left:12px">+ {{ '%g'|format(c.qty) }} {{ c.unit }} {{ c.material }} added by {{ c.added_by }} · issued automatically ({{ c.issue_no }}){% if c.reason %} · {{ c.reason }}{% endif %}</div>{% endfor %}
                 {% endfor %}
                 {% if st.status != 'Pending' and not lab_qc_passed(st) %}
-                <button type="button" class="rt-labqc-btn rt-btn teal" data-stage="{{ st.id }}" data-name="{{ st.stage_name }}" style="margin-top:6px;padding:4px 12px">Record lab test + TC</button>
+                <button type="button" class="rt-labqc-btn rt-btn teal" data-stage="{{ st.id }}" data-name="{{ st.stage_name }}" data-lines='{{ lab_lines(o, st)|tojson }}' style="margin-top:6px;padding:4px 12px">Record lab test + TC</button>
                 {% elif st.status == 'Pending' %}<div class="rt-meta">Available once this stage has started.</div>{% endif %}
               </div>
               {% endif %}
@@ -227,10 +228,20 @@
         <div><label class="rt-label">Tested at</label><input type="datetime-local" name="tested_at" id="lq-when" class="rt-input" /></div>
         <div>
           <label class="rt-label">Result *</label>
-          <select name="result" id="lq-result" class="rt-input"><option value="">Choose…</option><option value="Pass">Pass — alloy is OK</option><option value="Fail">Fail — needs correction</option></select>
+          <select name="result" id="lq-result" class="rt-input"><option value="">Choose…</option><option value="Pass">Pass — alloy is OK (TC needed)</option><option value="Need correction">Need correction — add metal, test again</option><option value="Fail">Fail — batch rejected</option></select>
         </div>
         <div id="lq-file-box"><label class="rt-label">Test certificate (TC) — PDF / PNG / JPG</label><input type="file" name="tc_file" id="lq-file" accept=".pdf,.png,.jpg,.jpeg" class="rt-input" /><p class="text-[11.5px] text-ink-faint mt-1">Required for a Pass. It stays linked to this order and lot.</p></div>
         <div><label class="rt-label">Remarks</label><input type="text" name="remarks" id="lq-remarks" maxlength="255" class="rt-input" placeholder="e.g. Tin 59.8%, needs 1 KG more Tin" autocomplete="off" /></div>
+      </div>
+      {# Correction: lab ne metal kam / zyada bataya to jo extra dala wo yahin likho — store se apne aap issue (client meeting 2, #12) #}
+      <div class="rt-box space-y-3" id="lq-corr-box">
+        <div class="text-[12.5px] text-ink-muted"><b>Correction — extra material added</b> (optional). It is issued from the store automatically when you save. There is no limit.</div>
+        <div id="lq-corr-rows" class="space-y-2"></div>
+        <button type="button" id="lq-corr-add" class="text-[12.5px] font-semibold underline" style="color:#8A4A1C">+ add a material</button>
+        <div id="lq-corr-who" style="display:none" class="space-y-3">
+          <div><label class="rt-label">Added by *</label><input type="text" name="extra_by" id="lq-extra-by" maxlength="60" class="rt-input" placeholder="Who put the extra metal in?" autocomplete="off" /></div>
+          <div><label class="rt-label">Reason</label><input type="text" name="extra_reason" maxlength="200" class="rt-input" placeholder="Defaults to the remarks above" autocomplete="off" /></div>
+        </div>
       </div>
     </form>
     <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
@@ -405,13 +416,13 @@
         return '<tr><td class="py-1">' + esc(m.name) + (m.kgpp ? '<div class="text-[11px] text-ink-faint">1 pack per ' + m.kgpp + ' KG of output</div>' : '') + '</td>' +
           '<td class="py-1 text-right tabular-nums">' + m.needed + (m.spare ? ' <span class="text-ink-faint">+' + m.spare + '</span>' : '') + ' ' + esc(m.unit) + '</td>' +
           '<td class="py-1 text-right tabular-nums">' + m.issued + '</td>' +
-          '<td class="py-1"><input type="number" step="any" min="0"' + (m.kgpp ? '' : ' max="' + m.issued + '"') + ' name="used_' + m.id + '" value="' + m.default + '" data-id="' + m.id + '" data-issued="' + m.issued + '" data-counts="' + (m.counts ? 1 : 0) + '"' + (m.kgpp ? ' data-kgpp="' + m.kgpp + '"' : '') + ' required class="rt-input rt-used" /></td></tr>' +
-          (m.kgpp ? '<tr class="rt-avg" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-1 text-[12px]"></td></tr>' +
+          '<td class="py-1"><input type="number" step="any" min="0" name="used_' + m.id + '" value="' + m.default + '" data-id="' + m.id + '" data-issued="' + m.issued + '" data-counts="' + (m.counts ? 1 : 0) + '"' + (m.kgpp ? ' data-kgpp="' + m.kgpp + '"' : '') + ' required class="rt-input rt-used" /></td></tr>' +
+          (m.kgpp ? '<tr class="rt-avg" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-1 text-[12px]"></td></tr>' : '') +
             '<tr class="rt-extra" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-2"><div class="rounded-lg border border-copper-border bg-copper-soft px-3 py-2 space-y-2">' +
             '<div class="text-[12.5px] rt-extra-msg"></div>' +
             '<div class="grid grid-cols-2 gap-2"><div><label class="rt-label">Taken by *</label><input type="text" name="extra_by_' + m.id + '" maxlength="60" class="rt-input rt-extra-by" placeholder="Who took them from the store?" autocomplete="off" /></div>' +
-            '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. more spools wound" autocomplete="off" /></div></div>' +
-            '<div class="text-[11.5px] text-ink-faint">The extra ones are issued from the store automatically when you complete the stage.</div></div></td></tr>' : '');
+            '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. lab correction, more spools wound" autocomplete="off" /></div></div>' +
+            '<div class="text-[11.5px] text-ink-faint">The extra is issued from the store automatically when you complete the stage. No limit.</div></div></td></tr>';
       }).join('');
       STARTED = a.started_iso || ''; HOURS_EDITED = false;
       autoHours();
@@ -439,13 +450,14 @@
       var issued = parseFloat(i.getAttribute('data-issued'));
       var used = parseFloat(i.value) || 0;
       var over = used > issued + 0.00005;
-      if (i.hasAttribute('data-kgpp')) {
-        // Packing (spool / box): zyada bane to error nahi, extra auto-issue ka panel (naam zaroori)
+      {
+        // Saare material: issue se zyada laga to error nahi, extra auto-issue ka panel (naam zaroori) — spool 520 bane, metal correction
+
         var panel = document.querySelector('#rt-mats .rt-extra[data-for="' + i.getAttribute('data-id') + '"]');
         if (panel) {
           panel.style.display = over ? 'table-row' : 'none';
           panel.querySelector('.rt-extra-by').required = over;
-          panel.querySelector('.rt-extra-msg').innerHTML = over ? '<b>' + Math.round((used - issued) * 10000) / 10000 + ' more</b> were made than issued (' + issued + '). Issue the extra from the store now.' : '';
+          panel.querySelector('.rt-extra-msg').innerHTML = over ? '<b>' + Math.round((used - issued) * 10000) / 10000 + ' more</b> than what was issued (' + issued + '). Write who took the extra from the store.' : '';
         }
         over = false;
       }
@@ -533,11 +545,40 @@
   // ---------- Lab QC + TC ----------
   (function () {
     var m = document.getElementById('lq-modal'), f = document.getElementById('lq-form');
+    var LAB_LINES = [], corrIndex = 0;
+    function syncCorr() {
+      var any = false;
+      document.querySelectorAll('#lq-corr-rows .lq-corr-qty').forEach(function (i) { any = any || (parseFloat(i.value) || 0) > 0; });
+      document.getElementById('lq-corr-who').style.display = any ? 'block' : 'none';
+      document.getElementById('lq-extra-by').required = any;
+    }
+    function addCorrRow() {
+      var i = corrIndex++;
+      var opts = LAB_LINES.map(function (l) { return '<option value="' + l.id + '">' + esc(l.name) + ' (needed ' + l.needed + ' ' + esc(l.unit) + ')</option>'; }).join('');
+      var div = document.createElement('div');
+      div.className = 'flex items-center gap-2';
+      div.innerHTML = '<select name="extra_line_' + i + '" class="rt-input" style="flex:1">' + opts + '</select>' +
+        '<input type="number" step="any" min="0" name="extra_qty_' + i + '" class="rt-input lq-corr-qty" style="width:100px" placeholder="Qty" />' +
+        '<span class="text-[12px] text-ink-faint lq-corr-note"></span>';
+      document.getElementById('lq-corr-rows').appendChild(div);
+    }
+    document.getElementById('lq-corr-add').addEventListener('click', function () { if (LAB_LINES.length) addCorrRow(); });
+    // Extra kitna % hai (sirf jaankari, koi limit nahi)
+    document.getElementById('lq-corr-rows').addEventListener('input', function (e) {
+      var row = e.target.closest('.flex'); if (!row) return;
+      var sel = row.querySelector('select'), qty = parseFloat(row.querySelector('.lq-corr-qty').value) || 0;
+      var line = LAB_LINES.filter(function (l) { return String(l.id) === sel.value; })[0];
+      row.querySelector('.lq-corr-note').textContent = line && qty > 0 && line.needed > 0 ? '= ' + (Math.round(qty / line.needed * 1000) / 10) + '% of needed' : '';
+      syncCorr();
+    });
     function close() { m.classList.add('hidden'); m.setAttribute('aria-hidden', 'true'); }
     document.querySelectorAll('.rt-labqc-btn').forEach(function (b) {
       b.addEventListener('click', function (e) {
         e.stopPropagation();
         f.reset();
+        LAB_LINES = []; try { LAB_LINES = JSON.parse(b.getAttribute('data-lines') || '[]'); } catch (err) { LAB_LINES = []; }
+        document.getElementById('lq-corr-rows').innerHTML = ''; corrIndex = 0; syncCorr();
+        document.getElementById('lq-corr-box').style.display = LAB_LINES.length ? 'block' : 'none';
         f.action = '/routing/lab_qc/' + b.getAttribute('data-stage');
         document.getElementById('lq-sub').textContent = b.getAttribute('data-name');
         document.getElementById('lq-when').value = '{{ now }}';
@@ -547,9 +588,9 @@
     ['lq-close', 'lq-cancel', 'lq-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', close); });
     f.addEventListener('submit', function (e) {
       var r = document.getElementById('lq-result').value, file = document.getElementById('lq-file').files.length;
-      if (!document.getElementById('lq-by').value.trim() || !r || (r === 'Pass' && !file)) {
+      if (!document.getElementById('lq-by').value.trim() || !r || (r === 'Pass' && !file) || (document.getElementById('lq-extra-by').required && !document.getElementById('lq-extra-by').value.trim())) {
         e.preventDefault();
-        if (typeof showToast === 'function') showToast(!r ? 'Choose Pass or Fail.' : (r === 'Pass' && !file ? 'Upload the test certificate (TC) for a Pass.' : 'Enter who did the lab test.'), 'error');
+        if (typeof showToast === 'function') showToast(!r ? 'Choose the lab result.' : (r === 'Pass' && !file ? 'Upload the test certificate (TC) for a Pass.' : (!document.getElementById('lq-by').value.trim() ? 'Enter who did the lab test.' : 'Write who added the extra material.')), 'error');
       }
     });
   })();

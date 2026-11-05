@@ -1965,9 +1965,11 @@ class StageLabQC(CreatedAtMixin, db.Model):
     stage = db.relationship("ProductionOrderStage", foreign_keys=[stage_id], backref=db.backref("lab_qcs", order_by="StageLabQC.id"))
     tested_at = db.Column(db.DateTime, nullable=False)
     tested_by = db.Column(db.String(60), nullable=False)
-    result = db.Column(db.String(8), nullable=False)             # "Pass" / "Fail"
+    result = db.Column(db.String(20), nullable=False)            # "Pass" / "Need correction" / "Fail"
     remarks = db.Column(db.String(255), nullable=True)
     tc_file = db.Column(db.String(255), nullable=True)           # UPLOAD_FOLDER ke andar ka relative path (Pass par zaroori)
+    # Correction me store se jo extra maal auto-issue hua (client meeting 2, #12): [{material, qty, unit, added_by, reason, issue_no}]
+    corrections = db.Column(db.JSON, nullable=True)
 
 
 class Rack(CreatedAtMixin, db.Model):
