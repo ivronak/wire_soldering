@@ -643,7 +643,9 @@ def production_orders_start(order_id):
         stage.start_date = start
         stage.end_date = end
     # Production line: lines bani hon to chunna zaroori (client change #1); koi line nahi to pehle jaisa chalta hai
-    board = line_board(today)
+    # In-house product (Flux) ka order line ki capacity / "line chuno" se bandha nahi: wo alag se store ke liye banta hai (client meeting 2, #9)
+    in_house = bool(order.product and order.product.output_rm_id)
+    board = [] if in_house else line_board(today)
     if board:
         # Order banate waqt line chuni thi (machines usi ki) to wahi; warna Start ke form se (purane orders)
         line_id = order.line_id or request.form.get("line_id", type=int)

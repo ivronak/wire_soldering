@@ -194,8 +194,8 @@
               data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
           <button type="submit" class="po-btn teal">Release</button></form>
         {% elif o.status == 'Released' %}
-        {% if line_board %}
-        {# Lines bani hain: Start par pehle line chunni padti hai (live status ke saath) #}
+        {% if line_board and not (o.product and o.product.output_rm_id) %}
+        {# Lines bani hain: Start par pehle line chunni padti hai (live status ke saath). In-house product (Flux) ko line / capacity ka sawaal nahi #}
         <button type="button" class="po-btn primary btn-start-line" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" data-line="{{ o.line_id or '' }}" data-kg="{{ '%g'|format(o.planned_qty * o.unit_weight) }}">Start</button>
         {% else %}
         <form method="post" action="{{ url_for('production_orders.production_orders_start', order_id=o.id) }}" class="js-confirm-submit"
