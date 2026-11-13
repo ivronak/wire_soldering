@@ -1,7 +1,7 @@
 # Live machine dashboard (client meeting 2, change 10): har production line aur uski har machine ka abhi ka haal.
 # Sirf padhta hai, kuch save nahi karta. Data: Machines (line), ProductionOrderStage (In progress = machine chal rahi hai),
 # aur live_schedule (agla kaun si machine par aane wala hai).
-from flask import Blueprint, render_template
+from flask import Blueprint, jsonify, render_template
 
 from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage
 from app.production_orders.scheduler import live_schedule, now_ist, today_ist
@@ -93,6 +93,53 @@ def machine_board(today=None, now=None):
     total["machines"] = total["running"] + total["free"] + total["inactive"]
     total["orders"] = len({r["order_id"] for rows in running.values() for r in rows})
     return {"groups": groups, "total": total, "now": now}
+
+
+def day_text(day):
+    return day.strftime("%d %b") if day else ""
+
+
+def order_detail(order, running_stage):
+    """Ek order ka pop-up wala haal: batch KG, line, dates, saare stages (status, machines, plan vs asli ghante) aur material (kitna lagna / kitna issue hua).
+    running_stage = wo stage jo is machine par chal raha hai (pop-up me highlight hota hai)."""
+    now = now_ist()
+    stages = []
+    for stage in order.stages:
+        if stage.status == "In progress" and stage.started_at:
+            actual = round((now - stage.started_at).total_seconds() / 3600, 2)
+        else:
+            actual = stage.actual_hours
+        stages.append({"name": stage.stage_name, "status": stage.status, "is_this": stage.id == running_stage.id,
+                       "machines": [row.machine_name for row in stage.machines], "start": day_text(stage.start_date), "end": day_text(stage.end_date),
+                       "planned_h": round(stage.planned_hours, 2) if stage.planned_hours else None, "actual_h": actual,
+                       "operator": stage.operator or "", "qty_in": round(stage.qty_in, 2) if stage.qty_in is not None else None,
+                       "qty_out": round(stage.qty_out, 2) if stage.qty_out is not None else None})
+    materials = [{"name": line.raw_material.name if line.raw_material else "", "required": round(line.required_qty, 3), "issued": round(line.issued_qty, 3),
+                  "unit": line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""} for line in order.lines]
+    done = len([s for s in order.stages if s.status == "Done"])
+    return {"order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "", "status": order.status,
+            "line": order.line.name if order.line else "", "batch_kg": round((order.planned_qty or 0) * (order.unit_weight or 1), 2),
+            "planned_start": day_text(order.planned_start_date), "planned_end": day_text(order.planned_end_date),
+            "needed_by": day_text(order.needed_by_date), "done": done, "total": len(order.stages), "stages": stages, "materials": materials,
+            "running_stage": running_stage.stage_name}
+
+
+@dashboard_bp.route("/dashboard/machine/<int:machine_id>")
+def machine_detail(machine_id):
+    """Tile par click: us machine ka pop-up data (JSON). Chal rahe order(s) ka poora planning + is machine ki aage ki queue."""
+    machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
+    orders = []
+    stages = (ProductionOrderStage.query.join(ProductionOrder, ProductionOrder.id == ProductionOrderStage.production_order_id)
+              .filter(ProductionOrderStage.status == "In progress", ProductionOrder.is_deleted == False).all())
+    for stage in stages:
+        if any(row.machine_id == machine.id for row in stage.machines):
+            orders.append(order_detail(stage.production_order, stage))
+    queue = [{"prod_no": q["prod_no"], "product": q["product"], "stage": q["stage"], "start": day_text(q["start"])}
+             for q in queue_by_machine(today_ist()).get(machine.id, [])]
+    return jsonify({"machine": {"name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
+                                "line": machine.line.name if machine.line else "No line", "capacity": machine.capacity_text,
+                                "status": machine.status},
+                    "orders": orders, "queue": queue})
 
 
 @dashboard_bp.route("/dashboard")

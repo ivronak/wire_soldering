@@ -25,6 +25,17 @@
   .db-order { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 700; color: #0F2F32; }
   .db-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
   .db-row b { color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .db-tile { cursor: pointer; transition: box-shadow .12s; }
+  .db-tile:hover { box-shadow: 0 2px 10px rgba(15,47,50,.14); }
+  #db-modal.hidden { display: none; }
+  #db-modal { display: flex; }
+  .dm-sec { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; margin: 14px 0 6px; }
+  .dm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .dm-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 6px 8px; border: 1px solid #D1D9D8; text-align: left; }
+  .dm-table td { padding: 5px 8px; border: 1px solid #E2E8E7; vertical-align: top; }
+  .dm-table tr.here td { background: #FFF4E5; font-weight: 600; }
+  .dm-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .dm-card { border: 1px solid #D1D9D8; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
   .db-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
 </style>
 {% endblock %}
@@ -106,6 +117,24 @@
 </div>
 {% endblock %}
 
+{% block modals %}
+{# Machine tile par click: us machine par chal rahe order ka planning + aage ki queue (data /dashboard/machine/<id> se) #}
+<div id="db-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="db-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="db-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-4 border-b border-slate-200 bg-copper-soft shrink-0 flex items-start justify-between gap-3">
+      <div><h2 id="db-title" class="text-[17px] font-bold text-ink">Machine</h2><p id="db-sub" class="text-[12.5px] text-ink-faint mt-0.5"></p></div>
+      <button type="button" id="db-close" class="px-2.5 py-1 text-[13px] border border-slate-300 bg-white rounded hover:bg-mist" aria-label="Close">Close</button>
+    </div>
+    <div id="db-body" class="flex-1 overflow-y-auto px-5 py-4 text-[13.5px] text-ink"></div>
+    <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <a href="/routing" class="px-3 py-2 text-[13px] font-medium border border-slate-300 bg-white rounded hover:bg-mist">Open Routing</a>
+      <a href="/production_orders" class="px-3 py-2 text-[13px] font-medium border border-copper bg-copper text-white rounded hover:bg-copper-dark">Open Order queue</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block page_js %}
 <script>
   // "Running for" ghadi: server ne page banate waqt minutes diye; hum page khulne ke baad ke minutes jodte hain (browser ki timezone ka koi lena-dena nahi)
@@ -122,8 +151,56 @@
       });
     }
     setInterval(tick, 30000);
-    // Poora page har 30 second me naya data le aata hai
-    setTimeout(function () { window.location.reload(); }, 30000);
+    // Poora page har 30 second me naya data le aata hai (pop-up khula ho to ruk ke, taaki padhte waqt band na ho)
+    var modal = document.getElementById('db-modal'), body = document.getElementById('db-body');
+    setInterval(function () { if (modal.classList.contains('hidden')) window.location.reload(); }, 30000);
+
+    // ---------- Machine pop-up ----------
+    var ENT = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return ENT[c]; }); }
+    function hrs(v) { return v == null ? '—' : v + ' h'; }
+    function kv(label, value) { return '<div><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">' + esc(label) + '</div><div class="mt-0.5">' + (esc(value) || '—') + '</div></div>'; }
+    function orderCard(o) {
+      var rows = o.stages.map(function (s) {
+        return '<tr class="' + (s.is_this ? 'here' : '') + '"><td>' + esc(s.name) + (s.is_this ? ' ◀ this machine' : '') + '</td><td>' + esc(s.status) + '</td><td>' + esc((s.machines || []).join(', ')) +
+          '</td><td>' + esc(s.start) + (s.end && s.end !== s.start ? ' – ' + esc(s.end) : '') + '</td><td class="r">' + hrs(s.planned_h) + '</td><td class="r">' + hrs(s.actual_h) + '</td></tr>';
+      }).join('');
+      var mats = o.materials.map(function (m) {
+        return '<tr><td>' + esc(m.name) + '</td><td class="r">' + m.required + ' ' + esc(m.unit) + '</td><td class="r">' + m.issued + ' ' + esc(m.unit) + '</td></tr>';
+      }).join('');
+      return '<div class="dm-card"><div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-mono font-bold text-[15px]">' + esc(o.prod_no) + '</span> <span class="text-ink-faint">' + esc(o.product) + '</span></div>' +
+        '<span class="db-chip running"><i></i>' + esc(o.running_stage) + ' running</span></div>' +
+        '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">' + kv('Batch', o.batch_kg + ' KG') + kv('Line', o.line) + kv('Plan', o.planned_start + (o.planned_end ? ' – ' + o.planned_end : '')) + kv('Needed by', o.needed_by) + '</div>' +
+        '<div class="dm-sec">Stages (' + o.done + ' of ' + o.total + ' done)</div><div class="overflow-x-auto"><table class="dm-table"><thead><tr><th>Stage</th><th>Status</th><th>Machines</th><th>Plan dates</th><th class="r">Planned</th><th class="r">Actual</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="dm-sec">Material</div><table class="dm-table"><thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th></tr></thead><tbody>' + mats + '</tbody></table></div>';
+    }
+    function show(data) {
+      var m = data.machine;
+      document.getElementById('db-title').textContent = m.name;
+      document.getElementById('db-sub').textContent = m.code + ' · ' + m.stage + ' · ' + m.line + ' · ' + m.capacity;
+      var html = '';
+      if (data.orders.length) html += data.orders.map(orderCard).join('');
+      else html += '<p class="text-ink-muted">' + (m.status === 'active' ? 'Nothing is running on this machine right now.' : 'This machine is switched off in the Machine master.') + '</p>';
+      html += '<div class="dm-sec">Waiting for this machine</div>';
+      if (data.queue.length) {
+        html += '<table class="dm-table"><thead><tr><th>Order</th><th>Product</th><th>Stage</th><th>From</th></tr></thead><tbody>' + data.queue.map(function (q) {
+          return '<tr><td class="font-mono font-semibold">' + esc(q.prod_no) + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td>' + esc(q.start) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+      } else html += '<p class="text-ink-muted">No order is waiting for this machine.</p>';
+      body.innerHTML = html;
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+    function closeModal() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+    document.querySelectorAll('.db-tile').forEach(function (tile) {
+      tile.addEventListener('click', function () {
+        fetch('/dashboard/machine/' + tile.getAttribute('data-machine')).then(function (r) { return r.json(); }).then(show)
+          .catch(function () { if (typeof showToast === 'function') showToast('Could not load the machine details.', 'error'); });
+      });
+    });
+    document.getElementById('db-close').addEventListener('click', closeModal);
+    document.getElementById('db-backdrop').addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
   })();
 </script>
 {% endblock %}
