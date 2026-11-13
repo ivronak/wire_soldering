@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block page_css %}
+<style>
+  .db-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .db-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .db-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .db-kpi .h { font-size: 12px; color: #6B7F82; }
+  .db-line { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 14px; }
+  .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8E7; background: #F8FAF9; border-radius: 12px 12px 0 0; }
+  .db-name { font-size: 15px; font-weight: 700; color: #0F2F32; }
+  .db-meta { font-size: 12px; color: #6B7F82; }
+  .db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 14px 16px; }
+  .db-tile { border: 1px solid #D1D9D8; border-radius: 10px; padding: 12px 14px; background: #fff; border-left-width: 5px; display: flex; flex-direction: column; gap: 6px; }
+  .db-tile.running { border-left-color: #C26A2E; background: #FFFAF5; }
+  .db-tile.free { border-left-color: #1F9D6A; }
+  .db-tile.inactive { border-left-color: #A6B4B3; background: #F5F7F7; color: #6B7F82; }
+  .db-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .db-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .db-chip.running { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .db-chip.free { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .db-chip.inactive { background: #EEF2F1; color: #6B7F82; border-color: #D1D9D8; }
+  .db-chip.over { background: #FDECEA; color: #B42318; border-color: #F3C9C4; }
+  .db-order { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 700; color: #0F2F32; }
+  .db-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+  .db-row b { color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .db-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0 flex flex-wrap items-end justify-between gap-2">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Dashboard</div>
+    <h1 class="text-[22px] font-bold text-ink leading-tight">Live machine dashboard</h1>
+    <p class="text-[13px] text-ink-faint">Every production line and machine right now: which order is running, how much material is in it and since when. The time counts from the real Start of the stage. The page refreshes by itself every 30 seconds.</p>
+  </div>
+  <div class="text-[12.5px] text-ink-faint">As of {{ board.now.strftime('%d %b %Y, %I:%M %p') }}</div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="db-kpi"><span class="k">Machines</span><span class="v">{{ board.total.machines }}</span><span class="h">on all lines</span></div>
+  <div class="db-kpi"><span class="k">Running</span><span class="v" style="color:#8A4A1C">{{ board.total.running }}</span><span class="h">{{ board.total.orders }} order{{ '' if board.total.orders == 1 else 's' }} in work</span></div>
+  <div class="db-kpi"><span class="k">Free</span><span class="v" style="color:#1F7A4D">{{ board.total.free }}</span><span class="h">ready for the next order</span></div>
+  <div class="db-kpi"><span class="k">Inactive</span><span class="v">{{ board.total.inactive }}</span><span class="h">switched off in Machine master</span></div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {% for g in board.groups %}
+  <section class="db-line">
+    <div class="db-line-head">
+      <div>
+        <span class="db-name">{{ g.name }}</span>{% if g.code %} <span class="db-meta font-mono">{{ g.code }}</span>{% endif %}
+        <span class="db-meta">{% if g.capacity %}· {{ '%g'|format(g.capacity) }} KG/day{% endif %}{% if g.handler %} · {{ g.handler }}{% endif %}{% if not g.line_active %} · line switched off{% endif %}</span>
+      </div>
+      <div class="flex gap-1.5">
+        <span class="db-chip running"><i></i>{{ g.running }} running</span>
+        <span class="db-chip free"><i></i>{{ g.free }} free</span>
+        {% if g.inactive %}<span class="db-chip inactive"><i></i>{{ g.inactive }} inactive</span>{% endif %}
+      </div>
+    </div>
+    {% if g.machines %}
+    <div class="db-grid">
+      {% for t in g.machines %}
+      <div class="db-tile {{ t.state }}" data-machine="{{ t.id }}">
+        <div class="flex items-start justify-between gap-2">
+          <div><div class="text-[14px] font-bold text-ink">{{ t.name }}</div><div class="db-meta">{{ t.code }} · {{ t.stage_name }}</div></div>
+          {% if t.state == 'running' %}<span class="db-chip running"><i></i>Running</span>
+          {% elif t.state == 'free' %}<span class="db-chip free"><i></i>Free</span>
+          {% else %}<span class="db-chip inactive"><i></i>Inactive</span>{% endif %}
+        </div>
+        {% if t.state == 'running' %}
+          {% for r in t.runs %}
+          <div class="{% if not loop.first %}border-t border-slate-200 pt-2{% endif %}">
+            <div class="db-order">{{ r.prod_no }}</div>
+            <div class="db-meta">{{ r.product }} · {{ r.stage }}</div>
+            <div class="db-row mt-1"><span>Material in</span><b>{{ '%g'|format(r.kg) }} KG</b></div>
+            <div class="db-row"><span>Running for</span><b class="db-elapsed" data-min="{{ r.elapsed_min }}">{{ r.elapsed_text }}</b></div>
+            <div class="db-row"><span>Started</span><b>{{ r.started }}</b></div>
+            {% if r.operator %}<div class="db-row"><span>Operator</span><b>{{ r.operator }}</b></div>{% endif %}
+            {% if r.planned_text %}<div class="db-row"><span>Planned time</span><b>{{ r.planned_text }}</b></div>{% endif %}
+            {% if r.over_text %}<div><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
+          </div>
+          {% endfor %}
+        {% elif t.state == 'free' %}
+          <div class="db-meta">Nothing is running on this machine.</div>
+        {% else %}
+          <div class="db-meta">Machine is switched off in the Machine master.</div>
+        {% endif %}
+        {% if t.next %}
+        <div class="border-t border-slate-200 pt-2 db-meta">Next: <b class="text-ink">{{ t.next.prod_no }}</b> · {{ t.next.stage }} from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more in queue{% endif %}</div>
+        {% elif t.state != 'inactive' %}
+        <div class="border-t border-slate-200 pt-2 db-meta">No order waiting for this machine.</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="db-meta px-4 py-4">No machine is attached to this line yet. Choose the line on the Machines page.</div>
+    {% endif %}
+  </section>
+  {% else %}
+  <div class="db-empty"><h3 class="text-[16px] font-bold text-ink mb-1">No machines yet</h3><p>Add machines in the Machines master and put them on a production line to see them here.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  // "Running for" ghadi: server ne page banate waqt minutes diye; hum page khulne ke baad ke minutes jodte hain (browser ki timezone ka koi lena-dena nahi)
+  (function () {
+    var loaded = Date.now();
+    function text(total) {
+      var h = Math.floor(total / 60), m = total % 60;
+      return h ? h + ' h ' + (m < 10 ? '0' : '') + m + ' m' : m + ' m';
+    }
+    function tick() {
+      var extra = Math.floor((Date.now() - loaded) / 60000);
+      document.querySelectorAll('.db-elapsed').forEach(function (el) {
+        el.textContent = text((parseInt(el.getAttribute('data-min'), 10) || 0) + extra);
+      });
+    }
+    setInterval(tick, 30000);
+    // Poora page har 30 second me naya data le aata hai
+    setTimeout(function () { window.location.reload(); }, 30000);
+  })();
+</script>
+{% endblock %}
