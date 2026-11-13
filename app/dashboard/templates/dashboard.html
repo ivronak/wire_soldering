@@ -11,20 +11,13 @@
   .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8E7; background: #F8FAF9; border-radius: 12px 12px 0 0; }
   .db-name { font-size: 15px; font-weight: 700; color: #0F2F32; }
   .db-meta { font-size: 12px; color: #6B7F82; }
-  /* Upar ek chhota stepper (poori chaudai me, scroll nahi): 1 -> 2 -> 3 ... Neeche stage ke blocks, har block me us stage ki machines ke card */
-  .db-stepper { display: flex; padding: 18px 16px 4px; }
-  .db-sp { flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-  .db-sp::before { content: ''; position: absolute; top: 12px; left: -50%; right: 50%; height: 3px; background: #D8E0DF; }
-  .db-sp:first-child::before { display: none; }
-  .db-sp.run::before { background: #E9A96B; }
-  .db-sp:not(:first-child)::after { content: ''; position: absolute; top: 7px; left: calc(50% - 26px); border-left: 8px solid #A6B4B3; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
-  .db-sp.run:not(:first-child)::after { border-left-color: #C26A2E; }
-  .db-sp-node { position: relative; z-index: 1; width: 27px; height: 27px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: #fff; border: 2.5px solid #1F9D6A; color: #1F7A4D; box-shadow: 0 0 0 3px #fff; }
-  .db-sp.run .db-sp-node { background: #C26A2E; border-color: #C26A2E; color: #fff; }
-  .db-sp.off .db-sp-node { border-color: #A6B4B3; color: #6B7F82; background: #F5F7F7; }
-  .db-sp-name { font-size: 11.5px; font-weight: 600; color: #3D5A5D; line-height: 1.25; padding: 0 3px; }
-  .db-stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 12px; padding: 12px 16px 16px; align-items: start; }
-  .db-sb { background: #F5F8F7; border: 1px solid #E2E8E7; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  /* Stage blocks hi journey hain: 1 -> 2 -> 3 ... Har row me barabar blocks (JS balance karta hai), same row ke blocks ke beech connector + arrow */
+  .db-stages { --cols: 4; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 16px 24px; padding: 16px 20px 18px; align-items: start; }
+  .db-sb { position: relative; background: #F5F8F7; border: 1px solid #E2E8E7; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .db-sb.has-next::before { content: ''; position: absolute; top: 22px; right: -24px; width: 24px; height: 3px; background: #D1D9D8; }
+  .db-sb.has-next::after { content: ''; position: absolute; top: 16px; right: -24px; border-left: 9px solid #A6B4B3; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+  .db-sb.run.has-next::before { background: #E9A96B; }
+  .db-sb.run.has-next::after { border-left-color: #C26A2E; }
   .db-sb-head { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
   .db-sb-no { width: 22px; height: 22px; border-radius: 6px; background: #0F2F32; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .db-sb-name { font-size: 13.5px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
@@ -40,7 +33,7 @@
   .db-dot { width: 9px; height: 9px; border-radius: 50%; background: #1F9D6A; flex-shrink: 0; box-shadow: 0 0 0 3px #E6F5EC; }
   .db-tile.running .db-dot { background: #C26A2E; box-shadow: 0 0 0 3px #FFF0DF; }
   .db-tile.inactive .db-dot { background: #A6B4B3; box-shadow: 0 0 0 3px #E8EDEC; }
-  .db-mc-name { font-size: 14px; font-weight: 700; color: #0F2F32; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-mc-name { font-size: 14px; font-weight: 700; color: #0F2F32; min-width: 0; line-height: 1.25; }
   .db-mc-state { margin-left: auto; font-size: 11.5px; font-weight: 700; color: #1F7A4D; white-space: nowrap; }
   .db-tile.running .db-mc-state { color: #8A4A1C; }
   .db-tile.inactive .db-mc-state { color: #6B7F82; }
@@ -85,7 +78,7 @@
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Dashboard</div>
     <h1 class="text-[22px] font-bold text-ink leading-tight">Live machine dashboard</h1>
-    <p class="text-[13px] text-ink-faint">Each line is a journey: the strip on top shows its stages in process order (1 &rarr; 2 &rarr; 3 ...), and below it every stage lists its machines. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
+    <p class="text-[13px] text-ink-faint">Each line is a journey: its stages come in process order (1 &rarr; 2 &rarr; 3 ...), and every stage lists its machines. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
   </div>
   <div class="text-[12.5px] text-ink-faint">As of {{ board.now.strftime('%d %b %Y, %I:%M %p') }}</div>
 </div>
@@ -112,14 +105,9 @@
       </div>
     </div>
     {% if g.stages %}
-    <div class="db-stepper">
-      {% for st in g.stages %}
-      <div class="db-sp {{ 'run' if st.running else ('free' if st.free else 'off') }}"><span class="db-sp-node">{{ st.no }}</span><span class="db-sp-name">{{ st.name }}</span></div>
-      {% endfor %}
-    </div>
     <div class="db-stages">
       {% for st in g.stages %}
-      <div class="db-sb">
+      <div class="db-sb{% if st.running %} run{% endif %}">
         <div class="db-sb-head">
           <span class="db-sb-no">{{ st.no }}</span><span class="db-sb-name">{{ st.name }}</span>
           <span class="db-sb-count">{% if st.running %}<span class="db-pill run">{{ st.running }} running</span>{% endif %}{% if st.free %}<span class="db-pill free">{{ st.free }} free</span>{% endif %}</span>
@@ -254,6 +242,27 @@
     document.getElementById('db-close').addEventListener('click', closeModal);
     document.getElementById('db-backdrop').addEventListener('click', closeModal);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+  })();
+  // Stage blocks ko barabar rows me baanto (jaise 10 stage = 5 + 5, 6 + 4 nahi) aur arrow sirf usi row ke agle block tak dikhao
+  (function () {
+    function layout() {
+      document.querySelectorAll('.db-stages').forEach(function (grid) {
+        var kids = Array.prototype.slice.call(grid.children);
+        if (!kids.length) return;
+        var cs = getComputedStyle(grid), gap = 24;
+        var width = grid.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        var maxCols = Math.max(1, Math.floor((width + gap) / (195 + gap)));
+        var rows = Math.ceil(kids.length / maxCols);
+        grid.style.setProperty('--cols', Math.ceil(kids.length / rows));
+        kids.forEach(function (kid, i) {
+          var next = kids[i + 1];
+          kid.classList.toggle('has-next', !!next && next.offsetTop === kid.offsetTop);
+        });
+      });
+    }
+    window.addEventListener('resize', layout);
+    window.addEventListener('load', layout);
+    layout();
   })();
 </script>
 {% endblock %}
