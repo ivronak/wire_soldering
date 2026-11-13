@@ -1,6 +1,51 @@
 {% extends "base.html" %}
 {% block title %}Product Master{% endblock %}
 
+{# Recipe plan: product ke stages (Work Stage ke order me) aur har stage me kaunsa material kitna jaata hai (recipe + packing). Expand row aur View panel dono me. #}
+{% macro recipe_plan(p) %}
+  {% set stages = p.routing_stages|sort(attribute='work_stage.sort_order') %}
+  {% set stage_ids = stages|map(attribute='work_stage_id')|list %}
+  {# Flux jaise product ki poori recipe flux hai: har line par 'flux' tag ka matlab nahi #}
+  {% set all_flux = (p.recipe_items|rejectattr('is_flux')|list|length) == 0 %}
+  <div class="rp-grid">
+    {% for rs in stages %}
+    {% set ws = rs.work_stage %}
+    {% set mats = p.recipe_items|selectattr('work_stage_id', 'equalto', ws.id)|list %}
+    {% set packs = p.packing_items|selectattr('work_stage_id', 'equalto', ws.id)|list %}
+    <div class="rp-card">
+      <div class="rp-head"><span class="rp-no">{{ loop.index }}</span><span class="rp-name">{{ ws.name }}</span></div>
+      {% for r in mats %}
+      <div class="rp-line"><span class="rp-mat">{{ r.raw_material.name if r.raw_material else '—' }}{% if r.is_flux and not all_flux %} <span class="rp-tag">flux</span>{% endif %}</span>
+        <span class="rp-qty">{{ "%g"|format(r.ratio_percent) }}%{% if r.spare_percent %} <span class="rp-spare">+{{ "%g"|format(r.spare_percent) }}% spare</span>{% endif %}</span></div>
+      {% endfor %}
+      {% for k in packs %}
+      <div class="rp-line"><span class="rp-mat">{{ k.raw_material.name if k.raw_material else '—' }} <span class="rp-tag pack">pack</span></span>
+        <span class="rp-qty">1 per {{ "%g"|format(k.kg_per_pack) }} KG{% if k.spare_percent %} <span class="rp-spare">+{{ "%g"|format(k.spare_percent) }}% spare</span>{% endif %}</span></div>
+      {% endfor %}
+      {% if not mats and not packs %}<div class="rp-none">No material at this stage</div>{% endif %}
+    </div>
+    {% endfor %}
+    {% set loose = [] %}
+    {% for r in p.recipe_items %}{% if not r.work_stage_id or r.work_stage_id not in stage_ids %}{% set _ = loose.append(r) %}{% endif %}{% endfor %}
+    {% set loose_packs = [] %}
+    {% for k in p.packing_items %}{% if not k.work_stage_id or k.work_stage_id not in stage_ids %}{% set _ = loose_packs.append(k) %}{% endif %}{% endfor %}
+    {% if loose or loose_packs %}
+    <div class="rp-card rp-loose">
+      <div class="rp-head"><span class="rp-name">{{ 'Not tied to a stage' if stages else 'Materials' }}</span></div>
+      {% for r in loose %}
+      <div class="rp-line"><span class="rp-mat">{{ r.raw_material.name if r.raw_material else '—' }}{% if r.is_flux and not all_flux %} <span class="rp-tag">flux</span>{% endif %}</span>
+        <span class="rp-qty">{{ "%g"|format(r.ratio_percent) }}%{% if r.spare_percent %} <span class="rp-spare">+{{ "%g"|format(r.spare_percent) }}% spare</span>{% endif %}</span></div>
+      {% endfor %}
+      {% for k in loose_packs %}
+      <div class="rp-line"><span class="rp-mat">{{ k.raw_material.name if k.raw_material else '—' }} <span class="rp-tag pack">pack</span></span>
+        <span class="rp-qty">1 per {{ "%g"|format(k.kg_per_pack) }} KG</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% if not stages %}<p class="rp-hint">No production stages set yet. Use the Production stages button (the lines icon) to set them; materials then group stage by stage here.</p>{% endif %}
+{% endmacro %}
+
 {% block page_css %}
 <style>
   /* Product (parent) + Variant (child) table — parent white, child indented grey group */
@@ -226,6 +271,21 @@
   .expand-btn svg { transition: transform 0.15s; }
   .expand-btn.is-open { color: #8A4A1C; background: #FFFFFF; border-color: #E8C9A8; }
   .expand-btn.is-open svg { transform: rotate(90deg); }
+  /* Recipe plan: stage-wise cards */
+  .rp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px; }
+  .rp-card { background: #fff; border: 1px solid #D9E1E0; border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 5px; }
+  .rp-loose { border-style: dashed; background: #FBFAF8; }
+  .rp-head { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid #EEF2F1; }
+  .rp-no { width: 20px; height: 20px; border-radius: 6px; background: #0F2F32; color: #fff; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rp-name { font-size: 13px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .rp-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12.5px; }
+  .rp-mat { color: #1B3A3D; min-width: 0; }
+  .rp-qty { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: #0F2F32; white-space: nowrap; font-size: 12px; }
+  .rp-spare { font-weight: 500; color: #8A4A1C; }
+  .rp-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 5px; border-radius: 4px; background: #FFF0DF; color: #8A4A1C; border: 1px solid #F5D9B5; }
+  .rp-tag.pack { background: #EEF2F1; color: #3D5A5D; border-color: #D9E1E0; }
+  .rp-none { font-size: 12px; color: #8A9A9C; font-style: italic; }
+  .rp-hint { font-size: 12px; color: #6B7F82; margin-top: 8px; }
 </style>
 {% endblock %}
 
@@ -419,37 +479,14 @@
                 </td>
               </tr>
               {% endif %}
-              {% if p.recipe_items %}
-              <tr class="variant-row recipe-head hidden" data-parent="recipe-{{ p.id }}">
+              {% if p.recipe_items or p.routing_stages or p.packing_items %}
+              <tr class="variant-row recipe-plan hidden" data-parent="recipe-{{ p.id }}">
                 <td></td>
-                <td class="cell-left">Material</td>
-                <td class="cell-left">Name</td>
-                <td class="cell-left">Type</td>
-                <td>Unit</td>
-                <td>Ratio</td>
-                <td></td>
-                <td></td>
-              </tr>
-              {% for r in p.recipe_items %}
-              <tr class="variant-row recipe-line hidden{% if loop.last %} recipe-last{% endif %}" data-parent="recipe-{{ p.id }}">
-                <td></td>
-                <td class="cell-left">
-                  <span class="inline-block font-mono text-[11.5px] font-semibold text-ink bg-white border border-slate-200 rounded px-1.5 py-0.5">{{ r.raw_material.code if r.raw_material else '—' }}</span>
+                <td class="cell-left" colspan="7" style="white-space:normal">
+                  <div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Recipe plan (stage by stage, % of the batch)</div>
+                  {{ recipe_plan(p) }}
                 </td>
-                <td class="cell-left text-[13px] text-ink">{{ r.raw_material.name if r.raw_material else '—' }}</td>
-                <td class="cell-left">
-                  {% if r.is_flux %}
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-copper-soft text-copper-text border border-copper-border">Core flux</span>
-                  {% else %}
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-brand-soft text-brand-teal border border-brand-border">Base metal</span>
-                  {% endif %}
-                </td>
-                <td class="text-center font-mono text-[12px] text-ink-muted">{{ r.raw_material.base_unit.code if r.raw_material and r.raw_material.base_unit else '—' }}</td>
-                <td class="text-center font-mono text-[12.5px] font-semibold text-ink tabular-nums">{{ "%.1f"|format(r.ratio_percent) }}%</td>
-                <td></td>
-                <td></td>
               </tr>
-              {% endfor %}
               {% endif %}
               {% else %}
               {% endfor %}
@@ -466,9 +503,7 @@
               {% endfor %}
             </div>
             {% endif %}
-            {% for r in p.recipe_items %}
-            <div class="text-[13px] text-ink mb-1">{{ r.raw_material.code if r.raw_material else '—' }} — {{ r.raw_material.name if r.raw_material else '—' }} · {{ "%.1f"|format(r.ratio_percent) }}%</div>
-            {% endfor %}
+            {{ recipe_plan(p) }}
           </div>
           {% endfor %}
 
