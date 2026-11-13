@@ -28,7 +28,10 @@ def running_by_machine(now):
         order = stage.production_order
         elapsed = int((now - stage.started_at).total_seconds() // 60) if stage.started_at else 0
         planned_min = int(round((stage.planned_hours or 0) * 60)) if stage.planned_hours else None
-        info = {"order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
+        stages_of_order = list(order.stages)
+        position = next((i for i, st in enumerate(stages_of_order) if st.id == stage.id), len(stages_of_order) - 1)
+        next_stage = stages_of_order[position + 1].stage_name if position + 1 < len(stages_of_order) else "Production output"
+        info = {"order_id": order.id, "next_stage": next_stage, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
                 "stage": stage.stage_name, "operator": stage.operator or "", "kg": round(stage.qty_in or 0, 2),
                 "elapsed_min": elapsed, "elapsed_text": hours_text(elapsed), "planned_text": hours_text(planned_min) if planned_min else "",
                 "over_min": (elapsed - planned_min) if planned_min and elapsed > planned_min else 0,

@@ -11,13 +11,21 @@
   .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8E7; background: #F8FAF9; border-radius: 12px 12px 0 0; }
   .db-name { font-size: 15px; font-weight: 700; color: #0F2F32; }
   .db-meta { font-size: 12px; color: #6B7F82; }
-  /* Line ke andar stage-wise column (process ke order me 1, 2, 3 ...), har column me us stage ki machines */
-  .db-flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; padding: 14px 16px; align-items: start; }
-  .db-stage { background: #F3F6F5; border: 1px solid #E2E8E7; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; position: relative; }
-  .db-stage-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 2px; }
-  .db-stage-no { width: 22px; height: 22px; border-radius: 50%; background: #0F2F32; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .db-stage-name { font-size: 13px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
-  .db-stage-count { margin-left: auto; font-size: 11.5px; color: #6B7F82; white-space: nowrap; }
+  /* Journey jaisa flow: stages ek line me, beech me connector aur arrow (1 -> 2 -> 3 ...). Har stage ke neeche uski machines */
+  .db-flow { display: flex; align-items: flex-start; overflow-x: auto; padding: 18px 12px 16px; }
+  .db-step { flex: 0 0 218px; position: relative; padding: 0 9px; display: flex; flex-direction: column; gap: 9px; }
+  .db-track { position: relative; height: 40px; display: flex; align-items: center; justify-content: center; }
+  .db-track::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 4px; margin-top: -2px; background: #D1D9D8; }
+  .db-step.first .db-track::before { left: 50%; }
+  .db-step.last .db-track::before { right: 50%; }
+  .db-step.run .db-track::before { background: #E9A96B; }
+  .db-step:not(.last) .db-track::after { content: ''; position: absolute; right: -9px; top: 50%; margin-top: -7px; border-left: 11px solid #A6B4B3; border-top: 7px solid transparent; border-bottom: 7px solid transparent; z-index: 2; }
+  .db-step.run:not(.last) .db-track::after { border-left-color: #C26A2E; }
+  .db-node { position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; background: #fff; border: 3px solid #1F9D6A; color: #1F7A4D; box-shadow: 0 0 0 4px #fff; }
+  .db-step.run .db-node { background: #C26A2E; border-color: #C26A2E; color: #fff; }
+  .db-step.off .db-node { border-color: #A6B4B3; color: #6B7F82; background: #F5F7F7; }
+  .db-step-name { text-align: center; font-size: 13.5px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .db-step-count { text-align: center; font-size: 11.5px; color: #6B7F82; margin-top: -5px; }
   .db-tile { border: 1px solid #D1D9D8; border-radius: 9px; padding: 9px 11px; background: #fff; border-left-width: 4px; display: flex; flex-direction: column; gap: 4px; }
   .db-tile.running { border-left-color: #C26A2E; background: #FFFAF5; }
   .db-tile.free { border-left-color: #1F9D6A; }
@@ -51,7 +59,7 @@
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Dashboard</div>
     <h1 class="text-[22px] font-bold text-ink leading-tight">Live machine dashboard</h1>
-    <p class="text-[13px] text-ink-faint">Each line shows its stages in process order (1, 2, 3 ...) with the machines of that stage. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
+    <p class="text-[13px] text-ink-faint">Each line is a journey: its stages in process order (1 &rarr; 2 &rarr; 3 ...), with the machines of that stage under it. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
   </div>
   <div class="text-[12.5px] text-ink-faint">As of {{ board.now.strftime('%d %b %Y, %I:%M %p') }}</div>
 </div>
@@ -80,12 +88,10 @@
     {% if g.stages %}
     <div class="db-flow">
       {% for st in g.stages %}
-      <div class="db-stage">
-        <div class="db-stage-head">
-          <span class="db-stage-no">{{ st.no }}</span>
-          <span class="db-stage-name">{{ st.name }}</span>
-          <span class="db-stage-count">{{ st.running }} running · {{ st.free }} free</span>
-        </div>
+      <div class="db-step {{ 'run' if st.running else ('free' if st.free else 'off') }}{% if loop.first %} first{% endif %}{% if loop.last %} last{% endif %}">
+        <div class="db-track"><span class="db-node">{{ st.no }}</span></div>
+        <div class="db-step-name">{{ st.name }}</div>
+        <div class="db-step-count">{{ st.running }} running · {{ st.free }} free</div>
         {% for t in st.machines %}
         <div class="db-tile {{ t.state }}" data-machine="{{ t.id }}" title="Click for the order and queue details">
           <div class="flex items-start justify-between gap-2">
@@ -101,6 +107,7 @@
               <div class="db-meta truncate">{{ r.product }}</div>
               <div class="db-meta"><b class="text-ink">{{ '%g'|format(r.kg) }} KG</b> in{% if r.operator %} · {{ r.operator }}{% endif %}{% if r.planned_text %} · plan {{ r.planned_text }}{% endif %}</div>
               {% if r.over_text %}<div class="mt-1"><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
+              <div class="db-meta mt-0.5">Then &rarr; <b class="text-ink">{{ r.next_stage }}</b></div>
             </div>
             {% endfor %}
           {% elif t.state == 'inactive' %}
