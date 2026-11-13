@@ -44,8 +44,19 @@
   .db-bar { height: 6px; border-radius: 999px; background: #EEF2F1; overflow: hidden; }
   .db-bar i { display: block; height: 100%; border-radius: 999px; background: #C26A2E; }
   .db-bar.over i { background: #D92D20; }
-  .db-bar-l { display: flex; justify-content: space-between; font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
-  .db-bar-l b { color: #0F2F32; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -.01em; }
+  /* Timer ka bada, ubhra hua block: chalta hua hh:mm:ss + "plan" ka time; plan se zyada chale to laal */
+  .db-timer { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #FFF4E5; border: 1px solid #F5D9B5; border-radius: 10px; padding: 7px 10px; margin-bottom: 7px; }
+  .db-timer.over { background: #FEF3F2; border-color: #FDA29B; }
+  .db-timer-l { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8A4A1C; display: flex; align-items: center; gap: 5px; }
+  .db-timer.over .db-timer-l { color: #B42318; }
+  .db-timer-l i { width: 7px; height: 7px; border-radius: 50%; background: #C26A2E; animation: db-pulse 1.4s ease-in-out infinite; }
+  .db-timer.over .db-timer-l i { background: #D92D20; }
+  @keyframes db-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+  .db-timer .db-elapsed { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; line-height: 1.1; font-weight: 800; color: #6B3410; font-variant-numeric: tabular-nums; letter-spacing: -.02em; margin-top: 2px; }
+  .db-timer.over .db-elapsed { color: #912018; }
+  .db-timer-plan { white-space: nowrap; text-align: right; font-size: 11px; color: #8A4A1C; line-height: 1.3; }
+  .db-timer-plan b { display: block; font-size: 13px; color: #6B3410; font-variant-numeric: tabular-nums; }
+  .db-timer.over .db-timer-plan, .db-timer.over .db-timer-plan b { color: #912018; }
   .db-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
   .db-fact .l { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8A9A9C; }
   .db-fact .v { font-size: 13px; font-weight: 600; color: #0F2F32; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -126,8 +137,11 @@
             <div class="db-run">
               <div><span class="db-ordno">{{ r.prod_no }}</span><div class="db-prod">{{ r.product }}</div></div>
               <div>
+                <div class="db-timer{% if r.over_min %} over{% endif %}" title="Running since {{ r.started }}">
+                  <div><div class="db-timer-l"><i></i>Running time</div><b class="db-elapsed" data-sec="{{ r.elapsed_sec }}">{{ r.elapsed_clock }}</b></div>
+                  <div class="db-timer-plan">{% if r.planned_text %}plan<b>{{ r.planned_text }}</b>{% else %}no plan<br>time{% endif %}</div>
+                </div>
                 <div class="db-bar{% if r.over_min %} over{% endif %}"><i style="width: {{ r.pct }}%"></i></div>
-                <div class="db-bar-l"><span>Running <b class="db-elapsed" data-sec="{{ r.elapsed_sec }}" title="Since {{ r.started }}">{{ r.elapsed_clock }}</b></span><span>{% if r.planned_text %}plan {{ r.planned_text }}{% else %}no plan time{% endif %}</span></div>
               </div>
               <div class="db-facts">
                 <div class="db-fact"><div class="l">Material</div><div class="v">{{ '%g'|format(r.kg) }} KG</div></div>
