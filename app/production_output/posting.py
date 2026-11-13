@@ -4,8 +4,8 @@
 #   Cancel -> sab ulti rows; sirf tab jab FG batch ko abhi kisi ne chheda nahi (aage Sales me dispatch hone par cancel nahi).
 from app.extensions import db
 from app.inventory.money import q2, q4, value_for_out
-from app.inventory.posting import InventoryError, add_movement, balance, reverse_document, rm_warehouse_of, wip_warehouse_for
-from app.models import FGBatch, FGMovement, Warehouse
+from app.inventory.posting import InventoryError, add_movement, balance, next_lot_code, reverse_document, rm_warehouse_of, wip_warehouse_for
+from app.models import FGBatch, FGMovement, StockLot, StockMovement, Warehouse
 
 
 def wip_lines(order):
@@ -118,17 +118,28 @@ def post_output(output, order, rack_id=None):
         value = value_for_out(wip_qty, wip_value, net)
         add_movement(lot, wip, output.output_date, "CONSUME", -net, -value, "OUTPUT", output.id, output.output_no, line.id)
         total_value += value
-    fg_warehouse = _warehouse(branch_id, "FG")
     scrap_warehouse = _warehouse(branch_id, "SCRAP") if output.scrap_qty > 0 else None
     output.total_value = q2(total_value)
     output.unit_cost = round(total_value / output.good_qty, 4) if output.good_qty else 0
 
-    batch = FGBatch(batch_no=output.batch_no, kind="FG", product_id=order.product_id, production_order_id=order.id, output=output,
-                    mfg_date=output.output_date, unit_cost=output.unit_cost, rack_id=rack_id)
-    db.session.add(batch)
-    db.session.flush()
-    db.session.add(FGMovement(batch_id=batch.id, warehouse_id=fg_warehouse.id, movement_date=output.output_date, movement_type="OUTPUT_IN",
-                              qty=q4(output.good_qty), value=output.total_value, ref_type="OUTPUT", ref_id=output.id, ref_no=output.output_no))
+    own_rm = order.product.output_rm if order.product else None
+    if own_rm is not None:
+        # In-house product (jaise Flux): Good maal FG me nahi, us Raw Material ke naye lot me store (RM) warehouse me. Wahan se wire ke order me issue hota hai.
+        store = _warehouse(branch_id, "RM")
+        lot = StockLot(lot_code=next_lot_code(), grn_line_id=None, source="OWN", raw_material_id=own_rm.id, unit_id=own_rm.base_unit_id,
+                       vendor_batch_no=output.batch_no)
+        db.session.add(lot)
+        db.session.flush()
+        add_movement(lot, store, output.output_date, "OWN_IN", output.good_qty, output.total_value, "OWNMADE", output.id, output.output_no, "1",
+                     note=f"Made in house: {order.prod_no}")
+    else:
+        fg_warehouse = _warehouse(branch_id, "FG")
+        batch = FGBatch(batch_no=output.batch_no, kind="FG", product_id=order.product_id, production_order_id=order.id, output=output,
+                        mfg_date=output.output_date, unit_cost=output.unit_cost, rack_id=rack_id)
+        db.session.add(batch)
+        db.session.flush()
+        db.session.add(FGMovement(batch_id=batch.id, warehouse_id=fg_warehouse.id, movement_date=output.output_date, movement_type="OUTPUT_IN",
+                                  qty=q4(output.good_qty), value=output.total_value, ref_type="OUTPUT", ref_id=output.id, ref_no=output.output_no))
     if scrap_warehouse is not None:
         scrap_batch = FGBatch(batch_no=output.batch_no + "-S", kind="SCRAP", product_id=order.product_id, production_order_id=order.id, output=output,
                               mfg_date=output.output_date, unit_cost=0)
@@ -140,6 +151,11 @@ def post_output(output, order, rack_id=None):
 
 
 def cancel_output(output):
+    # In-house product (Flux): uska lot abhi pura store me ho (kisi order me issue na hua ho), tabhi cancel
+    for move in StockMovement.query.filter_by(ref_type="OWNMADE", ref_id=output.id, movement_type="OWN_IN").filter(StockMovement.reverses_movement_id.is_(None)).all():
+        qty_now, _value = balance(move.lot_id, move.warehouse_id)
+        if qty_now + 0.00005 < move.qty:
+            raise InventoryError(f"Cannot cancel: some of {move.lot.lot_code} ({move.raw_material.name}) has already been issued to an order.")
     # Pehle jaanch: FG / Scrap batch ka maal abhi pura maujood ho (kisi ne nahi nikala)
     for batch in output.batches:
         booked = sum(m.qty for m in batch.movements if m.movement_type == "OUTPUT_IN" and m.reverses_movement_id is None)
@@ -147,6 +163,7 @@ def cancel_output(output):
         if qty_now + 0.00005 < booked:
             raise InventoryError(f"Cannot cancel: some of batch {batch.batch_no} has already been used or sent out.")
     reverse_document("OUTPUT", output.id, "Reversal: production output cancelled")          # RM WIP me wapas
+    reverse_document("OWNMADE", output.id, "Reversal: production output cancelled")         # in-house maal ka lot wapas
     for batch in output.batches:
         for move in list(batch.movements):
             if move.reverses_movement_id is not None or move.ref_type != "OUTPUT":

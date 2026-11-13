@@ -48,6 +48,26 @@ def read_unit_weight(base_unit_id):
     return round(weight, 4), None
 
 
+def read_output_rm(product_id=None):
+    """Form ka "Output goes to Raw Material stock" (khaali = normal FG product). Return (rm_id, error). Ek RM ka ek hi in-house product ho sakta hai,
+    aur wo RM us product ki apni recipe me nahi hona chahiye (khud se khud nahi banta)."""
+    raw = (request.form.get("output_rm_id") or "").strip()
+    if not raw:
+        return None, None
+    rm = db.session.get(RawMaterial, int(raw)) if raw.isdigit() else None
+    if rm is None or rm.is_deleted or not rm.is_active or rm.is_packing:
+        return None, "Choose an active raw material for the output."
+    clash = Product.query.filter(Product.output_rm_id == rm.id, Product.is_deleted == False)
+    if product_id:
+        clash = clash.filter(Product.id != product_id)
+    other = clash.first()
+    if other is not None:
+        return None, f"{rm.name} is already the output of {other.name}. One raw material can be made by one product only."
+    if rm.id in {int(x) for x in request.form.getlist("recipe_rm_id[]") if (x or "").strip().isdigit()}:
+        return None, f"{rm.name} is in this product's own recipe, so it cannot also be its output."
+    return rm.id, None
+
+
 def read_spare(values, index):
     # Recipe / packing line ka spare % (0 se 100). Khaali ya galat ho to 0.
     try:
@@ -77,10 +97,15 @@ def products_list():
         RawMaterial.is_deleted == False, RawMaterial.is_active == True, RawMaterial.is_packing == True,
     ).order_by(RawMaterial.code).all()
 
+    # "Output goes to Raw Material stock" dropdown: koi bhi chalu RM (packing nahi)
+    output_materials = RawMaterial.query.filter(RawMaterial.is_deleted == False, RawMaterial.is_active == True,
+                                                RawMaterial.is_packing == False).order_by(RawMaterial.name).all()
+
     next_code = generate_next_product_code()
 
     return render_template(
         "products.html",
+        output_materials=output_materials,
         active_nav='products',
         next_code=next_code,
         products=products,
@@ -132,6 +157,10 @@ def products_add():
     if weight_error:
         flash(weight_error, "error")
         return redirect(url_for('products.products_list'))
+    output_rm_id, output_error = read_output_rm()
+    if output_error:
+        flash(output_error, "error")
+        return redirect(url_for('products.products_list'))
     cat = ProductCategories.query.get(category_id) if category_id else None
     attr_keys = request.form.getlist('attr_key_0[]')
     attr_values = request.form.getlist('attr_value_0[]')
@@ -173,6 +202,7 @@ def products_add():
             existing.min_stock = min_stock
             existing.max_stock = max_stock
             existing.unit_weight = unit_weight
+            existing.output_rm_id = output_rm_id
             existing.is_active = True
             db.session.commit()
             flash("A Product restored with this code.", "success")    
@@ -193,6 +223,7 @@ def products_add():
         min_stock=min_stock,
         max_stock=max_stock,
         unit_weight=unit_weight,
+        output_rm_id=output_rm_id,
         is_active=True,
         is_deleted=False,
     )
@@ -320,6 +351,11 @@ def products_edit(p_id):
     if category_id is None or base_unit_id is None or tax_rate_id is None:
         return redirect(url_for('products.products_list'))
 
+    output_rm_id, output_error = read_output_rm(p.id)
+    if output_error:
+        flash(output_error, "error")
+        return redirect(url_for('products.products_list'))
+
     dup_name = Product.query.filter(Product.name == name, Product.is_deleted == False, Product.id != p_id,).first()
     if name and dup_name:
         flash("A product with this name already exists.", "error")
@@ -335,6 +371,7 @@ def products_edit(p_id):
     p.min_stock = min_stock
     p.max_stock = max_stock
     p.unit_weight = unit_weight
+    p.output_rm_id = output_rm_id
     p.is_deleted = False
 
     VariantRecipeItem.query.filter_by(product_id=p.id).delete()

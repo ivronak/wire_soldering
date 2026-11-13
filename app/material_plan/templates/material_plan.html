@@ -129,7 +129,7 @@
       <div><div class="mp-name">{{ r.material.name }}</div><div class="mp-meta">{{ r.material.code }} · {{ r.unit }}</div></div>
       <div><div class="mp-meta">In store</div><div class="mp-num">{{ '%g'|format(r.have) }}</div></div>
       <div><div class="mp-meta">Needed ({{ horizon }} d)</div><div class="mp-num">{{ '%g'|format(r.need) }}</div></div>
-      <div><div class="mp-meta">Coming (PO)</div><div class="mp-num">{{ '%g'|format(r.coming) }}</div></div>
+      <div><div class="mp-meta">Coming (PO / own make)</div><div class="mp-num">{{ '%g'|format(r.coming) }}</div></div>
       <div><div class="mp-meta">After {{ horizon }} days</div><div class="mp-num {{ 'neg' if r.end_balance < 0 else '' }}">{{ '%g'|format(r.end_balance) }}</div></div>
       <div>
         {% if r.short_date %}
@@ -138,13 +138,15 @@
             {% if r.urgency == 'late' %}<span class="mp-chip bad"><i></i>Place PO now · {{ r.days_late }} day{{ '' if r.days_late == 1 else 's' }} late</span>
             {% elif r.urgency == 'soon' %}<span class="mp-chip warn"><i></i>Place PO before {{ r.place_by.strftime('%d %b') }}</span>
             {% elif r.urgency == 'plan' %}<span class="mp-chip gone"><i></i>Place PO before {{ r.place_by.strftime('%d %b') }}</span>
+            {% elif r.urgency == 'make' %}<span class="mp-chip bad"><i></i>Make {{ r.maker.name }} before {{ r.short_date.strftime('%d %b') }}</span>
             {% else %}<span class="mp-chip warn"><i></i>Set vendor lead time</span>{% endif %}
           </div>
         {% else %}
           <span class="mp-chip ok"><i></i>Enough for {{ horizon }} days</span>
         {% endif %}
         <div class="mp-meta mt-1">
-          {% if r.vendor %}{{ r.vendor.name }}{% if r.vendor.grade %} (Grade {{ r.vendor.grade }}){% endif %}{% if r.lead is not none %} · lead time {{ r.lead }} days{% else %} · lead time not set{% endif %}{% else %}No purchase order yet, so no supplier{% endif %}
+          {% if r.maker %}Made in house by {{ r.maker.name }}.{% if r.short_date %} Plan a production order of at least {{ '%g'|format(r.shortage) }} {{ r.unit }}: <a class="text-copper-text font-semibold hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">Production order</a>{% endif %}
+          {% elif r.vendor %}{{ r.vendor.name }}{% if r.vendor.grade %} (Grade {{ r.vendor.grade }}){% endif %}{% if r.lead is not none %} · lead time {{ r.lead }} days{% else %} · lead time not set{% endif %}{% else %}No purchase order yet, so no supplier{% endif %}
         </div>
         {% if r.undated > 0 %}<div class="mp-meta">{{ '%g'|format(r.undated) }} {{ r.unit }} on order has no expected date, so it is not counted.</div>{% endif %}
         {% if r.overdue %}<div class="mp-chip bad mt-1"><i></i>Overdue: {{ r.overdue|join(', ') }}</div><div class="mp-meta">Expected date passed, goods not received. Counted as arriving today, so chase the vendor.</div>{% endif %}

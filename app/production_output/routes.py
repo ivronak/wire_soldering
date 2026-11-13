@@ -59,7 +59,8 @@ def output_plan(order):
         "leftover_note": leftover_message(order),
         "leftover": [{"id": line.id, "name": line.raw_material.name if line.raw_material else "", "qty": qty,
                       "unit": line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""} for line, qty in leftover_rows(order)],
-        "racks": [{"id": rack.id, "name": rack.name} for rack in fg_racks_for(order)],
+        "racks": [] if (order.product and order.product.output_rm_id) else [{"id": rack.id, "name": rack.name} for rack in fg_racks_for(order)],
+        "goes_to_store": order.product.output_rm.name if order.product and order.product.output_rm else "",
     }
 
 
@@ -121,7 +122,9 @@ def _read_form():
     # Rack optional; chuna ho to order ke FG warehouse ka chalu rack hona chahiye (backend pe bhi jaanch, sirf dropdown pe bharosa nahi)
     rack_raw = (request.form.get("rack_id") or "").strip()
     rack_id = int(rack_raw) if rack_raw.isdigit() else None
-    if rack_raw and (rack_id is None or rack_id not in {rack.id for rack in fg_racks_for(order)}):
+    if order.product and order.product.output_rm_id:
+        rack_id = None                    # in-house maal RM store me jaata hai, rack nahi
+    elif rack_raw and (rack_id is None or rack_id not in {rack.id for rack in fg_racks_for(order)}):
         return None, "Choose a rack that belongs to the finished goods warehouse of this order."
     return {"order": order, "output_date": output_date, "rack_id": rack_id, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4), "loss": round(loss, 4),
             "recorded_by": (request.form.get("recorded_by") or "").strip()[:60], "remarks": (request.form.get("remarks") or "").strip()[:255]}, None
@@ -153,7 +156,10 @@ def production_output_add():
     renumber_queue()
     persist_schedule()
     db.session.commit()
-    flash(f"Output {output.output_no} recorded. {output.good_qty:g} good went into finished goods as batch {output.batch_no}; {order.prod_no} is completed.", "success")
+    if order.product and order.product.output_rm:
+        flash(f"Output {output.output_no} recorded. {output.good_qty:g} {order.product.output_rm.name} went into raw material stock (store) and can now be issued to orders; {order.prod_no} is completed.", "success")
+    else:
+        flash(f"Output {output.output_no} recorded. {output.good_qty:g} good went into finished goods as batch {output.batch_no}; {order.prod_no} is completed.", "success")
     return redirect(_list_url("recorded"))
 
 

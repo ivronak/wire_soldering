@@ -5,7 +5,7 @@ import math
 from datetime import timedelta
 
 from app.inventory.alerts import store_stock_by_material
-from app.models import PurchaseOrder, RawMaterial
+from app.models import Product, PurchaseOrder, RawMaterial
 from app.production_orders.scheduler import live_schedule, today_ist
 
 HORIZON_DAYS = 30
@@ -78,6 +78,8 @@ def material_plan(today=None, picks=None):
     ordered, _materials, schedule = live_schedule(today)
     stock = store_stock_by_material()
     vendor_lines = po_lines_by_vendor()
+    # In-house material (jaise Flux): {raw_material_id: Product} — iski kami PO se nahi, apna production order bana kar poori hoti hai (client meeting 2, #9)
+    made_by = {p.output_rm_id: p for p in Product.query.filter(Product.output_rm_id.isnot(None), Product.is_deleted == False).all()}
 
     events = {}        # {material_id: [(date, order_of_day, kind, ref, qty)]}  qty signed; order_of_day: pehle aamad (0) phir zaroorat (1)
     undated = {}       # {material_id: qty} — expected date wala nahi PO
@@ -97,6 +99,14 @@ def material_plan(today=None, picks=None):
             if when <= end:
                 events.setdefault(line.raw_material_id, []).append((when, 0, "arrive", po.po_no, qty))
     for order in ordered:
+        # Queue me us in-house product ka order ho to uska output us din "aane wala maal" hai (jis din uska aakhri stage khatam)
+        if order.product is not None and order.product.output_rm_id and order.status in ("Released", "In production"):
+            info = schedule.get(order.id)
+            batch_kg = float((order.planned_qty or 0) * (order.unit_weight or 1))
+            if info and info["windows"] and batch_kg > EPS:
+                when = max(info["windows"][-1][1], today)
+                if when <= end:
+                    events.setdefault(order.product.output_rm_id, []).append((when, 0, "arrive", order.prod_no, batch_kg))
         for line in order.lines:
             need = float(line.open_demand_qty)          # zaroorat + order ka allowance (stage ki use likh di to 0)
             if need <= EPS:
@@ -128,7 +138,8 @@ def material_plan(today=None, picks=None):
         if need_total <= EPS and not undated.get(material.id) and not coming_total:
             continue          # 30 din me is material ka koi kaam nahi
         shortage = round(max(-lowest, 0.0), 4) if short_date else 0.0
-        options = vendor_options(vendor_lines.get(material.id, {}))
+        maker = made_by.get(material.id)
+        options = [] if maker else vendor_options(vendor_lines.get(material.id, {}))
         auto = options[0] if options else None
         chosen = auto
         if picks and options:
@@ -138,7 +149,9 @@ def material_plan(today=None, picks=None):
         place_by = None
         urgency = None
         days_late = 0
-        if short_date:
+        if short_date and maker is not None:
+            urgency = "make"
+        elif short_date:
             if lead is None:
                 urgency = "no_lead"
             else:
@@ -154,14 +167,14 @@ def material_plan(today=None, picks=None):
                      "overdue": overdue.get(material.id, []), "end_balance": round(balance, 4), "short_date": short_date, "shortage": shortage,
                      "vendor": vendor, "lead": lead, "place_by": place_by, "urgency": urgency, "days_late": days_late, "timeline": timeline,
                      "last_line": chosen["line"] if chosen else None, "vendor_options": options, "auto_vendor_id": auto["vendor"].id if auto else None,
-                     "orders": sorted({e["ref"] for e in timeline if e["kind"] == "need"})})
+                     "orders": sorted({e["ref"] for e in timeline if e["kind"] == "need"}), "maker": maker})
 
-    rank = {"late": 0, "soon": 1, "no_lead": 2, "plan": 3, None: 4}
+    rank = {"late": 0, "make": 1, "soon": 2, "no_lead": 3, "plan": 4, None: 5}
     rows.sort(key=lambda r: (rank[r["urgency"]], r["short_date"] or end, r["material"].name))
     kpi = {"short": len([r for r in rows if r["short_date"]]), "late": len([r for r in rows if r["urgency"] == "late"]),
            "soon": len([r for r in rows if r["urgency"] == "soon"]), "no_lead": len([r for r in rows if r["urgency"] == "no_lead"]),
            "undated": len([r for r in rows if r["undated"] > EPS]), "overdue": len([r for r in rows if r["overdue"]]), "orders": len(ordered), "materials": len(rows)}
-    return {"rows": rows, "kpi": kpi, "today": today, "end": end, "suggested": suggested_pos(rows, today), "no_supplier": [r for r in rows if r["short_date"] and r["vendor"] is None]}
+    return {"rows": rows, "kpi": kpi, "today": today, "end": end, "suggested": suggested_pos(rows, today), "no_supplier": [r for r in rows if r["short_date"] and r["vendor"] is None and r["maker"] is None]}
 
 
 def suggested_qty(shortage):

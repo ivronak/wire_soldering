@@ -108,6 +108,7 @@ EVENT_TITLES = {
     "TRANSFER": "Stock transfer",
     "ADJUST": "Stock adjustment",
     "OPENING": "Opening stock",
+    "OWNMADE": "Made in house",
 }
 
 
@@ -210,7 +211,7 @@ def stock_lot(lot_id):
                               "qty": round(t_line.qty, 4), "value": round(t_line.value or 0, 2)})
     where_now.sort(key=lambda w: {"good": 0, "wip": 1, "wait": 2, "bad": 3}[w["tone"]])
 
-    received = sum(m.qty for m in movements if m.movement_type in ("GRN_RECEIPT", "OPENING") and m.reverses_movement_id is None)
+    received = sum(m.qty for m in movements if m.movement_type in ("GRN_RECEIPT", "OPENING", "OWN_IN") and m.reverses_movement_id is None)
     return render_template("stock_lot.html", active_nav="stock", lot=lot, unit=unit,
                            events=build_events(movements, unit), where_now=where_now, received=received)
 

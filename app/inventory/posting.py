@@ -67,6 +67,11 @@ def _next_lot_code():
     return f"LOT-{count + 1:04d}"
 
 
+def next_lot_code():
+    # Doosre modules (production output: in-house maal ka lot) ke liye
+    return _next_lot_code()
+
+
 def lot_for(grn_line):
     # Is GRN line ka lot (nahi hai to banao)
     lot = StockLot.query.filter_by(grn_line_id=grn_line.id).first()
@@ -94,7 +99,7 @@ def store_warehouse_for(po):
 
 def rm_warehouse_of(lot):
     # Passed maal jahan gaya: us lot ki QC_IN row ka warehouse (QC Hold nahi); nahi mila to PO ke hisaab se store
-    rows = StockMovement.query.filter(StockMovement.lot_id == lot.id, StockMovement.movement_type.in_(["QC_IN", "OPENING"])).filter(
+    rows = StockMovement.query.filter(StockMovement.lot_id == lot.id, StockMovement.movement_type.in_(["QC_IN", "OPENING", "OWN_IN"])).filter(
         StockMovement.reverses_movement_id.is_(None)).order_by(StockMovement.id.desc()).all()
     for row in rows:
         if row.warehouse is not None and row.warehouse.warehouse_type != "QC_HOLD":
@@ -167,7 +172,7 @@ def available_lots(raw_material_id):
     # Is material ke wo lots jinka maal store (RM) me hai, purana lot pehle (FIFO). [(lot, warehouse, qty, value)]
     result = []
     for lot in StockLot.query.filter_by(raw_material_id=raw_material_id).order_by(StockLot.id).all():
-        has_store = StockMovement.query.filter(StockMovement.lot_id == lot.id, StockMovement.movement_type.in_(["QC_IN", "OPENING"])).first()
+        has_store = StockMovement.query.filter(StockMovement.lot_id == lot.id, StockMovement.movement_type.in_(["QC_IN", "OPENING", "OWN_IN"])).first()
         store = rm_warehouse_of(lot) if has_store else None
         if store is None:
             continue

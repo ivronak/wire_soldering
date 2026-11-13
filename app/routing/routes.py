@@ -32,11 +32,18 @@ def order_batch_kg(order):
     return round(order.planned_qty * order.unit_weight, 4)
 
 
+def flux_only_order(order):
+    # Flux jaise in-house product ka apna order: iski poori recipe flux ki hai, isliye iska stage "side" nahi, ye khud hi metal chain hai
+    # (iska output KG me product ka Good maal banta hai). Wire ke order me flux ek side stage / line hoti hai.
+    main = [l for l in order.lines if not l.is_packing and not l.is_extra]
+    return bool(main) and all(l.is_flux for l in main)
+
+
 def side_stage_info(order, stage):
     """Flux Preparation jaisa "side" stage: iski saari material lines flux ki hon to iska maal metal chain me nahi jaata. Iski apni qty
     (flux ki recipe qty) aur apni unit (jaise LTR) hoti hai, product ke KG totals me nahi judti. Nahi to None."""
     lines = [l for l in order.lines if l.work_stage_id and l.work_stage_id == stage.work_stage_id]
-    if not lines or not all(l.is_flux for l in lines):
+    if not lines or not all(l.is_flux for l in lines) or flux_only_order(order):
         return None
     units = {l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else "KG" for l in lines}
     return {"qty": round(sum(l.required_qty for l in lines), 4), "unit": units.pop() if len(units) == 1 else "KG"}
@@ -65,7 +72,7 @@ def counts_to_input(line, side):
     if side:
         return True
     unit = line.raw_material.base_unit.code.upper() if line.raw_material and line.raw_material.base_unit else ""
-    return (not line.is_flux) and unit in ("KG", "KGS")
+    return (not line.is_flux or flux_only_order(line.production_order)) and unit in ("KG", "KGS")
 
 
 def used_input(order, stage, used_map):

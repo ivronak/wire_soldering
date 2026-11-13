@@ -380,6 +380,7 @@
                       data-min-stock="{{ p.min_stock if p.min_stock is not none else '' }}"
                       data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}"
                       data-unit-weight="{{ p.unit_weight if p.unit_weight is not none else '' }}"
+                      data-output-rm-id="{{ p.output_rm_id or '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
                       data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }},"spare":{{ r.spare_percent or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]'
                       data-packing='[{% for k in p.packing_items %}{"id":{{ k.raw_material_id }},"kg":{{ k.kg_per_pack }},"stage":{{ k.work_stage_id or 'null' }},"spare":{{ k.spare_percent or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
@@ -568,6 +569,18 @@
           <option value="{{ t.id }}">{{ t.code }} — {{ t.rate_percent }}%</option>
           {% endfor %}
         </select>
+      </div>
+      {# In-house product (jaise Flux): output FG me nahi, is Raw Material ke stock me jaata hai (client meeting 2, #9) #}
+      <div>
+        <label for="product-output-rm" class="block text-[12.5px] font-semibold text-ink mb-1">Output goes to raw material stock</label>
+        <select id="product-output-rm" name="output_rm_id"
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <option value="">No, finished goods (normal product)</option>
+          {% for m in output_materials %}
+          <option value="{{ m.id }}">{{ m.code }} — {{ m.name }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-[11.5px] text-ink-faint mt-1">For an in-house material such as Flux: choose the raw material it becomes. The output is added to that material's stock and other products use it in their recipe.</p>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
@@ -1019,6 +1032,7 @@
     document.getElementById('product-min-stock').value = btn.getAttribute('data-min-stock') || '';
     document.getElementById('product-max-stock').value = btn.getAttribute('data-max-stock') || '';
     document.getElementById('product-unit-weight').value = btn.getAttribute('data-unit-weight') || '';
+    document.getElementById('product-output-rm').value = btn.getAttribute('data-output-rm-id') || '';
     var attrs = {};
     var recipe = [];
     try { attrs = JSON.parse(btn.getAttribute('data-attributes') || '{}'); } catch (err) { attrs = {}; }

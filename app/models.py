@@ -200,6 +200,11 @@ class Product(CreatedAtMixin, db.Model):
     # Order form me ye box nahi aata: qty x unit_weight = KG seedha is se banta hai. Khaali = KG wala product.
     unit_weight = db.Column(db.Float, nullable=True)
 
+    # In-house semi-finished product (jaise Flux): iska output FG me nahi, is Raw Material ke stock me jaata hai, taaki dusre product ki recipe me
+    # wo material ban ke issue ho (client meeting 2, #9). Khaali = normal product (output FG me).
+    output_rm_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=True)
+    output_rm = db.relationship("RawMaterial", foreign_keys=[output_rm_id])
+
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
