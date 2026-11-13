@@ -1,10 +1,12 @@
 # Live machine dashboard (client meeting 2, change 10): har production line aur uski har machine ka abhi ka haal.
-# Sirf padhta hai, kuch save nahi karta. Data: Machines (line), ProductionOrderStage (In progress = machine chal rahi hai),
+# Dekhne ke saath ek hi cheez badalta hai: machine ki queue me order ko upar / neeche karna (client meeting 2, #11). Data: Machines (line), ProductionOrderStage (In progress = machine chal rahi hai),
 # aur live_schedule (agla kaun si machine par aane wala hai).
 from flask import Blueprint, jsonify, render_template
 
+from app.extensions import db
+
 from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, WorkStage
-from app.production_orders.scheduler import live_schedule, now_ist, today_ist
+from app.production_orders.scheduler import live_schedule, now_ist, persist_schedule, queue_orders, today_ist
 from app.routing.handoff import hot_handoffs, hours_text as handoff_text
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
@@ -70,9 +72,10 @@ def queue_by_machine(today):
             for row in stage.machines:
                 out.setdefault(row.machine_id, []).append({"order_id": order.id, "prod_no": order.prod_no,
                                                            "product": order.product.name if order.product else "",
-                                                           "stage": stage.stage_name, "start": start})
+                                                           "stage": stage.stage_name, "start": start, "status": order.status,
+                                                           "position": order.queue_position, "batch_kg": round((order.planned_qty or 0) * (order.unit_weight or 1), 2)})
     for rows in out.values():
-        rows.sort(key=lambda r: (r["start"], r["prod_no"]))
+        rows.sort(key=lambda r: (r["position"] if r["position"] is not None else 10 ** 9, r["prod_no"]))      # queue ka number hi turn tay karta hai (dates usi se bani hain)
     return out
 
 
@@ -174,23 +177,75 @@ def order_detail(order, running_stage):
             "hold_reason": running_stage.hold_reason or ""}
 
 
-@dashboard_bp.route("/dashboard/machine/<int:machine_id>")
-def machine_detail(machine_id):
-    """Tile par click: us machine ka pop-up data (JSON). Chal rahe order(s) ka poora planning + is machine ki aage ki queue."""
-    machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
+def machine_payload(machine):
+    """Pop-up ka poora data (JSON ke liye dict): chal rahe order(s), garam maal aane wala, aur is machine ki queue (upar / neeche ke ishare ke saath)."""
     orders = []
     stages = (ProductionOrderStage.query.join(ProductionOrder, ProductionOrder.id == ProductionOrderStage.production_order_id)
               .filter(ProductionOrderStage.status.in_(["In progress", "On hold"]), ProductionOrder.is_deleted == False).all())
     for stage in stages:
         if any(row.machine_id == machine.id for row in stage.machines):
             orders.append(order_detail(stage.production_order, stage))
-    queue = [{"prod_no": q["prod_no"], "product": q["product"], "stage": q["stage"], "start": day_text(q["start"])}
-             for q in queue_by_machine(today_ist()).get(machine.id, [])]
+    rows = machine_queue(machine.id)
+    queue = []
+    for index, q in enumerate(rows):
+        movable = q["status"] == "Released"            # "In production" order queue me aage jam hai, use nahi hilate
+        queue.append({"order_id": q["order_id"], "prod_no": q["prod_no"], "product": q["product"], "stage": q["stage"], "start": day_text(q["start"]),
+                      "status": q["status"], "batch_kg": q["batch_kg"], "position": q["position"],
+                      "can_up": movable and index > 0 and rows[index - 1]["status"] == "Released",
+                      "can_down": movable and index < len(rows) - 1})
     incoming = incoming_by_machine(now_ist()).get(machine.id, [])
-    return jsonify({"incoming": incoming, "machine": {"name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
+    return {"incoming": incoming, "machine": {"id": machine.id, "name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
                                 "line": machine.line.name if machine.line else "No line", "capacity": machine.capacity_text,
                                 "status": machine.status},
-                    "orders": orders, "queue": queue})
+            "orders": orders, "queue": queue}
+
+
+def machine_queue(machine_id):
+    # Is machine par intezaar karte orders (ek order ek baar), jaldi wala pehle
+    seen, rows = set(), []
+    for q in queue_by_machine(today_ist()).get(machine_id, []):
+        if q["order_id"] not in seen:
+            seen.add(q["order_id"])
+            rows.append(q)
+    return rows
+
+
+@dashboard_bp.route("/dashboard/machine/<int:machine_id>")
+def machine_detail(machine_id):
+    """Tile par click: us machine ka pop-up data (JSON). Chal rahe order(s) ka poora planning + is machine ki aage ki queue."""
+    machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
+    return jsonify(machine_payload(machine))
+
+
+@dashboard_bp.route("/dashboard/machine/<int:machine_id>/move/<int:order_id>/<direction>", methods=["POST"])
+def machine_queue_move(machine_id, order_id, direction):
+    """Machine ki queue me order ko ek jagah upar / neeche karo. Asal me us order aur padosi order ki jagah queue me badal jaati hai
+    (queue ek hi hai, isliye Production order list me bhi wahi order dikhta hai) aur dates dobara bante hain. Wapas naya pop-up data."""
+    machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
+    if direction not in ("up", "down"):
+        return jsonify({"error": "Direction must be up or down."}), 400
+    rows = machine_queue(machine.id)
+    ids = [q["order_id"] for q in rows]
+    if order_id not in ids:
+        return jsonify({"error": "This order is not waiting for this machine."}), 400
+    index = ids.index(order_id)
+    other = index - 1 if direction == "up" else index + 1
+    if other < 0 or other >= len(rows):
+        return jsonify({"error": "It is already at the " + ("front" if direction == "up" else "end") + " of this machine's queue."}), 400
+    if rows[index]["status"] != "Released" or rows[other]["status"] != "Released":
+        return jsonify({"error": "Only released orders can be moved. An order already in production keeps its place."}), 400
+    waiting = [o for o in queue_orders() if o.status in ("Draft", "Released")]
+    by_id = {o.id: o for o in waiting}
+    first, second = by_id[order_id], by_id[rows[other]["order_id"]]
+    i, j = waiting.index(first), waiting.index(second)
+    waiting[i], waiting[j] = waiting[j], waiting[i]
+    frozen = [o for o in queue_orders() if o.status == "In production"]
+    for position, item in enumerate(frozen + waiting, start=1):
+        item.queue_position = position
+    db.session.flush()
+    persist_schedule()
+    db.session.commit()
+    return jsonify(machine_payload(machine))
 
 
 @dashboard_bp.route("/dashboard")

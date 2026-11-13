@@ -40,6 +40,9 @@
   .db-tile.held { border-color: #FDA29B; background: #FFFAF9; }
   .db-tile.held .db-dot { background: #D92D20; box-shadow: 0 0 0 3px #FEE4E2; }
   .db-tile.held .db-mc-state { color: #B42318; }
+  .dm-mv { border: 1px solid #D9E1E0; background: #fff; color: #0F2F32; border-radius: 6px; width: 26px; height: 24px; font-size: 11px; cursor: pointer; margin-left: 3px; }
+  .dm-mv:hover:not([disabled]) { background: #F4F6F5; border-color: #B9C6C4; }
+  .dm-mv[disabled] { opacity: .3; cursor: default; }
   .db-holdline { font-size: 12px; font-weight: 600; color: #B42318; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 3px 8px; }
   .db-mc-sub { font-size: 11.5px; color: #6B7F82; margin-top: -5px; padding-left: 17px; }
   .db-run { border-top: 1px dashed #E2E8E7; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -242,13 +245,25 @@
           return '<tr><td class="font-mono font-semibold">' + esc(q.prod_no) + '</td><td>' + esc(q.prev_stage) + ' &rarr; ' + esc(q.stage) + '</td><td>' + esc(q.text) + '</td></tr>';
         }).join('') + '</tbody></table><p class="db-meta mt-1">A long job started on this machine now would block it. The routing page refuses such a start unless a reason is written.</p>';
       }
-      html += '<div class="dm-sec">Waiting for this machine</div>';
+      html += '<div class="dm-sec">Queue for this machine</div>';
       if (data.queue.length) {
-        html += '<table class="dm-table"><thead><tr><th>Order</th><th>Product</th><th>Stage</th><th>From</th></tr></thead><tbody>' + data.queue.map(function (q) {
-          return '<tr><td class="font-mono font-semibold">' + esc(q.prod_no) + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td>' + esc(q.start) + '</td></tr>';
-        }).join('') + '</tbody></table>';
+        html += '<table class="dm-table"><thead><tr><th>#</th><th>Order</th><th>Product</th><th>Stage</th><th class="r">Batch</th><th>From</th><th></th></tr></thead><tbody>' + data.queue.map(function (q, i) {
+          var btn = function (dir, on, label) {
+            return '<button type="button" class="dm-mv" data-order="' + q.order_id + '" data-dir="' + dir + '"' + (on ? '' : ' disabled') + ' title="Move ' + dir + '" aria-label="Move ' + dir + '">' + label + '</button>';
+          };
+          return '<tr><td>' + (i === 0 ? '<b>Next</b>' : (i + 1)) + '</td><td class="font-mono font-semibold">' + esc(q.prod_no) + (q.status === 'In production' ? ' <span class="db-meta">(in production)</span>' : '') + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td class="r">' + q.batch_kg + ' KG</td><td>' + esc(q.start) + '</td><td class="r" style="white-space:nowrap">' + btn('up', q.can_up, '&#9650;') + btn('down', q.can_down, '&#9660;') + '</td></tr>';
+        }).join('') + '</tbody></table><p class="db-meta mt-1">When the running order finishes on this machine, the first order here is next. Use the arrows to change the turn of released orders; the dates of the other orders are worked out again.</p>';
       } else html += '<p class="text-ink-muted">No order is waiting for this machine.</p>';
+      html += '<div id="dm-err" class="db-meta mt-1" style="color:#B42318"></div>';
       body.innerHTML = html;
+      body.querySelectorAll('.dm-mv').forEach(function (b) {
+        b.addEventListener('click', function () {
+          fetch('/dashboard/machine/' + m.id + '/move/' + b.getAttribute('data-order') + '/' + b.getAttribute('data-dir'), { method: 'POST' })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) { if (res.ok) show(res.j); else document.getElementById('dm-err').textContent = res.j.error || 'Could not move the order.'; })
+            .catch(function () { document.getElementById('dm-err').textContent = 'Could not move the order.'; });
+        });
+      });
       modal.classList.remove('hidden');
       modal.setAttribute('aria-hidden', 'false');
     }
