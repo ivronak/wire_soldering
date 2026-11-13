@@ -19,6 +19,12 @@ def hours_text(minutes):
     return f"{hours} h {mins:02d} m" if hours else f"{mins} m"
 
 
+def clock_text(seconds):
+    # Chalne ka time hh:mm:ss (24 ghante se zyada ho to ghante badhte rehte hain: 126:05:09)
+    seconds = max(int(seconds), 0)
+    return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
+
+
 def running_by_machine(now):
     """{machine_id: [info]} — jis stage ka status "In progress" hai, uski saari chuni hui machines chal rahi maani jaati hain
     (asli machine routing me Complete par tick hoti hai). Elapsed time stage ke asli Start se ginte hain, order assign hone se nahi."""
@@ -27,14 +33,15 @@ def running_by_machine(now):
               .filter(ProductionOrderStage.status == "In progress", ProductionOrder.is_deleted == False).all())
     for stage in stages:
         order = stage.production_order
-        elapsed = int((now - stage.started_at).total_seconds() // 60) if stage.started_at else 0
+        elapsed_sec = max(int((now - stage.started_at).total_seconds()), 0) if stage.started_at else 0
+        elapsed = elapsed_sec // 60
         planned_min = int(round((stage.planned_hours or 0) * 60)) if stage.planned_hours else None
         stages_of_order = list(order.stages)
         position = next((i for i, st in enumerate(stages_of_order) if st.id == stage.id), len(stages_of_order) - 1)
         next_stage = stages_of_order[position + 1].stage_name if position + 1 < len(stages_of_order) else "Production output"
         info = {"order_id": order.id, "next_stage": next_stage, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
                 "stage": stage.stage_name, "operator": stage.operator or "", "kg": round(stage.qty_in or 0, 2),
-                "elapsed_min": elapsed, "elapsed_text": hours_text(elapsed), "planned_text": hours_text(planned_min) if planned_min else "",
+                "elapsed_min": elapsed, "elapsed_text": hours_text(elapsed), "elapsed_sec": elapsed_sec, "elapsed_clock": clock_text(elapsed_sec), "planned_text": hours_text(planned_min) if planned_min else "",
                 "over_min": (elapsed - planned_min) if planned_min and elapsed > planned_min else 0,
                 "pct": min(100, int(round(100 * elapsed / planned_min))) if planned_min else 0,
                 "started": stage.started_at.strftime("%d %b %H:%M") if stage.started_at else ""}

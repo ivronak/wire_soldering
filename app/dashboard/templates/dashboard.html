@@ -45,7 +45,7 @@
   .db-bar i { display: block; height: 100%; border-radius: 999px; background: #C26A2E; }
   .db-bar.over i { background: #D92D20; }
   .db-bar-l { display: flex; justify-content: space-between; font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
-  .db-bar-l b { color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .db-bar-l b { color: #0F2F32; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -.01em; }
   .db-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
   .db-fact .l { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8A9A9C; }
   .db-fact .v { font-size: 13px; font-weight: 600; color: #0F2F32; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -127,7 +127,7 @@
               <div><span class="db-ordno">{{ r.prod_no }}</span><div class="db-prod">{{ r.product }}</div></div>
               <div>
                 <div class="db-bar{% if r.over_min %} over{% endif %}"><i style="width: {{ r.pct }}%"></i></div>
-                <div class="db-bar-l"><span>Running <b class="db-elapsed" data-min="{{ r.elapsed_min }}" title="Since {{ r.started }}">{{ r.elapsed_text }}</b></span><span>{% if r.planned_text %}plan {{ r.planned_text }}{% else %}no plan time{% endif %}</span></div>
+                <div class="db-bar-l"><span>Running <b class="db-elapsed" data-sec="{{ r.elapsed_sec }}" title="Since {{ r.started }}">{{ r.elapsed_clock }}</b></span><span>{% if r.planned_text %}plan {{ r.planned_text }}{% else %}no plan time{% endif %}</span></div>
               </div>
               <div class="db-facts">
                 <div class="db-fact"><div class="l">Material</div><div class="v">{{ '%g'|format(r.kg) }} KG</div></div>
@@ -183,20 +183,21 @@
 
 {% block page_js %}
 <script>
-  // "Running for" ghadi: server ne page banate waqt minutes diye; hum page khulne ke baad ke minutes jodte hain (browser ki timezone ka koi lena-dena nahi)
+  // "Running" ghadi hh:mm:ss: server ne page banate waqt seconds diye; hum page khulne ke baad ke seconds jodte hain, har second badalta hai (browser ki timezone ka koi lena-dena nahi)
   (function () {
     var loaded = Date.now();
-    function text(total) {
-      var h = Math.floor(total / 60), m = total % 60;
-      return h ? h + ' h ' + (m < 10 ? '0' : '') + m + ' m' : m + ' m';
+    function two(n) { return (n < 10 ? '0' : '') + n; }
+    function clock(total) {
+      return two(Math.floor(total / 3600)) + ':' + two(Math.floor(total % 3600 / 60)) + ':' + two(total % 60);
     }
     function tick() {
-      var extra = Math.floor((Date.now() - loaded) / 60000);
+      var extra = Math.floor((Date.now() - loaded) / 1000);
       document.querySelectorAll('.db-elapsed').forEach(function (el) {
-        el.textContent = text((parseInt(el.getAttribute('data-min'), 10) || 0) + extra);
+        el.textContent = clock((parseInt(el.getAttribute('data-sec'), 10) || 0) + extra);
       });
     }
-    setInterval(tick, 30000);
+    tick();
+    setInterval(tick, 1000);
     // Poora page har 30 second me naya data le aata hai (pop-up khula ho to ruk ke, taaki padhte waqt band na ho)
     var modal = document.getElementById('db-modal'), body = document.getElementById('db-body');
     setInterval(function () { if (modal.classList.contains('hidden')) window.location.reload(); }, 30000);
