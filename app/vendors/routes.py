@@ -2,6 +2,9 @@ from flask import render_template, redirect, url_for, Blueprint, request, flash
 from app.models import ChartOfAccountsGroup, Ledger, Vendor, State, VendorType, PaymentTerm
 from app.extensions import db
 
+# Vendor ke grade ke fixed choices (client ne A, B, C maange hain)
+VENDOR_GRADES = ("A", "B", "C")
+
 vendors_bp = Blueprint("vendors", __name__, template_folder="templates")
 
 
@@ -24,6 +27,15 @@ def read_lead_time():
     return int(raw), None
 
 
+def read_grade():
+    # Grade optional: khaali = None. Diya ho to A, B ya C hi. (value, None) ya (None, "error")
+    raw = (request.form.get('grade') or "").strip().upper()
+    if not raw:
+        return None, None
+    if raw not in VENDOR_GRADES:
+        return None, "Grade must be A, B or C."
+    return raw, None
+
 
 @vendors_bp.route("/vendors")
 def vendors_list():
@@ -38,6 +50,7 @@ def vendors_list():
         result_count=total_count,
         active_nav="vendors",
         next_code=next_code,
+        grades=VENDOR_GRADES,
         # Dropdown ab State Master se — sirf live (deleted nahi, active) states
         states=State.query.filter(State.is_deleted == False, State.is_active == True).order_by(State.name).all(),
         # Vendor Type dropdown ab Vendor Type Master se — sirf live (deleted nahi, active) types
@@ -91,6 +104,11 @@ def vendors_add():
         flash(lead_error, "error")
         return redirect(url_for('vendors.vendors_list'))
 
+    grade, grade_error = read_grade()
+    if grade_error:
+        flash(grade_error, "error")
+        return redirect(url_for('vendors.vendors_list'))
+
     # Step 1: "Sundry Creditors" group dhoondo — na mile to pehli baar bana do
     group = ChartOfAccountsGroup.query.filter(ChartOfAccountsGroup.name == "Sundry Creditors").first()
     if not group:
@@ -125,6 +143,7 @@ def vendors_add():
         pan=pan or None,
         payment_terms_id=payment_terms_id,
         lead_time_days=lead_time_days,
+        grade=grade,
         vendor_type_id=vendor_type_id,
         bank_name=bank_name,
         bank_ifsc=bank_ifsc,
@@ -191,6 +210,11 @@ def vendors_edit(v_id):
         flash(lead_error, "error")
         return redirect(url_for('vendors.vendors_list'))
 
+    grade, grade_error = read_grade()
+    if grade_error:
+        flash(grade_error, "error")
+        return redirect(url_for('vendors.vendors_list'))
+
     ledger = v.ledger
 
     def signed_ammount(bal, bal_type):
@@ -216,6 +240,7 @@ def vendors_edit(v_id):
     v.pan=pan or None
     v.payment_terms_id=payment_terms_id
     v.lead_time_days=lead_time_days
+    v.grade=grade
     v.vendor_type_id=vendor_type_id
     v.bank_name=bank_name
     v.bank_ifsc=bank_ifsc

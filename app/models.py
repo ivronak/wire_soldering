@@ -352,6 +352,10 @@ class Vendor(CreatedAtMixin, db.Model):
     # Order dene se maal aane tak ke din (client change #3: 15-20 din). Material plan "PO kab tak dalo" isi se nikalta hai. Khaali = pata nahi.
     lead_time_days = db.Column(db.Integer, nullable=True)
 
+    # Supplier grade A / B / C (client meeting 2, change 7): Grade A = pasandida (shortlisted) supplier. Khaali = abhi grade nahi diya.
+    # 30-day material plan se Draft PO banate waqt Grade A vendors pehle suggest honge.
+    grade = db.Column(db.String(1), nullable=True)
+
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
