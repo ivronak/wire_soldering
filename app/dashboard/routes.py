@@ -26,14 +26,15 @@ def clock_text(seconds):
 
 
 def running_by_machine(now):
-    """{machine_id: [info]} — jis stage ka status "In progress" hai, uski saari chuni hui machines chal rahi maani jaati hain
-    (asli machine routing me Complete par tick hoti hai). Elapsed time stage ke asli Start se ginte hain, order assign hone se nahi."""
+    """{machine_id: [info]} — jis stage ka status "In progress" (ya "On hold") hai, uski saari chuni hui machines us order se bandhi maani jaati hain
+    (asli machine routing me Complete par tick hoti hai). Elapsed time stage ke asli Start se ginte hain, order assign hone se nahi;
+    hold me ruka hua time hat jaata hai aur hold chal raha ho to timer wahin ruka dikhta hai (held=True)."""
     out = {}
     stages = (ProductionOrderStage.query.join(ProductionOrder, ProductionOrder.id == ProductionOrderStage.production_order_id)
-              .filter(ProductionOrderStage.status == "In progress", ProductionOrder.is_deleted == False).all())
+              .filter(ProductionOrderStage.status.in_(["In progress", "On hold"]), ProductionOrder.is_deleted == False).all())
     for stage in stages:
         order = stage.production_order
-        elapsed_sec = max(int((now - stage.started_at).total_seconds()), 0) if stage.started_at else 0
+        elapsed_sec = stage.worked_seconds(now)
         elapsed = elapsed_sec // 60
         planned_min = int(round((stage.planned_hours or 0) * 60)) if stage.planned_hours else None
         stages_of_order = list(order.stages)
@@ -44,7 +45,9 @@ def running_by_machine(now):
                 "elapsed_min": elapsed, "elapsed_text": hours_text(elapsed), "elapsed_sec": elapsed_sec, "elapsed_clock": clock_text(elapsed_sec), "planned_text": hours_text(planned_min) if planned_min else "",
                 "over_min": (elapsed - planned_min) if planned_min and elapsed > planned_min else 0,
                 "pct": min(100, int(round(100 * elapsed / planned_min))) if planned_min else 0,
-                "started": stage.started_at.strftime("%d %b %H:%M") if stage.started_at else ""}
+                "started": stage.started_at.strftime("%d %b %H:%M") if stage.started_at else "",
+                "held": stage.status == "On hold", "hold_reason": stage.hold_reason or "",
+                "held_at": stage.held_at.strftime("%d %b %H:%M") if stage.held_at else ""}
         info["over_text"] = hours_text(info["over_min"]) if info["over_min"] else ""
         for row in stage.machines:
             out.setdefault(row.machine_id, []).append(info)
@@ -107,10 +110,11 @@ def machine_board(today=None, now=None):
         runs = running.get(machine.id, [])
         waiting = queue.get(machine.id, [])
         state = "running" if runs else ("free" if machine.status == "active" else "inactive")
+        held = bool(runs) and all(r["held"] for r in runs)          # sab hold par ho to card "On hold" dikhta hai
         return {"id": machine.id, "code": machine.code, "name": machine.name, "stage_name": machine.work_stage.name if machine.work_stage else "",
                 "stage_id": machine.work_stage_id, "stage_no": stage_no.get(machine.work_stage_id, 0),
                 "capacity": machine.capacity_text, "state": state, "runs": runs, "next": waiting[0] if waiting else None,
-                "queue_count": len(waiting), "master_inactive": machine.status != "active",
+                "queue_count": len(waiting), "master_inactive": machine.status != "active", "held": held,
                 "incoming": (incoming.get(machine.id) or [None])[0]}
 
     groups = []
@@ -150,8 +154,8 @@ def order_detail(order, running_stage):
     now = now_ist()
     stages = []
     for stage in order.stages:
-        if stage.status == "In progress" and stage.started_at:
-            actual = round((now - stage.started_at).total_seconds() / 3600, 2)
+        if stage.status in ("In progress", "On hold") and stage.started_at:
+            actual = round(stage.worked_seconds(now) / 3600, 2)
         else:
             actual = stage.actual_hours
         stages.append({"name": stage.stage_name, "status": stage.status, "is_this": stage.id == running_stage.id,
@@ -166,7 +170,8 @@ def order_detail(order, running_stage):
             "line": order.line.name if order.line else "", "batch_kg": round((order.planned_qty or 0) * (order.unit_weight or 1), 2),
             "planned_start": day_text(order.planned_start_date), "planned_end": day_text(order.planned_end_date),
             "needed_by": day_text(order.needed_by_date), "done": done, "total": len(order.stages), "stages": stages, "materials": materials,
-            "running_stage": running_stage.stage_name}
+            "running_stage": running_stage.stage_name, "held": running_stage.status == "On hold",
+            "hold_reason": running_stage.hold_reason or ""}
 
 
 @dashboard_bp.route("/dashboard/machine/<int:machine_id>")
@@ -175,7 +180,7 @@ def machine_detail(machine_id):
     machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
     orders = []
     stages = (ProductionOrderStage.query.join(ProductionOrder, ProductionOrder.id == ProductionOrderStage.production_order_id)
-              .filter(ProductionOrderStage.status == "In progress", ProductionOrder.is_deleted == False).all())
+              .filter(ProductionOrderStage.status.in_(["In progress", "On hold"]), ProductionOrder.is_deleted == False).all())
     for stage in stages:
         if any(row.machine_id == machine.id for row in stage.machines):
             orders.append(order_detail(stage.production_order, stage))

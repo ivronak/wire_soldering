@@ -58,6 +58,11 @@
   .rt-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
   .rt-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
   #rt-modal.hidden { display: none; } #rt-modal { display: flex; }
+  #rs-modal.hidden { display: none; } #rs-modal { display: flex; }
+  .rt-chip.hold { background: #FEF3F2; color: #B42318; border-color: #FDA29B; }
+  .rt-step.hold { background: #FEF3F2; border-color: #FDA29B; box-shadow: inset 0 -3px 0 #D92D20; } .rt-step.hold .n { color: #B42318; }
+  .rt-btn.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; } .rt-btn.warn:hover { background: #FDE9CC; }
+  .rt-btn.danger { background: #fff; color: #B42318; border-color: #F8CFCB; } .rt-btn.danger:hover { background: #FEF3F2; }
 </style>
 {% endblock %}
 
@@ -94,6 +99,7 @@
       <div style="min-width:0">
         <div class="flex items-center gap-2 flex-wrap"><span class="rt-no">{{ o.prod_no }}</span>
           {% if sm.all_done %}<span class="rt-chip ok"><i></i>All stages done</span>
+          {% elif sm.on_hold %}<span class="rt-chip hold" title="Since {{ tshort(sm.on_hold.held_at) }}"><i></i>{{ sm.on_hold.stage_name }} on hold: {{ sm.on_hold.hold_reason }}</span>
           {% elif sm.in_progress %}<span class="rt-chip run"><i></i>{{ sm.in_progress.stage_name }} running</span>
           {% else %}<span class="rt-chip gone"><i></i>Waiting to start {{ cur.stage_name }}</span>{% endif %}</div>
         <div class="rt-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
@@ -116,7 +122,13 @@
       <div class="flex gap-2 justify-end flex-wrap">
         {% if cur %}
           {% if cur.status == 'Pending' %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>
-          {% else %}<button type="button" class="rt-act rt-btn teal" data-mode="complete" data-stage="{{ cur.id }}">Complete {{ cur.stage_name }}</button>{% endif %}
+          {% elif cur.status == 'On hold' %}
+            <form method="post" action="{{ url_for('routing.routing_resume', stage_id=cur.id) }}" class="js-confirm-submit" data-confirm-title="Resume stage" data-confirm-ok="Resume" data-confirm-message="Resume {{ cur.stage_name }} for {{ o.prod_no }} now? The timer starts again from where it stopped.">
+              <button type="submit" class="rt-btn primary">Resume</button></form>
+            <button type="button" class="rt-reason rt-btn danger" data-do="cancel" data-stage="{{ cur.id }}" data-name="{{ cur.stage_name }}" data-order="{{ o.prod_no }}">Cancel run</button>
+          {% else %}<button type="button" class="rt-act rt-btn teal" data-mode="complete" data-stage="{{ cur.id }}">Complete {{ cur.stage_name }}</button>
+            <button type="button" class="rt-reason rt-btn warn" data-do="hold" data-stage="{{ cur.id }}" data-name="{{ cur.stage_name }}" data-order="{{ o.prod_no }}">Hold</button>
+            <button type="button" class="rt-reason rt-btn danger" data-do="cancel" data-stage="{{ cur.id }}" data-name="{{ cur.stage_name }}" data-order="{{ o.prod_no }}">Cancel run</button>{% endif %}
         {% else %}
           <a href="{{ url_for('production_output.production_output_list') }}" class="rt-btn primary">Record output →</a>
         {% endif %}
@@ -126,11 +138,12 @@
 
     <div class="rt-pipe">
       {% for st in sm.stages %}
-      <div class="rt-step {{ 'done' if st.status == 'Done' else ('cur' if st.status == 'In progress' or st.id == (cur.id if cur else 0) else '') }}">
+      <div class="rt-step {{ 'done' if st.status == 'Done' else ('hold' if st.status == 'On hold' else ('cur' if st.status == 'In progress' or st.id == (cur.id if cur else 0) else '')) }}">
         <div class="n">{{ '✓' if st.status == 'Done' else loop.index }} · {{ st.status }}</div>
         <div class="t">{{ st.stage_name }}</div>
         <div class="s">{% if st.status == 'Done' %}{{ st.actual_hours }} h <span style="opacity:.7">(plan {{ '%.1f'|format(st.planned_hours or 0) }})</span>
           {% elif st.status == 'In progress' %}since {{ tshort(st.started_at) }}
+          {% elif st.status == 'On hold' %}held {{ tshort(st.held_at) }}
           {% else %}plan {{ '%.1f'|format(st.planned_hours or 0) }} h{% endif %}</div>
       </div>
       {% endfor %}
@@ -173,7 +186,9 @@
               {% if st.completed_at %}
                 {% set diff = st.actual_hours - (st.planned_hours or 0) %}
                 <div class="rt-meta"><span style="color:{{ '#B42318' if diff > 0.05 else '#1F7A4D' }}; font-weight:600">{{ st.actual_hours }} h ({{ '%+.1f'|format(diff) }} h vs plan)</span></div>
+              {% elif st.status == 'On hold' %}<div class="rt-meta" style="color:#B42318;font-weight:600">On hold since {{ tshort(st.held_at) }}: {{ st.hold_reason }}</div>
               {% else %}<div class="rt-meta">In progress</div>{% endif %}
+              {% if st.hold_minutes %}<div class="rt-meta">Held earlier: {{ '%g'|format(st.hold_minutes|round(0)) }} min (not counted in the hours)</div>{% endif %}
               <div class="rt-meta">Machines: {% for m in st.machines if m.used %}{{ m.machine_name }}{% if not m.is_planned %} <i>(added)</i>{% endif %}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</div>
               {% if st.notes %}<div class="rt-meta">Note: {{ st.notes }}</div>{% endif %}
               {% endif %}
@@ -248,6 +263,26 @@
       <button type="button" id="lq-cancel" class="rt-btn ghost">Cancel</button>
       <button type="submit" form="lq-form" class="rt-btn primary" style="padding:8px 20px">Save lab test</button>
     </div>
+  </div>
+</div>
+{# Hold / Cancel run: dono ke liye wajah zaroori, isliye ek chhota common pop-up #}
+<div id="rs-modal" class="hidden fixed inset-0 z-50 items-center justify-center" aria-hidden="true">
+  <div id="rs-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-200 mx-4">
+    <form id="rs-form" method="post">
+      <div class="px-5 pt-4 pb-2"><h2 id="rs-title" class="text-[17px] font-bold text-ink">Hold</h2><p id="rs-sub" class="text-[12.5px] text-ink-faint">—</p></div>
+      <div class="px-5 pb-3 space-y-3">
+        <p id="rs-help" class="text-[13px] text-ink-muted"></p>
+        <div><label class="rt-label">Reason *</label>
+          <input type="text" name="reason" id="rs-reason" maxlength="120" class="rt-input" list="rs-reasons" placeholder="Write the reason" autocomplete="off" required />
+          <datalist id="rs-reasons"><option value="Power cut"></option><option value="Machine breakdown"></option><option value="Waiting for lab QC"></option><option value="Waiting for material"></option><option value="Operator not available"></option></datalist></div>
+        <div id="rs-when-wrap"><label class="rt-label">Hold time</label><input type="datetime-local" name="held_at" id="rs-when" class="rt-input" /></div>
+      </div>
+      <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" id="rs-cancel" class="rt-btn ghost">Back</button>
+        <button type="submit" id="rs-submit" class="rt-btn warn" style="padding:8px 20px">Hold</button>
+      </div>
+    </form>
   </div>
 </div>
 <div id="rt-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
@@ -438,7 +473,7 @@
             '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. lab correction, more spools wound" autocomplete="off" /></div></div>' +
             '<div class="text-[11.5px] text-ink-faint">The extra is issued from the store automatically when you complete the stage. No limit.</div></div></td></tr>';
       }).join('');
-      STARTED = a.started_iso || ''; HOURS_EDITED = false;
+      STARTED = a.started_iso || ''; HOURS_EDITED = false; HOLD_MIN = a.hold_min || 0;
       autoHours();
       document.getElementById('rt-hours-box').style.display = 'block';
       syncScrap(); checkUsed();
@@ -449,11 +484,11 @@
     }
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
-  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false, BILLET = null, NO_SCRAP = false, BILLET_OVER = false, BILLET_USED_BAD = false, STARTED = '', HOURS_EDITED = false;
+  var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false, BILLET = null, NO_SCRAP = false, BILLET_OVER = false, BILLET_USED_BAD = false, STARTED = '', HOURS_EDITED = false, HOLD_MIN = 0;
   // Working hours: start se finish tak khud nikalta hai; operator badal sakta hai (tab auto band)
   function autoHours() {
     if (HOURS_EDITED || !STARTED || !when.value) return;
-    var h = (new Date(when.value) - new Date(STARTED)) / 3600000;
+    var h = ((new Date(when.value) - new Date(STARTED)) / 60000 - HOLD_MIN) / 60;       // hold me ruka hua time hata kar
     document.getElementById('rt-hours').value = h > 0 ? Math.round(h * 100) / 100 : '';
   }
   document.getElementById('rt-hours').addEventListener('input', function () { HOURS_EDITED = true; });
@@ -552,6 +587,32 @@
   });
   document.getElementById('rt-prev-scrap').addEventListener('input', function () { syncScrap(); checkUsed(); });
   function closeStage() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+  // Hold / Cancel run: wajah ke saath chhota pop-up
+  (function () {
+    var m = document.getElementById('rs-modal'), f = document.getElementById('rs-form');
+    function close() { m.classList.add('hidden'); m.setAttribute('aria-hidden', 'true'); }
+    document.querySelectorAll('.rt-reason').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var hold = b.getAttribute('data-do') === 'hold';
+        f.action = (hold ? '/routing/hold/' : '/routing/cancel_start/') + b.getAttribute('data-stage');
+        document.getElementById('rs-title').textContent = (hold ? 'Hold ' : 'Cancel run of ') + b.getAttribute('data-name');
+        document.getElementById('rs-sub').textContent = b.getAttribute('data-order');
+        document.getElementById('rs-help').textContent = hold ? 'The timer stops until you press Resume. The held time is not counted in the working hours.'
+          : 'The stage goes back to waiting to start and its timer is cleared. Use this if it was started by mistake or never really ran. The material already issued stays with the order.';
+        document.getElementById('rs-submit').textContent = hold ? 'Put on hold' : 'Cancel the run';
+        document.getElementById('rs-submit').className = 'rt-btn ' + (hold ? 'warn' : 'danger');
+        document.getElementById('rs-when-wrap').style.display = hold ? 'block' : 'none';
+        document.getElementById('rs-when').disabled = !hold;
+        document.getElementById('rs-when').value = NOW;
+        document.getElementById('rs-reason').value = '';
+        m.classList.remove('hidden'); m.setAttribute('aria-hidden', 'false');
+        document.getElementById('rs-reason').focus();
+      });
+    });
+    document.getElementById('rs-cancel').addEventListener('click', close);
+    document.getElementById('rs-backdrop').addEventListener('click', close);
+  })();
   document.querySelectorAll('.rt-act').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); openStage(b); }); });
   ['rt-close', 'rt-cancel', 'rt-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeStage); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeStage(); });

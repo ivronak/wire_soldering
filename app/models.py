@@ -1833,14 +1833,26 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     billet_count = db.Column(db.Integer, nullable=True)
     billet_weight = db.Column(db.Float, nullable=True)
     scrap_photo = db.Column(db.String(255), nullable=True)
+    # Hold (lights gayi / machine kharab / QC): status "On hold" me timer ruk jaata hai. hold_minutes = ab tak ruke hue kul minute (pichhle holds ke),
+    # held_at = abhi wala hold kab laga (None = hold nahi), hold_reason = abhi wali wajah.
+    held_at = db.Column(db.DateTime, nullable=True)
+    hold_reason = db.Column(db.String(120), nullable=True)
+    hold_minutes = db.Column(db.Float, default=0, server_default="0", nullable=False)
+
+    def worked_seconds(self, now):
+        # Machine ne asal me kitni der kaam kiya: start se (ab ya finish tak) minus jitni der hold raha. Hold chal raha ho to timer wahi ruka hua dikhta hai.
+        if not self.started_at:
+            return 0
+        end = self.completed_at or (self.held_at if self.held_at else now)
+        return max(int((end - self.started_at).total_seconds() - (self.hold_minutes or 0) * 60), 0)
 
     @property
     def actual_hours(self):
-        # Asli lage ghante (start se end tak wall-clock). Abhi chal raha ho to start se ab tak nahi — sirf poora hone par
+        # Asli lage ghante (start se end tak, hold ka time hata kar). Abhi chal raha ho to start se ab tak nahi — sirf poora hone par
         if self.work_hours is not None and self.completed_at:
             return round(self.work_hours, 2)
         if self.started_at and self.completed_at:
-            return round((self.completed_at - self.started_at).total_seconds() / 3600, 2)
+            return round(self.worked_seconds(self.completed_at) / 3600, 2)
         return None
 
 

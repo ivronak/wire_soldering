@@ -154,8 +154,9 @@ def order_summary(order, today):
     planned_h = sum(s.planned_hours or 0 for s in done)
     actual_h = sum(s.actual_hours or 0 for s in done)
     in_progress = next((s for s in stages if s.status == "In progress"), None)
+    on_hold = next((s for s in stages if s.status == "On hold"), None)
     return {
-        "stages": stages, "done": len(done), "total": len(stages), "current": current, "in_progress": in_progress,
+        "stages": stages, "done": len(done), "total": len(stages), "current": current, "in_progress": in_progress, "on_hold": on_hold,
         "all_done": bool(stages) and len(done) == len(stages),
         "pct": int(round(100 * len(done) / len(stages))) if stages else 0,
         "delay": delay, "forecast": forecast, "planned_end": planned_end,
@@ -220,6 +221,8 @@ def routing_list():
             "planned_hours": cur.planned_hours, "machines": _machine_choices(cur),
             "started_at": cur.started_at.strftime("%d %b %H:%M") if cur.started_at else "",
             "started_iso": cur.started_at.strftime("%Y-%m-%dT%H:%M") if cur.started_at else "",
+            "hold_min": round(cur.hold_minutes or 0, 1), "hold_reason": cur.hold_reason or "",
+            "held_at": cur.held_at.strftime("%d %b %H:%M") if cur.held_at else "",
             "defer_self": bool(cur.work_stage and cur.work_stage.scrap_after_next),
             "defer_prev": None,
             # Ingot Casting jaisa stage: lattha ginti (weight stage master se); Extrusion jaisa stage: scrap box nahi
@@ -329,11 +332,106 @@ def routing_start(stage_id):
     return _back()
 
 
+def _add_note(stage, text):
+    # Stage ke notes me ek line jodta hai (255 akshar ki hadd ke andar; purani baat kate to kate, nayi hamesha rahe)
+    old = stage.notes or ""
+    stage.notes = ((old + " | " if old else "") + text)[-255:]
+
+
+@routing_bp.route("/routing/hold/<int:stage_id>", methods=["POST"])
+def routing_hold(stage_id):
+    # Lights gayi / machine kharab / QC me ruka: timer ruk jaata hai (client meeting 2, #11). Wajah zaroori.
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if stage.status != "In progress":
+        flash(f"{stage.stage_name} is not running, so it cannot be put on hold.", "error")
+        return _back()
+    reason = (request.form.get("reason") or "").strip()[:120]
+    if len(reason) < 3:
+        flash("Write the reason for the hold (for example power cut, machine breakdown).", "error")
+        return _back()
+    held_at, error = _read_when("held_at")
+    if error:
+        flash(error, "error")
+        return _back()
+    if held_at < stage.started_at:
+        flash("The hold time cannot be before the start time.", "error")
+        return _back()
+    stage.status = "On hold"
+    stage.held_at = held_at
+    stage.hold_reason = reason
+    db.session.commit()
+    flash(f"{stage.stage_name} of {order.prod_no} is on hold. The timer has stopped.", "success")
+    return _back()
+
+
+@routing_bp.route("/routing/resume/<int:stage_id>", methods=["POST"])
+def routing_resume(stage_id):
+    # Hold khatam: ruka hua time jod diya jaata hai, timer wahin se aage chalta hai
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if stage.status != "On hold" or stage.held_at is None:
+        flash(f"{stage.stage_name} is not on hold.", "error")
+        return _back()
+    resumed_at, error = _read_when("resumed_at")
+    if error:
+        flash(error, "error")
+        return _back()
+    if resumed_at < stage.held_at:
+        flash("The resume time cannot be before the hold time.", "error")
+        return _back()
+    minutes = (resumed_at - stage.held_at).total_seconds() / 60
+    stage.hold_minutes = round((stage.hold_minutes or 0) + minutes, 2)
+    _add_note(stage, f"Held {int(round(minutes))} min ({stage.hold_reason})")
+    stage.status = "In progress"
+    stage.held_at = None
+    stage.hold_reason = None
+    db.session.commit()
+    flash(f"{stage.stage_name} of {order.prod_no} resumed.", "success")
+    return _back()
+
+
+@routing_bp.route("/routing/cancel_start/<int:stage_id>", methods=["POST"])
+def routing_cancel_start(stage_id):
+    # Galti se / kaam shuru hi nahi hua: stage wapas "Pending" (timer saaf). Issue hua material order par hi rehta hai. Wajah zaroori.
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    if stage.status not in ("In progress", "On hold"):
+        flash(f"{stage.stage_name} is not running, so there is nothing to cancel.", "error")
+        return _back()
+    reason = (request.form.get("reason") or "").strip()[:120]
+    if len(reason) < 3:
+        flash("Write the reason for cancelling the run.", "error")
+        return _back()
+    if stage.lab_qcs:
+        flash(f"{stage.stage_name} has a lab test recorded, so the run cannot be cancelled. Put it on hold, or finish it.", "error")
+        return _back()
+    _add_note(stage, f"Run cancelled ({reason}) - was started {stage.started_at.strftime('%d %b %H:%M')}")
+    stage.status = "Pending"
+    stage.started_at = None
+    stage.qty_in = None
+    stage.held_at = None
+    stage.hold_reason = None
+    stage.hold_minutes = 0
+    db.session.commit()
+    flash(f"{stage.stage_name} of {order.prod_no} is back to waiting to start. Start it again when the machine really starts.", "success")
+    return _back()
+
+
 @routing_bp.route("/routing/complete/<int:stage_id>", methods=["POST"])
 def routing_complete(stage_id):
     stage, order, error = _stage_for_action(stage_id)
     if error:
         flash(error, "error")
+        return _back()
+    if stage.status == "On hold":
+        flash(f"{stage.stage_name} is on hold. Resume it before completing.", "error")
         return _back()
     if stage.status != "In progress":
         flash(f"{stage.stage_name} is not running. Start it first.", "error")
@@ -552,7 +650,7 @@ def routing_complete(stage_id):
     stage.scrap_kind = scrap_kind
     note = (request.form.get("notes") or "").strip()[:255]
     if note:
-        stage.notes = note
+        _add_note(stage, note)          # hold / clash wali purani lines mitti nahi, nayi note unke saath judti hai
     db.session.commit()
     summary = order_summary(order, today_ist())
     if summary["all_done"]:

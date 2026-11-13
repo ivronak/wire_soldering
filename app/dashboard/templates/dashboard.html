@@ -37,6 +37,10 @@
   .db-mc-state { margin-left: auto; font-size: 11.5px; font-weight: 700; color: #1F7A4D; white-space: nowrap; }
   .db-tile.running .db-mc-state { color: #8A4A1C; }
   .db-tile.inactive .db-mc-state { color: #6B7F82; }
+  .db-tile.held { border-color: #FDA29B; background: #FFFAF9; }
+  .db-tile.held .db-dot { background: #D92D20; box-shadow: 0 0 0 3px #FEE4E2; }
+  .db-tile.held .db-mc-state { color: #B42318; }
+  .db-holdline { font-size: 12px; font-weight: 600; color: #B42318; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 3px 8px; }
   .db-mc-sub { font-size: 11.5px; color: #6B7F82; margin-top: -5px; padding-left: 17px; }
   .db-run { border-top: 1px dashed #E2E8E7; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
   .db-ordno { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; color: #0F2F32; background: #EEF2F1; border: 1px solid #D9E1E0; border-radius: 6px; padding: 1px 7px; }
@@ -118,10 +122,10 @@
           <span class="db-sb-count">{% if st.running %}<span class="db-pill run">{{ st.running }} running</span>{% endif %}{% if st.free %}<span class="db-pill free">{{ st.free }} free</span>{% endif %}</span>
         </div>
         {% for t in st.machines %}
-        <div class="db-tile {{ t.state }}" data-machine="{{ t.id }}" title="Click for the order and queue details">
+        <div class="db-tile {{ t.state }}{% if t.held %} held{% endif %}" data-machine="{{ t.id }}" title="Click for the order and queue details">
           <div class="db-mc-top">
             <span class="db-dot"></span><span class="db-mc-name">{{ t.name }}</span>
-            <span class="db-mc-state">{{ 'Running' if t.state == 'running' else ('Free' if t.state == 'free' else 'Inactive') }}</span>
+            <span class="db-mc-state">{{ ('On hold' if t.held else 'Running') if t.state == 'running' else ('Free' if t.state == 'free' else 'Inactive') }}</span>
           </div>
           <div class="db-mc-sub">{{ t.code }} · {{ t.capacity.split(' · ')[0] }}</div>
           {% if t.state == 'running' %}
@@ -130,12 +134,13 @@
               <div><span class="db-ordno">{{ r.prod_no }}</span><div class="db-prod">{{ r.product }}</div></div>
               <div>
                 <div class="db-bar{% if r.over_min %} over{% endif %}"><i style="width: {{ r.pct }}%"></i></div>
-                <div class="db-bar-l"><span><b class="db-elapsed db-pill-t{% if r.over_min %} over{% endif %}" data-sec="{{ r.elapsed_sec }}" title="Since {{ r.started }}">{{ r.elapsed_clock }}</b></span><span>{% if r.planned_text %}plan {{ r.planned_text }}{% else %}no plan time{% endif %}</span></div>
+                <div class="db-bar-l"><span><b class="db-elapsed db-pill-t{% if r.over_min %} over{% endif %}" data-sec="{{ r.elapsed_sec }}"{% if r.held %} data-held="1"{% endif %} title="Since {{ r.started }}">{{ r.elapsed_clock }}</b></span><span>{% if r.planned_text %}plan {{ r.planned_text }}{% else %}no plan time{% endif %}</span></div>
               </div>
               <div class="db-facts">
                 <div class="db-fact"><div class="l">Material</div><div class="v">{{ '%g'|format(r.kg) }} KG</div></div>
                 <div class="db-fact"><div class="l">Operator</div><div class="v">{{ r.operator or '—' }}</div></div>
               </div>
+              {% if r.held %}<div class="db-holdline">On hold since {{ r.held_at }}: {{ r.hold_reason }}</div>{% endif %}
               {% if r.over_text %}<div><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
               <div class="db-then">Then &rarr; <b>{{ r.next_stage }}</b></div>
             </div>
@@ -196,6 +201,7 @@
     function tick() {
       var extra = Math.floor((Date.now() - loaded) / 1000);
       document.querySelectorAll('.db-elapsed').forEach(function (el) {
+        if (el.getAttribute('data-held')) return;          // hold par timer ruka rehta hai
         el.textContent = clock((parseInt(el.getAttribute('data-sec'), 10) || 0) + extra);
       });
     }
@@ -219,7 +225,7 @@
         return '<tr><td>' + esc(m.name) + '</td><td class="r">' + m.required + ' ' + esc(m.unit) + '</td><td class="r">' + m.issued + ' ' + esc(m.unit) + '</td></tr>';
       }).join('');
       return '<div class="dm-card"><div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-mono font-bold text-[15px]">' + esc(o.prod_no) + '</span> <span class="text-ink-faint">' + esc(o.product) + '</span></div>' +
-        '<span class="db-chip running"><i></i>' + esc(o.running_stage) + ' running</span></div>' +
+        '<span class="db-chip running"><i></i>' + esc(o.running_stage) + (o.held ? ' on hold: ' + esc(o.hold_reason) : ' running') + '</span></div>' +
         '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">' + kv('Batch', o.batch_kg + ' KG') + kv('Line', o.line) + kv('Plan', o.planned_start + (o.planned_end ? ' – ' + o.planned_end : '')) + kv('Needed by', o.needed_by) + '</div>' +
         '<div class="dm-sec">Stages (' + o.done + ' of ' + o.total + ' done)</div><div class="overflow-x-auto"><table class="dm-table"><thead><tr><th>Stage</th><th>Status</th><th>Machines</th><th>Plan dates</th><th class="r">Planned</th><th class="r">Actual</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="dm-sec">Material</div><table class="dm-table"><thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th></tr></thead><tbody>' + mats + '</tbody></table></div>';
