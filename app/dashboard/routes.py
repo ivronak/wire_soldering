@@ -3,7 +3,7 @@
 # aur live_schedule (agla kaun si machine par aane wala hai).
 from flask import Blueprint, jsonify, render_template
 
-from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage
+from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, WorkStage
 from app.production_orders.scheduler import live_schedule, now_ist, today_ist
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
@@ -68,13 +68,21 @@ def machine_board(today=None, now=None):
     now = now or now_ist()
     running = running_by_machine(now)
     queue = queue_by_machine(today)
+    # Stage ka order Work Stage master ke "Order" number se (chhota = pehle: Flux, Melting, Casting ...). Machines usi order me dikhti hain.
+    stage_rank = {}
+    for index, ws in enumerate(WorkStage.query.filter_by(is_deleted=False).all()):
+        stage_rank[ws.id] = (int(ws.sort_order or 0), ws.id)
+    ranked = sorted(stage_rank, key=lambda i: stage_rank[i])
+    stage_no = {stage_id: n + 1 for n, stage_id in enumerate(ranked)}          # 1, 2, 3 ... poore process me stage ka number
     machines = Machines.query.filter_by(is_deleted=False).order_by(Machines.code).all()
+    machines.sort(key=lambda m: (stage_rank.get(m.work_stage_id, (10 ** 9, 0)), m.code))
 
     def tile(machine):
         runs = running.get(machine.id, [])
         waiting = queue.get(machine.id, [])
         state = "running" if runs else ("free" if machine.status == "active" else "inactive")
         return {"id": machine.id, "code": machine.code, "name": machine.name, "stage_name": machine.work_stage.name if machine.work_stage else "",
+                "stage_id": machine.work_stage_id, "stage_no": stage_no.get(machine.work_stage_id, 0),
                 "capacity": machine.capacity_text, "state": state, "runs": runs, "next": waiting[0] if waiting else None,
                 "queue_count": len(waiting), "master_inactive": machine.status != "active"}
 
@@ -86,6 +94,16 @@ def machine_board(today=None, now=None):
     if loose:
         groups.append({"name": "Machines without a line", "code": "", "capacity": None, "handler": "", "line_active": True, "machines": loose})
     for group in groups:
+        # Line ke andar stage-wise column: process ke order me (jis stage me us line ki machine ho wahi dikhta hai)
+        stages = []
+        for t in group["machines"]:
+            if not stages or stages[-1]["id"] != t["stage_id"]:
+                stages.append({"id": t["stage_id"], "no": t["stage_no"], "name": t["stage_name"], "machines": []})
+            stages[-1]["machines"].append(t)
+        for st in stages:
+            st["running"] = len([t for t in st["machines"] if t["state"] == "running"])
+            st["free"] = len([t for t in st["machines"] if t["state"] == "free"])
+        group["stages"] = stages
         group["running"] = len([t for t in group["machines"] if t["state"] == "running"])
         group["free"] = len([t for t in group["machines"] if t["state"] == "free"])
         group["inactive"] = len([t for t in group["machines"] if t["state"] == "inactive"])

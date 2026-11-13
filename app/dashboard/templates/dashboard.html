@@ -11,8 +11,14 @@
   .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8E7; background: #F8FAF9; border-radius: 12px 12px 0 0; }
   .db-name { font-size: 15px; font-weight: 700; color: #0F2F32; }
   .db-meta { font-size: 12px; color: #6B7F82; }
-  .db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 14px 16px; }
-  .db-tile { border: 1px solid #D1D9D8; border-radius: 10px; padding: 12px 14px; background: #fff; border-left-width: 5px; display: flex; flex-direction: column; gap: 6px; }
+  /* Line ke andar stage-wise column (process ke order me 1, 2, 3 ...), har column me us stage ki machines */
+  .db-flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; padding: 14px 16px; align-items: start; }
+  .db-stage { background: #F3F6F5; border: 1px solid #E2E8E7; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; position: relative; }
+  .db-stage-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 2px; }
+  .db-stage-no { width: 22px; height: 22px; border-radius: 50%; background: #0F2F32; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .db-stage-name { font-size: 13px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .db-stage-count { margin-left: auto; font-size: 11.5px; color: #6B7F82; white-space: nowrap; }
+  .db-tile { border: 1px solid #D1D9D8; border-radius: 9px; padding: 9px 11px; background: #fff; border-left-width: 4px; display: flex; flex-direction: column; gap: 4px; }
   .db-tile.running { border-left-color: #C26A2E; background: #FFFAF5; }
   .db-tile.free { border-left-color: #1F9D6A; }
   .db-tile.inactive { border-left-color: #A6B4B3; background: #F5F7F7; color: #6B7F82; }
@@ -45,7 +51,7 @@
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Dashboard</div>
     <h1 class="text-[22px] font-bold text-ink leading-tight">Live machine dashboard</h1>
-    <p class="text-[13px] text-ink-faint">Every production line and machine right now: which order is running, how much material is in it and since when. The time counts from the real Start of the stage. The page refreshes by itself every 30 seconds.</p>
+    <p class="text-[13px] text-ink-faint">Each line shows its stages in process order (1, 2, 3 ...) with the machines of that stage. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
   </div>
   <div class="text-[12.5px] text-ink-faint">As of {{ board.now.strftime('%d %b %Y, %I:%M %p') }}</div>
 </div>
@@ -71,39 +77,42 @@
         {% if g.inactive %}<span class="db-chip inactive"><i></i>{{ g.inactive }} inactive</span>{% endif %}
       </div>
     </div>
-    {% if g.machines %}
-    <div class="db-grid">
-      {% for t in g.machines %}
-      <div class="db-tile {{ t.state }}" data-machine="{{ t.id }}">
-        <div class="flex items-start justify-between gap-2">
-          <div><div class="text-[14px] font-bold text-ink">{{ t.name }}</div><div class="db-meta">{{ t.code }} · {{ t.stage_name }}</div></div>
-          {% if t.state == 'running' %}<span class="db-chip running"><i></i>Running</span>
-          {% elif t.state == 'free' %}<span class="db-chip free"><i></i>Free</span>
-          {% else %}<span class="db-chip inactive"><i></i>Inactive</span>{% endif %}
+    {% if g.stages %}
+    <div class="db-flow">
+      {% for st in g.stages %}
+      <div class="db-stage">
+        <div class="db-stage-head">
+          <span class="db-stage-no">{{ st.no }}</span>
+          <span class="db-stage-name">{{ st.name }}</span>
+          <span class="db-stage-count">{{ st.running }} running · {{ st.free }} free</span>
         </div>
-        {% if t.state == 'running' %}
-          {% for r in t.runs %}
-          <div class="{% if not loop.first %}border-t border-slate-200 pt-2{% endif %}">
-            <div class="db-order">{{ r.prod_no }}</div>
-            <div class="db-meta">{{ r.product }} · {{ r.stage }}</div>
-            <div class="db-row mt-1"><span>Material in</span><b>{{ '%g'|format(r.kg) }} KG</b></div>
-            <div class="db-row"><span>Running for</span><b class="db-elapsed" data-min="{{ r.elapsed_min }}">{{ r.elapsed_text }}</b></div>
-            <div class="db-row"><span>Started</span><b>{{ r.started }}</b></div>
-            {% if r.operator %}<div class="db-row"><span>Operator</span><b>{{ r.operator }}</b></div>{% endif %}
-            {% if r.planned_text %}<div class="db-row"><span>Planned time</span><b>{{ r.planned_text }}</b></div>{% endif %}
-            {% if r.over_text %}<div><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
+        {% for t in st.machines %}
+        <div class="db-tile {{ t.state }}" data-machine="{{ t.id }}" title="Click for the order and queue details">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0"><div class="text-[13.5px] font-bold text-ink truncate">{{ t.name }}</div><div class="db-meta">{{ t.code }} · {{ t.capacity.split(' · ')[0] }}</div></div>
+            {% if t.state == 'running' %}<span class="db-chip running"><i></i>Running</span>
+            {% elif t.state == 'free' %}<span class="db-chip free"><i></i>Free</span>
+            {% else %}<span class="db-chip inactive"><i></i>Inactive</span>{% endif %}
           </div>
-          {% endfor %}
-        {% elif t.state == 'free' %}
-          <div class="db-meta">Nothing is running on this machine.</div>
-        {% else %}
-          <div class="db-meta">Machine is switched off in the Machine master.</div>
-        {% endif %}
-        {% if t.next %}
-        <div class="border-t border-slate-200 pt-2 db-meta">Next: <b class="text-ink">{{ t.next.prod_no }}</b> · {{ t.next.stage }} from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more in queue{% endif %}</div>
-        {% elif t.state != 'inactive' %}
-        <div class="border-t border-slate-200 pt-2 db-meta">No order waiting for this machine.</div>
-        {% endif %}
+          {% if t.state == 'running' %}
+            {% for r in t.runs %}
+            <div class="{% if not loop.first %}border-t border-slate-200 pt-1.5{% endif %}">
+              <div class="flex items-baseline justify-between gap-2"><span class="db-order">{{ r.prod_no }}</span><b class="db-elapsed text-[12.5px] text-ink" data-min="{{ r.elapsed_min }}" title="Running since {{ r.started }}">{{ r.elapsed_text }}</b></div>
+              <div class="db-meta truncate">{{ r.product }}</div>
+              <div class="db-meta"><b class="text-ink">{{ '%g'|format(r.kg) }} KG</b> in{% if r.operator %} · {{ r.operator }}{% endif %}{% if r.planned_text %} · plan {{ r.planned_text }}{% endif %}</div>
+              {% if r.over_text %}<div class="mt-1"><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
+            </div>
+            {% endfor %}
+          {% elif t.state == 'inactive' %}
+            <div class="db-meta">Switched off in Machine master.</div>
+          {% endif %}
+          {% if t.next %}
+          <div class="border-t border-slate-200 pt-1.5 db-meta">Next: <b class="text-ink">{{ t.next.prod_no }}</b> from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more{% endif %}</div>
+          {% elif t.state == 'free' %}
+          <div class="db-meta">Nothing waiting.</div>
+          {% endif %}
+        </div>
+        {% endfor %}
       </div>
       {% endfor %}
     </div>
