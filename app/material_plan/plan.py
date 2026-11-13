@@ -11,6 +11,7 @@ from app.production_orders.scheduler import live_schedule, today_ist
 HORIZON_DAYS = 30
 EPS = 1e-6
 SOON_DAYS = 7          # "place PO before" itne din ke andar ho to "Place soon"
+GRADE_RANK = {"A": 0, "B": 1, "C": 2}      # vendor grade ki pasand: A sabse pehle, bina grade wale sabse baad me
 
 
 def _demand_date(order, line, schedule, today):
@@ -40,6 +41,26 @@ def last_po_lines():
     return out
 
 
+def po_lines_by_vendor():
+    # {material_id: {vendor_id: (po, line)}} — us material ko jis-jis vendor se kharida (Cancelled / Draft PO nahi); har vendor ki sabse nayi line.
+    # Rate / tax / unit isi line se aate hain, isliye sirf pehle kharide hue vendors hi suggest ho sakte hain.
+    out = {}
+    pos = (PurchaseOrder.query.filter(PurchaseOrder.is_deleted == False, PurchaseOrder.status.notin_(["Cancelled", "Draft"]))
+           .order_by(PurchaseOrder.po_date, PurchaseOrder.id).all())
+    for po in pos:
+        for line in po.lines:
+            out.setdefault(line.raw_material_id, {})[po.vendor_id] = (po, line)
+    return out
+
+
+def vendor_options(by_vendor):
+    # Ek material ke vendors ki list, sabse achha pehle: chalu vendor, phir Grade A -> B -> C -> bina grade, barabar grade me sabse nayi PO wala.
+    opts = [{"vendor": po.vendor, "po": po, "line": line} for po, line in by_vendor.values() if po.vendor is not None]
+    opts.sort(key=lambda o: (0 if (o["vendor"].is_active and not o["vendor"].is_deleted) else 1, GRADE_RANK.get(o["vendor"].grade, 3),
+                             -o["po"].po_date.toordinal(), -o["po"].id))
+    return opts
+
+
 def draft_po_by_material():
     # {material_id: po_no} — jo material kisi Draft PO me pehle se hai (dobara PO na ban jaye)
     out = {}
@@ -49,14 +70,14 @@ def draft_po_by_material():
     return out
 
 
-def material_plan(today=None):
-    """Wapas {"rows": [...], "kpi": {...}, "today", "end"}. Har row = ek material: stock, 30 din ki zaroorat, aane wala maal, pehli kami ki date,
+def material_plan(today=None, picks=None):
+    """picks = {material_id: vendor_id} — user ne dropdown se jo vendor chuna (nahi to Grade-A wala suggestion). Wapas {"rows": [...], "kpi": {...}, "today", "end"}. Har row = ek material: stock, 30 din ki zaroorat, aane wala maal, pehli kami ki date,
     kitni kami, vendor + lead time, "PO kab tak dalo", aur timeline (date-wise balance)."""
     today = today or today_ist()
     end = today + timedelta(days=HORIZON_DAYS)
     ordered, _materials, schedule = live_schedule(today)
     stock = store_stock_by_material()
-    last_lines = last_po_lines()
+    vendor_lines = po_lines_by_vendor()
 
     events = {}        # {material_id: [(date, order_of_day, kind, ref, qty)]}  qty signed; order_of_day: pehle aamad (0) phir zaroorat (1)
     undated = {}       # {material_id: qty} — expected date wala nahi PO
@@ -107,8 +128,12 @@ def material_plan(today=None):
         if need_total <= EPS and not undated.get(material.id) and not coming_total:
             continue          # 30 din me is material ka koi kaam nahi
         shortage = round(max(-lowest, 0.0), 4) if short_date else 0.0
-        last = last_lines.get(material.id)
-        vendor = last[0].vendor if last else None
+        options = vendor_options(vendor_lines.get(material.id, {}))
+        auto = options[0] if options else None
+        chosen = auto
+        if picks and options:
+            chosen = next((o for o in options if o["vendor"].id == picks.get(material.id)), auto)
+        vendor = chosen["vendor"] if chosen else None
         lead = vendor.lead_time_days if vendor is not None else None
         place_by = None
         urgency = None
@@ -128,7 +153,7 @@ def material_plan(today=None):
                      "need": round(need_total, 4), "coming": round(coming_total, 4), "undated": round(undated.get(material.id, 0.0), 4),
                      "overdue": overdue.get(material.id, []), "end_balance": round(balance, 4), "short_date": short_date, "shortage": shortage,
                      "vendor": vendor, "lead": lead, "place_by": place_by, "urgency": urgency, "days_late": days_late, "timeline": timeline,
-                     "last_line": last[1] if last else None,
+                     "last_line": chosen["line"] if chosen else None, "vendor_options": options, "auto_vendor_id": auto["vendor"].id if auto else None,
                      "orders": sorted({e["ref"] for e in timeline if e["kind"] == "need"})})
 
     rank = {"late": 0, "soon": 1, "no_lead": 2, "plan": 3, None: 4}
@@ -146,6 +171,7 @@ def suggested_qty(shortage):
 
 def suggested_pos(rows, today):
     """Kami wale materials ko vendor ke hisaab se jodo: har vendor ke liye ek PO ka suggestion (client change #3: ek consolidated PO kai orders ke liye).
+    Vendor = Grade A pehle (ya user ka chuna hua, material_plan ke picks se).
     Wapas [{vendor, expected, lines: [{row, qty, draft_po}], late}]. expected = aaj + vendor ka lead time (pata ho to); late = kami ki date tak nahi pahunchega."""
     drafts = draft_po_by_material()
     groups = {}

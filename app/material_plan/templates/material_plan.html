@@ -36,6 +36,19 @@
 </style>
 {% endblock %}
 
+{% macro vendor_pick(row) %}
+  {# Ek se zyada vendor se kharida ho to dropdown (Grade-A pehle); badalte hi page naye vendor ke saath reload hota hai #}
+  {% if row.vendor_options|length > 1 %}
+  <select class="mp-pick w-full px-1.5 py-1 text-[12.5px] border border-slate-300 rounded bg-white" name="pick_{{ row.material.id }}" data-auto="{{ row.auto_vendor_id }}" title="Choose the vendor for this material">
+    {% for o in row.vendor_options %}
+    <option value="{{ o.vendor.id }}" {% if o.vendor.id == row.vendor.id %}selected{% endif %}>{{ o.vendor.name }}{% if o.vendor.grade %} · Grade {{ o.vendor.grade }}{% endif %} · ₹{{ '%g'|format(o.line.rate) }}{% if o.vendor.lead_time_days is not none %} · {{ o.vendor.lead_time_days }} d{% endif %}</option>
+    {% endfor %}
+  </select>
+  {% else %}
+  <span class="text-[12.5px]">{{ row.vendor.name }}</span>{% if row.vendor.grade %} <span class="mp-meta">Grade {{ row.vendor.grade }}</span>{% endif %}
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="shrink-0">
   <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Material plan</div>
@@ -69,13 +82,13 @@
     <form method="post" action="{{ url_for('material_plan.material_plan_create_po') }}" class="border border-slate-200 rounded-lg p-3 mb-2">
       <input type="hidden" name="vendor_id" value="{{ g.vendor.id }}" />
       <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div><span class="mp-name">{{ g.vendor.name }}</span>
+        <div><span class="mp-name">{{ g.vendor.name }}</span>{% if g.vendor.grade %} <span class="mp-chip {{ 'ok' if g.vendor.grade == 'A' else 'gone' }}">Grade {{ g.vendor.grade }}</span>{% endif %}
           <span class="mp-meta">· {% if g.vendor.lead_time_days is not none %}lead time {{ g.vendor.lead_time_days }} days, goods about {{ g.expected.strftime('%d %b') }}{% else %}lead time not set{% endif %}</span></div>
         {% if g.late %}<span class="mp-chip bad"><i></i>Will arrive after some materials run short</span>{% endif %}
       </div>
       <div class="overflow-x-auto">
         <table class="mp-table">
-          <thead><tr><th>Material</th><th style="width:16%">Runs short from</th><th style="width:22%">For orders</th><th class="r" style="width:12%">Rate</th><th class="r" style="width:16%">Quantity</th></tr></thead>
+          <thead><tr><th>Material</th><th style="width:14%">Runs short from</th><th style="width:18%">For orders</th><th style="width:22%">Vendor</th><th class="r" style="width:10%">Rate</th><th class="r" style="width:14%">Quantity</th></tr></thead>
           <tbody>
             {% for line in g.open_lines %}
             <tr>
@@ -83,6 +96,7 @@
                 <input type="hidden" name="material_id_{{ loop.index0 }}" value="{{ line.row.material.id }}" /></td>
               <td>{{ line.row.short_date.strftime('%d %b') }}</td>
               <td class="mp-meta">{{ line.row.orders|join(', ') }}</td>
+              <td>{{ vendor_pick(line.row) }}</td>
               <td class="r">₹{{ '%g'|format(line.row.last_line.rate) }}</td>
               <td class="r"><input type="number" name="qty_{{ loop.index0 }}" value="{{ '%g'|format(line.qty) }}" min="0" step="any" class="w-24 px-2 py-1 text-[13px] border border-slate-300 rounded text-right" /> {{ line.row.unit }}</td>
             </tr>
@@ -91,7 +105,7 @@
             <tr style="color:#6B7F82">
               <td><b>{{ line.row.material.name }}</b> <span class="mp-meta">{{ line.row.material.code }}</span></td>
               <td>{{ line.row.short_date.strftime('%d %b') }}</td>
-              <td colspan="3">Already in draft {{ line.draft_po }}. Confirm that PO instead.</td>
+              <td colspan="4">Already in draft {{ line.draft_po }}. Confirm that PO instead.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -130,7 +144,7 @@
           <span class="mp-chip ok"><i></i>Enough for {{ horizon }} days</span>
         {% endif %}
         <div class="mp-meta mt-1">
-          {% if r.vendor %}{{ r.vendor.name }}{% if r.lead is not none %} · lead time {{ r.lead }} days{% else %} · lead time not set{% endif %}{% else %}No purchase order yet, so no supplier{% endif %}
+          {% if r.vendor %}{{ r.vendor.name }}{% if r.vendor.grade %} (Grade {{ r.vendor.grade }}){% endif %}{% if r.lead is not none %} · lead time {{ r.lead }} days{% else %} · lead time not set{% endif %}{% else %}No purchase order yet, so no supplier{% endif %}
         </div>
         {% if r.undated > 0 %}<div class="mp-meta">{{ '%g'|format(r.undated) }} {{ r.unit }} on order has no expected date, so it is not counted.</div>{% endif %}
         {% if r.overdue %}<div class="mp-chip bad mt-1"><i></i>Overdue: {{ r.overdue|join(', ') }}</div><div class="mp-meta">Expected date passed, goods not received. Counted as arriving today, so chase the vendor.</div>{% endif %}
@@ -162,4 +176,21 @@
       {% else %}Add production orders to the queue to see the plan.{% endif %}</p></div>
   {% endfor %}
 </div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  // Vendor dropdown badalte hi page reload: jo vendor Grade-A suggestion se alag chune gaye wahi URL me jaate hain (typed quantity reset ho jaati hai)
+  (function () {
+    var picks = document.querySelectorAll('.mp-pick');
+    picks.forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var url = new URL(window.location.href);
+        Array.from(url.searchParams.keys()).forEach(function (k) { if (k.indexOf('pick_') === 0) url.searchParams.delete(k); });
+        picks.forEach(function (s) { if (s.value !== s.getAttribute('data-auto')) url.searchParams.set(s.name, s.value); });
+        window.location.href = url.toString();
+      });
+    });
+  })();
+</script>
 {% endblock %}

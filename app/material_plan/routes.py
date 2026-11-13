@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
-from app.material_plan.plan import HORIZON_DAYS, draft_po_by_material, last_po_lines, material_plan
+from app.material_plan.plan import HORIZON_DAYS, draft_po_by_material, material_plan, po_lines_by_vendor
 from app.models import PurchaseOrder, PurchaseOrderLine, RawMaterial, Vendor
 
 material_plan_bp = Blueprint("material_plan", __name__, template_folder="templates")
@@ -16,7 +16,12 @@ def material_plan_page():
     view = request.args.get("view", "short")
     if view not in ("short", "all"):
         view = "short"
-    plan = material_plan()
+    # Dropdown se badla hua vendor URL me aata hai: ?pick_<material id>=<vendor id>
+    picks = {}
+    for key, value in request.args.items():
+        if key.startswith("pick_") and key[5:].isdigit() and value.isdigit():
+            picks[int(key[5:])] = int(value)
+    plan = material_plan(picks=picks)
     # "short" = jinme kami hai, jinke PO ki date nahi likhi, ya jo date nikal chuke (overdue) PO ke bharose covered hain; "all" = 30 din ke saare materials
     rows = [r for r in plan["rows"] if view == "all" or r["short_date"] or r["undated"] > 0 or r["overdue"]]
     return render_template("material_plan.html", active_nav="material_plan", plan=plan, rows=rows, view=view, horizon=HORIZON_DAYS)
@@ -31,7 +36,7 @@ def material_plan_create_po():
     if vendor is None or vendor.is_deleted or not vendor.is_active:
         flash("Choose an active vendor for the purchase order.", "error")
         return back
-    last = last_po_lines()
+    by_vendor = po_lines_by_vendor()
     drafts = draft_po_by_material()
     picked = []                 # [(material, qty, po_line)]
     seen = set()
@@ -59,9 +64,9 @@ def material_plan_create_po():
             return back
         if qty == 0:
             continue
-        found = last.get(material.id)
-        if found is None or found[0].vendor_id != vendor.id:
-            flash(f"{material.name} is no longer bought from {vendor.name}. Reload the page.", "error")
+        found = by_vendor.get(material.id, {}).get(vendor.id)
+        if found is None:
+            flash(f"{material.name} has not been bought from {vendor.name} before, so there is no rate to use. Choose another vendor or reload the page.", "error")
             return back
         if material.id in drafts:
             flash(f"{material.name} is already in draft {drafts[material.id]}. Open that PO instead of raising another.", "error")
