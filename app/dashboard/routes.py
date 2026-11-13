@@ -35,6 +35,7 @@ def running_by_machine(now):
                 "stage": stage.stage_name, "operator": stage.operator or "", "kg": round(stage.qty_in or 0, 2),
                 "elapsed_min": elapsed, "elapsed_text": hours_text(elapsed), "planned_text": hours_text(planned_min) if planned_min else "",
                 "over_min": (elapsed - planned_min) if planned_min and elapsed > planned_min else 0,
+                "pct": min(100, int(round(100 * elapsed / planned_min))) if planned_min else 0,
                 "started": stage.started_at.strftime("%d %b %H:%M") if stage.started_at else ""}
         info["over_text"] = hours_text(info["over_min"]) if info["over_min"] else ""
         for row in stage.machines:

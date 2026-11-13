@@ -11,36 +11,62 @@
   .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8E7; background: #F8FAF9; border-radius: 12px 12px 0 0; }
   .db-name { font-size: 15px; font-weight: 700; color: #0F2F32; }
   .db-meta { font-size: 12px; color: #6B7F82; }
-  /* Journey jaisa flow: stages ek line me, beech me connector aur arrow (1 -> 2 -> 3 ...). Har stage ke neeche uski machines */
-  .db-flow { display: flex; align-items: flex-start; overflow-x: auto; padding: 18px 12px 16px; }
-  .db-step { flex: 0 0 218px; position: relative; padding: 0 9px; display: flex; flex-direction: column; gap: 9px; }
-  .db-track { position: relative; height: 40px; display: flex; align-items: center; justify-content: center; }
-  .db-track::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 4px; margin-top: -2px; background: #D1D9D8; }
-  .db-step.first .db-track::before { left: 50%; }
-  .db-step.last .db-track::before { right: 50%; }
-  .db-step.run .db-track::before { background: #E9A96B; }
-  .db-step:not(.last) .db-track::after { content: ''; position: absolute; right: -9px; top: 50%; margin-top: -7px; border-left: 11px solid #A6B4B3; border-top: 7px solid transparent; border-bottom: 7px solid transparent; z-index: 2; }
-  .db-step.run:not(.last) .db-track::after { border-left-color: #C26A2E; }
-  .db-node { position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; background: #fff; border: 3px solid #1F9D6A; color: #1F7A4D; box-shadow: 0 0 0 4px #fff; }
-  .db-step.run .db-node { background: #C26A2E; border-color: #C26A2E; color: #fff; }
-  .db-step.off .db-node { border-color: #A6B4B3; color: #6B7F82; background: #F5F7F7; }
-  .db-step-name { text-align: center; font-size: 13.5px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
-  .db-step-count { text-align: center; font-size: 11.5px; color: #6B7F82; margin-top: -5px; }
-  .db-tile { border: 1px solid #D1D9D8; border-radius: 9px; padding: 9px 11px; background: #fff; border-left-width: 4px; display: flex; flex-direction: column; gap: 4px; }
-  .db-tile.running { border-left-color: #C26A2E; background: #FFFAF5; }
-  .db-tile.free { border-left-color: #1F9D6A; }
-  .db-tile.inactive { border-left-color: #A6B4B3; background: #F5F7F7; color: #6B7F82; }
+  /* Upar ek chhota stepper (poori chaudai me, scroll nahi): 1 -> 2 -> 3 ... Neeche stage ke blocks, har block me us stage ki machines ke card */
+  .db-stepper { display: flex; padding: 18px 16px 4px; }
+  .db-sp { flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .db-sp::before { content: ''; position: absolute; top: 12px; left: -50%; right: 50%; height: 3px; background: #D8E0DF; }
+  .db-sp:first-child::before { display: none; }
+  .db-sp.run::before { background: #E9A96B; }
+  .db-sp:not(:first-child)::after { content: ''; position: absolute; top: 7px; left: calc(50% - 26px); border-left: 8px solid #A6B4B3; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+  .db-sp.run:not(:first-child)::after { border-left-color: #C26A2E; }
+  .db-sp-node { position: relative; z-index: 1; width: 27px; height: 27px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: #fff; border: 2.5px solid #1F9D6A; color: #1F7A4D; box-shadow: 0 0 0 3px #fff; }
+  .db-sp.run .db-sp-node { background: #C26A2E; border-color: #C26A2E; color: #fff; }
+  .db-sp.off .db-sp-node { border-color: #A6B4B3; color: #6B7F82; background: #F5F7F7; }
+  .db-sp-name { font-size: 11.5px; font-weight: 600; color: #3D5A5D; line-height: 1.25; padding: 0 3px; }
+  .db-stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 12px; padding: 12px 16px 16px; align-items: start; }
+  .db-sb { background: #F5F8F7; border: 1px solid #E2E8E7; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .db-sb-head { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  .db-sb-no { width: 22px; height: 22px; border-radius: 6px; background: #0F2F32; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .db-sb-name { font-size: 13.5px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .db-sb-count { margin-left: auto; display: flex; gap: 4px; }
+  .db-pill { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .db-pill.run { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .db-pill.free { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  /* Machine card */
+  .db-tile { background: #fff; border: 1px solid #D9E1E0; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: box-shadow .12s, border-color .12s; box-shadow: 0 1px 2px rgba(15,47,50,.05); }
+  .db-tile:hover { box-shadow: 0 3px 12px rgba(15,47,50,.14); border-color: #B9C6C4; }
+  .db-tile.inactive { background: #F5F7F7; }
+  .db-mc-top { display: flex; align-items: center; gap: 8px; }
+  .db-dot { width: 9px; height: 9px; border-radius: 50%; background: #1F9D6A; flex-shrink: 0; box-shadow: 0 0 0 3px #E6F5EC; }
+  .db-tile.running .db-dot { background: #C26A2E; box-shadow: 0 0 0 3px #FFF0DF; }
+  .db-tile.inactive .db-dot { background: #A6B4B3; box-shadow: 0 0 0 3px #E8EDEC; }
+  .db-mc-name { font-size: 14px; font-weight: 700; color: #0F2F32; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-mc-state { margin-left: auto; font-size: 11.5px; font-weight: 700; color: #1F7A4D; white-space: nowrap; }
+  .db-tile.running .db-mc-state { color: #8A4A1C; }
+  .db-tile.inactive .db-mc-state { color: #6B7F82; }
+  .db-mc-sub { font-size: 11.5px; color: #6B7F82; margin-top: -5px; padding-left: 17px; }
+  .db-run { border-top: 1px dashed #E2E8E7; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .db-ordno { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; color: #0F2F32; background: #EEF2F1; border: 1px solid #D9E1E0; border-radius: 6px; padding: 1px 7px; }
+  .db-prod { font-size: 12px; color: #3D5A5D; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-bar { height: 6px; border-radius: 999px; background: #EEF2F1; overflow: hidden; }
+  .db-bar i { display: block; height: 100%; border-radius: 999px; background: #C26A2E; }
+  .db-bar.over i { background: #D92D20; }
+  .db-bar-l { display: flex; justify-content: space-between; font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
+  .db-bar-l b { color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .db-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .db-fact .l { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8A9A9C; }
+  .db-fact .v { font-size: 13px; font-weight: 600; color: #0F2F32; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-then { font-size: 11.5px; color: #3D5A5D; background: #F1F5F4; border-radius: 6px; padding: 4px 8px; }
+  .db-then b { color: #0F2F32; }
+  .db-idle { font-size: 12.5px; color: #6B7F82; }
+  .db-next { font-size: 12px; color: #3D5A5D; border-top: 1px dashed #E2E8E7; padding-top: 7px; }
+  .db-next b { color: #0F2F32; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .db-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .db-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .db-chip.running { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
   .db-chip.free { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .db-chip.inactive { background: #EEF2F1; color: #6B7F82; border-color: #D1D9D8; }
   .db-chip.over { background: #FDECEA; color: #B42318; border-color: #F3C9C4; }
-  .db-order { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 700; color: #0F2F32; }
-  .db-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
-  .db-row b { color: #0F2F32; font-variant-numeric: tabular-nums; }
-  .db-tile { cursor: pointer; transition: box-shadow .12s; }
-  .db-tile:hover { box-shadow: 0 2px 10px rgba(15,47,50,.14); }
   #db-modal.hidden { display: none; }
   #db-modal { display: flex; }
   .dm-sec { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; margin: 14px 0 6px; }
@@ -59,7 +85,7 @@
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Dashboard</div>
     <h1 class="text-[22px] font-bold text-ink leading-tight">Live machine dashboard</h1>
-    <p class="text-[13px] text-ink-faint">Each line is a journey: its stages in process order (1 &rarr; 2 &rarr; 3 ...), with the machines of that stage under it. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
+    <p class="text-[13px] text-ink-faint">Each line is a journey: the strip on top shows its stages in process order (1 &rarr; 2 &rarr; 3 ...), and below it every stage lists its machines. The order of stages comes from the Order number in Work stages. Click a machine for its order and queue. The time counts from the real Start of the stage; the page refreshes every 30 seconds.</p>
   </div>
   <div class="text-[12.5px] text-ink-faint">As of {{ board.now.strftime('%d %b %Y, %I:%M %p') }}</div>
 </div>
@@ -86,37 +112,48 @@
       </div>
     </div>
     {% if g.stages %}
-    <div class="db-flow">
+    <div class="db-stepper">
       {% for st in g.stages %}
-      <div class="db-step {{ 'run' if st.running else ('free' if st.free else 'off') }}{% if loop.first %} first{% endif %}{% if loop.last %} last{% endif %}">
-        <div class="db-track"><span class="db-node">{{ st.no }}</span></div>
-        <div class="db-step-name">{{ st.name }}</div>
-        <div class="db-step-count">{{ st.running }} running · {{ st.free }} free</div>
+      <div class="db-sp {{ 'run' if st.running else ('free' if st.free else 'off') }}"><span class="db-sp-node">{{ st.no }}</span><span class="db-sp-name">{{ st.name }}</span></div>
+      {% endfor %}
+    </div>
+    <div class="db-stages">
+      {% for st in g.stages %}
+      <div class="db-sb">
+        <div class="db-sb-head">
+          <span class="db-sb-no">{{ st.no }}</span><span class="db-sb-name">{{ st.name }}</span>
+          <span class="db-sb-count">{% if st.running %}<span class="db-pill run">{{ st.running }} running</span>{% endif %}{% if st.free %}<span class="db-pill free">{{ st.free }} free</span>{% endif %}</span>
+        </div>
         {% for t in st.machines %}
         <div class="db-tile {{ t.state }}" data-machine="{{ t.id }}" title="Click for the order and queue details">
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0"><div class="text-[13.5px] font-bold text-ink truncate">{{ t.name }}</div><div class="db-meta">{{ t.code }} · {{ t.capacity.split(' · ')[0] }}</div></div>
-            {% if t.state == 'running' %}<span class="db-chip running"><i></i>Running</span>
-            {% elif t.state == 'free' %}<span class="db-chip free"><i></i>Free</span>
-            {% else %}<span class="db-chip inactive"><i></i>Inactive</span>{% endif %}
+          <div class="db-mc-top">
+            <span class="db-dot"></span><span class="db-mc-name">{{ t.name }}</span>
+            <span class="db-mc-state">{{ 'Running' if t.state == 'running' else ('Free' if t.state == 'free' else 'Inactive') }}</span>
           </div>
+          <div class="db-mc-sub">{{ t.code }} · {{ t.capacity.split(' · ')[0] }}</div>
           {% if t.state == 'running' %}
             {% for r in t.runs %}
-            <div class="{% if not loop.first %}border-t border-slate-200 pt-1.5{% endif %}">
-              <div class="flex items-baseline justify-between gap-2"><span class="db-order">{{ r.prod_no }}</span><b class="db-elapsed text-[12.5px] text-ink" data-min="{{ r.elapsed_min }}" title="Running since {{ r.started }}">{{ r.elapsed_text }}</b></div>
-              <div class="db-meta truncate">{{ r.product }}</div>
-              <div class="db-meta"><b class="text-ink">{{ '%g'|format(r.kg) }} KG</b> in{% if r.operator %} · {{ r.operator }}{% endif %}{% if r.planned_text %} · plan {{ r.planned_text }}{% endif %}</div>
-              {% if r.over_text %}<div class="mt-1"><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
-              <div class="db-meta mt-0.5">Then &rarr; <b class="text-ink">{{ r.next_stage }}</b></div>
+            <div class="db-run">
+              <div><span class="db-ordno">{{ r.prod_no }}</span><div class="db-prod">{{ r.product }}</div></div>
+              <div>
+                <div class="db-bar{% if r.over_min %} over{% endif %}"><i style="width: {{ r.pct }}%"></i></div>
+                <div class="db-bar-l"><span>Running <b class="db-elapsed" data-min="{{ r.elapsed_min }}" title="Since {{ r.started }}">{{ r.elapsed_text }}</b></span><span>{% if r.planned_text %}plan {{ r.planned_text }}{% else %}no plan time{% endif %}</span></div>
+              </div>
+              <div class="db-facts">
+                <div class="db-fact"><div class="l">Material</div><div class="v">{{ '%g'|format(r.kg) }} KG</div></div>
+                <div class="db-fact"><div class="l">Operator</div><div class="v">{{ r.operator or '—' }}</div></div>
+              </div>
+              {% if r.over_text %}<div><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
+              <div class="db-then">Then &rarr; <b>{{ r.next_stage }}</b></div>
             </div>
             {% endfor %}
           {% elif t.state == 'inactive' %}
-            <div class="db-meta">Switched off in Machine master.</div>
+            <div class="db-idle">Switched off in Machine master.</div>
+          {% else %}
+            <div class="db-idle">Idle, ready for work.</div>
           {% endif %}
           {% if t.next %}
-          <div class="border-t border-slate-200 pt-1.5 db-meta">Next: <b class="text-ink">{{ t.next.prod_no }}</b> from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more{% endif %}</div>
-          {% elif t.state == 'free' %}
-          <div class="db-meta">Nothing waiting.</div>
+          <div class="db-next">Next: <b>{{ t.next.prod_no }}</b> from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more{% endif %}</div>
           {% endif %}
         </div>
         {% endfor %}
