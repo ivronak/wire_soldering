@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, render_template
 
 from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, WorkStage
 from app.production_orders.scheduler import live_schedule, now_ist, today_ist
+from app.routing.handoff import hot_handoffs, hours_text as handoff_text
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
 
@@ -65,6 +66,19 @@ def queue_by_machine(today):
     return out
 
 
+def incoming_by_machine(now):
+    """{machine_id: [info]} — jis machine par kisi order ka garam maal (Melting ka output) kuch hi der me aane wala hai, jaldi wala pehle."""
+    orders = ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status == "In production").all()
+    out = {}
+    for h in hot_handoffs(orders, now):
+        out.setdefault(h["machine_id"], []).append({"prod_no": h["order"].prod_no, "stage": h["stage"].stage_name, "prev_stage": h["prev_stage"].stage_name,
+                                                    "minutes_left": h["minutes_left"],
+                                                    "text": "now" if h["minutes_left"] <= 0.5 else "in " + handoff_text(h["minutes_left"])})
+    for rows in out.values():
+        rows.sort(key=lambda r: r["minutes_left"])
+    return out
+
+
 def machine_board(today=None, now=None):
     """Wapas {"lines": [{"name", "code", "capacity", "handler", "machines": [tile], "running", "free", "inactive"}], "total": {...}}.
     Tile state: "running" (stage chal raha), "free", "inactive" (Machine master me band). Bina line ki machines last me "No line"."""
@@ -72,6 +86,7 @@ def machine_board(today=None, now=None):
     now = now or now_ist()
     running = running_by_machine(now)
     queue = queue_by_machine(today)
+    incoming = incoming_by_machine(now)
     # Stage ka order Work Stage master ke "Order" number se (chhota = pehle: Flux, Melting, Casting ...). Machines usi order me dikhti hain.
     stage_rank = {}
     for index, ws in enumerate(WorkStage.query.filter_by(is_deleted=False).all()):
@@ -88,7 +103,8 @@ def machine_board(today=None, now=None):
         return {"id": machine.id, "code": machine.code, "name": machine.name, "stage_name": machine.work_stage.name if machine.work_stage else "",
                 "stage_id": machine.work_stage_id, "stage_no": stage_no.get(machine.work_stage_id, 0),
                 "capacity": machine.capacity_text, "state": state, "runs": runs, "next": waiting[0] if waiting else None,
-                "queue_count": len(waiting), "master_inactive": machine.status != "active"}
+                "queue_count": len(waiting), "master_inactive": machine.status != "active",
+                "incoming": (incoming.get(machine.id) or [None])[0]}
 
     groups = []
     for line in ProductionLine.query.filter_by(is_deleted=False).order_by(ProductionLine.code).all():
@@ -158,7 +174,8 @@ def machine_detail(machine_id):
             orders.append(order_detail(stage.production_order, stage))
     queue = [{"prod_no": q["prod_no"], "product": q["product"], "stage": q["stage"], "start": day_text(q["start"])}
              for q in queue_by_machine(today_ist()).get(machine.id, [])]
-    return jsonify({"machine": {"name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
+    incoming = incoming_by_machine(now_ist()).get(machine.id, [])
+    return jsonify({"incoming": incoming, "machine": {"name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
                                 "line": machine.line.name if machine.line else "No line", "capacity": machine.capacity_text,
                                 "status": machine.status},
                     "orders": orders, "queue": queue})

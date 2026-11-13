@@ -51,6 +51,8 @@
   .db-fact .v { font-size: 13px; font-weight: 600; color: #0F2F32; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .db-then { font-size: 11.5px; color: #3D5A5D; background: #F1F5F4; border-radius: 6px; padding: 4px 8px; }
   .db-then b { color: #0F2F32; }
+  .db-hot { font-size: 11.5px; color: #7A271A; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 5px 8px; }
+  .db-hot b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .db-idle { font-size: 12.5px; color: #6B7F82; }
   .db-next { font-size: 12px; color: #3D5A5D; border-top: 1px dashed #E2E8E7; padding-top: 7px; }
   .db-next b { color: #0F2F32; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -140,6 +142,9 @@
           {% else %}
             <div class="db-idle">Idle, ready for work.</div>
           {% endif %}
+          {% if t.incoming %}
+          <div class="db-hot" title="Another order's hot metal goes to this machine. A long job started here now would block it.">Hot metal due {{ t.incoming.text }}: <b>{{ t.incoming.prod_no }}</b> &middot; {{ t.incoming.prev_stage }} &rarr; {{ t.incoming.stage }}</div>
+          {% endif %}
           {% if t.next %}
           <div class="db-next">Next: <b>{{ t.next.prod_no }}</b> from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more{% endif %}</div>
           {% endif %}
@@ -222,6 +227,11 @@
       var html = '';
       if (data.orders.length) html += data.orders.map(orderCard).join('');
       else html += '<p class="text-ink-muted">' + (m.status === 'active' ? 'Nothing is running on this machine right now.' : 'This machine is switched off in the Machine master.') + '</p>';
+      if (data.incoming && data.incoming.length) {
+        html += '<div class="dm-sec">Hot metal coming to this machine</div><table class="dm-table"><thead><tr><th>Order</th><th>From &rarr; to</th><th>Due</th></tr></thead><tbody>' + data.incoming.map(function (q) {
+          return '<tr><td class="font-mono font-semibold">' + esc(q.prod_no) + '</td><td>' + esc(q.prev_stage) + ' &rarr; ' + esc(q.stage) + '</td><td>' + esc(q.text) + '</td></tr>';
+        }).join('') + '</tbody></table><p class="db-meta mt-1">A long job started on this machine now would block it. The routing page refuses such a start unless a reason is written.</p>';
+      }
       html += '<div class="dm-sec">Waiting for this machine</div>';
       if (data.queue.length) {
         html += '<table class="dm-table"><thead><tr><th>Order</th><th>Product</th><th>Stage</th><th>From</th></tr></thead><tbody>' + data.queue.map(function (q) {

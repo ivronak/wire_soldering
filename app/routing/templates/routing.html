@@ -264,6 +264,13 @@
           <input type="text" name="operator" id="rt-operator" maxlength="60" list="rt-operators" class="rt-input" placeholder="Who is doing this stage?" autocomplete="off" />
           <datalist id="rt-operators">{% for name in operators %}<option value="{{ name }}">{% endfor %}</datalist>
         </div>
+        {# Timing clash lock: agle stage ki machine par doosre order ka garam maal aane wala hai #}
+        <div id="rt-clash-box" style="display:none" class="rounded-lg p-3" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#B42318">Timing clash: hot metal is coming to this machine</div>
+          <p id="rt-clash-text" class="text-[12.5px] mt-1" style="color:#7A271A"></p>
+          <label class="rt-label mt-2" for="rt-clash-reason">Start anyway? Write the reason</label>
+          <input type="text" name="clash_reason" id="rt-clash-reason" maxlength="150" class="rt-input" placeholder="Leave empty to wait; fill to start anyway" autocomplete="off" />
+        </div>
         <div>
           <label class="rt-label" id="rt-when-label">Started at</label>
           <input type="datetime-local" id="rt-when" class="rt-input" />
@@ -371,6 +378,13 @@
     when.value = NOW;
     document.getElementById('rt-when-label').textContent = start ? 'Started at' : 'Finished at';
     document.getElementById('rt-notes').value = '';
+    var clashBox = document.getElementById('rt-clash-box');
+    var clashOn = start && !!a.clash;
+    clashBox.style.display = clashOn ? 'block' : 'none';
+    clashBox.style.background = '#FEF3F2'; clashBox.style.border = '1px solid #FDA29B';
+    document.getElementById('rt-clash-text').textContent = clashOn ? a.clash : '';
+    document.getElementById('rt-clash-reason').value = '';
+    document.getElementById('rt-clash-reason').disabled = !clashOn;
     document.getElementById('rt-submit').disabled = false;
     document.getElementById('rt-used-warn').style.display = 'none';
     document.getElementById('rt-hours-box').style.display = 'none';        // sirf complete par

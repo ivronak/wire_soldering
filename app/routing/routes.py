@@ -12,10 +12,16 @@ from app.extensions import db
 from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, ScrapType, StageLabQC
 from app.production_orders.planning import next_working_day
 from app.production_orders.scheduler import now_ist, today_ist
+from app.routing.handoff import stage_clash
 
 routing_bp = Blueprint("routing", __name__, template_folder="templates")
 
 EPS = 0.0001
+
+
+def in_production_orders():
+    # Abhi chal rahe (In production) saare orders — stage timing clash dekhne ke liye
+    return ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status == "In production").all()
 
 
 def _back(tab="running"):
@@ -192,6 +198,7 @@ def routing_list():
            "late": len([o for o in running if summaries[o.id]["delay"] > 0]), "ready": len(finished)}
     # Drawers ke liye: har stage ka data (JS) — sirf jo abhi kuch kar sakte hain (current stage)
     actions = {}
+    clash_orders = in_production_orders()
     for o in shown:
         sm = summaries[o.id]
         cur = sm["current"]
@@ -211,6 +218,8 @@ def routing_list():
             # Ingot Casting jaisa stage: lattha ginti (weight stage master se); Extrusion jaisa stage: scrap box nahi
             "billet": {"weight": cur.work_stage.billet_weight} if cur.work_stage and cur.work_stage.is_billet_stage and not side else None,
             "no_scrap": bool(cur.work_stage and cur.work_stage.no_scrap),
+            # Stage timing clash lock: shuru karne par kisi doosre order ke garam maal se takrao ho to uska message (start drawer me dikhta hai)
+            "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
         }
         deferred = deferred_scrap_stage(o, cur)
         if deferred is not None:
@@ -285,6 +294,13 @@ def routing_start(stage_id):
     if not operator:
         flash("Enter the operator's name.", "error")
         return _back()
+    # Timing clash lock: agle stage ki machine par doosre order ka garam maal aane wala ho aur ye kaam us gap me poora na ho to roko.
+    # Wajah (kam se kam 3 akshar) likh kar "start anyway" ho sakta hai; wajah stage ke notes me jaati hai.
+    clash = stage_clash(order, stage, in_production_orders())
+    clash_reason = (request.form.get("clash_reason") or "").strip()[:150]
+    if clash is not None and len(clash_reason) < 3:
+        flash(f"{stage.stage_name} cannot start now. " + clash["message"], "error")
+        return _back()
     started_at, error = _read_when("started_at")
     if error:
         flash(error, "error")
@@ -297,7 +313,10 @@ def routing_start(stage_id):
     stage.operator = operator
     side = side_stage_info(order, stage)
     stage.qty_in = side["qty"] if side else main_input(order, stage)       # flux stage: flux ki apni qty; baaki: metal chain
-    stage.notes = (request.form.get("notes") or "").strip()[:255] or None
+    notes = (request.form.get("notes") or "").strip()
+    if clash is not None:
+        notes = (notes + " | " if notes else "") + f"Timing clash overridden ({clash['machine_name']} due for {clash['other_order']}): {clash_reason}"
+    stage.notes = notes[:255] or None
     db.session.commit()
     flash(f"{stage.stage_name} started for {order.prod_no}.", "success")
     return _back()
