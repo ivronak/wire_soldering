@@ -1192,6 +1192,25 @@
   });
   ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', rsClose); });
 
+  // Production planning page se aaye (?plan=<id>&back=planning): drawer seedha khol do; save ke baad wahin wapas (hidden next=planning),
+  // aur Cancel / close dabane par bhi planning page par wapas.
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var planId = params.get('plan');
+    if (!planId) return;
+    var fromPlanning = params.get('back') === 'planning';
+    if (fromPlanning) {
+      var nextInput = document.createElement('input');
+      nextInput.type = 'hidden'; nextInput.name = 'next'; nextInput.value = 'planning';
+      rsForm.appendChild(nextInput);
+      ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) {
+        document.getElementById(id).addEventListener('click', function () { window.location.href = '/production_planning'; });
+      });
+    }
+    var target = document.querySelector('.btn-resched[data-id="' + planId + '"]');
+    if (target) target.click();
+  })();
+
   // ---------- Start production: line chuno ----------
   (function () {
     var modal = document.getElementById('start-modal');

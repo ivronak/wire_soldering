@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Production planning{% endblock %}
+
+{% block page_css %}
+<style>
+  /* Production planning: Production queue jaisa card look (copper-teal theme) */
+  .pp-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .pp-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .pp-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .pp-kpi .h { font-size: 12px; color: #6B7F82; }
+  .pp-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .pp-kpi.warn .v { color: #8A4A1C; }
+  .pp-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .pp-kpi.bad .v { color: #B42318; }
+  .pp-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .pp-kpi.good .v { color: #1F7A4D; }
+  .pp-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .pp-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .pp-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .pp-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
+  .pp-card { background: #fff; border: 1px solid #D1D9D8; border-left: 4px solid #C46B2D; border-radius: 12px; margin-bottom: 10px; display: grid; grid-template-columns: minmax(200px, 1.3fr) minmax(170px, 1fr) minmax(170px, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; }
+  .pp-card.is-ready { border-left-color: #1F7A4D; }
+  .pp-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
+  .pp-prod { font-size: 13.5px; color: #1C2B2D; }
+  .pp-meta { font-size: 12px; color: #6B7F82; }
+  .pp-dates { font-size: 14px; font-weight: 700; color: #0F2F32; } .pp-dates span { color: #98A5A4; font-weight: 500; margin: 0 4px; }
+  .pp-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; margin: 0 4px 3px 0; }
+  .pp-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .pp-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .pp-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .pp-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .pp-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .pp-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .pp-btn.primary:hover { background: #A35522; }
+  .pp-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .pp-btn.teal:hover { background: #1F5558; }
+  .pp-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .pp-btn.ghost:hover { background: #F4F6F5; }
+  .pp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .pp-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  @media (max-width: 1100px) { .pp-card { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro dshort(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
+
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Production planning</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Production planning</h1>
+  <p class="text-[13px] text-ink-faint">New orders arrive here as drafts. Choose the production line and machines for each one, check the expected dates and material, then release it for the store to issue material.</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-3 gap-3 shrink-0">
+  <div class="pp-kpi {{ 'warn' if needs_count else '' }}"><span class="k">Needs planning</span><span class="v">{{ needs_count }}</span><span class="h">line and machines not chosen yet</span></div>
+  <div class="pp-kpi {{ 'good' if ready_count else '' }}"><span class="k">Ready to release</span><span class="v">{{ ready_count }}</span><span class="h">planned, waiting for release</span></div>
+  <div class="pp-kpi {{ 'bad' if late_count else '' }}"><span class="k">Will be late</span><span class="v">{{ late_count }}</span><span class="h">finish after the needed-by date</span></div>
+</div>
+
+<div class="shrink-0">
+  <div class="pp-tabs">
+    <a href="{{ url_for('production_planning.production_planning_page', tab='needs') }}" class="{{ 'on' if tab == 'needs' else '' }}">Needs planning<span>{{ needs_count }}</span></a>
+    <a href="{{ url_for('production_planning.production_planning_page', tab='ready') }}" class="{{ 'on' if tab == 'ready' else '' }}">Ready to release<span>{{ ready_count }}</span></a>
+  </div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6">
+  {% for o in orders %}
+  {% set sc = schedule.get(o.id) %}
+  {% set mat = materials.get(o.id) %}
+  {% set late_days = (sc.end - o.needed_by_date).days if (sc and o.needed_by_date and sc.end > o.needed_by_date) else 0 %}
+  <article class="pp-card {{ 'is-ready' if o.plan_confirmed else '' }}">
+    <div style="min-width:0">
+      <div class="flex items-center gap-2 flex-wrap"><span class="pp-no">{{ o.prod_no }}</span>
+        {% if o.plan_confirmed %}<span class="pp-chip ok"><i></i>Planned{% if o.line %} · {{ o.line.name }}{% endif %}</span>{% else %}<span class="pp-chip warn"><i></i>Needs planning</span>{% endif %}</div>
+      <div class="pp-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
+      <div class="pp-meta">{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.unit_weight and o.unit_weight != 1 %} ({{ '%g'|format(o.planned_qty * o.unit_weight) }} KG){% endif %} · ordered {{ dshort(o.order_date) }}</div>
+    </div>
+    <div>
+      {% if sc %}
+        <div class="pp-meta">Expected delivery</div>
+        <div class="pp-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
+        <div class="pp-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · {{ o.stages|length }} stages</div>
+        {% if late_days %}<span class="pp-chip bad"><i></i>Late {{ late_days }}d · needed {{ dshort(o.needed_by_date) }}</span>
+        {% elif o.needed_by_date %}<span class="pp-chip ok"><i></i>On time · needed {{ dshort(o.needed_by_date) }}</span>{% endif %}
+      {% else %}<span class="pp-meta">No plan · set stages in Product Master</span>{% endif %}
+    </div>
+    <div>
+      <div class="pp-meta">Raw material</div>
+      {% if not mat %}<span class="pp-meta">—</span>
+      {% elif mat.status == 'buy' %}<span class="pp-chip bad"><i></i>Need to buy</span><div class="pp-meta">{% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} −{{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      {% elif mat.status == 'coming' %}<span class="pp-chip warn"><i></i>PO coming</span>
+      {% else %}<span class="pp-chip ok"><i></i>Stock OK</span>{% endif %}
+      {% if sc and sc.waits_for_material %}<div><span class="pp-chip warn"><i></i>Waits for material till {{ dshort(sc.waits_for_material) }}</span></div>{% endif %}
+    </div>
+    <div class="flex gap-2 justify-end flex-wrap">
+      <a href="{{ url_for('production_orders.production_orders_list', plan=o.id, back='planning') }}" class="pp-btn {{ 'ghost' if o.plan_confirmed else 'primary' }}">{{ 'Change plan' if o.plan_confirmed else 'Plan' }}</a>
+      {% if o.plan_confirmed %}
+      <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
+            data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
+        <input type="hidden" name="next" value="planning" />
+        <button type="submit" class="pp-btn teal">Release</button></form>
+      {% endif %}
+    </div>
+  </article>
+  {% else %}
+  <div class="pp-empty">
+    {% if tab == 'needs' %}<h3>Nothing waiting to be planned</h3><p>New orders from the Production order page show up here.</p>
+    {% else %}<h3>No planned order is waiting for release</h3><p>Plan an order first, then release it from here.</p>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

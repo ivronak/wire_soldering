@@ -567,23 +567,30 @@ def production_orders_expected():
     return jsonify(result or {"ok": False, "text": "A stage has no machine capacity, so no date can be worked out."})
 
 
+def _back_url():
+    # Production planning page se aaye hain (form me next=planning) to wahin wapas bhejo; sirf yahi ek value allowed (open redirect nahi)
+    if request.form.get("next") == "planning":
+        return url_for("production_planning.production_planning_page")
+    return url_for("production_orders.production_orders_list")
+
+
 @production_orders_bp.route("/production_orders/release/<int:order_id>", methods=["POST"])
 def production_orders_release(order_id):
     # Draft order ko Released karo: ab uske liye Material issue ho sakta hai (RM store se production ko).
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
     if order.status != "Draft":
         flash("Only a draft production order can be released.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     if not order.lines:
         flash("This production order has no materials, so it cannot be released.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     if not order.plan_confirmed:
         flash(f"Plan {order.prod_no} first: choose its production line and machines on the Production planning page, then release it.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     order.status = "Released"
     db.session.commit()
     flash(f"Production order {order.prod_no} released. Its material can now be issued from the Material issue page.", "success")
-    return redirect(url_for("production_orders.production_orders_list"))
+    return redirect(_back_url())
 
 
 @production_orders_bp.route("/production_orders/cancel/<int:order_id>", methods=["POST"])
@@ -622,26 +629,26 @@ def production_orders_reschedule(order_id):
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
     if order.status not in ACTIVE_STATUSES:
         flash("Only a draft or released production order can be rescheduled.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     routing = ([{"stage_id": st.work_stage_id, "name": st.stage_name} for st in order.stages]
                if order.stages else _routing_for(order.product))
     if not routing:
         flash("This product has no production stages. Set them in Product Master first.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     # Line badal sakte hain (spec 28.1: dusri line me move possible). Form me line na aaye to order ki purani line; us line ki machines hi chun sakte hain.
     line, line_error = _read_line()
     if line_error:
         flash(line_error, "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     line = line or order.line
     plan, plan_error = read_plan(order.product, order.planned_qty * order.unit_weight, order.order_date, routing, line=line)
     if plan_error:
         flash(plan_error, "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     needed_by, needed_error = _read_needed_by()
     if needed_error:
         flash(needed_error, "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     order.needed_by_date = needed_by
     order.line_id = line.id if line else None
     order.plan_confirmed = True          # line + machines ab production manager ne chun li (Production planning)
@@ -649,7 +656,7 @@ def production_orders_reschedule(order_id):
     persist_schedule()
     db.session.commit()
     flash(f"Plan updated for {order.prod_no}. Its start and finish dates now come from its place in the queue.", "success")
-    return redirect(url_for("production_orders.production_orders_list"))
+    return redirect(_back_url())
 
 
 @production_orders_bp.route("/production_orders/move/<int:order_id>/<direction>", methods=["POST"])
