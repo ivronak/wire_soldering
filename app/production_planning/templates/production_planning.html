@@ -25,6 +25,7 @@
   .pp-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .pp-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .pp-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .pp-chip.bnd { background: #E8F1F1; color: #1F5558; border-color: #BCD6D7; text-decoration: none; }
   .pp-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
   .pp-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
   .pp-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .pp-btn.primary:hover { background: #A35522; }
@@ -66,7 +67,8 @@
   <article class="pp-card {{ 'is-ready' if o.plan_confirmed else '' }}">
     <div style="min-width:0">
       <div class="flex items-center gap-2 flex-wrap"><span class="pp-no">{{ o.prod_no }}</span>
-        {% if o.plan_confirmed %}<span class="pp-chip ok"><i></i>Planned{% if o.line %} · {{ o.line.name }}{% endif %}</span>{% else %}<span class="pp-chip warn"><i></i>Needs planning</span>{% endif %}</div>
+        {% if o.plan_confirmed %}<span class="pp-chip ok"><i></i>Planned{% if o.line %} · {{ o.line.name }}{% endif %}</span>{% else %}<span class="pp-chip warn"><i></i>Needs planning</span>{% endif %}
+        {% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="pp-chip bnd" title="Same party order: see all items of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
       <div class="pp-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
       <div class="pp-meta">{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.unit_weight and o.unit_weight != 1 %} ({{ '%g'|format(o.planned_qty * o.unit_weight) }} KG){% endif %} · ordered {{ dshort(o.order_date) }}</div>
     </div>

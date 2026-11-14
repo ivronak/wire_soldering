@@ -785,6 +785,9 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     # Production planning (client meeting 2, #6): order form me line / machine nahi chunte; pehle default machines se andaza plan banta hai (False),
     # production manager Planning page par line + machines chun kar pakka karta hai (True). Release tabhi jab True. Purane orders True.
     plan_confirmed = db.Column(db.Boolean, default=True, server_default="1", nullable=False)
+    # Bundle (client meeting 2, #5): ek party ke order me kai products ho to har product ka apna normal PROD order banta hai
+    # (recipe, stages, line sab alag), par sab ek hi bundle number (BND-2026-001) se jude rehte hain. Single order me khaali.
+    bundle_no = db.Column(db.String(20), nullable=True, index=True)
     started_date = db.Column(db.Date, nullable=True)             # "Start production" dabane ka din
 
     # Cancel: order delete nahi hota, status "Cancelled" + wajah (audit trail ke liye)

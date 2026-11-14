@@ -228,6 +228,26 @@ def _planner_products():
     return products, planner
 
 
+def bundle_counts():
+    # {bundle_no: kitne (cancel nahi hue) orders} — card par 'Bundle BND-... · 3 items' chip ke liye
+    rows = (db.session.query(ProductionOrder.bundle_no, db.func.count(ProductionOrder.id))
+            .filter(ProductionOrder.is_deleted == False, ProductionOrder.status != "Cancelled", ProductionOrder.bundle_no.isnot(None))
+            .group_by(ProductionOrder.bundle_no).all())
+    return {b: n for b, n in rows}
+
+
+def _new_bundle_no(year):
+    # BND-<saal>-NNN: us saal ka sabse bada number + 1 (count nahi, taaki gap hone par bhi duplicate na bane)
+    prefix = f"BND-{year}-"
+    biggest = 0
+    for (b,) in db.session.query(ProductionOrder.bundle_no).filter(ProductionOrder.bundle_no.like(prefix + "%")).distinct().all():
+        try:
+            biggest = max(biggest, int(b[len(prefix):]))
+        except ValueError:
+            pass
+    return f"{prefix}{biggest + 1:03d}"
+
+
 @production_orders_bp.route("/production_orders")
 def production_orders_list():
     # Open = queue me saare orders (Draft / Released / In production), Cancelled = alag tab (aage Completed bhi yahin judega)
@@ -247,6 +267,20 @@ def production_orders_list():
         orders = base.filter(ProductionOrder.status == "Completed").order_by(ProductionOrder.id.desc()).all()
     else:
         orders = queue
+    # ?bundle=BND-... : sirf us bundle ke orders (card ke chip se). ?add_to=BND-... : form us bundle me agla item jodne ke liye khulta hai.
+    bundles = bundle_counts()
+    bundle_filter = (request.args.get("bundle") or "").strip()
+    if bundle_filter:
+        orders = [o for o in orders if o.bundle_no == bundle_filter]
+    bundle_ctx = None
+    add_to = (request.args.get("add_to") or "").strip()
+    if add_to:
+        first = (ProductionOrder.query.filter_by(bundle_no=add_to, is_deleted=False).order_by(ProductionOrder.id).first())
+        if first:
+            bundle_ctx = {"bundle_no": add_to, "next_item": bundles.get(add_to, 0) + 1,
+                          "order_date": first.order_date.isoformat(),
+                          "needed_by": first.needed_by_date.isoformat() if first.needed_by_date else "",
+                          "remarks": first.remarks or ""}
     today = today_ist()
     # Upar ke chhote cards (KPI): kitne chal rahe, kitno ko material chahiye, kitne der se
     kpi = {"running": len([o for o in queue if o.status == "In production"]),
@@ -330,6 +364,9 @@ def production_orders_list():
         store_stock={str(k): v for k, v in store_stock_by_material().items()},
         line_board=line_board(today),
         resched=resched,
+        bundles=bundles,
+        bundle_filter=bundle_filter,
+        bundle_ctx=bundle_ctx,
         products=products,
         categories=categories,
         planner=planner,
@@ -411,6 +448,16 @@ def production_orders_add():
     count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
     prod_no = f"PROD-{year}-{count + 1:03d}"
 
+    # Bundle (client meeting 2, #5): form se bundle_no aaye to us bundle me judta hai (wo pehle se hona chahiye);
+    # 'Save & add another item' dabaya aur bundle nahi tha to naya BND-... banta hai. Dono nahi to single order (bundle khaali).
+    add_another = request.form.get("add_another") == "1"
+    bundle_no = (request.form.get("bundle_no") or "").strip() or None
+    if bundle_no and not ProductionOrder.query.filter_by(bundle_no=bundle_no, is_deleted=False).first():
+        flash(f"Bundle {bundle_no[:20]} does not exist.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if add_another and not bundle_no:
+        bundle_no = _new_bundle_no(year)
+
     order = ProductionOrder(
         prod_no=prod_no,
         product_id=product.id,
@@ -425,6 +472,7 @@ def production_orders_add():
         earliest_start_date=plan["earliest_start"] if plan else order_date,
         queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
         plan_confirmed=not (planning_later and plan),      # andaze ka plan ho to planning baaki; plan hi nahi (stages nahi) to planning ka kuch nahi
+        bundle_no=bundle_no,
     )
     db.session.add(order)
     db.session.flush()
@@ -514,6 +562,12 @@ def production_orders_add():
 
     persist_schedule()
     db.session.commit()
+    if add_another:
+        flash(f"Production order {order.prod_no} saved in bundle {bundle_no}. Add the next item for the same order below.", "success")
+        return redirect(url_for("production_orders.production_orders_list", add_to=bundle_no))
+    if bundle_no:
+        flash(f"Production order {order.prod_no} saved and added to bundle {bundle_no} at the end of the queue.", "success")
+        return redirect(url_for("production_orders.production_orders_list", bundle=bundle_no))
     flash(f"Production order {order.prod_no} saved and added to the end of the queue.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
 

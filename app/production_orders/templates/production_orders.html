@@ -33,6 +33,8 @@
   .po-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .po-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
   .po-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  .po-chip.bnd { background: #E8F1F1; color: #1F5558; border-color: #BCD6D7; text-decoration: none; }
+  .po-chip.bnd:hover { background: #D5E7E8; }
   .po-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
   .po-chip.rel { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
   .po-chip.draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
@@ -145,7 +147,7 @@
       </div>
 
       <div style="min-width:0">
-        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}</div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}{% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="po-chip bnd" title="Show only the orders of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
         <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
         <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}</div>
       </div>
@@ -312,6 +314,16 @@
   {% endif %}
 </div>
 
+{% if bundle_filter %}
+<div class="shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2" style="background:#E8F1F1;border:1px solid #BCD6D7">
+  <div class="text-[13px] text-ink">Showing bundle <b class="font-mono">{{ bundle_filter }}</b> — {{ bundles.get(bundle_filter, 0) }} item{{ '' if bundles.get(bundle_filter, 0) == 1 else 's' }} for one party order.</div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('production_orders.production_orders_list', add_to=bundle_filter) }}" class="po-btn primary" style="padding:5px 12px">+ Add item</a>
+    <a href="{{ url_for('production_orders.production_orders_list') }}" class="po-btn ghost" style="padding:5px 12px">Show all</a>
+  </div>
+</div>
+{% endif %}
+
 <div class="flex-1 overflow-auto min-h-0 pb-6">
   {% if tab == 'timeline' %}
     {% if timeline %}
@@ -385,11 +397,14 @@
     <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
       <div>
         <h2 id="mo-title" class="text-[17px] font-bold text-ink">New production order</h2>
-        <p class="text-[12.5px] text-ink-faint">Pick the product, set the quantity, choose the machines. The order joins the end of the queue.</p>
+        <p class="text-[12.5px] text-ink-faint">Pick the product and set the quantity. The order joins the end of the queue.</p>
       </div>
       <button type="button" id="btn-close-mo" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
     <form id="mo-form" method="post" action="{{ url_for('production_orders.production_orders_add') }}" class="flex-1 overflow-y-auto">
+      {# Bundle (client meeting 2, #5): ek party ke order me kai products — har product ka apna order, sab ek bundle number se jude. #}
+      <input type="hidden" id="mo-bundle" name="bundle_no" value="" />
+      <div id="mo-bundle-banner" class="hidden mx-4 mt-4 rounded-lg px-3 py-2 text-[13px] text-ink" style="background:#E8F1F1;border:1px solid #BCD6D7"></div>
       <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div class="space-y-4 min-w-0">
 
@@ -499,7 +514,8 @@
     </form>
     <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel-mo" class="po-btn ghost">Cancel</button>
-      <button type="submit" form="mo-form" class="po-btn primary" style="padding:8px 20px">Save to queue</button>
+      <button type="submit" form="mo-form" name="add_another" value="1" class="po-btn ghost" style="padding:8px 16px" title="Save this item and open the form again for the next product of the same party order">Save &amp; add another item</button>
+      <button type="submit" form="mo-form" id="mo-save" class="po-btn primary" style="padding:8px 20px">Save to queue</button>
     </div>
   </div>
 </div>
@@ -1027,10 +1043,19 @@
     var day = String(d.getDate()).padStart(2, '0');
     return d.getFullYear() + '-' + m + '-' + day;
   }
-  function openModal() {
-    document.getElementById('mo-date').value = todayIso();
+  // bundle = {bundle_no, next_item, order_date, needed_by, remarks} jab 'Save & add another item' ke baad ya bundle ke '+ Add item' se khule;
+  // normal 'New production order' me null: bundle khaali, date aaj ki.
+  function openModal(bundle) {
+    if (!bundle || !bundle.bundle_no) bundle = null;
+    document.getElementById('mo-date').value = bundle ? bundle.order_date : todayIso();
     startInput.value = todayIso();
-    document.getElementById('mo-needed').value = '';
+    document.getElementById('mo-needed').value = bundle ? bundle.needed_by : '';
+    document.getElementById('mo-remarks').value = bundle ? bundle.remarks : '';
+    document.getElementById('mo-bundle').value = bundle ? bundle.bundle_no : '';
+    var bnBanner = document.getElementById('mo-bundle-banner');
+    bnBanner.classList.toggle('hidden', !bundle);
+    if (bundle) bnBanner.innerHTML = 'Bundle <b class="font-mono">' + bundle.bundle_no + '</b> — this is item ' + bundle.next_item + ' of the same party order. Date, needed-by and remarks are copied from item 1.';
+    document.getElementById('mo-save').textContent = bundle ? 'Save item & finish' : 'Save to queue';
     if (lineSel) lineSel.value = '';
     mainPlan.reset('Select a product to see its stages.');
     categorySel.value = '';
@@ -1138,7 +1163,7 @@
   });
   productSel.addEventListener('change', function () { ALLOW = {}; });
   document.getElementById('btn-add-mo').addEventListener('click', function () { ALLOW = {}; });
-  document.getElementById('btn-add-mo').addEventListener('click', openModal);
+  document.getElementById('btn-add-mo').addEventListener('click', function () { openModal(null); });
   document.getElementById('btn-close-mo').addEventListener('click', closeModal);
   document.getElementById('btn-cancel-mo').addEventListener('click', closeModal);
   document.getElementById('mo-backdrop').addEventListener('click', closeModal);
@@ -1191,6 +1216,9 @@
     if (event.target.classList.contains('plan-machine')) rsRefresh();
   });
   ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', rsClose); });
+
+  // 'Save & add another item' ke baad / bundle ke '+ Add item' se (?add_to=BND-...): form seedha khule, bundle ke saath. Sab setup ke baad, isliye yahan.
+  {% if bundle_ctx %}openModal({{ bundle_ctx | tojson }});{% endif %}
 
   // Production planning page se aaye (?plan=<id>&back=planning): drawer seedha khol do; save ke baad wahin wapas (hidden next=planning),
   // aur Cancel / close dabane par bhi planning page par wapas.
