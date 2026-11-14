@@ -860,6 +860,20 @@ def routing_tc(qc_id):
     return send_from_directory(current_app.config["UPLOAD_FOLDER"], row.tc_file)
 
 
+@routing_bp.route("/routing/tc/<int:qc_id>/print")
+def routing_tc_print(qc_id):
+    """TC ka branded A4 print (client meeting 2, #15): Nrupex letterhead, order / product / lab result, lab ki uploaded TC (image ya PDF) neeche,
+    aur poore page par Nrupex logo + naam ka halka watermark. Party ka naam ?party= se (print ke waqt likhte hain, kahin save nahi hota)."""
+    row = db.session.get(StageLabQC, qc_id)
+    if row is None or not row.tc_file:
+        abort(404)
+    stage = row.stage
+    order = stage.production_order
+    ext = row.tc_file.rsplit(".", 1)[-1].lower() if "." in row.tc_file else ""
+    party = (request.args.get("party") or "").strip()[:80]
+    return render_template("tc_print.html", qc=row, stage=stage, order=order, party=party, is_pdf=(ext == "pdf"), batch_kg=order_batch_kg(order))
+
+
 @routing_bp.route("/routing/scrap_photo/<int:stage_id>")
 def routing_scrap_photo(stage_id):
     # Billet (lattha) stage ke scrap ka proof photo kholna

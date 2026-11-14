@@ -66,6 +66,7 @@
     footer.foot { margin-top: 26px; padding-top: 8px; border-top: 2px solid #0e3a8a; display: flex; justify-content: space-between; align-items: baseline; }
     .script { font-family: "Libre Baskerville", Georgia, serif; font-style: italic; font-size: 16px; color: #0e3a8a; }
     .tomorrow { font-size: 9.5px; letter-spacing: 0.16em; font-weight: 700; color: #8b9aab; }
+    {% block page_css %}{% endblock %}
     @media print {
       body { background: #fff; }
       .toolbar { display: none; }
