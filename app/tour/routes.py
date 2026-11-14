@@ -40,7 +40,10 @@ def tour_info():
     wd_split = WorkStage.query.filter_by(is_deleted=False, is_active=True, name="Wire Drawing 3").first() is not None
     racks = bool(store) and Rack.query.filter_by(warehouse_id=store.id, is_active=True, is_deleted=False).first() is not None
     lines = ProductionLine.query.filter_by(is_active=True, is_deleted=False).first() is not None
-    return jsonify({"ok": True, "product": {"id": product.id, "name": product.name, "category_id": product.category_id, "recipe": recipe},
+    # Production planning steps (client meeting 2, #6): naya order tabhi 'Needs planning' banta hai jab product ke stages + machines hon
+    from app.production_orders.routes import _routing_for
+    plan_needed = bool(_routing_for(product))
+    return jsonify({"ok": True, "plan_needed": plan_needed, "product": {"id": product.id, "name": product.name, "category_id": product.category_id, "recipe": recipe},
                     "store_warehouse_id": store.id if store else None,
                     "vendor_id": vendor.id if vendor else None, "lab_qc": lab_qc,
                     "scrap_later": scrap_later, "wd_split": wd_split, "racks": racks, "lines": lines})
