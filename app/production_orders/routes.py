@@ -4,7 +4,7 @@ import math
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from flask import abort, Blueprint, flash, redirect, render_template, request, url_for
+from flask import abort, Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionLine, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
@@ -57,10 +57,12 @@ def _routing_for(product):
     return stages
 
 
-def read_plan(product, batch_kg, order_date, routing=None, line=None):
+def read_plan(product, batch_kg, order_date, routing=None, line=None, auto=False):
     """Form se production plan padho: har stage ki chuni hui machines aur start date. (plan, error) wapas deta hai.
     Product ka routing na ho to (None, None): order bina plan ke ban jaata hai. Server khud hisaab lagata hai (JS ke dikhaye par bharosa nahi).
-    line = order ki Production Line (ho to sirf usi line ki machines chun sakte hain)."""
+    line = order ki Production Line (ho to sirf usi line ki machines chun sakte hain).
+    auto=True (client meeting 2, #6): order form me machine nahi chunte — har stage ki saari chalu KG-machines andaze ke liye maan lete hain;
+    asli line + machines baad me Production planning page par chunte hain."""
     if routing is None:
         routing = _routing_for(product)
     if not routing:
@@ -72,6 +74,13 @@ def read_plan(product, batch_kg, order_date, routing=None, line=None):
         return None, "Enter a valid start date."
     chosen = []
     for stage in routing:
+        if auto:
+            usable = [m for m in stage["machines"] if m["ok"]]
+            if not usable:
+                return None, f"No machine with an output per hour in KG is set for {stage['name']}. Add one in Machines first."
+            chosen.append({"stage_id": stage["stage_id"], "name": stage["name"],
+                           "machines": [{"id": m["id"], "name": m["name"], "per_hour": m["per_hour"], "hours_per_day": m["hours_per_day"]} for m in usable]})
+            continue
         ids = request.form.getlist(f"machines_{stage['stage_id']}", type=int)
         machines = []
         for machine_id in ids:
@@ -377,11 +386,16 @@ def production_orders_add():
             return redirect(url_for("production_orders.production_orders_list"))
 
     batch_kg = planned_qty * unit_weight
-    line, line_error = _read_line()
+    # Naya form (client meeting 2, #6) line / machine nahi bhejta: planning_later=1 -> andaze ka plan, asli plan Production planning page par
+    planning_later = request.form.get("planning_later") == "1"
+    if planning_later:
+        line, line_error = None, None
+    else:
+        line, line_error = _read_line()
     if line_error:
         flash(line_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
-    plan, plan_error = read_plan(product, batch_kg, order_date, line=line)
+    plan, plan_error = read_plan(product, batch_kg, order_date, line=line, auto=planning_later)
     if plan_error:
         flash(plan_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
@@ -410,6 +424,7 @@ def production_orders_add():
         needed_by_date=needed_by,
         earliest_start_date=plan["earliest_start"] if plan else order_date,
         queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
+        plan_confirmed=not (planning_later and plan),      # andaze ka plan ho to planning baaki; plan hi nahi (stages nahi) to planning ka kuch nahi
     )
     db.session.add(order)
     db.session.flush()
@@ -504,6 +519,54 @@ def production_orders_add():
 
 
 
+@production_orders_bp.route("/production_orders/expected", methods=["POST"])
+def production_orders_expected():
+    """Order form ke liye "Expected delivery date" (client meeting 2, #6): sales / accounts wale ko line-machine nahi, bas ye dikhna chahiye ki
+    ye order daalne par kab tak tayyar hoga. Naya order queue ke aakhir me rakh kar (andaze ke machines se) asli scheduler chalate hain
+    (queue, machines, raw material sab ginta hai) aur sab kuch wapas rollback — DB me kuch nahi bachta. JSON: {ok, start, end, text, ...}."""
+    product = db.session.get(Product, request.form.get("product_id", type=int) or 0)
+    qty = request.form.get("planned_qty", type=float) or 0
+    if not product or product.is_deleted or not product.is_active or not product.recipe_items or qty <= 0:
+        return jsonify({"ok": False, "text": "Choose a product and a quantity."})
+    unit_code = (product.base_unit.code if product.base_unit else "KG").upper()
+    unit_weight = 1.0 if unit_code in ("KG", "KGS") else (product.unit_weight or request.form.get("unit_weight", type=float) or 0)
+    if unit_weight <= 0:
+        return jsonify({"ok": False, "text": "Enter the weight per unit."})
+    batch_kg = qty * unit_weight
+    today = today_ist()
+    plan, error = read_plan(product, batch_kg, today, auto=True)
+    if error:
+        return jsonify({"ok": False, "text": error})
+    if not plan:
+        return jsonify({"ok": False, "text": "This product has no production stages, so no date can be worked out."})
+    try:
+        order = ProductionOrder(prod_no="PREVIEW", product_id=product.id, order_date=today, planned_qty=qty, unit_weight=unit_weight, status="Draft", is_deleted=False,
+                                earliest_start_date=plan["earliest_start"], queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1)
+        db.session.add(order)
+        db.session.flush()
+        _save_plan(order, plan)
+        for r in product.recipe_items:
+            db.session.add(ProductionOrderLine(production_order_id=order.id, raw_material_id=r.raw_material_id, ratio_percent=r.ratio_percent,
+                                               required_qty=batch_kg * (r.ratio_percent or 0) / 100, is_flux=bool(r.is_flux), is_extra=False, work_stage_id=r.work_stage_id))
+        for k in product.packing_items:
+            if k.raw_material and not k.raw_material.is_deleted and k.kg_per_pack:
+                db.session.add(ProductionOrderLine(production_order_id=order.id, raw_material_id=k.raw_material_id, ratio_percent=0, is_packing=True,
+                                                   required_qty=math.ceil(round(batch_kg / k.kg_per_pack, 6)), is_flux=False, is_extra=False, work_stage_id=k.work_stage_id, kg_per_pack=k.kg_per_pack))
+        db.session.flush()
+        db.session.expire(order, ["stages", "lines"])          # stages / lines abhi id se jude hain; collection naye sire se load ho
+        _queue, materials, schedule = live_schedule(today)
+        info = schedule.get(order.id)
+        status = (materials.get(order.id) or {}).get("status", "ok")
+        result = None
+        if info:
+            result = {"ok": True, "start": info["start"].isoformat(), "end": info["end"].isoformat(), "end_text": info["end"].strftime("%d %b %Y"),
+                      "days": info["working_days"], "material": status,
+                      "waits_for_material": info["waits_for_material"].strftime("%d %b %Y") if info["waits_for_material"] else None}
+    finally:
+        db.session.rollback()          # preview hai: kuch save nahi hota
+    return jsonify(result or {"ok": False, "text": "A stage has no machine capacity, so no date can be worked out."})
+
+
 @production_orders_bp.route("/production_orders/release/<int:order_id>", methods=["POST"])
 def production_orders_release(order_id):
     # Draft order ko Released karo: ab uske liye Material issue ho sakta hai (RM store se production ko).
@@ -513,6 +576,9 @@ def production_orders_release(order_id):
         return redirect(url_for("production_orders.production_orders_list"))
     if not order.lines:
         flash("This production order has no materials, so it cannot be released.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if not order.plan_confirmed:
+        flash(f"Plan {order.prod_no} first: choose its production line and machines on the Production planning page, then release it.", "error")
         return redirect(url_for("production_orders.production_orders_list"))
     order.status = "Released"
     db.session.commit()
@@ -578,6 +644,7 @@ def production_orders_reschedule(order_id):
         return redirect(url_for("production_orders.production_orders_list"))
     order.needed_by_date = needed_by
     order.line_id = line.id if line else None
+    order.plan_confirmed = True          # line + machines ab production manager ne chun li (Production planning)
     _save_plan(order, plan)
     persist_schedule()
     db.session.commit()

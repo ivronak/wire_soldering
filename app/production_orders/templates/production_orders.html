@@ -145,7 +145,7 @@
       </div>
 
       <div style="min-width:0">
-        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}</div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}</div>
         <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
         <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}</div>
       </div>
@@ -189,7 +189,10 @@
       </div>
 
       <div class="po-act">
-        {% if o.status == 'Draft' %}
+        {% if o.status == 'Draft' and not o.plan_confirmed %}
+        {# Line + machines abhi chuni nahi (order form me nahi poochte): pehle plan, phir Release #}
+        <button type="button" class="po-btn primary btn-resched" data-id="{{ o.id }}">Plan</button>
+        {% elif o.status == 'Draft' %}
         <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
               data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
           <button type="submit" class="po-btn teal">Release</button></form>
@@ -449,24 +452,13 @@
             </div>
           </section>
 
-          <section class="po-step">
-            <div class="po-step-h"><span class="po-step-n">3</span><div><h3>Stages and machines</h3><p>Tick the machines to use at each stage. More machines means less time. Timings come from each machine's KG per hour.</p></div></div>
-            {% if line_board %}
-            {# Line pehle: us line ki machines hi tick hoti hain (dusri line ki machine disabled). Start par yahi line chalti hai #}
-            <div class="mb-3 max-w-sm">
-              <label for="mo-line" class="po-label">Production line *</label>
-              <select id="mo-line" name="line_id" required class="po-input bg-white">
-                <option value="">Choose a line</option>
-                {% for ln in line_board %}<option value="{{ ln.id }}">{{ ln.name }} · {{ '%g'|format(ln.capacity) }} KG/day · {{ ln.machines }} machines</option>{% endfor %}
-              </select>
-              <p class="text-[11.5px] text-ink-faint mt-1">Only the machines of this line can be used. The order will run on this line.</p>
-            </div>
-            {% endif %}
-            <div id="mo-plan" class="text-[13px] text-ink-faint">Select a product to see its stages.</div>
-          </section>
+          {# Line / machine yahan nahi (client meeting 2, #6): order daalne wale (sales / accounts) ko inki jaankari nahi hoti. Production manager inhe
+             "Production planning" page par chunta hai. Neeche ka box chhupa hai, JS andaze ke time ke liye use karta hai; planning_later=1 se server ise ignore karta hai. #}
+          <input type="hidden" name="planning_later" value="1" />
+          <div class="hidden"><div id="mo-plan"></div></div>
 
           <section class="po-step">
-            <div class="po-step-h"><span class="po-step-n">4</span><div><h3>Raw material</h3><p>From the product recipe. <span id="mo-summary" class="font-mono"></span> Spare % is extra material for wastage, set for each material. Unused spare goes back to the store.</p></div></div>
+            <div class="po-step-h"><span class="po-step-n">3</span><div><h3>Raw material</h3><p>From the product recipe. <span id="mo-summary" class="font-mono"></span> Spare % is extra material for wastage, set for each material. Unused spare goes back to the store.</p></div></div>
             <div class="overflow-x-auto rounded-lg">
               <table class="lines-table">
                 <thead><tr><th>Material</th><th style="text-align:right">Required</th><th style="text-align:right">In store</th><th>Status</th><th style="text-align:right">Spare %</th></tr></thead>
@@ -496,10 +488,11 @@
               <div id="sum-code" class="font-mono text-[12px] text-ink-faint"></div>
             </div>
             <div class="row"><div class="lab">Quantity</div><div id="sum-qty" class="font-semibold"></div></div>
+            <div class="row"><div class="lab">Expected delivery</div><div id="sum-expected" class="text-[13px] text-ink-faint">Working it out…</div></div>
             <div class="row"><div class="lab">Production time</div><div id="sum-time"></div></div>
             <div class="row"><div class="lab">Most per day</div><div id="sum-perday"></div><div class="text-[12px] text-ink-faint">Slowest stage: <span id="sum-slow"></span></div></div>
             <div class="row"><div class="lab">Raw material</div><div id="sum-material"></div></div>
-            <div class="row"><div class="lab">Queue</div><div class="text-[13px]">Joins the <b>end of the queue</b>. Start and finish dates are set from the queue after saving; move it up with the arrows.</div></div>
+            <div class="row"><div class="lab">Queue</div><div class="text-[13px]">Joins the <b>end of the queue</b>. The production manager picks the line and machines on the <b>Production planning</b> page before it is released.</div></div>
           </div>
         </aside>
       </div>
@@ -971,11 +964,41 @@
   var mainPlan = makePlanWidget(planBox, startInput);
   var lineSel = document.getElementById('mo-line');      // lines bani na ho to select hi nahi hota (null)
 
+  // ---------- "Expected delivery": server asli scheduler chala kar batata hai (queue + machines + raw material), kuch save nahi hota ----------
+  var expectedTimer = null, expectedSeq = 0;
+  function refreshExpected(product) {
+    var el = document.getElementById('sum-expected');
+    clearTimeout(expectedTimer);
+    el.className = 'text-[13px] text-ink-faint';
+    el.textContent = 'Working it out…';
+    expectedTimer = setTimeout(function () {
+      var seq = ++expectedSeq;
+      var body = new URLSearchParams();
+      body.set('product_id', product.id);
+      body.set('planned_qty', qtyInput.value || '0');
+      body.set('unit_weight', weightInput.value || '');
+      body.set('start_date', startInput.value || '');
+      fetch('{{ url_for("production_orders.production_orders_expected") }}', { method: 'POST', body: body, headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (seq !== expectedSeq) return;          // naya request chala gaya, purana jawab chhod do
+          if (!d.ok) { el.className = 'text-[13px] text-ink-faint'; el.textContent = d.text || 'Not available yet.'; return; }
+          el.className = 'text-[13px]';
+          el.innerHTML = '<strong>' + esc(d.end_text) + '</strong> <span class="text-ink-faint">(about ' + d.days + ' working day' + (d.days === 1 ? '' : 's') + ' of work)</span>' +
+            (d.waits_for_material ? '<div class="text-[12px]" style="color:#8A4A1C">Waits for raw material until ' + esc(d.waits_for_material) + '.</div>'
+              : (d.material === 'buy' ? '<div class="text-[12px]" style="color:#B42318">Some raw material has to be bought; the date can move.</div>' : '')) +
+            '<div class="text-[12px] text-ink-faint">Counts the orders already in the queue. Final dates are fixed on the Production planning page.</div>';
+        })
+        .catch(function () { if (seq === expectedSeq) { el.textContent = 'Could not work out the date right now.'; } });
+    }, 350);
+  }
+
   // ---------- Form ka right side "Order summary" card ----------
   function renderSide(product, batchKg) {
     var empty = document.getElementById('sum-empty'), body = document.getElementById('sum-body');
     if (!product) { empty.classList.remove('hidden'); body.classList.add('hidden'); return; }
     empty.classList.add('hidden'); body.classList.remove('hidden');
+    refreshExpected(product);
     document.getElementById('sum-product').textContent = product.name;
     document.getElementById('sum-code').textContent = product.code;
     document.getElementById('sum-qty').textContent = (parseFloat(qtyInput.value) || 0) + ' ' + (product.unit || 'KG') + (product.unit && product.unit.toUpperCase() !== 'KG' ? ' (' + batchKg.toFixed(2) + ' KG)' : '');

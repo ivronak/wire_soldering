@@ -782,6 +782,9 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     queue_position = db.Column(db.Integer, nullable=True)
     needed_by_date = db.Column(db.Date, nullable=True)           # client ko kab tak chahiye (optional); der hone par list me "Late" dikhta hai
     earliest_start_date = db.Column(db.Date, nullable=True)      # isse pehle start nahi; asli start / end queue + machines + RM se nikalte hain
+    # Production planning (client meeting 2, #6): order form me line / machine nahi chunte; pehle default machines se andaza plan banta hai (False),
+    # production manager Planning page par line + machines chun kar pakka karta hai (True). Release tabhi jab True. Purane orders True.
+    plan_confirmed = db.Column(db.Boolean, default=True, server_default="1", nullable=False)
     started_date = db.Column(db.Date, nullable=True)             # "Start production" dabane ka din
 
     # Cancel: order delete nahi hota, status "Cancelled" + wajah (audit trail ke liye)
