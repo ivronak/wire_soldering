@@ -1908,6 +1908,36 @@ class ProductionOutput(CreatedAtMixin, db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewed_by = db.Column(db.String(60), nullable=True)
     review_note = db.Column(db.String(255), nullable=True)
+    # Fixed cost (client meeting 2, #1): mahine ka fixed kharcha per KG, output record hote waqt is batch par freeze ho jaata hai.
+    # basis: NULL = fixed cost set nahi tha (sirf material cost), "Approx" = estimate, "Final" = mahina finalize hone ke baad ka asli rate.
+    # Stock valuation (FGBatch / FGMovement unit_cost) sirf material cost par rehti hai; product cost = material + fixed Costing page me dikhti hai.
+    fixed_cost_per_kg = db.Column(db.Float, default=0, server_default="0", nullable=False)
+    fixed_cost_total = db.Column(db.Float, default=0, server_default="0", nullable=False)
+    fixed_cost_basis = db.Column(db.String(8), nullable=True)
+
+
+class FixedCostPeriod(CreatedAtMixin, db.Model):
+    # Mahine ka estimated fixed kharcha (salary, kiraya, light...) jo effective_from tareekh se lagu hota hai. Badalna ho to NAYI row jodte hain;
+    # purani rows aur purane batch ki cost kabhi nahi badalti (client: "jis tareekh se badla wahin se nayi costing").
+    __tablename__ = "fixed_cost_periods"
+
+    id = db.Column(db.Integer, primary_key=True)
+    effective_from = db.Column(db.Date, nullable=False)
+    monthly_amount = db.Column(db.Float, nullable=False)
+    working_days = db.Column(db.Integer, nullable=False)          # din ka kharcha = monthly_amount / working_days
+    note = db.Column(db.String(255), nullable=True)
+
+
+class FixedCostMonth(CreatedAtMixin, db.Model):
+    # Mahina finalize: asli (final) fixed kharcha, us mahine ke total good KG se bhaga = final per KG. Ek mahina ek baar hi finalize hota hai.
+    __tablename__ = "fixed_cost_months"
+
+    id = db.Column(db.Integer, primary_key=True)
+    month_start = db.Column(db.Date, unique=True, nullable=False)  # mahine ki pehli tareekh
+    final_amount = db.Column(db.Float, nullable=False)
+    total_kg = db.Column(db.Float, nullable=False)
+    final_per_kg = db.Column(db.Float, nullable=False)
+    finalized_at = db.Column(db.DateTime, default=utc_now, nullable=True)
 
 
 class FGBatch(CreatedAtMixin, db.Model):

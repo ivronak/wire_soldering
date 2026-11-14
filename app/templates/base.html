@@ -207,6 +207,10 @@
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           Consumption variance
         </a>
+        <a href="{{ url_for('costing.costing_page') }}" class="nav-link{% if active_nav == 'costing' %} is-active{% endif %}"{% if active_nav == 'costing' %} aria-current="page"{% endif %}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 8h6m-6 4h6m-3 4l-3-4m0-8h.01M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>
+          Costing
+        </a>
       </nav>
     </aside>
 

@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
+from app.costing.fixed import apply_fixed_cost
 from app.extensions import db
 from app.inventory.posting import InventoryError
 from app.models import FGBatch, Product, ProductCategories, ProductionOrder, ProductionOutput, Rack
@@ -151,6 +152,7 @@ def production_output_add():
         db.session.rollback()
         flash(str(stock_error), "error")
         return redirect(_list_url("ready"))
+    apply_fixed_cost(output)          # mahine ka fixed cost per KG is batch par freeze (client meeting 2, #1)
     order.status = "Completed"
     order.queue_position = None
     renumber_queue()

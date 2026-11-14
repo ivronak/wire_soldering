@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Costing{% endblock %}
+
+{% block page_css %}
+<style>
+  /* Costing: Production planning / Variance jaisa look (copper-teal) */
+  .cs-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .cs-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .cs-kpi .v { font-size: 24px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
+  .cs-kpi .h { font-size: 12px; color: #6B7F82; }
+  .cs-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
+  .cs-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .cs-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
+  .cs-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .cs-box h3 { font-size: 15px; font-weight: 700; color: #0F2F32; }
+  .cs-note { font-size: 12.5px; color: #6B7F82; }
+  .cs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cs-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D1D9D8; text-align: left; white-space: nowrap; }
+  .cs-table td { padding: 8px; border: 1px solid #E2E8E7; vertical-align: middle; }
+  .cs-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .cs-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .cs-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .cs-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .cs-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .cs-chip.mute { background: #EEF2F1; color: #5B6F72; border-color: #D1D9D8; }
+  .cs-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .cs-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .cs-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
+  .cs-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; white-space: nowrap; }
+  .cs-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .cs-btn.primary:hover { background: #A35522; }
+  .cs-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .cs-btn.teal:hover { background: #1F5558; }
+  .cs-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .cs-btn.ghost:hover { background: #F4F6F5; }
+  .cs-btn.sm { padding: 4px 10px; font-size: 12px; }
+  .cs-empty { text-align: center; padding: 48px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Costing</div>
+  <h1 class="text-[22px] font-bold text-ink leading-tight">Costing</h1>
+  <p class="text-[13px] text-ink-faint">Product cost of each batch = raw material + fixed cost per KG (salary, rent, power...). Fixed cost is set once, changes only from the date you choose, and never changes a batch that is already recorded.</p>
+</div>
+
+<div class="shrink-0">
+  <div class="cs-tabs">
+    <a href="{{ url_for('costing.costing_page', tab='batches') }}" class="{{ 'on' if tab == 'batches' else '' }}">Batch cost</a>
+    <a href="{{ url_for('costing.costing_page', tab='fixed') }}" class="{{ 'on' if tab == 'fixed' else '' }}">Fixed cost</a>
+    <a href="{{ url_for('costing.costing_page', tab='months') }}" class="{{ 'on' if tab == 'months' else '' }}">Months</a>
+  </div>
+</div>
+
+<div class="flex-1 overflow-auto min-h-0 pb-6 space-y-4">
+
+{% if tab == 'batches' %}
+  <form method="get" class="flex flex-wrap items-end gap-3">
+    <input type="hidden" name="tab" value="batches" />
+    <div><label class="cs-label" for="cs-m">Month</label>
+      <select id="cs-m" name="m" class="cs-input bg-white" onchange="this.form.submit()">
+        {% for k in month_keys %}<option value="{{ month_key(k) }}" {{ 'selected' if k == picked else '' }}>{{ k.strftime('%B %Y') }}</option>{% endfor %}
+      </select></div>
+  </form>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="cs-kpi"><span class="k">Batches</span><span class="v">{{ kpi.batches }}</span><span class="h">{{ '%g'|format(kpi.kg|round(1)) }} KG made</span></div>
+    <div class="cs-kpi"><span class="k">Raw material</span><span class="v">₹{{ kpi.material|inr }}</span><span class="h">from WIP at issue cost</span></div>
+    <div class="cs-kpi"><span class="k">Fixed cost</span><span class="v">₹{{ kpi.fixed|inr }}</span><span class="h">{{ 'approx, month not final' if any_approx else 'share of the month' }}</span></div>
+    <div class="cs-kpi"><span class="k">{{ 'Approx product cost' if any_approx else 'Product cost' }} / KG</span><span class="v">₹{{ kpi.per_kg|inr }}</span><span class="h">material + fixed</span></div>
+  </div>
+  {% if batch_rows %}
+  <div class="cs-box overflow-x-auto">
+    <table class="cs-table">
+      <thead><tr><th>Batch</th><th>Product</th><th>Order</th><th>Date</th><th class="r">Good qty</th><th class="r">KG</th><th class="r">Material / unit</th><th class="r">Fixed / unit</th><th class="r">Product cost / unit</th><th>Cost is</th></tr></thead>
+      <tbody>
+      {% for r in batch_rows %}
+        <tr>
+          <td class="font-mono font-semibold">{{ r.o.batch_no }}</td>
+          <td>{{ r.product }}</td>
+          <td class="font-mono">{{ r.order_no }}</td>
+          <td>{{ r.o.output_date.strftime('%d %b') }}</td>
+          <td class="r">{{ '%g'|format(r.o.good_qty) }} {{ r.unit }}</td>
+          <td class="r">{{ '%g'|format(r.kg|round(2)) }}</td>
+          <td class="r">₹{{ r.material_unit|inr }}</td>
+          <td class="r">₹{{ r.fixed_unit|inr }}</td>
+          <td class="r font-bold">₹{{ r.cost_unit|inr }}</td>
+          <td>{% if r.basis == 'Approx' %}<span class="cs-chip warn" title="Month not finalised yet"><i></i>Approx</span>{% elif r.basis == 'Final' %}<span class="cs-chip ok"><i></i>Final</span>{% else %}<span class="cs-chip mute" title="No fixed cost was set when this batch was recorded"><i></i>Material only</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="cs-note">Product cost is shown as <b>Approx</b> until the month is finalised on the Months tab. Stock valuation in the store still uses raw material cost only.</p>
+  {% else %}
+  <div class="cs-empty"><h3 class="text-[16px] font-bold text-ink mb-1">No batches in {{ picked.strftime('%B %Y') }}</h3><p>Batches appear here when a production output is recorded.</p></div>
+  {% endif %}
+
+{% elif tab == 'fixed' %}
+  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div class="space-y-4 min-w-0">
+      <div class="cs-box">
+        <h3>In use today</h3>
+        {% if current %}
+        <div class="text-[26px] font-bold text-ink mt-1">₹{{ current.monthly_amount|inr }} <span class="text-[14px] font-medium text-ink-faint">a month</span></div>
+        <p class="text-[13.5px] text-ink mt-1">₹{{ current.monthly_amount|inr }} ÷ {{ current.working_days }} working days = <b>₹{{ (current.monthly_amount / current.working_days)|inr }} per day</b>.
+          That day cost is shared over the good KG made on that day: for example 200 KG → ₹{{ (current.monthly_amount / current.working_days / 200)|inr }} per KG, 500 KG → ₹{{ (current.monthly_amount / current.working_days / 500)|inr }} per KG.</p>
+        <p class="cs-note mt-1">Since {{ current.effective_from.strftime('%d %b %Y') }}{% if current.note %} · {{ current.note }}{% endif %}</p>
+        {% else %}
+        <p class="text-[13.5px] text-ink-faint mt-1">No fixed cost is set yet. Batches recorded now show <b>Material only</b>. Add the estimated monthly cost on the right.</p>
+        {% endif %}
+      </div>
+      <div class="cs-box overflow-x-auto">
+        <h3 class="mb-2">History</h3>
+        {% if periods %}
+        <table class="cs-table">
+          <thead><tr><th>From</th><th class="r">Monthly cost</th><th class="r">Working days</th><th class="r">Per day</th><th>Note</th><th></th></tr></thead>
+          <tbody>
+          {% for p in periods %}
+            <tr>
+              <td>{{ p.effective_from.strftime('%d %b %Y') }}{% if current and current.id == p.id %} <span class="cs-chip ok"><i></i>In use</span>{% elif p.effective_from > today %} <span class="cs-chip warn"><i></i>Starts later</span>{% endif %}</td>
+              <td class="r">₹{{ p.monthly_amount|inr }}</td>
+              <td class="r">{{ p.working_days }}</td>
+              <td class="r">₹{{ (p.monthly_amount / p.working_days)|inr }}</td>
+              <td>{{ p.note or '' }}</td>
+              <td class="r">{% if p.effective_from > today %}
+                <form method="post" action="{{ url_for('costing.costing_period_delete', period_id=p.id) }}" class="js-confirm-submit" data-confirm-title="Remove entry" data-confirm-ok="Remove" data-confirm-message="Remove this fixed cost entry? It has not started yet.">
+                  <button type="submit" class="cs-btn ghost sm">Remove</button></form>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="cs-note mt-2">Old entries stay for the record. A change only affects batches recorded from its start date.</p>
+        {% else %}<p class="cs-note">Nothing added yet.</p>{% endif %}
+      </div>
+    </div>
+    <div class="cs-box self-start">
+      <h3>Add or change fixed cost</h3>
+      <p class="cs-note mb-3">Include salary, rent, electricity, office bills, diesel... for one month. It applies from the date below; earlier batches keep their cost.</p>
+      <form method="post" action="{{ url_for('costing.costing_period_add') }}" class="space-y-3">
+        <div><label class="cs-label" for="cs-from">Applies from *</label><input type="date" id="cs-from" name="effective_from" required value="{{ today.isoformat() }}" min="{{ today.replace(day=1).isoformat() }}" class="cs-input" /></div>
+        <div><label class="cs-label" for="cs-amt">Estimated fixed cost for the month (₹) *</label><input type="number" id="cs-amt" name="monthly_amount" min="1" step="0.01" required placeholder="300000" class="cs-input" /></div>
+        <div><label class="cs-label" for="cs-days">Working days in the month *</label><input type="number" id="cs-days" name="working_days" min="1" max="31" required value="{{ current.working_days if current else 26 }}" class="cs-input" /></div>
+        <div><label class="cs-label" for="cs-note">Note</label><input type="text" id="cs-note" name="note" maxlength="255" class="cs-input" /></div>
+        <button type="submit" class="cs-btn primary">Save fixed cost</button>
+      </form>
+    </div>
+  </div>
+
+{% else %}
+  <div class="cs-box overflow-x-auto">
+    <h3 class="mb-2">Months</h3>
+    <table class="cs-table">
+      <thead><tr><th>Month</th><th class="r">Batches</th><th class="r">Good KG</th><th class="r">Estimated cost</th><th class="r">Fixed cost in batches</th><th>Status</th><th class="r">Final cost</th><th class="r">Final per KG</th><th></th></tr></thead>
+      <tbody>
+      {% for m in months %}
+        <tr>
+          <td class="font-semibold">{{ m.start.strftime('%B %Y') }}</td>
+          <td class="r">{{ m.outputs }}</td>
+          <td class="r">{{ '%g'|format(m.kg|round(1)) }}</td>
+          <td class="r">{% if m.estimate %}₹{{ m.estimate|inr }}{% else %}—{% endif %}</td>
+          <td class="r">₹{{ m.absorbed|inr }}</td>
+          <td>{% if m.final %}<span class="cs-chip ok"><i></i>Final</span>{% elif m.outputs %}<span class="cs-chip warn"><i></i>Approx</span>{% else %}<span class="cs-chip mute"><i></i>No output</span>{% endif %}</td>
+          <td class="r">{% if m.final %}₹{{ m.final.final_amount|inr }}{% else %}—{% endif %}</td>
+          <td class="r">{% if m.final %}₹{{ m.final.final_per_kg|inr }}{% else %}—{% endif %}</td>
+          <td class="r">{% if m.can_finalize %}
+            <form method="post" action="{{ url_for('costing.costing_month_finalize') }}" class="js-confirm-submit flex gap-2 items-center justify-end" data-confirm-title="Finalise month" data-confirm-ok="Finalise" data-confirm-message="Finalise {{ m.start.strftime('%B %Y') }}? Its batches will show the final cost, and a finalised month cannot be changed.">
+              <input type="hidden" name="month" value="{{ month_key(m.start) }}" />
+              <input type="number" name="final_amount" min="1" step="0.01" required placeholder="Final cost ₹" class="cs-input" style="width:130px" />
+              <button type="submit" class="cs-btn teal sm">Finalise</button></form>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="cs-note mt-2">When the month is nearly over, enter the real fixed cost (e.g. ₹3.25 lakh instead of the ₹3 lakh estimate). The final cost per KG = final cost ÷ good KG of the month, and the batches of that month change from <b>Approx</b> to <b>Final</b> once. A finalised month never changes again.</p>
+  </div>
+{% endif %}
+
+</div>
+{% endblock %}
