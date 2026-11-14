@@ -898,5 +898,40 @@
   "hash": "a4cc16acdb17",
   "bytes": 237312,
   "chars": 310
+ },
+ "po-bundle": {
+  "hash": "8af095864e8f",
+  "bytes": 210960,
+  "chars": 267
+ },
+ "co-link": {
+  "hash": "bcd16d5c1aca",
+  "bytes": 37584,
+  "chars": 53
+ },
+ "co-batch": {
+  "hash": "abe30494ec68",
+  "bytes": 156672,
+  "chars": 215
+ },
+ "co-fixed-tab": {
+  "hash": "1e1ffd136e52",
+  "bytes": 17568,
+  "chars": 24
+ },
+ "co-fixed": {
+  "hash": "6bd13a9c68db",
+  "bytes": 197136,
+  "chars": 248
+ },
+ "co-months-tab": {
+  "hash": "935d986c5fd2",
+  "bytes": 17136,
+  "chars": 21
+ },
+ "co-months": {
+  "hash": "d7aa1951b7d8",
+  "bytes": 171072,
+  "chars": 233
  }
 }

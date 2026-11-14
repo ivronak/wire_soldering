@@ -73,7 +73,8 @@
 
   // Naye features ke steps tabhi jab /tour/info ka flag (lines / racks / scrap_later / wd_split) true ho
   function flag(name) { return function () { return !!(infoCache && infoCache[name]); }; }
-  function tableOrTitle() { return $('main table') || $('main h1'); }
+  // Table tabhi jab dikh rahi ho (khaali page par table chhupi rehti hai, tab title dikhao)
+  function tableOrTitle() { var t = $('main table'); return (t && t.offsetWidth > 0) ? t : $('main h1'); }
   // Material plan / Scrap page ke dabbe (class same hai, isliye likhe hue text se pehchano)
   function boxWith(sel, text) { var b = $$(sel).filter(function (x) { return x.textContent.indexOf(text) !== -1; })[0]; return b || null; }
 
@@ -253,6 +254,8 @@
         text: '<b>પહેલા:</b> ઓર્ડર ભરનારે લાઇન અને મશીન ચૂંટવા પડતા.<br><b>હવે:</b> ફક્ત <b>Expected delivery</b> — આ ઓર્ડર કતારના છેડે મૂકીએ તો ક્યારે તૈયાર થશે. કતાર, મશીન અને કાચો માલ ગણીને સિસ્ટમ જ તારીખ કાઢે છે. લાઇન અને મશીન પછી <b>Production planning</b> માં production manager ચૂંટે.' },
       { id: 'po-side', type: 'info', path: '/production_orders', target: '.po-side', title: 'Order summary',
         text: 'જમણી બાજુ સારાંશ: <b>કુલ સમય, રોજનું વધુમાં વધુ ઉત્પાદન</b> અને <b>કાચા માલનું ચેક</b>. "In store" કૉલમમાં દેખાય છે કે સ્ટોકમાં માલ છે કે નહિ — <b>Short</b> લખ્યું હોય તો માલ ઓછો છે.' },
+      { id: 'po-bundle', type: 'info', path: '/production_orders', target: 'button[name="add_another"]', title: 'Bundle — એક પાર્ટી, ઘણા પ્રોડક્ટ (નવું)',
+        text: '<b>પહેલા:</b> પાર્ટીના એક ઓર્ડરમાં ઘણા પ્રોડક્ટ હોય તો દરેકનો ઓર્ડર અલગ, કોઈ સંબંધ નહિ.<br><b>હવે:</b> <b>Save &amp; add another item</b> દબાવો — ઓર્ડર સેવ થાય, <b>BND-વર્ષ-નંબર</b> બને અને ફોર્મ ફરી ખુલે. દરેક item નો પોતાનો PROD ઓર્ડર, રેસિપી અને plan; કાર્ડ પર <b>Bundle</b> ચિપથી બધા item એકસાથે જોવાય. (ડેમોમાં આપણે એક જ item સેવ કરીશું.)' },
       { id: 'po-save', type: 'submit', path: '/production_orders', target: '#mo-form', retryTo: 'po-new', capture: { re: 'PROD-[0-9]{4}-[0-9]+', as: 'order' }, title: 'કતારમાં સેવ કરો',
         text: 'નીચે <b>Save to queue</b> દબાવો. નવો ઓર્ડર કતારના <b>છેડે</b> જોડાશે.', todo: 'ક્લિક કરો: Save to queue' },
       { id: 'po-card', type: 'info', path: '/production_orders', target: function () { return orderCard('.po-card'); }, title: 'તમારો ઓર્ડર કતારમાં છે',
@@ -394,6 +397,15 @@
       { id: 'ou-post', type: 'submit', path: '/production_output', target: '#ou-form', retryTo: 'ou-open', title: 'Record output', text: 'નીચે <b>Record output</b> દબાવો.', todo: 'ક્લિક કરો: Record output' },
       { id: 'ou-done', type: 'info', path: '/production_output', target: '.ou-card', title: 'Output નોંધાયું ✅',
         text: 'આ <b>Recorded</b> ટૅબ છે. અહીં <b>OUT નંબર, Batch નંબર</b> (<code>BATCH-WS-તારીખ-001</code>), Good/Rework/Scrap અને <b>પ્રતિ યુનિટ ખર્ચ</b> દેખાય છે. <b>Print batch slip</b> થી બેચ-સ્લિપ નીકળે. ભૂલ હોય તો <b>Cancel</b> (જ્યાં સુધી માલ વેચાયો ન હોય).' },
+      { id: 'co-link', type: 'click', target: navLink('/costing'), title: 'Costing (નવું)', text: 'બેચની <b>પ્રોડક્ટ કોસ્ટ</b> જોવા ડાબા મેનુમાં <b>Manufacturing</b> હેઠળ <b>Costing</b>.', todo: 'ક્લિક કરો: Costing' },
+      { id: 'co-batch', type: 'info', path: '/costing', target: '.cs-table', title: 'Batch cost',
+        text: '<b>પહેલા:</b> બેચનો ખર્ચ ફક્ત કાચા માલનો.<br><b>હવે:</b> દરેક બેચની <b>Product cost / unit = કાચો માલ + Fixed cost</b>. ચિપ: <b>Approx</b> (મહિનો હજી ફાઇનલ નથી), <b>Final</b>, અથવા <b>Material only</b> (Fixed cost હજી નક્કી નથી — ડેમોમાં એમ જ છે). ઉપર KG દીઠ કોસ્ટ પણ.' },
+      { id: 'co-fixed-tab', type: 'click', path: '/costing', target: '.cs-tabs a[href*="tab=fixed"]', title: 'Fixed cost ટૅબ', text: '<b>Fixed cost</b> ટૅબ ખોલો.', todo: 'ક્લિક કરો: Fixed cost' },
+      { id: 'co-fixed', type: 'info', path: '/costing', target: '.cs-box.self-start', title: 'મહિનાનો Fixed cost',
+        text: 'પગાર, ભાડું, વીજળી, ઑફિસ ખર્ચ — <b>આખા મહિનાની અંદાજિત રકમ</b> અને <b>કામના દિવસ</b> અહીં લખાય. રોજનો ખર્ચ = રકમ ÷ દિવસ; એ દિવસના <b>કુલ સારા KG</b> પર વહેંચાય અને બેચ પર <b>ફ્રીઝ</b> થઈ જાય. નવી રકમ ફક્ત <b>આગળની તારીખથી</b> લાગે — જૂની બેચ બદલાય નહિ. (ડેમોમાં આપણે કંઈ સેવ નહિ કરીએ.)' },
+      { id: 'co-months-tab', type: 'click', path: '/costing', target: '.cs-tabs a[href*="tab=months"]', title: 'Months ટૅબ', text: '<b>Months</b> ટૅબ ખોલો.', todo: 'ક્લિક કરો: Months' },
+      { id: 'co-months', type: 'info', path: '/costing', target: '.cs-table', title: 'મહિનો ફાઇનલ કરો',
+        text: 'મહિનાના અંતે <b>અસલી Fixed cost</b> લખીને <b>Finalise</b> દબાવો. Final રકમ ÷ મહિનાના કુલ KG = <b>Final રેટ</b>, અને મહિનાની બધી બેચ એક જ વાર <b>Approx → Final</b> થાય. એક મહિનો એક જ વાર ફાઇનલ થાય. સ્ટોરની કિંમત (valuation) હજી ફક્ત કાચા માલની છે.' },
       { id: 'fg-link', type: 'click', target: navLink('/finished_goods'), title: 'Finished goods', text: 'તૈયાર માલનો સ્ટોક.', todo: 'ક્લિક કરો: Finished goods' },
       { id: 'fg-info', type: 'info', path: '/finished_goods', target: '.fg-card', title: 'તૈયાર માલ — કેટેગરી પ્રમાણે',
         text: '<b>પહેલા:</b> દરેક બેચ અલગ લાઇનમાં, લાંબી યાદી.<br><b>હવે:</b> પહેલા <b>કેટેગરી બ્લોક</b> (Solder Wire, Stick ...) — દરેકમાં કુલ જથ્થો (KG / PCS) અને કિંમત.' },
