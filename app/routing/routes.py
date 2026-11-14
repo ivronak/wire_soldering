@@ -190,11 +190,50 @@ def lab_lines(order, stage):
     return rows
 
 
+def next_on_machine(done_stage):
+    """Stage Complete hone ke baad: jin machines par wo chala unki queue me sabse pehle kaun sa order ab shuru ho sakta hai (client meeting 2, #11).
+    Sirf wahi order jiska agla (pehla na-hua) stage isi machine par hai — baad ke stage ko abhi shuru nahi kar sakte. Dusre order ki hi baat (apna agla stage nahi).
+    Wapas dict (order, stage, machine_name, status) ya None."""
+    from app.dashboard.routes import queue_by_machine          # yahin import: dashboard.routes khud routing se juda nahi, par load-order ke jhanjhat se bachne ke liye
+    own = done_stage.production_order
+    machine_ids = [row.machine_id for row in done_stage.machines if row.used] or [row.machine_id for row in done_stage.machines]
+    queue = queue_by_machine(today_ist())
+    candidates = []
+    for machine_id in machine_ids:
+        for q in queue.get(machine_id, []):
+            if q["order_id"] == own.id:
+                continue
+            stage = db.session.get(ProductionOrderStage, q["stage_id"])
+            order = stage.production_order if stage else None
+            if order is None or stage.status != "Pending":
+                continue
+            first_open = next((s for s in order.stages if s.status != "Done"), None)
+            if first_open is None or first_open.id != stage.id:
+                continue
+            machine = db.session.get(Machines, machine_id)
+            if machine is None or machine.status != "active":
+                continue
+            candidates.append(((q["position"] if q["position"] is not None else 10 ** 9, q["prod_no"]),
+                               {"order": order, "stage": stage, "machine_name": machine.name, "status": order.status}))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0])
+    return candidates[0][1]
+
+
 @routing_bp.route("/routing")
 def routing_list():
     tab = request.args.get("tab", "running")
     if tab not in ("running", "done"):
         tab = "running"
+    # "Next on this machine" box: Complete ke baad ?after=<khatam hua stage id>; ?focus=<stage id> us stage ka card chamkata hai
+    next_up = None
+    after_id = request.args.get("after", type=int)
+    if after_id:
+        done_stage = db.session.get(ProductionOrderStage, after_id)
+        if done_stage is not None and done_stage.status == "Done":
+            next_up = next_on_machine(done_stage)
+    focus_id = request.args.get("focus", type=int)
     today = today_ist()
     orders = (ProductionOrder.query.filter(ProductionOrder.is_deleted == False, ProductionOrder.status == "In production")
               .order_by(ProductionOrder.queue_position, ProductionOrder.id).all())
@@ -242,7 +281,7 @@ def routing_list():
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
-        now=now_ist().strftime("%Y-%m-%dT%H:%M"),
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id,
     )
 
 
@@ -653,11 +692,12 @@ def routing_complete(stage_id):
         _add_note(stage, note)          # hold / clash wali purani lines mitti nahi, nayi note unke saath judti hai
     db.session.commit()
     summary = order_summary(order, today_ist())
+    # Machine ab khali hui: uski queue ka agla order dikhane ke liye "after" me khatam hua stage bhejte hain (routing page par box banta hai)
     if summary["all_done"]:
         flash(f"{stage.stage_name} done. All stages of {order.prod_no} are complete.", "success")
-        return _back("done")
+        return redirect(url_for("routing.routing_list", tab="done", after=stage.id))
     flash(f"{stage.stage_name} done for {order.prod_no}. Next: {summary['current'].stage_name}.", "success")
-    return _back()
+    return redirect(url_for("routing.routing_list", tab="running", after=stage.id))
 
 
 @routing_bp.route("/routing/reopen/<int:stage_id>", methods=["POST"])

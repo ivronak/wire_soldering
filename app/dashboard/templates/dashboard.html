@@ -237,7 +237,7 @@
       var m = data.machine;
       document.getElementById('db-title').textContent = m.name;
       document.getElementById('db-sub').textContent = m.code + ' · ' + m.stage + ' · ' + m.line + ' · ' + m.capacity;
-      var html = '';
+      var html = '<p class="db-meta" id="db-learned">' + esc(m.learned) + '</p>';
       if (data.orders.length) html += data.orders.map(orderCard).join('');
       else html += '<p class="text-ink-muted">' + (m.status === 'active' ? 'Nothing is running on this machine right now.' : 'This machine is switched off in the Machine master.') + '</p>';
       if (data.incoming && data.incoming.length) {

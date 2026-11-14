@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, render_template
 
 from app.extensions import db
 
-from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, WorkStage
+from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, WorkStage
 from app.production_orders.scheduler import live_schedule, now_ist, persist_schedule, queue_orders, today_ist
 from app.routing.handoff import hot_handoffs, hours_text as handoff_text
 
@@ -70,7 +70,7 @@ def queue_by_machine(today):
                 continue
             start = info["windows"][index][0]
             for row in stage.machines:
-                out.setdefault(row.machine_id, []).append({"order_id": order.id, "prod_no": order.prod_no,
+                out.setdefault(row.machine_id, []).append({"order_id": order.id, "stage_id": stage.id, "prod_no": order.prod_no,
                                                            "product": order.product.name if order.product else "",
                                                            "stage": stage.stage_name, "start": start, "status": order.status,
                                                            "position": order.queue_position, "batch_kg": round((order.planned_qty or 0) * (order.unit_weight or 1), 2)})
@@ -177,6 +177,54 @@ def order_detail(order, running_stage):
             "hold_reason": running_stage.hold_reason or ""}
 
 
+LEARN_RUNS = 5           # pichhle itne completed runs se machine ki asli speed nikalte hain
+LEARN_MIN_RUNS = 3       # isse kam run ho to "abhi kaafi run nahi" (andaza galat ho sakta hai)
+
+
+def learned_speed(machine):
+    """Machine ki asli speed (KG / ghanta) pichhle completed runs se — sirf dikhane ke liye, planning abhi rated capacity se hi hoti hai.
+    Run tab ginta hai jab wo stage sirf isi ek machine par chala ho (do machine ho to kaam ka hissa pata nahi), maal KG me aur ghante > 0 ho.
+    Speed = kul KG / kul ghante (hold ka time pehle se hata hua). Wapas {"runs", "kg_per_hour", "rated", "ok"}."""
+    stages = (ProductionOrderStage.query.join(ProductionOrderStageMachine, ProductionOrderStageMachine.stage_id == ProductionOrderStage.id)
+              .join(ProductionOrder, ProductionOrder.id == ProductionOrderStage.production_order_id)
+              .filter(ProductionOrderStageMachine.machine_id == machine.id, ProductionOrderStageMachine.used == True,
+                      ProductionOrderStage.status == "Done", ProductionOrderStage.completed_at.isnot(None),
+                      ProductionOrder.is_deleted == False)
+              .order_by(ProductionOrderStage.completed_at.desc()).all())
+    kg = hours = 0.0
+    runs = 0
+    for stage in stages:
+        if sum(1 for row in stage.machines if row.used) != 1:
+            continue
+        worked = stage.actual_hours
+        if not worked or worked <= 0 or not stage.qty_in or stage.qty_in <= 0:
+            continue
+        if _is_side_stage(stage):
+            continue                  # flux jaisa side stage KG nahi hota
+        kg += stage.qty_in
+        hours += worked
+        runs += 1
+        if runs >= LEARN_RUNS:
+            break
+    speed = round(kg / hours, 1) if runs and hours > 0 else None
+    return {"runs": runs, "kg_per_hour": speed, "rated": machine.capacity_per_hour, "ok": runs >= LEARN_MIN_RUNS and speed is not None}
+
+
+def _is_side_stage(stage):
+    from app.routing.routes import side_stage_info
+    return side_stage_info(stage.production_order, stage) is not None
+
+
+def learned_text(info):
+    # Pop-up ki line: "Learned 34 KG/hr from last 5 runs (rated 40 KG/hr)" ya "Not enough runs yet (1 of 3)"
+    if not info["ok"]:
+        return f"Learned speed: not enough runs yet ({info['runs']} of {LEARN_MIN_RUNS} needed)"
+    text = f"Learned speed: {info['kg_per_hour']:g} KG/hr from the last {info['runs']} run{'s' if info['runs'] != 1 else ''}"
+    if info["rated"]:
+        text += f" (rated {info['rated']:g} KG/hr)"
+    return text
+
+
 def machine_payload(machine):
     """Pop-up ka poora data (JSON ke liye dict): chal rahe order(s), garam maal aane wala, aur is machine ki queue (upar / neeche ke ishare ke saath)."""
     orders = []
@@ -194,9 +242,11 @@ def machine_payload(machine):
                       "can_up": movable and index > 0 and rows[index - 1]["status"] == "Released",
                       "can_down": movable and index < len(rows) - 1})
     incoming = incoming_by_machine(now_ist()).get(machine.id, [])
+    learned = learned_speed(machine)
     return {"incoming": incoming, "machine": {"id": machine.id, "name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
                                 "line": machine.line.name if machine.line else "No line", "capacity": machine.capacity_text,
-                                "status": machine.status},
+                                "status": machine.status, "learned": learned_text(learned),
+                                "learned_kg_per_hour": learned["kg_per_hour"] if learned["ok"] else None},
             "orders": orders, "queue": queue}
 
 
