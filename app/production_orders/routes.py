@@ -17,6 +17,10 @@ from app.production_orders.scheduler import OPEN_STATUSES, live_schedule, persis
 production_orders_bp = Blueprint("production_orders", __name__, template_folder="templates")
 
 
+# Planner me kaun si machines dikhti hain: Active + temporary band (maintenance / breakdown). Retired (hamesha ke liye band) nahi dikhti.
+PLANNER_MACHINE_STATUSES = ("active", "maintenance", "breakdown")
+
+
 def _is_kg(machine):
     # Plan KG me banta hai, isliye sirf wahi machine ginti hai jiski numeric capacity KG / hr me likhi ho
     unit = machine.capacity_unit.code.upper() if machine.capacity_unit else ""
@@ -25,8 +29,9 @@ def _is_kg(machine):
 
 def _machine_row(m):
     # Planner ke liye machine ka data. line_id / line: machine kis Production Line ki hai (form me us line ki machines hi tick hoti hain)
+    # G27: Breakdown / Maintenance machine bhi picker me dikhti hai (grey + label), par chun nahi sakte — isliye ok sirf Active machine ke liye True
     return {"id": m.id, "name": m.name, "per_hour": m.capacity_per_hour or 0, "hours_per_day": m.hours_per_day or 8,
-            "ok": _is_kg(m), "line_id": m.line_id, "line": m.line.name if m.line else ""}
+            "ok": _is_kg(m) and m.status == "active", "status": m.status, "line_id": m.line_id, "line": m.line.name if m.line else ""}
 
 
 def _read_line():
@@ -48,7 +53,7 @@ def _routing_for(product):
         if stage is None or stage.is_deleted or not stage.is_active:
             continue
         machines = Machines.query.filter(Machines.work_stage_id == stage.id, Machines.is_deleted == False,
-                                         Machines.status == "active").order_by(Machines.code).all()
+                                         Machines.status.in_(PLANNER_MACHINE_STATUSES)).order_by(Machines.code).all()
         stages.append({
             "stage_id": stage.id,
             "name": stage.name,
@@ -77,6 +82,9 @@ def read_plan(product, batch_kg, order_date, routing=None, line=None, auto=False
         if auto:
             usable = [m for m in stage["machines"] if m["ok"]]
             if not usable:
+                down = [m["name"] for m in stage["machines"] if m.get("status", "active") != "active"]
+                if down:
+                    return None, f"No machine is available for {stage['name']} right now: {', '.join(down)} not working (breakdown / maintenance)."
                 return None, f"No machine with an output per hour in KG is set for {stage['name']}. Add one in Machines first."
             chosen.append({"stage_id": stage["stage_id"], "name": stage["name"],
                            "machines": [{"id": m["id"], "name": m["name"], "per_hour": m["per_hour"], "hours_per_day": m["hours_per_day"]} for m in usable]})
@@ -314,7 +322,7 @@ def production_orders_list():
             routing = []
             for st in o.stages:
                 machines = Machines.query.filter(Machines.work_stage_id == st.work_stage_id, Machines.is_deleted == False,
-                                                 Machines.status == "active").order_by(Machines.code).all()
+                                                 Machines.status.in_(PLANNER_MACHINE_STATUSES)).order_by(Machines.code).all()
                 routing.append({"stage_id": st.work_stage_id, "name": st.stage_name, "machines": [_machine_row(m) for m in machines]})
             chosen = {str(st.work_stage_id): [m.machine_id for m in st.machines] for st in o.stages}
         else:

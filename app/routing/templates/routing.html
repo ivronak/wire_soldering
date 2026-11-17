@@ -126,6 +126,8 @@
           {% else %}<span class="rt-chip gone"><i></i>Waiting to start {{ cur.stage_name }}</span>{% endif %}</div>
         <div class="rt-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
         <div class="rt-meta">{{ '%g'|format(o.planned_qty * o.unit_weight) }} KG batch{% if o.started_date %} · started {{ dshort(o.started_date) }}{% endif %}</div>
+        {# G27: is stage ki machine kharab / maintenance me hai #}
+        {% if cur and machine_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">Machine not working: {{ machine_alerts[cur.id] }}</div>{% endif %}
       </div>
       <div>
         <div class="text-[13px]"><b>{{ sm.done }}</b> of {{ sm.total }} stages done</div>
@@ -328,6 +330,15 @@
           <label class="rt-label mt-2" for="rt-clash-reason">Start anyway? Write the reason</label>
           <input type="text" name="clash_reason" id="rt-clash-reason" maxlength="150" class="rt-input" placeholder="Leave empty to wait; fill to start anyway" autocomplete="off" />
         </div>
+        {# G27: planned machine kharab / maintenance me — doosri Active machine chuno #}
+        <div id="rt-down-box" style="display:none" class="rounded-lg p-3" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#B42318">Machine not working</div>
+          <p id="rt-down-text" class="text-[12.5px] mt-1" style="color:#7A271A"></p>
+          <div id="rt-down-pick" style="display:none">
+            <label class="rt-label mt-2" for="rt-down-swap">Use this machine instead *</label>
+            <select name="swap_machine_id" id="rt-down-swap" class="rt-input"></select>
+          </div>
+        </div>
         <div>
           <label class="rt-label" id="rt-when-label">Started at</label>
           <input type="datetime-local" id="rt-when" class="rt-input" />
@@ -444,7 +455,20 @@
     document.getElementById('rt-clash-text').textContent = clashOn ? a.clash : '';
     document.getElementById('rt-clash-reason').value = '';
     document.getElementById('rt-clash-reason').disabled = !clashOn;
-    document.getElementById('rt-submit').disabled = false;
+    // G27: planned machine kharab / maintenance me ho to batao; sab ki sab kharab ho to doosri Active machine chunna zaroori
+    var downBox = document.getElementById('rt-down-box'), downPick = document.getElementById('rt-down-pick'), downSel = document.getElementById('rt-down-swap');
+    var down = start && a.down ? a.down : null;
+    downBox.style.display = down ? 'block' : 'none';
+    downBox.style.background = '#FEF3F2'; downBox.style.border = '1px solid #FDA29B';
+    downSel.disabled = !(down && down.all_down); downSel.required = !!(down && down.all_down);
+    downPick.style.display = down && down.all_down ? 'block' : 'none';
+    if (down) {
+      document.getElementById('rt-down-text').textContent = down.names + (down.all_down
+        ? (down.swaps.length ? ' Choose another machine of this stage to start it.' : ' No other active machine is available for this stage. Fix the machine in Machines first.')
+        : ' It will be left out and the stage starts on the other planned machine(s).');
+      downSel.innerHTML = '<option value="">Choose a machine</option>' + (down.swaps || []).map(function (m) { return '<option value="' + m.id + '">' + esc(m.name) + '</option>'; }).join('');
+    } else { downSel.innerHTML = ''; }
+    document.getElementById('rt-submit').disabled = !!(down && down.all_down && !(down.swaps || []).length);      // koi doosri Active machine nahi to Start band
     document.getElementById('rt-used-warn').style.display = 'none';
     document.getElementById('rt-hours-box').style.display = 'none';        // sirf complete par
     if (!start) {

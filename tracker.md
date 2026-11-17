@@ -13,7 +13,9 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 ### 2026-11-17 — DEMO WALKTHROUGH KE CHANGES BUILD SHURU (list: demo_changes_2026_11_16.md, "BUILD LOG" section)
 - Build mode: AI code likhta hai + Hinglish me samjhata hai, user review karta hai (user ne is round ke liye "Main likh deta hoon" chuna).
 - **Batch 1 DONE (local, live nahi):** G31 GSTIN/PAN/IFSC validation, G30 + G20 wording, G23 release shortage warning, G18 box auto-fill ceil, G24 dashboard on-hold (KPI + line chip + stage pill). Tested on DB copy + user ko live (browser) dikhaya 17 Nov.
-- **Agla (Current Focus):** Batch 2 = G27 machine status (Breakdown/Maintenance) — planning grey-out, Start block + alternate machine, dashboard badge/KPI, banner. Phir C19+C14, C7, C18 FINAL, C15, C8/C11/C12.
+- **Batch 1 committed (6a4b017, local; push/deploy nahi).**
+- **Batch 2 BUILT (local, commit pending user review):** G27 machine status — planning picker grey, stage Start block + "Use this machine instead", dashboard Breakdown/Maintenance tile + Unavailable KPI, routing card alert. Live test 17 Nov. Detail: demo_changes_2026_11_16.md.
+- **Agla (Current Focus):** user review Batch 2 -> commit; phir C19+C14, C7, C18 FINAL, C15, C8/C11/C12.
 
 ### 2026-11-04 — CLIENT MEETING 2 (15 changes, ek ek karke; har item ka flow user se verify karke) — file: Downloads/erp_client_meeting_2_transcript_and_changes.md
 - Plan order (user ne haan kaha): #8 -> #4 -> #3 -> #13 -> #14 ... Conflicts jo user ne confirm kiye: spare % ab Product Master me (order me pre-filled + editable).

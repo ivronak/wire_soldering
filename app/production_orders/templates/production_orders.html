@@ -920,7 +920,9 @@
           var inLine = !linesOn || (lineId !== '' && String(m.line_id) === String(lineId));
           var usable = m.ok && inLine;
           var on = usable && (!picked || picked.indexOf(m.id) !== -1);
-          var note = !m.ok ? 'set output per hour in Machines' : (!inLine ? (lineId === '' ? 'choose a line first' : (m.line ? m.line + ' (not this line)' : 'not on any line')) : m.per_hour + ' KG/hr' + (linesOn && m.line ? ' · ' + esc(m.line) : ''));
+          // G27: Breakdown / Maintenance machine grey hoti hai aur uska kaaran likha aata hai
+          var down = m.status && m.status !== 'active';
+          var note = down ? '<b style="color:' + (m.status === 'breakdown' ? '#B42318' : '#B45309') + '">' + (m.status === 'breakdown' ? 'Under breakdown' : 'Under maintenance') + '</b> · cannot be chosen' : !m.ok ? 'set output per hour in Machines' : (!inLine ? (lineId === '' ? 'choose a line first' : (m.line ? m.line + ' (not this line)' : 'not on any line')) : m.per_hour + ' KG/hr' + (linesOn && m.line ? ' · ' + esc(m.line) : ''));
           return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (usable ? 'text-ink' : 'text-ink-faint') + '">' +
             '<input type="checkbox" class="plan-machine" name="machines_' + stage.stage_id + '" value="' + m.id + '" data-stage="' + stage.stage_id + '" data-name="' + esc(m.name) + '" data-per-hour="' + m.per_hour + '" data-hours="' + m.hours_per_day + '"' +
             (on ? ' checked' : '') + (usable ? '' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + note + '</span></label>';

@@ -180,6 +180,31 @@ def _machine_choices(stage):
     return choices
 
 
+# G27: machine ka status text (Machine master me Active / Maintenance / Breakdown / Retired)
+MACHINE_STATUS_TEXT = {"breakdown": "under breakdown", "maintenance": "under maintenance", "retired": "retired"}
+
+
+def stage_machine_problem(stage):
+    """Is stage ki chuni hui machines me se jo Active nahi (breakdown / maintenance / retired / deleted) unki jaankari.
+    None = sab theek. Warna {"names": "Furnace 2 (under breakdown)", "all_down": sab ki sab kharab?, "swaps": usi work stage ki Active machines jo is stage me nahi, "rows": [(row, machine)]}.
+    all_down hone par stage Start nahi hota jab tak doosri machine na chuni jaye; kuch hi kharab ho to unhe hata kar baaki se chalta hai."""
+    rows = list(stage.machines)
+    down = []
+    for row in rows:
+        machine = db.session.get(Machines, row.machine_id)
+        if machine is not None and (machine.is_deleted or machine.status != "active"):
+            down.append((row, machine))
+    if not down:
+        return None
+    planned_ids = {row.machine_id for row in rows}
+    others = Machines.query.filter(Machines.work_stage_id == stage.work_stage_id, Machines.is_deleted == False,
+                                   Machines.status == "active").order_by(Machines.code).all()
+    return {"names": ", ".join(f"{m.name} ({MACHINE_STATUS_TEXT.get(m.status, 'not available')})" for _, m in down),
+            "all_down": len(down) == len(rows),
+            "swaps": [{"id": m.id, "name": m.name} for m in others if m.id not in planned_ids],
+            "rows": down}
+
+
 def lab_lines(order, stage):
     # Lab test form ke "Correction" rows ke liye: is stage ka material (Tin / Lead ...) — kitna chahiye, kitna issue ho chuka
     rows = []
@@ -245,6 +270,7 @@ def routing_list():
            "late": len([o for o in running if summaries[o.id]["delay"] > 0]), "ready": len(finished)}
     # Drawers ke liye: har stage ka data (JS) — sirf jo abhi kuch kar sakte hain (current stage)
     actions = {}
+    machine_alerts = {}          # {stage id: text} — card par laal "machine not working" line (G27)
     clash_orders = in_production_orders()
     for o in shown:
         sm = summaries[o.id]
@@ -270,6 +296,15 @@ def routing_list():
             # Stage timing clash lock: shuru karne par kisi doosre order ke garam maal se takrao ho to uska message (start drawer me dikhta hai)
             "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
         }
+        # G27: stage ki machine kharab / maintenance me ho to Start drawer me "Use this machine instead" aur card par laal alert
+        problem = stage_machine_problem(cur)
+        if problem is not None:
+            actions[str(cur.id)]["down"] = {"names": problem["names"], "all_down": problem["all_down"], "swaps": problem["swaps"]} if cur.status == "Pending" else None
+            if cur.status == "Pending":
+                machine_alerts[cur.id] = (f"{problem['names']}. " + ("Choose another machine when you start this stage." if problem["all_down"]
+                                          else "It will be left out when you start this stage."))
+            else:
+                machine_alerts[cur.id] = f"{problem['names']}. Hold the stage if work has stopped, and when you complete it tick the machine that was really used."
         deferred = deferred_scrap_stage(o, cur)
         if deferred is not None:
             actions[str(cur.id)]["defer_prev"] = {
@@ -281,7 +316,7 @@ def routing_list():
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
-        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id,
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts,
     )
 
 
@@ -339,6 +374,16 @@ def routing_start(stage_id):
     if blocker is not None:
         flash(f"{stage.stage_name} cannot start yet: {blocker.stage_name} needs a passed lab test with the test certificate (TC) uploaded first.", "error")
         return _back()
+    # G27: stage ki machine kharab / maintenance me ho to start nahi hone dete. Sab ki sab kharab ho to doosri Active machine chunni padti hai
+    # (form ka "Use this machine instead"); kuch hi kharab ho to unhe hata ke baaki Active se chalta hai.
+    problem = stage_machine_problem(stage)
+    swap_machine = None
+    if problem is not None and problem["all_down"]:
+        swap_id = request.form.get("swap_machine_id", type=int)
+        if not any(option["id"] == swap_id for option in problem["swaps"]):
+            flash(f"{stage.stage_name} cannot start: {problem['names']}. Choose another machine in the Start form (Use this machine instead).", "error")
+            return _back()
+        swap_machine = db.session.get(Machines, swap_id)
     operator = (request.form.get("operator") or "").strip()[:60]
     if not operator:
         flash("Enter the operator's name.", "error")
@@ -357,6 +402,18 @@ def routing_start(stage_id):
     if previous and previous[-1].completed_at and started_at < previous[-1].completed_at:
         flash(f"{stage.stage_name} cannot start before {previous[-1].stage_name} finished ({previous[-1].completed_at.strftime('%d %b %H:%M')}).", "error")
         return _back()
+    machine_note = ""
+    if problem is not None:
+        # Kharab machine ki plan-row hata dete hain (warna dashboard par us machine par order chalta dikhta). Wajah stage notes me jaati hai.
+        for row, _machine in problem["rows"]:
+            db.session.delete(row)
+        if swap_machine is not None:
+            db.session.add(ProductionOrderStageMachine(stage_id=stage.id, machine_id=swap_machine.id, machine_name=swap_machine.name,
+                                                       capacity_per_hour=swap_machine.capacity_per_hour or 0, hours_per_day=swap_machine.hours_per_day or 8,
+                                                       is_planned=True, used=False))
+            machine_note = f"Machine changed at start: {problem['names']} -> {swap_machine.name}"
+        else:
+            machine_note = f"Not working, left out: {problem['names']}"
     stage.status = "In progress"
     stage.started_at = started_at
     stage.operator = operator
@@ -365,9 +422,11 @@ def routing_start(stage_id):
     notes = (request.form.get("notes") or "").strip()
     if clash is not None:
         notes = (notes + " | " if notes else "") + f"Timing clash overridden ({clash['machine_name']} due for {clash['other_order']}): {clash_reason}"
+    if machine_note:
+        notes = (notes + " | " if notes else "") + machine_note
     stage.notes = notes[:255] or None
     db.session.commit()
-    flash(f"{stage.stage_name} started for {order.prod_no}.", "success")
+    flash(f"{stage.stage_name} started for {order.prod_no}." + (f" {machine_note}." if machine_note else ""), "success")
     return _back()
 
 

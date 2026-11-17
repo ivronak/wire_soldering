@@ -38,6 +38,14 @@
   .db-mc-state { margin-left: auto; font-size: 11.5px; font-weight: 700; color: #1F7A4D; white-space: nowrap; }
   .db-tile.running .db-mc-state { color: #8A4A1C; }
   .db-tile.inactive .db-mc-state { color: #6B7F82; }
+  /* G27: breakdown laal, maintenance amber (running machine par bhi) */
+  .db-tile.m-breakdown { border-color: #FDA29B; }
+  .db-tile.m-breakdown .db-dot { background: #D92D20; box-shadow: 0 0 0 3px #FEE4E2; }
+  .db-tile.m-breakdown .db-mc-state, .db-tile.m-breakdown .db-mwarn { color: #B42318; }
+  .db-tile.m-maintenance { border-color: #F5D9B5; }
+  .db-tile.m-maintenance .db-dot { background: #B45309; box-shadow: 0 0 0 3px #FEF0C7; }
+  .db-tile.m-maintenance .db-mc-state, .db-tile.m-maintenance .db-mwarn { color: #B45309; }
+  .db-mwarn { font-size: 12px; font-weight: 700; margin-top: 6px; }
   .db-tile.held { border-color: #FDA29B; background: #FFFAF9; }
   .db-tile.held .db-dot { background: #D92D20; box-shadow: 0 0 0 3px #FEE4E2; }
   .db-tile.held .db-mc-state { color: #B42318; }
@@ -100,7 +108,7 @@
   <div class="db-kpi"><span class="k">Machines</span><span class="v">{{ board.total.machines }}</span><span class="h">on all lines</span></div>
   <div class="db-kpi"><span class="k">Running</span><span class="v" style="color:#8A4A1C">{{ board.total.running - board.total.held }}</span><span class="h">{% if board.total.held %}{{ board.total.held }} on hold · {% endif %}{{ board.total.orders }} order{{ '' if board.total.orders == 1 else 's' }} in work</span></div>
   <div class="db-kpi"><span class="k">Free</span><span class="v" style="color:#1F7A4D">{{ board.total.free }}</span><span class="h">ready for the next order</span></div>
-  <div class="db-kpi"><span class="k">Inactive</span><span class="v">{{ board.total.inactive }}</span><span class="h">switched off in Machine master</span></div>
+  <div class="db-kpi"><span class="k">Unavailable</span><span class="v"{% if board.total.down %} style="color:#B42318"{% endif %}>{{ board.total.down }}</span><span class="h">breakdown, maintenance or off</span></div>
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
@@ -115,7 +123,7 @@
         <span class="db-chip running"><i></i>{{ g.running - g.held }} running</span>
         {% if g.held %}<span class="db-chip over"><i></i>{{ g.held }} on hold</span>{% endif %}
         <span class="db-chip free"><i></i>{{ g.free }} free</span>
-        {% if g.inactive %}<span class="db-chip inactive"><i></i>{{ g.inactive }} inactive</span>{% endif %}
+        {% if g.inactive %}<span class="db-chip inactive"><i></i>{{ g.inactive }} unavailable</span>{% endif %}
       </div>
     </div>
     {% if g.stages %}
@@ -127,10 +135,10 @@
           <span class="db-sb-count">{% if st.running - st.held > 0 %}<span class="db-pill run">{{ st.running - st.held }} running</span>{% endif %}{% if st.held %}<span class="db-pill hold">{{ st.held }} on hold</span>{% endif %}{% if st.free %}<span class="db-pill free">{{ st.free }} free</span>{% endif %}</span>
         </div>
         {% for t in st.machines %}
-        <div class="db-tile {{ t.state }}{% if t.held %} held{% endif %}" data-machine="{{ t.id }}" title="Click for the order and queue details">
+        <div class="db-tile {{ t.state }}{% if t.held %} held{% endif %}{% if t.down_text and t.mstatus in ('breakdown', 'maintenance') %} m-{{ t.mstatus }}{% endif %}" data-machine="{{ t.id }}" title="Click for the order and queue details">
           <div class="db-mc-top">
             <span class="db-dot"></span><span class="db-mc-name">{{ t.name }}</span>
-            <span class="db-mc-state">{{ ('On hold' if t.held else 'Running') if t.state == 'running' else ('Free' if t.state == 'free' else 'Inactive') }}</span>
+            <span class="db-mc-state">{{ ('On hold' if t.held else 'Running') if t.state == 'running' else ('Free' if t.state == 'free' else (t.down_text or 'Inactive')) }}</span>
           </div>
           <div class="db-mc-sub">{{ t.code }} · {{ t.capacity.split(' · ')[0] }}</div>
           {% if t.state == 'running' %}
@@ -150,8 +158,9 @@
               <div class="db-then">Then &rarr; <b>{{ r.next_stage }}</b></div>
             </div>
             {% endfor %}
+            {% if t.down_text %}<div class="db-mwarn">Machine is {{ t.down_phrase }}. Hold the stage or move the work to another machine.</div>{% endif %}
           {% elif t.state == 'inactive' %}
-            <div class="db-idle">Switched off in Machine master.</div>
+            <div class="db-idle">{% if t.mstatus == 'breakdown' %}Under breakdown. No new order can start here.{% elif t.mstatus == 'maintenance' %}Under maintenance. No new order can start here.{% else %}Switched off in Machine master.{% endif %}</div>
           {% else %}
             <div class="db-idle">Idle, ready for work.</div>
           {% endif %}

@@ -118,6 +118,9 @@ def machine_board(today=None, now=None):
                 "stage_id": machine.work_stage_id, "stage_no": stage_no.get(machine.work_stage_id, 0),
                 "capacity": machine.capacity_text, "state": state, "runs": runs, "next": waiting[0] if waiting else None,
                 "queue_count": len(waiting), "master_inactive": machine.status != "active", "held": held,
+                # G27: kharab / maintenance / retired — tile par alag rang aur naam se dikhta hai (pehle sab "Inactive" tha)
+                "mstatus": machine.status, "down_text": {"breakdown": "Breakdown", "maintenance": "Maintenance", "retired": "Retired"}.get(machine.status, ""),
+                "down_phrase": {"breakdown": "under breakdown", "maintenance": "under maintenance", "retired": "retired"}.get(machine.status, ""),
                 "incoming": (incoming.get(machine.id) or [None])[0]}
 
     groups = []
@@ -147,6 +150,8 @@ def machine_board(today=None, now=None):
     total["machines"] = total["running"] + total["free"] + total["inactive"]
     # G24: hold par ruki machine "running" state me hi rehti hai (machine busy hai), par KPI me alag dikhate hain taaki "Running" sach batae
     total["held"] = len([t for g in groups for t in g["machines"] if t["held"]])
+    # G27: "Unavailable" = machine ka status Active nahi (breakdown / maintenance / retired) — chahe us par abhi koi run ho ya na ho
+    total["down"] = len([t for g in groups for t in g["machines"] if t["mstatus"] != "active"])
     total["orders"] = len({r["order_id"] for rows in running.values() for r in rows})
     return {"groups": groups, "total": total, "now": now}
 
