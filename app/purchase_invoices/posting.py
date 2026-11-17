@@ -7,11 +7,16 @@
 # Vendor ko paisa DENA hai => Cr => balance plus ki taraf badhta hai.
 
 
+from app.inventory.posting import bill_to_stock, bill_cancelled
+
+
 def post_invoice(invoice):
     # Draft bill ko Posted banao: vendor ko dena baaki (Cr) total_amount se badhta hai.
+    # C5: saath me us bill ke lots ki stock value bill ke final rate par ho jaati hai (qty nahi badalti)
     ledger = invoice.vendor.ledger
     ledger.current_balance = round(ledger.current_balance + invoice.total_amount, 2)
     invoice.status = "Posted"
+    bill_to_stock(invoice)
 
 
 def cancel_invoice(invoice):
@@ -20,6 +25,7 @@ def cancel_invoice(invoice):
     if invoice.status == "Posted":
         ledger = invoice.vendor.ledger
         ledger.current_balance = round(ledger.current_balance - invoice.total_amount, 2)
+        bill_cancelled(invoice)         # C5: lot wapas PO rate (estimate) par
     invoice.status = "Cancelled"
 
 from app.inventory.posting import return_to_stock, return_cancelled

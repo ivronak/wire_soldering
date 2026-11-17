@@ -56,7 +56,7 @@
             <p><strong>QC passed</strong> → moves to the store, shown as <em>Available</em>.</p>
             <p><strong>QC rejected</strong> → stays in QC Hold as <em>Rejected</em> until a Purchase Return sends it back.</p>
             <p><strong>Material issue</strong> → store to production, shown as <em>In production</em>.</p>
-            <p class="mt-1 text-ink-faint">A bill never changes stock. Values are estimated at the PO rate.</p>
+            <p class="mt-1 text-ink-faint">A bill never changes the quantity. Value is the PO rate (estimate) until the vendor bill is posted, then the bill rate.</p>
           </div>
         </details>
       </div>
@@ -64,7 +64,7 @@
       <div class="flex-1 overflow-auto min-h-0 space-y-5">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div class="sc-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Materials in stock</div><div class="sc-big text-ink mt-1">{{ summary_rows|length }}</div></div>
-          <div class="sc-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Stock value (estimated)</div><div class="sc-big text-ink mt-1">₹{{ total_value|inr }}</div></div>
+          <div class="sc-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Stock value</div><div class="sc-big text-ink mt-1">₹{{ total_value|inr }}</div></div>
           <div class="sc-card" {% if waiting_lots %}style="border-color:#F5D9B5;background:#FFF9F0"{% endif %}><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots waiting for QC</div><div class="sc-big mt-1 text-ink" {% if waiting_lots %}style="color:#8A4A1C"{% endif %}>{{ waiting_lots }}</div></div>
           <div class="sc-card" {% if rejected_lots %}style="border-color:#F8CFCB;background:#FFF6F5"{% endif %}><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots with rejected goods</div><div class="sc-big mt-1 {{ 'text-stop' if rejected_lots else 'text-ink' }}">{{ rejected_lots }}</div>{% if rejected_lots %}<div class="text-[11.5px] text-ink-muted mt-0.5">Failed Inward QC. Send back with a Purchase Return</div>{% endif %}</div>
         </div>

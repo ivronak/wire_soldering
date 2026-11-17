@@ -219,6 +219,11 @@ def read_qc_parameter_form(m, exclude_id=None):
             return None, "Enter a minimum, a maximum or both."
         if min_value is not None and max_value is not None and min_value > max_value:
             return None, "Minimum cannot be more than maximum."
+        # G5: percent wale parameter (purity) ki limit 0 se 100 ke beech hi ho sakti hai (Tin me galti se 100.5 save hua tha)
+        if (unit_label or "").replace(" ", "") in ("%", "percent"):
+            for limit in (min_value, max_value):
+                if limit is not None and (limit < 0 or limit > 100):
+                    return None, "A percent limit must be between 0 and 100."
     else:
         # pass/fail me limits ka matlab nahi, saaf kar do
         min_value = max_value = None

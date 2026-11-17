@@ -40,7 +40,7 @@
               <div class="lh-tag">{{ w.label }}</div>
               <div class="text-[24px] font-bold text-ink tabular-nums leading-tight mt-1">{{ w.qty|qty }} <span class="text-[14px] font-semibold text-ink-muted">{{ unit }}</span></div>
               <div class="text-[13px] text-ink-muted">in {{ w.warehouse }}</div>
-              <div class="text-[12px] text-ink-faint mt-1">Value ₹{{ w.value|inr }} (estimated)</div>
+              <div class="text-[12px] text-ink-faint mt-1">Value ₹{{ w.value|inr }} ({{ 'bill rate' if final_rate else 'estimated at PO rate' }})</div>
             </div>
             {% endfor %}
           </div>
@@ -57,15 +57,20 @@
           <ul class="tl px-4">
             {% for e in events %}
             <li class="{{ 'cancelled' if e.cancelled else '' }}">
-              <div class="dot {{ e.kind }}">{{ '+' if e.kind == 'in' else ('−' if e.kind == 'out' else '⇄') }}</div>
+              <div class="dot {{ e.kind }}">{{ '+' if e.kind == 'in' else ('−' if e.kind == 'out' else ('₹' if e.kind == 'value' else '⇄')) }}</div>
               <div>
                 <div class="text-[14px] font-semibold text-ink">{{ e.title }} <span class="font-mono text-[12px] font-normal text-ink-faint">· {{ e.ref_no or '' }}</span></div>
                 <div class="text-[13.5px] text-ink-muted">{{ e.sentence }}</div>
                 <div class="text-[11.5px] text-ink-faint mt-0.5">{{ e.date.strftime('%d %b %Y') }}{% if e.created_at %} · entered {{ e.created_at|ist }}{% endif %}</div>
               </div>
               <div class="text-right tabular-nums">
+                {% if e.kind == 'value' %}
+                <div class="text-[15px] font-bold {{ 'text-success' if e.value >= 0 else 'text-stop' }}">{{ '+' if e.value >= 0 else '−' }}₹{{ e.value|abs|inr }}</div>
+                <div class="text-[12px] text-ink-faint">value only</div>
+                {% else %}
                 <div class="text-[15px] font-bold {{ 'text-success' if e.kind == 'in' else ('text-stop' if e.kind == 'out' else 'text-ink') }}">{{ e.qty|qty }} {{ unit }}</div>
                 <div class="text-[12px] text-ink-faint">₹{{ e.value|inr }}</div>
+                {% endif %}
               </div>
             </li>
             {% else %}

@@ -4,7 +4,9 @@
 #   1. GRN post  -> har line ka naya LOT, poori received qty us branch ke QC Hold warehouse me (value = PO rate, "estimated").
 #   2. Final QC  -> passed qty QC Hold se nikal ke PO ke warehouse (RM) me. Rejected qty QC Hold me hi rehti hai ("Rejected"),
 #                   jab tak Purchase Return (rejected me se) usse vendor ko wapas na bheje.
-#   3. Purchase Invoice stock nahi badalta (wo sirf vendor ka paisa hai).
+#   3. Purchase Invoice stock ki QTY nahi badalta. Par VALUE badalta hai (C5): GRN ke time lot PO rate par "estimated" hota hai,
+#                   bill post hote hi us lot ka maal (jahan bhi abhi hai: QC Hold / store / WIP) bill ke final rate par ho jaata hai
+#                   ("REVALUE" row, qty 0, sirf value ka farak). Bill cancel = wapas PO rate par.
 #   4. Purchase Return -> "passed" ka maal RM warehouse se, "rejected" ka maal QC Hold se ghatata hai. Cancel = ulti rows.
 #   5. Stock kabhi minus nahi: nikalne se pehle jaanch, kam ho to InventoryError.
 # Ledger ki rows kabhi edit / delete nahi hoti (models.py ka listener rokta hai); galti = ulti (reversal) row.
@@ -137,6 +139,50 @@ def qc_passed_to_stock(inward_qc, grn_line):
     date_ = inward_qc.inspection_date
     add_movement(lot, hold, date_, "QC_OUT", -qty, -out_value, "QC", inward_qc.id, inward_qc.qc_no, grn_line.id)
     add_movement(lot, store_warehouse_for(po), date_, "QC_IN", qty, out_value, "QC", inward_qc.id, inward_qc.qc_no, grn_line.id)
+
+
+# ---------------- 3. Purchase bill (C5) ----------------
+def revalue_lot(lot, rate, move_date, ref_id, ref_no, key, note):
+    # Lot ka jo maal abhi har warehouse me hai, use `rate` par value karo: nayi value = qty x rate, farak ek REVALUE row (qty 0).
+    # Ledger ki purani rows nahi badalti. Jo maal pehle hi use ho chuka (CONSUME), uski value wahi rehti hai jo us waqt thi.
+    rows = db.session.query(StockMovement.warehouse_id, func.sum(StockMovement.qty), func.sum(StockMovement.value)).filter(
+        StockMovement.lot_id == lot.id).group_by(StockMovement.warehouse_id).all()
+    changed = 0.0
+    for warehouse_id, qty, value in rows:
+        qty, value = q4(qty), q2(value)
+        if qty <= 0.00005:
+            continue
+        delta = q2(q2(qty * rate) - value)
+        if abs(delta) < 0.01:
+            continue
+        warehouse = db.session.get(Warehouse, warehouse_id)
+        add_movement(lot, warehouse, move_date, "REVALUE", 0, delta, "BILL", ref_id, ref_no, f"{key}:{warehouse_id}", note=note)
+        changed += delta
+    return q2(changed)
+
+
+def bill_to_stock(invoice):
+    # Bill post: har bill-line ka lot bill ke final rate par (discount ke baad, GST se pehle: taxable amount / qty)
+    db.session.flush()
+    for line in invoice.lines:
+        grn_line = line.grn_line
+        lot = lot_for(grn_line)
+        if line.qty <= 0:
+            continue
+        final_rate = line.taxable_amount / line.qty
+        revalue_lot(lot, final_rate, invoice.invoice_date, invoice.id, invoice.pi_no, line.id,
+                    f"Valued at bill rate {final_rate:,.2f} per unit (bill {invoice.pi_no})")
+
+
+def bill_cancelled(invoice):
+    # Bill cancel: lot wapas PO rate (estimate) par. Naye rows (key "...:undo"), kyunki beech me maal hil chuka ho sakta hai.
+    db.session.flush()
+    for line in invoice.lines:
+        grn_line = line.grn_line
+        lot = lot_for(grn_line)
+        po_rate = grn_line.po_line.rate or 0
+        revalue_lot(lot, po_rate, invoice.invoice_date, invoice.id, invoice.pi_no, f"{line.id}:undo",
+                    f"Back to PO rate {po_rate:,.2f} per unit (bill {invoice.pi_no} cancelled)")
 
 
 # ---------------- 4. Purchase Return ----------------

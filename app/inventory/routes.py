@@ -18,6 +18,7 @@ MOVEMENT_LABELS = {
     "MRET_OUT": "Returned from production: left WIP",
     "MRET_IN": "Returned from production: back into store",
     "CONSUME": "Used up in production output",
+    "REVALUE": "Value updated to the vendor bill rate",
 }
 
 
@@ -109,7 +110,12 @@ EVENT_TITLES = {
     "ADJUST": "Stock adjustment",
     "OPENING": "Opening stock",
     "OWNMADE": "Made in house",
+    "BILL": "Valued at the vendor bill rate",
 }
+
+
+def name_of(row):
+    return row.warehouse.name if row.warehouse else "?"
 
 
 def build_events(movements, unit):
@@ -131,6 +137,15 @@ def build_events(movements, unit):
         arriving = [r for r in rows if r.qty > 0]
         qty = abs(first.qty)
         title = EVENT_TITLES.get(ref_type, ref_type)
+        if ref_type == "BILL":
+            # C5: sirf value ka farak (qty 0). Cancel wali row ka note "Back to PO rate ..." hota hai
+            sign = "+" if first.value >= 0 else "-"
+            events.append({
+                "date": first.movement_date, "created_at": first.created_at,
+                "title": "Back to the PO rate" if (first.note or "").startswith("Back to PO") else title,
+                "sentence": "%s Stock in %s changed by %s₹%s." % (first.note or "", name_of(first), sign, "{:,.2f}".format(abs(first.value))),
+                "kind": "value", "qty": 0, "value": first.value, "ref_no": first.ref_no, "cancelled": False})
+            continue
         if cancelled:
             title = "Cancelled: " + title.lower()
         if ref_type == "TRANSFER":
@@ -212,7 +227,13 @@ def stock_lot(lot_id):
     where_now.sort(key=lambda w: {"good": 0, "wip": 1, "wait": 2, "bad": 3}[w["tone"]])
 
     received = sum(m.qty for m in movements if m.movement_type in ("GRN_RECEIPT", "OPENING", "OWN_IN") and m.reverses_movement_id is None)
-    return render_template("stock_lot.html", active_nav="stock", lot=lot, unit=unit,
+    # C5: is lot ka koi Posted (cancel nahi) vendor bill hai to value bill rate par hai, warna PO rate ka anumaan
+    final_rate = False
+    if lot.grn_line is not None:
+        for bill_line in lot.grn_line.invoice_lines:
+            if bill_line.invoice.status == "Posted" and not bill_line.invoice.is_deleted:
+                final_rate = True
+    return render_template("stock_lot.html", active_nav="stock", lot=lot, unit=unit, final_rate=final_rate,
                            events=build_events(movements, unit), where_now=where_now, received=received)
 
 
