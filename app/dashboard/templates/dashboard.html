@@ -85,6 +85,9 @@
   #db-modal { display: flex; }
   .dm-sec { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; margin: 14px 0 6px; }
   .dm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  /* G25: arrow se abhi hila order thodi der highlight, taaki naya number turant dikhe */
+  .dm-table tr.dm-moved td { background: #FFF4D6; animation: dm-fade 2.5s ease-out forwards; }
+  @keyframes dm-fade { from { background: #FFE9A8; } to { background: transparent; } }
   .dm-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 6px 8px; border: 1px solid #D1D9D8; text-align: left; }
   .dm-table td { padding: 5px 8px; border: 1px solid #E2E8E7; vertical-align: top; }
   .dm-table tr.here td { background: #FFF4E5; font-weight: 600; }
@@ -244,7 +247,7 @@
         '<div class="dm-sec">Stages (' + o.done + ' of ' + o.total + ' done)</div><div class="overflow-x-auto"><table class="dm-table"><thead><tr><th>Stage</th><th>Status</th><th>Machines</th><th>Plan dates</th><th class="r">Planned</th><th class="r">Actual</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="dm-sec">Material</div><table class="dm-table"><thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th></tr></thead><tbody>' + mats + '</tbody></table></div>';
     }
-    function show(data) {
+    function show(data, movedId) {
       var m = data.machine;
       document.getElementById('db-title').textContent = m.name;
       document.getElementById('db-sub').textContent = m.code + ' · ' + m.stage + ' · ' + m.line + ' · ' + m.capacity;
@@ -262,7 +265,7 @@
           var btn = function (dir, on, label) {
             return '<button type="button" class="dm-mv" data-order="' + q.order_id + '" data-dir="' + dir + '"' + (on ? '' : ' disabled') + ' title="Move ' + dir + '" aria-label="Move ' + dir + '">' + label + '</button>';
           };
-          return '<tr><td>' + (i === 0 ? '<b>Next</b>' : (i + 1)) + '</td><td class="font-mono font-semibold">' + esc(q.prod_no) + (q.status === 'In production' ? ' <span class="db-meta">(in production)</span>' : '') + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td class="r">' + q.batch_kg + ' KG</td><td>' + esc(q.start) + '</td><td class="r" style="white-space:nowrap">' + btn('up', q.can_up, '&#9650;') + btn('down', q.can_down, '&#9660;') + '</td></tr>';
+          return '<tr class="' + (movedId && String(q.order_id) === String(movedId) ? 'dm-moved' : '') + '"><td>' + (i === 0 ? '<b>Next</b>' : (i + 1)) + '</td><td class="font-mono font-semibold">' + esc(q.prod_no) + (q.status === 'In production' ? ' <span class="db-meta">(in production)</span>' : '') + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td class="r">' + q.batch_kg + ' KG</td><td>' + esc(q.start) + '</td><td class="r" style="white-space:nowrap">' + btn('up', q.can_up, '&#9650;') + btn('down', q.can_down, '&#9660;') + '</td></tr>';
         }).join('') + '</tbody></table><p class="db-meta mt-1">When the running order finishes on this machine, the first order here is next. Use the arrows to change the turn of released orders; the dates of the other orders are worked out again.</p>';
       } else html += '<p class="text-ink-muted">No order is waiting for this machine.</p>';
       html += '<div id="dm-err" class="db-meta mt-1" style="color:#B42318"></div>';
@@ -271,7 +274,7 @@
         b.addEventListener('click', function () {
           fetch('/dashboard/machine/' + m.id + '/move/' + b.getAttribute('data-order') + '/' + b.getAttribute('data-dir'), { method: 'POST' })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-            .then(function (res) { if (res.ok) show(res.j); else document.getElementById('dm-err').textContent = res.j.error || 'Could not move the order.'; })
+            .then(function (res) { if (res.ok) show(res.j, b.getAttribute('data-order')); else document.getElementById('dm-err').textContent = res.j.error || 'Could not move the order.'; })
             .catch(function () { document.getElementById('dm-err').textContent = 'Could not move the order.'; });
         });
       });

@@ -46,6 +46,8 @@ def output_plan(order):
     metal = [s for s in stages if side_stage_info(order, s) is None]
     scrap = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind != "Process loss") / weight, 4)
     loss = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind == "Process loss") / weight, 4)
+    # G19: scrap asli me KG me gaya hota hai (jaise 25 KG dross) — PCS wala number sirf product ki unit me conversion hai, isliye KG alag se dikhate hain
+    scrap_kg = round(sum(s.scrap_qty or 0 for s in metal if s.scrap_kind != "Process loss"), 3)
     unit = order.product.base_unit.code if order.product and order.product.base_unit else ""
     packed = packed_lines(order)
     # PCS wale product me asli ginti spool ki hoti hai: Spooling stage me jo spool gine (product ki unit wali packing line), wahi Good ka suggest
@@ -67,7 +69,7 @@ def output_plan(order):
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": unit, "packed": packed, "counted_from_packing": counted is not None, "unit_weight": weight,
-        "planned": order.planned_qty, "extra_percent": order.extra_percent or 0, "good": good, "scrap": scrap, "loss": loss, "rework": 0,
+        "planned": order.planned_qty, "extra_percent": order.extra_percent or 0, "good": good, "scrap": scrap, "scrap_kg": scrap_kg, "loss": loss, "rework": 0,
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),

@@ -130,6 +130,10 @@
         {% if leftover_text.get(o.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FFF7ED;border-color:#F5D9B5;color:#8A4A1C">Left over, return to store: {{ leftover_text[o.id] }} · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Return now</a></div>{% endif %}
         {# C7: is stage ka maal poora issue nahi hua — stage Start tab tak block #}
         {% if cur and material_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">{{ cur.stage_name }} cannot start: material not fully issued ({{ material_alerts[cur.id] }}) · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Issue it</a></div>{% endif %}
+        {# G13: pichhle Lab-QC stage ka test + TC baaki hai — card band ho tab bhi dikhe, aur yahin se record ho; tab tak Start band #}
+        {% set lab_block = lab_qc_blocker(o, cur) if cur and cur.status == 'Pending' else None %}
+        {% if lab_block %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">Lab test + TC pending: {{ cur.stage_name }} cannot start until {{ lab_block.stage_name }} has a passed lab test with the TC uploaded.
+          <button type="button" class="rt-labqc-btn rt-btn teal" data-stage="{{ lab_block.id }}" data-name="{{ lab_block.stage_name }}" data-lines='{{ lab_lines(o, lab_block)|tojson }}' style="margin-left:6px;padding:2px 10px">Record lab test + TC</button></div>{% endif %}
         {# G27: is stage ki machine kharab / maintenance me hai #}
         {% if cur and machine_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">Machine not available: {{ machine_alerts[cur.id] }}</div>{% endif %}
         {# C12: Melting ke baad garam maal Casting ke intezaar me — kab se, limit kitni #}
@@ -152,7 +156,7 @@
       </div>
       <div class="flex gap-2 justify-end flex-wrap">
         {% if cur %}
-          {% if cur.status == 'Pending' %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>
+          {% if cur.status == 'Pending' %}{% if lab_block %}<button type="button" class="rt-btn primary" disabled style="opacity:.45;cursor:not-allowed" title="Lab test + TC pending">Start {{ cur.stage_name }}</button>{% else %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>{% endif %}
           {% elif cur.status == 'On hold' %}
             <form method="post" action="{{ url_for('routing.routing_resume', stage_id=cur.id) }}" class="js-confirm-submit" data-confirm-title="Resume stage" data-confirm-ok="Resume" data-confirm-message="Resume {{ cur.stage_name }} for {{ o.prod_no }} now? The timer starts again from where it stopped.">
               <button type="submit" class="rt-btn primary">Resume</button></form>

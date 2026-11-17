@@ -431,7 +431,7 @@ def routing_list():
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
-        operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
+        operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed, lab_qc_blocker=lab_qc_blocker,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"), pcs_cells=pcs_cells, wait_payload=wait_payload, metal_wait=metal_wait, next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
     )
 

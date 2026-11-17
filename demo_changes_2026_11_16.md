@@ -465,3 +465,12 @@ Learned average = (ordered - good) / ordered, pichhle 3 completed orders, produc
 - **Test:** auto 14/14 (nothing busy, all busy, ek free, 3 h me free vs melt 5 h, limit 400 / 120 min, hold, Start block + reason + note, free hone par bina wajah start, page + payload). b4-b13 pass. Is baar live voice demo nahi kiya (user ne bola khud test kar lo).
 - **Chhoda / limits:** (1) Dusre order ke *waiting hot melt* (jo Casting machine ka intezaar kar raha) ko busy nahi ginta, sirf In progress / On hold casting stages. (2) Check sirf melt ke Start par; plan / scheduler abhi Casting busy nahi dekhta. (3) Combined melt me initiating order ke stage se check (poora melt ek hi time par start hota hai).
 
+## BUILD LOG — Batch 15 (17 Nov 2026): chhote items G13, G19, G25 (+ G10, G28 verify)  (local, commit pending user review; NO migration)
+- **G13 (routing card):** pichhle Lab-QC stage (jaise Melting & Alloying) ka Pass + TC baaki ho to Pending stage ke card par (card band ho tab bhi) laal notice "Lab test + TC pending: Ingot Casting cannot start until Melting & Alloying has a passed lab test with the TC uploaded" + wahin "Record lab test + TC" button (wahi popup). Start button disabled. Backend ka purana block waisa hi (sirf chhupaya nahi).
+- **G19 (Production output):** scrap asli me KG me jaata hai (posting pehle se sahi thi). Ab card: "20 was scrap (10 KG of metal)" aur drawer summary: "50 PCS (about 25 KG) scrap goes to the scrap yard". `output_plan` me naya `scrap_kg`.
+- **G25 (machine queue drawer):** arrow ke baad server pehle se naya queue bhejta tha; ab hila hua order ki row 2.5 sec highlight hoti hai (`dm-moved`) taaki naya number turant nazar aaye.
+- **G10 (verify):** store me kam maal ho to issue backend se block (message "only X is free in the store" / "can still be issued") — test add kiya, code badla nahi.
+- **G28 (verify):** PO short-close => status Cancelled => Material plan sirf Open/Partial PO ginta hai, isliye na mila hua maal wapas shortage me — test add kiya, code badla nahi.
+- **Test:** auto 15/15 (b15). b4-b14 pass. Live demo nahi (user ne bola khud test kar lo).
+- **Backlog (user decision chahiye):** G16 (Testing scrap par photo?), G17 (Reopen to Pending), C10 (night / tomorrow plan + extra shift, bada design), G21 / G22 / G32 / C17+.
+

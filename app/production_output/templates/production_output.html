@@ -93,7 +93,7 @@
         <div class="ou-meta">{{ '%g'|format(o.planned_qty) }} {{ plan.unit }} ordered</div>
       </div>
       <div>
-        <div class="text-[13px]">Routing says about <b>{{ '%g'|format(plan.good) }} {{ plan.unit }}</b> came out{% if plan.scrap %} and <b>{{ '%g'|format(plan.scrap) }}</b> was scrap{% endif %}.</div>
+        <div class="text-[13px]">Routing says about <b>{{ '%g'|format(plan.good) }} {{ plan.unit }}</b> came out{% if plan.scrap %} and <b>{{ '%g'|format(plan.scrap) }}</b> was scrap{% if plan.scrap_kg and plan.unit.upper() not in ('KG', 'KGS') %} (<b>{{ '%g'|format(plan.scrap_kg) }} KG</b> of metal){% endif %}{% endif %}.</div>
         {% if plan.packed %}<div class="ou-meta mt-1">Counted in production: {% for p in plan.packed %}<b>{{ '%g'|format(p.qty) }} {{ p.unit }}</b> {{ p.name }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
         <div class="ou-meta mt-1">{{ sm.actual_h }} h worked (plan {{ sm.planned_h }} h){% if plan.machines %} · last stage {{ plan.last_stage }} on {{ plan.machines }}{% endif %}</div>
       </div>
@@ -255,7 +255,9 @@
     var total = good + rework + scrap + loss;
     var totalValue = current.materials.reduce(function (s, m) { return s + m.value; }, 0);
     document.getElementById('ou-s-good').textContent = fmt(good) + ' ' + current.unit;
-    document.getElementById('ou-s-scrap').textContent = fmt(scrap) + ' ' + current.unit;
+    // G19: scrap KG me jaata hai — PCS product me ho to saath me KG (nominal weight se) bhi dikhao
+    var isKg = /^kgs?$/i.test(current.unit || '');
+    document.getElementById('ou-s-scrap').textContent = fmt(scrap) + ' ' + current.unit + (!isKg && current.unit_weight ? ' (about ' + fmt(scrap * current.unit_weight) + ' KG)' : '');
     document.getElementById('ou-s-scrap-li').style.display = scrap > 0 ? 'block' : 'none';
     document.getElementById('ou-s-unit').textContent = current.unit;
     document.getElementById('ou-s-total').textContent = inr(totalValue);
