@@ -495,3 +495,10 @@ Learned average = (ordered - good) / ordered, pichhle 3 completed orders, produc
 - **Limits:** (1) Chalte order ki dates extra shift se nahi badalti. (2) Extra sirf machine-wise (poori line ek saath nahi). (3) Dashboard / routing timers abhi extra shift ko alag nahi dikhate (sirf planning). (4) Idle machine ke liye "kaunsa order daalein" suggestion nahi — sirf dikhata hai (planning team khud queue / Make first se karti hai).
 - **Deploy note:** ab live ko 6 migrations chahiye (pehle 5 + f1b6d3e8a4c9).
 
+## BUILD LOG — Batch 19 (17 Nov 2026): G7 + poora smoke test  (local, commit pending user review; NO migration)
+- **Baaki items ka hisaab (audit):** G3 (machine busy) = C8 (Batch 7), G4 (bill rate stock value) = C5 (Batch 10), G6 / G9 (own-make = "Will be made") = C6/G9 (Batch 9) + C2 (Batch 13), G12 (hot metal) = C12 + G14-4 (Batch 7, 14), G31 = Batch 1. C4 / G11 / G15 koi alag item nahi nikla. **Sirf G7 ka wording bacha tha.**
+- **G7:** Material plan > Create purchase orders tab: vendor group par chip ab "Will arrive after 500G Spool runs short (04 Dec)" — kaun sa material aur kab, pehle sirf "some materials". Logic wahi (goods aane ki date < us material ki kami ki date).
+- **Smoke test:** app ke saare parameter-less GET pages (44) test DB par khole — koi server error (5xx) nahi. `compileall` app + migrations clean. Alembic head ek hi: f1b6d3e8a4c9.
+- **Test:** b19 4/4; b4-b18 pass. Live demo nahi.
+- **Ab sirf deploy + live data:** G29 (Tin Purity Min 100.5 -> sahi value) aur live setup (Spooling "Counted in pieces", Melting "Max wait", furnace batch capacity + hours per batch). Live par 6 migrations. Ye user ke bolne par; backup + rollback plan ke saath.
+

@@ -216,7 +216,9 @@ def suggested_pos(rows, today):
     for group in groups.values():
         lead = group["vendor"].lead_time_days
         group["expected"] = today + timedelta(days=lead) if lead is not None else None
-        group["late"] = bool(group["expected"] and any(line["row"]["short_date"] < group["expected"] for line in group["lines"]))
+        # G7: kaun se material kami ki date tak nahi pahunchenge (naam batane ke liye), sirf "kuch" nahi
+        group["late_lines"] = [line for line in group["lines"] if group["expected"] and line["row"]["short_date"] < group["expected"]]
+        group["late"] = bool(group["late_lines"])
         group["open_lines"] = [line for line in group["lines"] if not line["draft_po"]]
         out.append(group)
     out.sort(key=lambda g: g["vendor"].name)

@@ -130,7 +130,7 @@
       <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div><span class="mp-name">{{ g.vendor.name }}</span>{% if g.vendor.grade %} <span class="mp-chip {{ 'ok' if g.vendor.grade == 'A' else 'gone' }}">Grade {{ g.vendor.grade }}</span>{% endif %}
           <span class="mp-meta">· {% if g.vendor.lead_time_days is not none %}lead time {{ g.vendor.lead_time_days }} days, goods about {{ g.expected.strftime('%d %b') }}{% else %}lead time not set{% endif %}</span></div>
-        {% if g.late %}<span class="mp-chip bad"><i></i>Will arrive after some materials run short</span>{% endif %}
+        {% if g.late %}<span class="mp-chip bad"><i></i>Will arrive after {{ g.late_lines | map(attribute='row.material.name') | join(', ') }} runs short ({{ g.late_lines[0].row.short_date.strftime('%d %b') }}{% if g.late_lines|length > 1 %}, ...{% endif %})</span>{% endif %}
       </div>
       <div class="overflow-x-auto">
         <table class="mp-table">
