@@ -481,3 +481,9 @@ Learned average = (ordered - good) / ordered, pichhle 3 completed orders, produc
 - **Test:** auto 8/8 (b16). b4-b15 pass. Live demo nahi.
 - **Ab baaki (sab bade / decision wale):** C10 (night/tomorrow plan + extra shift), G17 (Reopen ko Pending), G16 split (Testing: Samples used / Rejected after test), G29 (live Tin purity data), live deploy + migrations.
 
+## BUILD LOG — Batch 17 (17 Nov 2026): G17 + G16 verify  (local, commit pending user review; NO migration)
+- **G17 (Reopen ko Pending):** nayi cheez ki zaroorat nahi — Reopen karne par stage "In progress" banta hai, usi par **Cancel run** (reason ke saath) stage ko "Pending" kar deta hai (timer saaf). Phir pichhla stage bhi Reopen ho sakta hai. Test: Packing reopen -> Cancel run -> Pending -> Testing reopen. Sirf Reopen ke confirm text me hint jodi: "If you want it to wait instead, use Cancel run after reopening."
+- **G16 (Testing scrap):** photo sirf casting (billet) stage par maangi jaati hai; Testing par photo nahi. Scrap type dropdown Scrap type master se aata hai, isliye "Test samples" / "Rejected after test" jaise type master me bana ke use kar sakte hain (Saleable ya Process loss chunna). Alag code nahi chahiye. Test: Testing "Rejected after test" scrap ke saath bina photo complete.
+- **Test:** auto 7/7 (b17); b4-b16 pass. Live demo nahi.
+- **Ab baaki:** C10 (night/tomorrow plan + extra shift — design ka sawal), live deploy + migrations, live data setup (G29 Tin purity 100.5, Spooling "Counted in pieces", Melting "Max wait", furnace batch capacity + hours per batch).
+

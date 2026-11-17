@@ -258,7 +258,7 @@
               {% else %}<span class="rt-meta">—</span>{% endif %}</td>
             <td style="text-align:right">
               {% if st.status == 'Done' and loop.last or (st.status == 'Done' and sm.stages[loop.index0 + 1].status == 'Pending') %}
-              <form method="post" action="{{ url_for('routing.routing_reopen', stage_id=st.id) }}" class="js-confirm-submit" data-confirm-title="Reopen stage" data-confirm-ok="Reopen" data-confirm-message="Reopen {{ st.stage_name }} for {{ o.prod_no }}? Use this only to correct a mistake.">
+              <form method="post" action="{{ url_for('routing.routing_reopen', stage_id=st.id) }}" class="js-confirm-submit" data-confirm-title="Reopen stage" data-confirm-ok="Reopen" data-confirm-message="Reopen {{ st.stage_name }} for {{ o.prod_no }}? Use this only to correct a mistake. If you want it to wait instead, use Cancel run after reopening.">
                 <button type="submit" class="rt-btn ghost" style="padding:4px 10px">Reopen</button></form>
               {% endif %}
             </td>
