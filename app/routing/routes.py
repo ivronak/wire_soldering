@@ -271,6 +271,13 @@ def routing_list():
     # Drawers ke liye: har stage ka data (JS) — sirf jo abhi kuch kar sakte hain (current stage)
     actions = {}
     machine_alerts = {}          # {stage id: text} — card par laal "machine not working" line (G27)
+    # C14: stage ke baad jo maal bacha (issued - used) uska chhota text, card par "return to store" chip ke liye
+    from app.material_issues.routes import leftover_items
+    leftover_text = {}
+    for o in shown:
+        items = leftover_items(o)
+        if items:
+            leftover_text[o.id] = ", ".join(f"{i['qty']:g} {i['unit']} {i['name']}".strip() for i in items)
     clash_orders = in_production_orders()
     for o in shown:
         sm = summaries[o.id]
@@ -316,7 +323,7 @@ def routing_list():
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
-        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts,
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, leftover_text=leftover_text,
     )
 
 
@@ -887,6 +894,11 @@ def routing_lab_qc(stage_id):
                 db.session.rollback()
                 flash(str(stock_error), "error")
                 return _back()
+            # C19: stage pehle hi Complete ho chuka ho (used likha ja chuka) to correction ka maal seedha melt me gaya hai — use me jod do.
+            # Warna wo "unaccounted" dikhta aur operator ko jhootha return / write-off karna padta. Stage chalu ho to Complete form ka default
+            # (_auto_extra_qty) ye khud sambhal leta hai, isliye wahan kuch nahi karna.
+            if stage.status == "Done" and line.used_qty is not None:
+                line.used_qty = round(line.used_qty + extra_qty, 4)
             rm = line.raw_material
             corrections.append({"material": rm.name if rm else "", "qty": extra_qty, "unit": rm.base_unit.code if rm and rm.base_unit else "",
                                 "added_by": added_by, "reason": extra_reason, "issue_no": issue.issue_no})

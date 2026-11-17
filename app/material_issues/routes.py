@@ -87,9 +87,24 @@ def issue_plan(order):
             "product": (order.product.code + " " + order.product.name) if order.product else "", "lines": lines}
 
 
+def leftover_items(order):
+    """C14: production me bacha hua maal jo store ko lautana hai. Sirf wahi lines jinka "used" stage Complete par likha ja chuka hai
+    (leftover = issued - used). Jab tak stage chal raha ho tab tak "bacha" nahi kehte. Wapas [{"line_id", "name", "unit", "qty", "used", "issued"}]."""
+    items = []
+    for line in order.lines:
+        left = line.leftover_qty
+        if left > 0.00005:
+            rm = line.raw_material
+            items.append({"line_id": line.id, "name": rm.name if rm else "", "unit": rm.base_unit.code if rm and rm.base_unit else "",
+                          "qty": left, "used": line.used_qty, "issued": line.issued_qty})
+    return items
+
+
 def return_plan(order):
     # Return panel (JS) ke liye: is order ki Posted issue lines jinme se kuch wapas ho sakta hai (lot-wise)
     lines = []
+    # C14: har requirement line ka leftover lot-lines me baant dete hain (pehle wali lot se) — wahi "Return now" me pehle se bhara aata hai
+    remaining_left = {ol.id: ol.leftover_qty for ol in order.lines}
     for issue in sorted(order.issues, key=lambda i: i.id):
         if issue.is_deleted or issue.status != "Posted":
             continue
@@ -97,7 +112,12 @@ def return_plan(order):
             if line.returnable_qty <= 0:
                 continue
             material = line.raw_material
+            order_line = line.production_order_line
+            suggest = min(line.returnable_qty, remaining_left.get(order_line.id, 0)) if order_line else 0
+            if order_line:
+                remaining_left[order_line.id] = round(remaining_left.get(order_line.id, 0) - suggest, 4)
             lines.append({
+                "used": order_line.used_qty if order_line else None, "leftover": order_line.leftover_qty if order_line else 0, "suggest": round(suggest, 4),
                 "id": line.id, "issue_no": issue.issue_no,
                 "material": (material.code + " " + material.name) if material else "",
                 "lot": line.lot.lot_code if line.lot else "", "batch": line.lot.vendor_batch_no if line.lot else "",
@@ -152,13 +172,16 @@ def material_issues_list():
 
     pending_count = len(to_issue) + len(draft_issues)
     counts = {"issue": pending_count, "issued": len(issues), "returns": len(returns)}
+    # C14: jin orders me stage ke baad maal bacha hai (issued - used) — "To return" list aur KPI
+    leftovers = {o.id: leftover_items(o) for o in can_return}
+    to_return = [o for o in can_return if leftovers[o.id]]
     kpi = {"orders": len(to_issue), "drafts": len(draft_issues),
            "short": len([o for o in to_issue if materials.get(o.id, {}).get("status") in ("coming", "buy")]),
-           "returnable": len(can_return)}
+           "returnable": len(to_return)}
     return render_template(
         "material_issues.html", active_nav="material_issues", tab=tab,
         to_issue=to_issue, extra_orders=extra_orders, plans={order.id: issue_plan(order) for order in to_issue + extra_orders},
-        return_plans={order.id: return_plan(order) for order in can_return},
+        return_plans={order.id: return_plan(order) for order in can_return}, to_return=to_return, leftovers=leftovers,
         materials=materials, schedule=schedule,
         draft_issues=draft_issues, issues=issues, returns=returns,
         pending_count=pending_count, completed_count=len(issues), counts=counts, kpi=kpi,

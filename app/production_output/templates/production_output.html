@@ -100,7 +100,7 @@
       <div>{% set bad = plan.materials | selectattr('issued', 'le', 0) | list %}
         <div class="ou-meta">Material in production</div>
         <div class="text-[13px] font-semibold">₹{{ (plan.materials | sum(attribute='value'))|inr }}</div>
-        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first (or written off)</div>
+        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first (or written off) · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline;font-weight:600">Return it to the store</a></div>
         {% for l in plan.leftover %}<div class="ou-meta" style="color:#B42318"><b>{{ '%g'|format(l.qty) }} {{ l.unit }}</b> {{ l.name }} unaccounted for</div>{% endfor %}
         <button type="button" class="ou-writeoff ou-btn ghost" style="margin-top:6px" data-plan='{{ plan|tojson }}'>Write off as missing</button>{% endif %}</div>
       <div><button type="button" class="ou-act ou-btn primary" data-plan='{{ plan|tojson }}'>Record output</button></div>

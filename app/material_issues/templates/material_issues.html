@@ -94,7 +94,7 @@
   <div class="mi-kpi"><span class="k">Orders to issue</span><span class="v">{{ kpi.orders }}</span><span class="h">in queue order</span></div>
   <div class="mi-kpi {{ 'bad' if kpi.short else '' }}"><span class="k">Short of stock</span><span class="v">{{ kpi.short }}</span><span class="h">PO coming or need to buy</span></div>
   <div class="mi-kpi {{ 'warn' if kpi.drafts else '' }}"><span class="k">Draft issues</span><span class="v">{{ kpi.drafts }}</span><span class="h">not posted yet</span></div>
-  <div class="mi-kpi"><span class="k">Can return</span><span class="v">{{ kpi.returnable }}</span><span class="h">orders with material in WIP</span></div>
+  <div class="mi-kpi"><span class="k">To return</span><span class="v"{% if kpi.returnable %} style="color:#B42318"{% endif %}>{{ kpi.returnable }}</span><span class="h">orders with left-over material</span></div>
 </div>
 
 <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
@@ -109,6 +109,24 @@
 
 {# =============================== TO ISSUE =============================== #}
 {% if tab == 'issue' %}
+  {# C14: stage complete hone ke baad jo maal bacha (issued - used) wo yahin sabse upar dikhta hai, taaki koi return karna bhool na jaye #}
+  {% if to_return %}
+  <div class="mi-group" style="color:#B42318">Left over, return to store <b>{{ to_return|length }}</b></div>
+  {% for order in to_return %}
+  <article class="mi-card is-run">
+    <div class="mi-row plain" style="cursor:default">
+      <div><div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ order.prod_no }}</span><span class="mi-chip bad"><i></i>Return to store</span></div>
+        <div class="mi-prod mt-0.5">{{ order.product.name if order.product else '—' }}</div></div>
+      <div>{% for i in leftovers[order.id] %}<div class="text-[13px]"><b style="color:#B42318">{{ '%g'|format(i.qty) }} {{ i.unit }}</b> {{ i.name }} <span class="mi-meta">· issued {{ '%g'|format(i.issued) }}, used {{ '%g'|format(i.used) }}</span></div>{% endfor %}
+        <div class="mi-meta mt-0.5">Not used in production. Return it to the store, or it must be written off before the output.</div></div>
+      <div class="mi-meta">{% if order.issues %}Received by {{ (order.issues|selectattr('status', 'equalto', 'Posted')|map(attribute='received_by')|select|list|last) or '—' }}{% endif %}</div>
+      <div class="mi-act"><button type="button" class="btn-return mi-btn primary" data-plan='{{ return_plans[order.id]|tojson }}'>Return now</button></div>
+      <span></span>
+    </div>
+  </article>
+  {% endfor %}
+  {% endif %}
+
   {% if draft_issues %}
   <div class="mi-group">Draft issues, not posted <b>{{ draft_issues|length }}</b></div>
   {% for issue in draft_issues %}
@@ -355,12 +373,15 @@
       </section>
       <section class="mi-step">
         <div class="flex items-center justify-between gap-2 mb-2">
-          <p class="text-[12.5px] text-ink-faint">Return from the lot it was issued from. You can return at most what is still in production for that lot line. Returned material can be issued again.</p>
-          <button type="button" id="mr-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Return everything</button>
+          <p class="text-[12.5px] text-ink-faint">Return from the lot it was issued from. You can return at most what is still in production for that lot line. <b>Left over</b> = issued minus what the stages used; it is filled in for you. Returned material can be issued again.</p>
+          <div class="flex gap-2">
+            <button type="button" id="mr-fill-left" class="mi-btn primary" style="padding:5px 12px;white-space:nowrap">Fill left over</button>
+            <button type="button" id="mr-fill" class="mi-btn ghost" style="padding:5px 12px;white-space:nowrap">Return everything</button>
+          </div>
         </div>
         <div class="overflow-x-auto rounded-lg">
           <table class="lines-table">
-            <thead><tr><th style="width:30%">Material</th><th>Lot</th><th>Issued</th><th>Returned</th><th>In production</th><th style="width:15%">Return now</th></tr></thead>
+            <thead><tr><th style="width:30%">Material</th><th>Lot</th><th>Issued</th><th>Returned</th><th>In production</th><th>Used</th><th>Left over</th><th style="width:15%">Return now</th></tr></thead>
             <tbody id="mr-lines"></tbody>
           </table>
         </div>
@@ -445,12 +466,17 @@
         '<td class="text-right tabular-nums">' + fmt(l.issued) + ' ' + esc(l.unit) + '</td>' +
         '<td class="text-right tabular-nums">' + fmt(l.returned) + '</td>' +
         '<td class="text-right tabular-nums font-semibold">' + fmt(l.returnable) + '</td>' +
-        '<td><input type="number" class="mr-qty" data-max="' + l.returnable + '" name="qty_' + i + '" min="0" max="' + l.returnable + '" step="any" value=""></td></tr>';
+        '<td class="text-right tabular-nums">' + (l.used == null ? '<span class="text-ink-faint" title="Stage not complete yet">—</span>' : fmt(l.used)) + '</td>' +
+        '<td class="text-right tabular-nums font-semibold" style="color:' + (l.leftover > 0 ? '#B42318' : 'inherit') + '">' + (l.used == null ? '—' : fmt(l.leftover)) + '</td>' +
+        '<td><input type="number" class="mr-qty" data-max="' + l.returnable + '" data-suggest="' + (l.suggest || 0) + '" name="qty_' + i + '" min="0" max="' + l.returnable + '" step="any" value="' + (l.suggest > 0 ? l.suggest : '') + '"></td></tr>';
     });
     document.getElementById('mr-lines').innerHTML = html;
     show(mrModal);
   }
   document.querySelectorAll('.btn-return').forEach(function (b) { b.addEventListener('click', function () { openReturn(b); }); });
+  document.getElementById('mr-fill-left').addEventListener('click', function () {
+    document.querySelectorAll('#mr-lines .mr-qty').forEach(function (i) { var v = parseFloat(i.getAttribute('data-suggest')) || 0; i.value = v > 0 ? v : ''; });
+  });
   document.getElementById('mr-fill').addEventListener('click', function () {
     document.querySelectorAll('#mr-lines .mr-qty').forEach(function (i) { i.value = i.getAttribute('data-max'); });
   });
