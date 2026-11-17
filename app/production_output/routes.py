@@ -10,6 +10,7 @@ from app.extensions import db
 from app.inventory.posting import InventoryError
 from app.models import FGBatch, Product, ProductCategories, ProductionOrder, ProductionOutput, Rack
 from app.production_orders.scheduler import persist_schedule, renumber_queue
+from app.production_orders.yield_info import short_info
 from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, leftover_rows, material_table, packed_lines, post_output, wip_lines
 from app.routing.routes import order_summary, side_stage_info
 
@@ -53,7 +54,7 @@ def output_plan(order):
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": unit, "packed": packed, "counted_from_packing": counted is not None, "unit_weight": weight,
-        "planned": order.planned_qty, "good": good, "scrap": scrap, "loss": loss, "rework": 0,
+        "planned": order.planned_qty, "extra_percent": order.extra_percent or 0, "good": good, "scrap": scrap, "loss": loss, "rework": 0,
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
@@ -113,8 +114,10 @@ def _read_form():
         return None, "Enter the good quantity (it must be more than zero)."
     if rework < 0 or scrap < 0 or loss < 0:
         return None, "Rework, scrap and process loss cannot be negative."
-    if good + rework + scrap + loss > order.planned_qty * OVER_TOLERANCE + 0.00005:
-        return None, f"Good + rework + scrap + loss ({good + rework + scrap + loss:g}) is more than 10% above the ordered quantity ({order.planned_qty:g}). Check the numbers."
+    # C18: "Make extra for scrap" wale order me material (aur isliye total output) ordered se extra % zyada ho sakta hai; us par 10% ki chhoot
+    allowed = order.planned_qty * (1 + (order.extra_percent or 0) / 100) * OVER_TOLERANCE
+    if good + rework + scrap + loss > allowed + 0.00005:
+        return None, f"Good + rework + scrap + loss ({good + rework + scrap + loss:g}) is more than 10% above the quantity planned ({allowed / OVER_TOLERANCE:g}). Check the numbers."
     if not wip_lines(order):
         return None, "No material is in production for this order. Issue material first."
     blocked = leftover_message(order)
@@ -129,6 +132,14 @@ def _read_form():
         return None, "Choose a rack that belongs to the finished goods warehouse of this order."
     return {"order": order, "output_date": output_date, "rack_id": rack_id, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4), "loss": round(loss, 4),
             "recorded_by": (request.form.get("recorded_by") or "").strip()[:60], "remarks": (request.form.get("remarks") or "").strip()[:255]}, None
+
+
+def _short_note(order):
+    # C18: kam bana ho to flash me bata do ki agla kaam kahan hai (Production orders -> Completed tab)
+    info = short_info(order)
+    if info and info["short"]:
+        return f" Ordered {info['ordered']:g} but made {info['good']:g}: short by {info['short']:g} {info['unit']}. Decide what to do on the Completed tab of Production orders."
+    return ""
 
 
 @production_output_bp.route("/production_output/add", methods=["POST"])
@@ -161,7 +172,7 @@ def production_output_add():
     if order.product and order.product.output_rm:
         flash(f"Output {output.output_no} recorded. {output.good_qty:g} {order.product.output_rm.name} went into raw material stock (store) and can now be issued to orders; {order.prod_no} is completed.", "success")
     else:
-        flash(f"Output {output.output_no} recorded. {output.good_qty:g} good went into finished goods as batch {output.batch_no}; {order.prod_no} is completed.", "success")
+        flash(f"Output {output.output_no} recorded. {output.good_qty:g} good went into finished goods as batch {output.batch_no}; {order.prod_no} is completed.{_short_note(order)}", "success")
     return redirect(_list_url("recorded"))
 
 
@@ -181,6 +192,7 @@ def production_output_cancel(output_id):
     order = output.production_order
     order.status = "In production"
     order.queue_position = None
+    order.short_action = order.short_note = order.short_resolved_at = None      # C18: output hi cancel, to kami ka faisla bhi dobara hoga
     renumber_queue()
     persist_schedule()
     db.session.commit()

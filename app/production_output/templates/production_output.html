@@ -261,10 +261,14 @@
     document.getElementById('ou-s-total').textContent = inr(totalValue);
     document.getElementById('ou-s-cost').textContent = good > 0 ? inr(totalValue / good) : '—';
     var check = document.getElementById('ou-check');
+    // C18: ordered ke saath GOOD qty compare hoti hai (scrap nahi ginte): "180 of 200 PCS ordered. Short by 20."
+    var limit = current.planned * (1 + (current.extra_percent || 0) / 100) * 1.1;
+    var diff = Math.round((current.planned - good) * 10000) / 10000;
     if (good <= 0) { check.style.color = '#B42318'; check.textContent = 'Enter the good quantity.'; }
-    else if (total > current.planned * 1.1) { check.style.color = '#B42318'; check.textContent = 'Total (' + fmt(total) + ') is more than 10% above the ordered ' + fmt(current.planned) + ' ' + current.unit + '. Please check.'; }
-    else if (total < current.planned * 0.8) { check.style.color = '#8A4A1C'; check.textContent = 'Total (' + fmt(total) + ') is well below the ordered ' + fmt(current.planned) + ' ' + current.unit + '. That is fine if the order was cut short.'; }
-    else { check.style.color = '#1F7A4D'; check.textContent = 'Total ' + fmt(total) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered.'; }
+    else if (total > limit) { check.style.color = '#B42318'; check.textContent = 'Total (' + fmt(total) + ') is more than 10% above the quantity planned (' + fmt(limit / 1.1) + ' ' + current.unit + '). Please check.'; }
+    else if (diff > 0) { check.style.color = '#8A4A1C'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered. Short by ' + fmt(diff) + '. After saving, choose on the order card: cover from stock, make a balance order, or close it as is.'; }
+    else if (diff < 0) { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered. Extra ' + fmt(-diff) + ' goes to finished goods stock.'; }
+    else { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered.'; }
   }
 
   function openOutput(btn) {

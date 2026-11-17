@@ -149,7 +149,7 @@
       <div style="min-width:0">
         <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}{% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="po-chip bnd" title="Show only the orders of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
         <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
-        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}</div>
+        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}{% if o.extra_percent %} · +{{ '%g'|format(o.extra_percent) }}% metal for scrap{% endif %}{% if o.balance_for %} · balance of {{ o.balance_for.prod_no }}{% endif %}</div>
       </div>
 
       <div class="po-mcol">
@@ -175,7 +175,28 @@
         <div class="po-meta">{{ out.output_date.strftime('%d %b %Y') }} · batch {{ out.batch_no }}</div>
         <div class="po-meta">scrap {{ '%g'|format(out.scrap_qty) }} · ₹{{ out.unit_cost|inr }} each</div>
         <a href="{{ url_for('production_output.production_output_list', tab='recorded') }}" class="po-meta" style="color:#8A4A1C;font-weight:600;text-decoration:none">See output →</a>{% endif %}
-        {% elif sc %}
+        {# C18: ordered vs good. Kam ho to 3 raste (stock se pura / balance order / jaisa hai band); zyada ho to bas "Extra" (FG stock me hai) #}
+        {% set sh = shorts.get(o.id) %}
+        {% if sh and sh.short %}
+        <div class="mt-1.5" style="color:#B42318;font-weight:700;font-size:13px">Ordered {{ '%g'|format(sh.ordered) }}, made {{ '%g'|format(sh.good) }}. Short by {{ '%g'|format(sh.short) }} {{ sh.unit }}.</div>
+        {% if o.short_action %}
+        <div class="po-meta mt-1"><span class="po-chip ok"><i></i>{{ o.short_action }}</span> {{ o.short_note }}</div>
+        {% else %}
+        <div class="flex flex-wrap gap-1 mt-1.5">
+          <form method="post" action="{{ url_for('production_orders.production_orders_short', order_id=o.id) }}" onsubmit="return confirm('Cover the short {{ '%g'|format(sh.short) }} {{ sh.unit }} from finished goods stock? This only records the decision; the stock itself is given out from the Sales module.');">
+            <input type="hidden" name="action" value="stock" /><button type="submit" class="po-btn">Cover from stock</button></form>
+          <a href="{{ url_for('production_orders.production_orders_list', balance_for=o.id) }}" class="po-btn">Make balance order</a>
+          <button type="button" class="po-btn btn-short-close" data-id="{{ o.id }}">Close as is</button>
+        </div>
+        <form method="post" action="{{ url_for('production_orders.production_orders_short', order_id=o.id) }}" class="short-close-form hidden mt-1.5" id="short-close-{{ o.id }}">
+          <input type="hidden" name="action" value="close" />
+          <input type="text" name="note" maxlength="255" required placeholder="Reason, e.g. customer accepted {{ '%g'|format(sh.good) }}" class="po-input" style="font-size:12.5px" />
+          <button type="submit" class="po-btn primary mt-1">Close order short</button>
+        </form>
+        {% endif %}
+        {% elif sh and sh.extra %}
+        <div class="po-meta mt-1.5" style="color:#1F7A4D;font-weight:700">Extra {{ '%g'|format(sh.extra) }} {{ sh.unit }} — kept in finished goods stock.</div>
+        {% endif %}        {% elif sc %}
         <div class="po-dates">{{ dshort(sc.start) }}<span>→</span>{{ dshort(sc.end) }}</div>
         <div class="po-meta">{{ sc.working_days }} working day{{ '' if sc.working_days == 1 else 's' }} · ~{{ (o.planned_hours or 0)|round(0)|int }} h</div>
         {% if o.line and o.status in ('Draft', 'Released', 'In production', 'Completed') %}<div class="po-meta mt-1">{{ o.line.name }}{% if o.under_capacity_kg %} · <span style="color:#8A4A1C">{{ '%g'|format(o.under_capacity_kg) }} KG capacity unused: {{ o.under_capacity_reason }}</span>{% endif %}</div>{% endif %}
@@ -463,6 +484,23 @@
               {# Total KG = PCS x kg per PCS — qty ya weight badalte hi live badalta hai (refreshPlan) #}
               <p id="mo-weight-total" class="text-[13px] font-semibold text-ink mt-2"></p>
             </div>
+            {# C18: scrap ke baad bhi ordered qty bane, isliye metal extra. No = sirf ordered qty ka material. #}
+            <div id="mo-extra-wrap" class="rounded-lg border border-slate-200 px-3 py-2.5 mt-3">
+              <span class="po-label">Make extra for scrap?</span>
+              <div class="flex gap-5 mt-1 text-[13.5px]">
+                <label class="inline-flex items-center gap-1.5"><input type="radio" name="make_extra" value="0" id="mo-extra-no" checked /> No</label>
+                <label class="inline-flex items-center gap-1.5"><input type="radio" name="make_extra" value="1" id="mo-extra-yes" /> Yes</label>
+              </div>
+              <p class="text-[11.5px] text-ink-faint mt-1">Some metal is always lost as scrap. Yes = melt a little more, so the good quantity still reaches what was ordered.</p>
+              <div id="mo-extra-box" class="hidden mt-2">
+                <label for="mo-extra-pct" class="po-label">Extra % *</label>
+                <input type="number" id="mo-extra-pct" name="extra_percent" min="0.1" max="50" step="0.1" placeholder="e.g. 5" class="po-input max-w-xs" disabled />
+                <p id="mo-extra-hint" class="text-[12.5px] mt-1.5" style="color:#8A4A1C"></p>
+                <p id="mo-extra-note" class="text-[13px] font-semibold text-ink mt-1"></p>
+              </div>
+            </div>
+            <input type="hidden" id="mo-balance" name="balance_for" value="" />
+            <div id="mo-balance-banner" class="hidden rounded-lg border border-copper-border bg-copper-soft px-3 py-2 mt-3 text-[13px]"></div>
             <div class="mt-3">
               <label for="mo-remarks" class="po-label">Remarks</label>
               <input type="text" id="mo-remarks" name="remarks" maxlength="255" class="po-input" />
@@ -1030,7 +1068,7 @@
     document.getElementById('sum-perday').innerHTML = ready ? '<strong>' + plan.dailyCapacity + ' KG</strong> per day' : '—';
     document.getElementById('sum-slow').textContent = ready ? plan.bottleneck : '—';
     var lines = product.recipe || [];
-    var short = lines.filter(function (l) { return batchKg * (l.ratio || 0) / 100 - (STORE[String(l.rm_id)] || 0) > 0.0001; });
+    var short = lines.filter(function (l) { return batchKg * (l.ratio || 0) / 100 * extraFactor() - (STORE[String(l.rm_id)] || 0) > 0.0001; });
     document.getElementById('sum-material').innerHTML = !lines.length
       ? '<span class="text-ink-faint">No recipe</span>'
       : (short.length
@@ -1065,6 +1103,9 @@
     categorySel.value = '';
     fillProducts();
     clearExtraLines();
+    setExtraMode(false);
+    document.getElementById('mo-balance').value = '';
+    document.getElementById('mo-balance-banner').classList.add('hidden');
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
     refreshPlan();
@@ -1073,6 +1114,43 @@
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
   }
+  // C18: Completed card ka "Close as is" -> reason wala chhota form khulta hai
+  document.querySelectorAll('.btn-short-close').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var f = document.getElementById('short-close-' + btn.getAttribute('data-id'));
+      if (f) { f.classList.toggle('hidden'); var i = f.querySelector('input[name=note]'); if (i && !f.classList.contains('hidden')) i.focus(); }
+    });
+  });
+
+  // ---------- C18: "Make extra for scrap?" ----------
+  var extraYes = document.getElementById('mo-extra-yes');
+  var extraNo = document.getElementById('mo-extra-no');
+  var extraPctInput = document.getElementById('mo-extra-pct');
+  function extraPct() { return extraYes.checked ? (parseFloat(extraPctInput.value) || 0) : 0; }
+  function extraFactor() { return 1 + extraPct() / 100; }
+  function syncExtra(product, qty, unitName) {
+    // Hint: is product ke pichhle 3 completed orders ka average loss. Note: "200 PCS order, material for 210 PCS"
+    var hint = document.getElementById('mo-extra-hint'), note = document.getElementById('mo-extra-note');
+    hint.textContent = product && product.loss_hint
+      ? 'Last ' + product.loss_hint.orders + ' order' + (product.loss_hint.orders === 1 ? '' : 's') + ' of this product: avg ' + product.loss_hint.pct + '% lost.'
+      : (product ? 'No finished order of this product yet, so enter your own estimate (for example 5).' : '');
+    var pct = extraPct();
+    note.textContent = pct > 0 && qty > 0 ? qty + ' ' + unitName + ' ordered, material for ' + (Math.round(qty * (1 + pct / 100) * 100) / 100) + ' ' + unitName : '';
+  }
+  function setExtraMode(on, prefill) {
+    extraYes.checked = on; extraNo.checked = !on;
+    document.getElementById('mo-extra-box').classList.toggle('hidden', !on);
+    extraPctInput.disabled = !on;            // No ho to form ke saath jaata hi nahi
+    if (on && !extraPctInput.value) {
+      var product = byId[productSel.value];
+      extraPctInput.value = prefill || (product && product.loss_hint && product.loss_hint.pct > 0 ? product.loss_hint.pct : '');
+    }
+    if (!on) extraPctInput.value = '';
+  }
+  extraYes.addEventListener('change', function () { setExtraMode(true); refreshPlan(); });
+  extraNo.addEventListener('change', function () { setExtraMode(false); refreshPlan(); });
+  extraPctInput.addEventListener('input', refreshPlan);
+
   function refreshPlan() {
     var product = byId[productSel.value];
     renderAttrs(product);
@@ -1106,9 +1184,12 @@
     var batchKg = qty * weight;
     if (!isKg) weightTotal.textContent = qty + ' ' + unitName + ' × ' + weight + ' KG = ' + batchKg.toFixed(2) + ' KG in total';
     mainPlan.sync(product.id, product.routing || [], null, batchKg, null, lineSel ? lineSel.value : undefined);
+    syncExtra(product, qty, unitName);
+    var xf = extraFactor();
     summary.textContent = isKg
       ? 'Making ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.'
       : (qty + ' ' + unitName + ' × ' + weight + ' KG each = ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.');
+    if (xf > 1) summary.textContent += ' Metal and flux include ' + extraPct() + '% extra for scrap.';
     if (!product.recipe.length) {
       linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">This product has no recipe.</td></tr>';
       renderSide(product, batchKg);
@@ -1116,7 +1197,7 @@
     }
     linesBody.innerHTML = product.recipe.map(function (line) {
       if (ALLOW[line.rm_id] === undefined) ALLOW[line.rm_id] = line.spare || 0;          // Product Master ka Spare % pehle se bhara
-      var need = batchKg * (line.ratio || 0) / 100;
+      var need = batchKg * (line.ratio || 0) / 100 * xf;      // C18: extra % sirf metal / flux par
       var have = STORE[String(line.rm_id)] || 0;
       var short = need - have;
       var status = short <= 0.0001
@@ -1223,6 +1304,29 @@
 
   // 'Save & add another item' ke baad / bundle ke '+ Add item' se (?add_to=BND-...): form seedha khule, bundle ke saath. Sab setup ke baad, isliye yahan.
   {% if bundle_ctx %}openModal({{ bundle_ctx | tojson }});{% endif %}
+
+  // C18 balance order (?balance_for=<completed order>): form wahi product + kami ki qty ke saath khulta hai; save par original order "Balance order" ho jaata hai
+  {% if balance_ctx %}
+  (function () {
+    var b = {{ balance_ctx | tojson }};
+    openModal(null);
+    categorySel.value = String(b.category_id);
+    fillProducts();
+    var p = byId[String(b.product_id)];
+    if (p) {
+      setProductChoices([p], 'Select product');      // attribute cascade chhod kar seedha wahi product
+      productSel.disabled = false;
+      productSel.value = String(p.id);
+      document.getElementById('mo-attrs').textContent = '';
+    }
+    qtyInput.value = b.qty;
+    document.getElementById('mo-balance').value = b.order_id;
+    var banner = document.getElementById('mo-balance-banner');
+    banner.textContent = 'Balance order for ' + b.prod_no + ': it was short by ' + b.qty + ' ' + b.unit + '. The same product and the missing quantity are filled in.';
+    banner.classList.remove('hidden');
+    refreshPlan();
+  })();
+  {% endif %}
 
   // Production planning page se aaye (?plan=<id>&back=planning): drawer seedha khol do; save ke baad wahin wapas (hidden next=planning),
   // aur Cancel / close dabane par bhi planning page par wapas.

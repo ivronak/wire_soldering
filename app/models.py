@@ -794,6 +794,17 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
 
+    # C18: "Make extra for scrap?" — Yes ho to metal (recipe lines) ordered qty se extra_percent % zyada issue hota hai taaki scrap ke baad bhi ordered qty bane.
+    # 0 = No. Order ki planned_qty badalti nahi (customer ne jitna manga wahi); sirf material zyada lagta hai.
+    extra_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)
+    # C18: order complete hone par good qty ordered se kam ho to user ka faisla: "Cover from stock" / "Balance order" / "Closed as is" (+ note).
+    short_action = db.Column(db.String(20), nullable=True)
+    short_note = db.Column(db.String(255), nullable=True)
+    short_resolved_at = db.Column(db.DateTime, nullable=True)
+    # Balance order: kami poori karne ke liye bana naya order, original order ki id yahan (card par "Balance of PROD-...").
+    balance_for_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=True)
+    balance_for = db.relationship("ProductionOrder", remote_side=[id], foreign_keys=[balance_for_id])
+
     @property
     def issue_status(self):
         # Material issue ka haal, quantity se nikala (status column me store nahi): Not issued / Partly issued / Fully issued

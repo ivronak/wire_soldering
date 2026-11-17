@@ -10,6 +10,7 @@ from app.models import (Machines, Product, ProductCategories, ProductionLine, Pr
                         ProductionOrderStageMachine, RawMaterial)
 from app.production_orders.planning import plan_stages
 from app.production_orders.stage_material import gap_text, later_stage_gaps, stage_material_gap
+from app.production_orders.yield_info import learned_loss, short_info
 from app.production_lines.status import line_board
 from app.inventory.alerts import store_stock_by_material
 from app.production_orders.timeline import build_timeline
@@ -233,6 +234,7 @@ def _planner_products():
             "routing": _routing_for(p),
             "recipe": lines,
             "packing": packing,
+            "loss_hint": learned_loss(p.id),          # C18: {"pct", "orders"} ya None (pehla order)
         })
     return products, planner
 
@@ -290,6 +292,19 @@ def production_orders_list():
                           "order_date": first.order_date.isoformat(),
                           "needed_by": first.needed_by_date.isoformat() if first.needed_by_date else "",
                           "remarks": first.remarks or ""}
+    # C18: balance order ke liye form (?balance_for=<completed order id>): wahi product, qty = kami; form JS se khulta hai
+    balance_ctx = None
+    balance_raw = (request.args.get("balance_for") or "").strip()
+    if balance_raw.isdigit():
+        src = db.session.get(ProductionOrder, int(balance_raw))
+        info = short_info(src) if src and src.status == "Completed" else None
+        if info and info["short"] and not src.short_action and src.product:
+            balance_ctx = {"order_id": src.id, "prod_no": src.prod_no, "product_id": src.product_id, "category_id": src.product.category_id,
+                           "qty": info["short"], "unit": info["unit"]}
+        else:
+            flash("That order does not need a balance order.", "error")
+    # Completed tab: har order ka "Short by / Extra" (C18)
+    shorts = {o.id: short_info(o) for o in orders if o.status == "Completed"}
     today = today_ist()
     # Upar ke chhote cards (KPI): kitne chal rahe, kitno ko material chahiye, kitne der se
     kpi = {"running": len([o for o in queue if o.status == "In production"]),
@@ -377,6 +392,8 @@ def production_orders_list():
         bundles=bundles,
         bundle_filter=bundle_filter,
         bundle_ctx=bundle_ctx,
+        balance_ctx=balance_ctx,
+        shorts=shorts,
         products=products,
         categories=categories,
         planner=planner,
@@ -433,6 +450,17 @@ def production_orders_add():
             return redirect(url_for("production_orders.production_orders_list"))
 
     batch_kg = planned_qty * unit_weight
+    # C18: "Make extra for scrap?" Yes -> recipe (metal) lines ordered se extra_percent % zyada; No -> sirf ordered ke hisaab se
+    extra_percent = 0.0
+    if request.form.get("make_extra") == "1":
+        try:
+            extra_percent = float((request.form.get("extra_percent") or "").strip())
+        except ValueError:
+            extra_percent = -1
+        if extra_percent <= 0 or extra_percent > 50:
+            flash("Extra % for scrap must be more than 0 and not more than 50.", "error")
+            return redirect(url_for("production_orders.production_orders_list"))
+    extra_factor = 1 + extra_percent / 100
     # Naya form (client meeting 2, #6) line / machine nahi bhejta: planning_later=1 -> andaze ka plan, asli plan Production planning page par
     planning_later = request.form.get("planning_later") == "1"
     if planning_later:
@@ -468,6 +496,16 @@ def production_orders_add():
     if add_another and not bundle_no:
         bundle_no = _new_bundle_no(year)
 
+    # Balance order: kisi completed order ki kami poori karne ke liye (hidden field balance_for). Wahi product, original "Short" hona chahiye
+    balance_for = None
+    info = None
+    balance_raw = (request.form.get("balance_for") or "").strip()
+    if balance_raw.isdigit():
+        balance_for = db.session.get(ProductionOrder, int(balance_raw))
+        info = short_info(balance_for) if balance_for and balance_for.status == "Completed" else None
+        if not info or not info["short"] or balance_for.short_action or balance_for.product_id != product.id:
+            flash("That order does not need a balance order (it is not short, is already settled, or the product is different).", "error")
+            return redirect(url_for("production_orders.production_orders_list", tab="completed"))
     order = ProductionOrder(
         prod_no=prod_no,
         product_id=product.id,
@@ -483,6 +521,8 @@ def production_orders_add():
         queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
         plan_confirmed=not (planning_later and plan),      # andaze ka plan ho to planning baaki; plan hi nahi (stages nahi) to planning ka kuch nahi
         bundle_no=bundle_no,
+        extra_percent=extra_percent,
+        balance_for_id=balance_for.id if balance_for else None,
     )
     db.session.add(order)
     db.session.flush()
@@ -497,7 +537,7 @@ def production_orders_add():
             production_order_id=order.id,
             raw_material_id=r.raw_material_id,
             ratio_percent=r.ratio_percent,
-            required_qty=batch_kg * (r.ratio_percent or 0) / 100,
+            required_qty=batch_kg * (r.ratio_percent or 0) / 100 * extra_factor,      # C18: extra % sirf metal / flux par; spool-box ordered qty ke hisaab se
             is_flux=bool(r.is_flux),
             is_extra=False,
             work_stage_id=r.work_stage_id,
@@ -570,6 +610,12 @@ def production_orders_add():
             is_extra=True,
         ))
 
+    if balance_for:
+        balance_for.short_action = "Balance order"
+        balance_for.short_note = f"Balance order {prod_no} for {info['short']:g} {info['unit']}"[:255]
+        balance_for.short_resolved_at = datetime.now()
+        if not order.remarks:
+            order.remarks = f"Balance of {balance_for.prod_no} (short by {info['short']:g} {info['unit']})"[:255]
     persist_schedule()
     db.session.commit()
     if add_another:
@@ -581,6 +627,38 @@ def production_orders_add():
     flash(f"Production order {order.prod_no} saved and added to the end of the queue.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
 
+
+
+@production_orders_bp.route("/production_orders/short/<int:order_id>", methods=["POST"])
+def production_orders_short(order_id):
+    """C18: completed order ki kami ka faisla. action = stock ("Cover from stock": abhi sirf record, asli dispatch Sales module ke saath) ya
+    close ("Closed as is": customer ne maan liya; reason zaroori). 'Make balance order' alag hai: naya order banta hai (production_orders_add)."""
+    order = db.session.get(ProductionOrder, order_id)
+    back = redirect(url_for("production_orders.production_orders_list", tab="completed"))
+    info = short_info(order) if order and not order.is_deleted and order.status == "Completed" else None
+    if not info or not info["short"]:
+        flash("This order is not short, so there is nothing to settle.", "error")
+        return back
+    if order.short_action:
+        flash(f"{order.prod_no} is already settled ({order.short_action}).", "error")
+        return back
+    action = request.form.get("action")
+    note = (request.form.get("note") or "").strip()[:255]
+    if action == "close":
+        if not note:
+            flash("Write the reason for closing the order short (for example: customer accepted the lower quantity).", "error")
+            return back
+        order.short_action, order.short_note = "Closed as is", note
+    elif action == "stock":
+        order.short_action = "Cover from stock"
+        order.short_note = note or f"Short by {info['short']:g} {info['unit']} to be given from finished goods stock"
+    else:
+        flash("Choose what to do with the short quantity.", "error")
+        return back
+    order.short_resolved_at = datetime.now()
+    db.session.commit()
+    flash(f"{order.prod_no}: short by {info['short']:g} {info['unit']} marked as '{order.short_action}'.", "success")
+    return back
 
 
 @production_orders_bp.route("/production_orders/expected", methods=["POST"])
