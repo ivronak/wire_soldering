@@ -495,7 +495,7 @@
             '<div class="text-[12.5px] rt-extra-msg"></div>' +
             '<div class="grid grid-cols-2 gap-2"><div><label class="rt-label">Taken by *</label><input type="text" name="extra_by_' + m.id + '" maxlength="60" class="rt-input rt-extra-by" placeholder="Who took them from the store?" autocomplete="off" /></div>' +
             '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. lab correction, more spools wound" autocomplete="off" /></div></div>' +
-            '<div class="text-[11.5px] text-ink-faint">The extra is issued from the store automatically when you complete the stage. No limit.</div></div></td></tr>';
+            '<div class="text-[11.5px] text-ink-faint">The extra is issued from the store automatically when you complete the stage. It cannot be more than the free stock in the store.</div></div></td></tr>';
       }).join('');
       STARTED = a.started_iso || ''; HOURS_EDITED = false; HOLD_MIN = a.hold_min || 0;
       autoHours();
@@ -581,7 +581,8 @@
     document.querySelectorAll('#rt-mats .rt-used[data-kgpp]').forEach(function (i) {
       if (i.getAttribute('data-edited') === '1') return;
       var per = parseFloat(i.getAttribute('data-kgpp'));
-      if (per > 0) i.value = Math.floor(good / per + 1e-9);
+      // Round UP (ceil): 18.8 box ka matlab 19 box lagenge (aadha box bhi ek box hi hai). Pehle floor tha, isliye 18 aata tha aur red warning (G18)
+      if (per > 0) i.value = Math.ceil(good / per - 1e-9);
     });
     // Har pack (spool) me average kitna KG: output KG / bane hue pack. Plan se zyada = har spool me jyada wire gaya; kam = free spool (fayda)
     document.querySelectorAll('#rt-mats .rt-used[data-kgpp]').forEach(function (i) {

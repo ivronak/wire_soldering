@@ -137,12 +137,16 @@ def machine_board(today=None, now=None):
         for st in stages:
             st["running"] = len([t for t in st["machines"] if t["state"] == "running"])
             st["free"] = len([t for t in st["machines"] if t["state"] == "free"])
+            st["held"] = len([t for t in st["machines"] if t["held"]])       # "running" me hi gine jaate hain, par dikhate alag (G24)
         group["stages"] = stages
         group["running"] = len([t for t in group["machines"] if t["state"] == "running"])
         group["free"] = len([t for t in group["machines"] if t["state"] == "free"])
+        group["held"] = len([t for t in group["machines"] if t["held"]])
         group["inactive"] = len([t for t in group["machines"] if t["state"] == "inactive"])
     total = {key: sum(g[key] for g in groups) for key in ("running", "free", "inactive")}
     total["machines"] = total["running"] + total["free"] + total["inactive"]
+    # G24: hold par ruki machine "running" state me hi rehti hai (machine busy hai), par KPI me alag dikhate hain taaki "Running" sach batae
+    total["held"] = len([t for g in groups for t in g["machines"] if t["held"]])
     total["orders"] = len({r["order_id"] for rows in running.values() for r in rows})
     return {"groups": groups, "total": total, "now": now}
 

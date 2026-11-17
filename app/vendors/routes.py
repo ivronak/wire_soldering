@@ -1,6 +1,7 @@
 from flask import render_template, redirect, url_for, Blueprint, request, flash
 from app.models import ChartOfAccountsGroup, Ledger, Vendor, State, VendorType, PaymentTerm
 from app.extensions import db
+from app.validators import check_tax_ids
 
 # Vendor ke grade ke fixed choices (client ne A, B, C maange hain)
 VENDOR_GRADES = ("A", "B", "C")
@@ -87,6 +88,12 @@ def vendors_add():
     # Dropdown se aaya state_id sach me valid State hona chahiye
     if not State.query.filter(State.id == state_id, State.is_deleted == False).first():
         flash("Please select a valid state.", "error")
+        return redirect(url_for('vendors.vendors_list'))
+
+    # GSTIN / PAN / IFSC ka format check (G31) — galat ho to save nahi hoga
+    tax_error = check_tax_ids(gstin, pan, bank_ifsc)
+    if tax_error:
+        flash(tax_error, "error")
         return redirect(url_for('vendors.vendors_list'))
 
     # Vendor type optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
@@ -193,6 +200,12 @@ def vendors_edit(v_id):
 
     if not State.query.filter(State.id == state_id, State.is_deleted == False).first():
         flash("Please select a valid state.", "error")
+        return redirect(url_for('vendors.vendors_list'))
+
+    # GSTIN / PAN / IFSC ka format check (G31). Edit me sirf badli hui value check hoti hai
+    tax_error = check_tax_ids(gstin, pan, bank_ifsc, v.gstin, v.pan, v.bank_ifsc)
+    if tax_error:
+        flash(tax_error, "error")
         return redirect(url_for('vendors.vendors_list'))
 
     # Vendor type optional hai — par agar diya hai to valid (deleted nahi) hona chahiye

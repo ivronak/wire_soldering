@@ -10,6 +10,11 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 
 > **2026-10-19 — PROJECT KI SACHI STHITI + ROADMAP (user: "tracker, memory, development md check karo, update na ho to update karo").** Neeche ka phase-wise table aur roadmap ab sahi hai; iske neeche ke purane dated notes history hain. **Decision: auth / user-role (Phase 0) Sales tak ke modules ke baad.** BOM / Recipe ka sidebar link hata diya (recipe Product par hi hai).
 
+### 2026-11-17 — DEMO WALKTHROUGH KE CHANGES BUILD SHURU (list: demo_changes_2026_11_16.md, "BUILD LOG" section)
+- Build mode: AI code likhta hai + Hinglish me samjhata hai, user review karta hai (user ne is round ke liye "Main likh deta hoon" chuna).
+- **Batch 1 DONE (local, live nahi):** G31 GSTIN/PAN/IFSC validation, G30 + G20 wording, G23 release shortage warning, G18 box auto-fill ceil, G24 dashboard on-hold (KPI + line chip + stage pill). Tested on DB copy + user ko live (browser) dikhaya 17 Nov.
+- **Agla (Current Focus):** Batch 2 = G27 machine status (Breakdown/Maintenance) — planning grey-out, Start block + alternate machine, dashboard badge/KPI, banner. Phir C19+C14, C7, C18 FINAL, C15, C8/C11/C12.
+
 ### 2026-11-04 — CLIENT MEETING 2 (15 changes, ek ek karke; har item ka flow user se verify karke) — file: Downloads/erp_client_meeting_2_transcript_and_changes.md
 - Plan order (user ne haan kaha): #8 -> #4 -> #3 -> #13 -> #14 ... Conflicts jo user ne confirm kiye: spare % ab Product Master me (order me pre-filled + editable).
 - **#8 DONE (local):** Material issue me "Fill needed" bada orange button; "with spare..." chhota link, dabane par confirm popup. Issue now box pehle se Needed se bhara.

@@ -1,6 +1,7 @@
 from flask import render_template, Blueprint, redirect, url_for, request, flash
 from app.models import Customer, Ledger, ChartOfAccountsGroup, State, PaymentTerm
 from app.extensions import db
+from app.validators import check_tax_ids
 
 customers_bp = Blueprint("customers", __name__, template_folder='templates')
 
@@ -64,6 +65,12 @@ def customers_add():
     # Payment terms optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
     if payment_terms_id and not PaymentTerm.query.filter(PaymentTerm.id == payment_terms_id, PaymentTerm.is_deleted == False).first():
         flash("Please select valid payment terms.", "error")
+        return redirect(url_for('customers.customers_list'))
+
+    # GSTIN / PAN / IFSC ka format check (G31) — galat ho to save nahi hoga
+    tax_error = check_tax_ids(gstin, pan, bank_ifsc)
+    if tax_error:
+        flash(tax_error, "error")
         return redirect(url_for('customers.customers_list'))
 
     # Step 1: "Sundry Debtors" group dhoondo — na mile to pehli baar bana do
@@ -152,6 +159,12 @@ def customers_edit(c_id):
     # Payment terms optional hai — par agar diya hai to valid (deleted nahi) hona chahiye
     if payment_terms_id and not PaymentTerm.query.filter(PaymentTerm.id == payment_terms_id, PaymentTerm.is_deleted == False).first():
         flash("Please select valid payment terms.", "error")
+        return redirect(url_for('customers.customers_list'))
+
+    # GSTIN / PAN / IFSC ka format check (G31). Edit me sirf badli hui value check hoti hai
+    tax_error = check_tax_ids(gstin, pan, bank_ifsc, c.gstin, c.pan, c.bank_ifsc)
+    if tax_error:
+        flash(tax_error, "error")
         return redirect(url_for('customers.customers_list'))
 
     ledger = c.ledger

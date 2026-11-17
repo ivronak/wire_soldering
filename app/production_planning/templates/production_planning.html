@@ -93,7 +93,7 @@
       <a href="{{ url_for('production_orders.production_orders_list', plan=o.id, back='planning') }}" class="pp-btn {{ 'ghost' if o.plan_confirmed else 'primary' }}">{{ 'Change plan' if o.plan_confirmed else 'Plan' }}</a>
       {% if o.plan_confirmed %}
       <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
-            data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
+            data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.{% if mat and mat.status == 'buy' %} Material is short: {% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} {{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}. You can still release, but only the available stock can be issued until the rest is bought.{% endif %}">
         <input type="hidden" name="next" value="planning" />
         <button type="submit" class="pp-btn teal">Release</button></form>
       {% endif %}

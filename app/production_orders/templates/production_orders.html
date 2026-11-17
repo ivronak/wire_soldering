@@ -196,7 +196,7 @@
         <button type="button" class="po-btn primary btn-resched" data-id="{{ o.id }}">Plan</button>
         {% elif o.status == 'Draft' %}
         <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
-              data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.">
+              data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.{% if mat and mat.status == 'buy' %} Material is short: {% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} {{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}. You can still release, but only the available stock can be issued until the rest is bought.{% endif %}">
           <button type="submit" class="po-btn teal">Release</button></form>
         {% elif o.status == 'Released' %}
         {% if line_board and not (o.product and o.product.output_rm_id) %}

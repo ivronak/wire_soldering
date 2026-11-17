@@ -24,6 +24,7 @@
   .db-sb-count { margin-left: auto; display: flex; gap: 4px; }
   .db-pill { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .db-pill.run { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .db-pill.hold { background: #FEF3F2; color: #B42318; border-color: #FDA29B; }
   .db-pill.free { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   /* Machine card */
   .db-tile { background: #fff; border: 1px solid #D9E1E0; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: box-shadow .12s, border-color .12s; box-shadow: 0 1px 2px rgba(15,47,50,.05); }
@@ -97,7 +98,7 @@
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="db-kpi"><span class="k">Machines</span><span class="v">{{ board.total.machines }}</span><span class="h">on all lines</span></div>
-  <div class="db-kpi"><span class="k">Running</span><span class="v" style="color:#8A4A1C">{{ board.total.running }}</span><span class="h">{{ board.total.orders }} order{{ '' if board.total.orders == 1 else 's' }} in work</span></div>
+  <div class="db-kpi"><span class="k">Running</span><span class="v" style="color:#8A4A1C">{{ board.total.running - board.total.held }}</span><span class="h">{% if board.total.held %}{{ board.total.held }} on hold · {% endif %}{{ board.total.orders }} order{{ '' if board.total.orders == 1 else 's' }} in work</span></div>
   <div class="db-kpi"><span class="k">Free</span><span class="v" style="color:#1F7A4D">{{ board.total.free }}</span><span class="h">ready for the next order</span></div>
   <div class="db-kpi"><span class="k">Inactive</span><span class="v">{{ board.total.inactive }}</span><span class="h">switched off in Machine master</span></div>
 </div>
@@ -111,7 +112,8 @@
         <span class="db-meta">{% if g.capacity %}· {{ '%g'|format(g.capacity) }} KG/day{% endif %}{% if g.handler %} · {{ g.handler }}{% endif %}{% if not g.line_active %} · line switched off{% endif %}</span>
       </div>
       <div class="flex gap-1.5">
-        <span class="db-chip running"><i></i>{{ g.running }} running</span>
+        <span class="db-chip running"><i></i>{{ g.running - g.held }} running</span>
+        {% if g.held %}<span class="db-chip over"><i></i>{{ g.held }} on hold</span>{% endif %}
         <span class="db-chip free"><i></i>{{ g.free }} free</span>
         {% if g.inactive %}<span class="db-chip inactive"><i></i>{{ g.inactive }} inactive</span>{% endif %}
       </div>
@@ -122,7 +124,7 @@
       <div class="db-sb{% if st.running %} run{% endif %}">
         <div class="db-sb-head">
           <span class="db-sb-no">{{ st.no }}</span><span class="db-sb-name">{{ st.name }}</span>
-          <span class="db-sb-count">{% if st.running %}<span class="db-pill run">{{ st.running }} running</span>{% endif %}{% if st.free %}<span class="db-pill free">{{ st.free }} free</span>{% endif %}</span>
+          <span class="db-sb-count">{% if st.running - st.held > 0 %}<span class="db-pill run">{{ st.running - st.held }} running</span>{% endif %}{% if st.held %}<span class="db-pill hold">{{ st.held }} on hold</span>{% endif %}{% if st.free %}<span class="db-pill free">{{ st.free }} free</span>{% endif %}</span>
         </div>
         {% for t in st.machines %}
         <div class="db-tile {{ t.state }}{% if t.held %} held{% endif %}" data-machine="{{ t.id }}" title="Click for the order and queue details">
