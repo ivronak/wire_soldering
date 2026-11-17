@@ -12,6 +12,7 @@ from app.extensions import db
 from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, ScrapType, StageLabQC
 from app.production_orders.planning import next_working_day
 from app.production_orders.stage_material import gap_text, stage_material_gap
+from app.routing.pcs import pcs_mode, spools_made, to_pcs
 from app.production_orders.scheduler import now_ist, today_ist
 from app.routing.handoff import stage_clash
 
@@ -131,6 +132,20 @@ def stage_plan(order, stage):
     if not mats and not lots:
         return None
     return {"materials": mats, "lots": lots, "lot_kg": cap if lots else None}
+
+
+def pcs_cells(order, stage):
+    """C15: stage table ke liye PCS rup: None (KG hi) ya {"kind", "in", "out", "scrap"} (PCS me). Spooling (kind "out") me wire KG hi aata hai,
+    nikalti hai spool ki ginti (jo operator ne likhi, nahi to KG / nominal weight). Baad ke stages me in / out / scrap sab PCS."""
+    if side_stage_info(order, stage) is not None:
+        return None
+    pm = pcs_mode(order, stage)
+    if pm is None or stage.qty_out is None:
+        return None
+    if pm["kind"] == "out":
+        made = spools_made(order, stage)
+        return {"kind": "out", "out": made if made is not None else to_pcs(stage.qty_out, pm), "scrap": None, "in": None}
+    return {"kind": "all", "in": to_pcs(stage.qty_in, pm), "out": to_pcs(stage.qty_out, pm), "scrap": to_pcs(stage.scrap_qty, pm) if stage.scrap_qty else 0}
 
 
 def order_summary(order, today):
@@ -302,6 +317,8 @@ def routing_list():
             # Ingot Casting jaisa stage: lattha ginti (weight stage master se); Extrusion jaisa stage: scrap box nahi
             "billet": {"weight": cur.work_stage.billet_weight} if cur.work_stage and cur.work_stage.is_billet_stage and not side else None,
             "no_scrap": bool(cur.work_stage and cur.work_stage.no_scrap),
+            # C15: Spooling (kind "out") / uske baad ke stages (kind "all") PCS rup me; wa = asli KG per piece. Side stage (flux) me nahi.
+            "pcs": ({"kind": pm["kind"], "w": pm["w"], "wa": pm["wa"]} if (pm := (None if side else pcs_mode(o, cur))) else None),
             # Stage timing clash lock: shuru karne par kisi doosre order ke garam maal se takrao ho to uska message (start drawer me dikhta hai)
             "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
         }
@@ -330,7 +347,7 @@ def routing_list():
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
-        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"), pcs_cells=pcs_cells, next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
     )
 
 
@@ -565,6 +582,11 @@ def routing_complete(stage_id):
     scrap = request.form.get("scrap_qty", type=float) or 0.0
     side = side_stage_info(order, stage)
     unit = side["unit"] if side else "KG"
+    # C15: Spooling ke baad ke stages me scrap PCS me likha jaata hai; DB me KG chahiye (asli KG per piece se). Message PCS me dikhte hain.
+    pm = None if side else pcs_mode(order, stage)
+    pcs_all = pm is not None and pm["kind"] == "all"
+    if pcs_all and scrap > 0:
+        scrap = round(scrap * pm["wa"], 4)
     qty_in = side["qty"] if side else (stage.qty_in or 0)          # flux stage: hamesha flux ki qty (purane galat 1500 par nahi)
     if scrap < 0:
         flash("Scrap cannot be negative.", "error")
@@ -680,12 +702,25 @@ def routing_complete(stage_id):
     if eff_in is not None and deferred is None:
         qty_in = eff_in
     if scrap > qty_in + EPS:
-        flash(f"Scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} {unit}).", "error")
+        if pcs_all:
+            flash(f"Scrap ({scrap / pm['wa']:g} PCS) cannot be more than what came into this stage ({qty_in / pm['wa']:g} PCS).", "error")
+        else:
+            flash(f"Scrap ({scrap:g}) cannot be more than what came into this stage ({qty_in:g} {unit}).", "error")
         return _back()
     qty_out = max(qty_in - scrap, 0.0)
     if qty_out <= EPS:
         flash("Scrap cannot be the whole quantity. Some material must go on to the next stage.", "error")
         return _back()
+    # C13: ek spool / box me uski capacity (kg_per_pack) se zyada wire nahi aa sakta. Average = good wire / bane hue packs; usse zyada ho to ginti galat hai.
+    for line in stage_lines(order, stage):
+        used = used_map.get(line.id)
+        if used and used > 0 and line.is_packing and line.kg_per_pack:
+            avg = qty_out / used
+            if avg > line.kg_per_pack * (1 + 1e-6) + EPS:
+                pack_name = line.raw_material.name if line.raw_material else "Pack"
+                pack_unit = line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else ""
+                flash(f"{pack_name}: {qty_out:g} KG in {used:g} {pack_unit} is {avg:.3f} KG each, but one holds at most {line.kg_per_pack:g} KG. Count again, or use more {pack_unit}.", "error")
+                return _back()
     # Scrap hui to batao kis tarah ka aur kaisa (Saleable = Scrap warehouse me jaayega, Process loss = sirf record)
     scrap_type = None
     scrap_kind = "Saleable"

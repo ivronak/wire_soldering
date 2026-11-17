@@ -54,6 +54,7 @@ def work_stages_add():
     is_batch = request.form.get('is_batch') == 'on'
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
     scrap_after_next = request.form.get('scrap_after_next') == 'on'
+    counts_pcs = request.form.get('counts_pcs') == 'on'
     is_billet_stage, billet_weight, no_scrap = read_billet_fields()
 
     if not name:
@@ -69,6 +70,7 @@ def work_stages_add():
             existing.is_batch = is_batch
             existing.requires_lab_qc = requires_lab_qc
             existing.scrap_after_next = scrap_after_next
+            existing.counts_pcs = counts_pcs
             existing.is_billet_stage, existing.billet_weight, existing.no_scrap = is_billet_stage, billet_weight, no_scrap
             existing.is_active = True
             db.session.commit()
@@ -85,6 +87,7 @@ def work_stages_add():
         is_batch=is_batch,
         requires_lab_qc=requires_lab_qc,
         scrap_after_next=scrap_after_next,
+        counts_pcs=counts_pcs,
         is_billet_stage=is_billet_stage,
         billet_weight=billet_weight,
         no_scrap=no_scrap,
@@ -104,6 +107,7 @@ def work_stages_edit(stage_id):
     is_batch = request.form.get('is_batch') == 'on'
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
     scrap_after_next = request.form.get('scrap_after_next') == 'on'
+    counts_pcs = request.form.get('counts_pcs') == 'on'
     is_billet_stage, billet_weight, no_scrap = read_billet_fields()
 
     if not name:
@@ -115,6 +119,7 @@ def work_stages_edit(stage_id):
     s.is_batch = is_batch
     s.requires_lab_qc = requires_lab_qc
     s.scrap_after_next = scrap_after_next
+    s.counts_pcs = counts_pcs
     s.is_billet_stage, s.billet_weight, s.no_scrap = is_billet_stage, billet_weight, no_scrap
     db.session.commit()
     flash("Work Stage Updated", "success")

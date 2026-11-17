@@ -121,6 +121,7 @@
                   {% if s.is_batch %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
                   {% if s.is_billet_stage %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="Billets are counted; scrap is worked out">Billets{% if s.billet_weight %} · {{ '%g'|format(s.billet_weight) }} KG{% endif %}</span>{% endif %}
                   {% if s.no_scrap %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="No scrap is recorded at this stage">No scrap</span>{% endif %}
+                  {% if s.counts_pcs %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Counted in pieces (PCS) from this stage; later stages also run in PCS">PCS from here</span>{% endif %}
                 </td>
                 <td class="text-[13px] {% if s.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %} tabular-nums">
                   {{ s.sort_order }}
@@ -149,7 +150,8 @@
                       data-scraplater="{{ 1 if s.scrap_after_next else 0 }}"
                       data-billet="{{ 1 if s.is_billet_stage else 0 }}"
                       data-billetweight="{{ s.billet_weight if s.billet_weight is not none else '' }}"
-                      data-noscrap="{{ 1 if s.no_scrap else 0 }}">
+                      data-noscrap="{{ 1 if s.no_scrap else 0 }}"
+                      data-pcs="{{ 1 if s.counts_pcs else 0 }}">
                       Edit
                     </button>
                     {# Soft-delete — confirm popup = js-confirm-submit (erp-toast.js) #}
@@ -268,6 +270,13 @@
           <input type="checkbox" id="stage-noscrap" name="no_scrap" value="on" class="mt-1" />
           <span><span class="block text-[13px] font-semibold text-ink">No scrap at this stage</span>
             <span class="block text-[12px] text-ink-faint">Use it on Extrusion and Wire Drawing: once the billet is made there is no scrap, only the hours. The scrap box is not shown when the stage is completed.</span></span>
+        </label>
+      </div>
+      <div>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" id="stage-pcs" name="counts_pcs" value="on" class="mt-1" />
+          <span><span class="block text-[13px] font-semibold text-ink">Counted in pieces (PCS) from this stage</span>
+            <span class="block text-[12px] text-ink-faint">Use it on Spooling: after it the product is spools (pieces), not kilograms. This stage shows the spool count, and the later stages (Testing, Packing) show and take quantities in PCS, with KG only as a reference. Only for products made in PCS.</span></span>
         </label>
       </div>
     </form>
@@ -391,6 +400,7 @@
     document.getElementById('stage-billet').checked = btn.getAttribute('data-billet') === '1';
     document.getElementById('stage-billet-weight').value = btn.getAttribute('data-billetweight') || '';
     document.getElementById('stage-noscrap').checked = btn.getAttribute('data-noscrap') === '1';
+    document.getElementById('stage-pcs').checked = btn.getAttribute('data-pcs') === '1';
     syncBilletBox();
     openModal();
   }

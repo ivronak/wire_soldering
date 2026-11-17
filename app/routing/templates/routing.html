@@ -221,7 +221,10 @@
               {% if st.notes %}<div class="rt-meta">Note: {{ st.notes }}</div>{% endif %}
               {% endif %}
             </td>
-            <td>{% if st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} {{ stage_unit(o, st) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}
+            {% set pc = pcs_cells(o, st) %}
+            <td>{% if pc and pc.kind == 'all' and pc['in'] is not none %}{{ '%g'|format(pc['in']) }} PCS in → <b>{{ '%g'|format(pc.out) }}</b> PCS out <span class="rt-meta">(≈ {{ '%g'|format(st.qty_out) }} KG)</span>
+              {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(pc.scrap) }} PCS (≈ {{ '%g'|format(st.scrap_qty) }} KG){% if st.scrap_type %} · {{ st.scrap_type.name }}{% endif %} · {{ st.scrap_kind }}</div>{% endif %}
+              {% elif st.qty_in is not none %}{{ '%g'|format(st.qty_in) }} {{ stage_unit(o, st) }} in{% if st.qty_out is not none %} → <b>{{ '%g'|format(st.qty_out) }}</b> out{% endif %}{% if pc and pc.kind == 'out' %} <b>= {{ '%g'|format(pc.out) }} PCS</b> <span class="rt-meta">(spools made)</span>{% endif %}
               {% if st.scrap_qty %}<div class="rt-meta" style="color:#B42318">Scrap {{ '%g'|format(st.scrap_qty) }}{% if st.scrap_type %} · {{ st.scrap_type.name }}{% endif %} · {{ st.scrap_kind }}</div>{% endif %}
               {% if st.billet_count %}<div class="rt-meta">{{ st.billet_count }} billets × {{ '%g'|format(st.billet_weight) }} KG{% if st.scrap_photo %} · <a href="{{ url_for('routing.routing_scrap_photo', stage_id=st.id) }}" target="_blank" class="underline">scrap proof</a>{% endif %}</div>{% endif %}
               {% if st.qty_out is not none and st.qty_in %}<div class="rt-meta">Yield {{ '%.1f'|format(100 * st.qty_out / st.qty_in) }}%</div>{% endif %}
@@ -386,7 +389,7 @@
           <p class="text-[11.5px] text-ink-faint mt-2">Enter the total used in this stage, even if it ran more than once. You cannot use more than was issued. Whatever was issued but not used must be returned to the store before the output is recorded.</p>
         </div>
         <div class="rt-box grid grid-cols-2 gap-3">
-          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> <span class="rt-unit">KG</span></div>
+          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> <span class="rt-unit">KG</span> <span id="rt-qty-ref" class="text-ink-faint"></span></div>
           {# Sirf scrap likhna hai; good output = aaya hua - scrap, system khud nikaalta hai (client change 8) #}
           <div id="rt-scrap-wrap"><label class="rt-label">Scrap (<span class="rt-unit">KG</span>)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
           <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none"></div>
@@ -476,14 +479,16 @@
     document.getElementById('rt-used-warn').style.display = 'none';
     document.getElementById('rt-hours-box').style.display = 'none';        // sirf complete par
     if (!start) {
-      document.getElementById('rt-qty-in').textContent = a.qty_in;
+      // C15: Spooling ke baad ke stages me sab PCS me (wa = asli KG per piece); form ke andar ka hisaab KG me hi rehta hai
+      PCS_WA = (a.pcs && a.pcs.kind === 'all' && a.pcs.wa > 0) ? a.pcs.wa : 0;
+      document.getElementById('rt-qty-in').textContent = PCS_WA ? Math.round(a.qty_in / PCS_WA * 100) / 100 : a.qty_in;
       QTY_IN = a.qty_in;
       DEFER_PREV = a.defer_prev;
       DEFER_SELF = !!a.defer_self;
       BILLET = a.billet || null;
       NO_SCRAP = !!a.no_scrap;
       // Flux jaise stage ki apni unit (LTR ...) aur waste hamesha "process loss"
-      document.querySelectorAll('.rt-unit').forEach(function (u) { u.textContent = a.unit || 'KG'; });
+      document.querySelectorAll('.rt-unit').forEach(function (u) { u.textContent = PCS_WA ? 'PCS' : (a.unit || 'KG'); });
       document.getElementById('rt-kind-wrap').style.display = a.side ? 'none' : 'block';
       document.getElementById('rt-kind-side').style.display = a.side ? 'block' : 'none';
       document.getElementById('rt-scrap').value = 0;
@@ -536,6 +541,7 @@
     }
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
+  var PCS_WA = 0, C13_BAD = false;      // PCS_WA > 0: PCS rup (KG per piece); C13_BAD: spool / box me capacity se zyada wire
   var QTY_IN = 0, DEFER_PREV = null, DEFER_SELF = false, BILLET = null, NO_SCRAP = false, BILLET_OVER = false, BILLET_USED_BAD = false, STARTED = '', HOURS_EDITED = false, HOLD_MIN = 0;
   // Working hours: start se finish tak khud nikalta hai; operator badal sakta hai (tab auto band)
   function autoHours() {
@@ -567,7 +573,7 @@
     });
     document.getElementById('rt-used-warn').style.display = bad ? 'inline' : 'none';
     BILLET_USED_BAD = bad;
-    document.getElementById('rt-submit').disabled = bad || BILLET_OVER;
+    document.getElementById('rt-submit').disabled = bad || BILLET_OVER || C13_BAD;
   }
   function syncBillet() {
     // Lattha x weight = bana maal; aaya maal - bana maal = scrap (apne aap). Scrap > 0 ho to type + proof photo zaroori.
@@ -595,14 +601,16 @@
     document.getElementById('rt-photo-wrap').style.display = 'none';
     document.getElementById('rt-scrap-photo').required = false;
     if (BILLET) { syncBillet(); return; }
-    var scrapNow = (DEFER_SELF || NO_SCRAP) ? 0 : (parseFloat(document.getElementById('rt-scrap').value) || 0);
+    C13_BAD = false;
+    var scrapNow = (DEFER_SELF || NO_SCRAP) ? 0 : (parseFloat(document.getElementById('rt-scrap').value) || 0) * (PCS_WA || 1);      // PCS me likha ho to KG me badla
     // Pichhle stage ka scrap ghata ke hi is stage me aaya maal nikalta hai
     var prevScrap = DEFER_PREV ? (parseFloat(document.getElementById('rt-prev-scrap').value) || 0) : 0;
     var cameIn = DEFER_PREV ? Math.max(DEFER_PREV.qty_in - prevScrap, 0) : QTY_IN;
     // Input = asli use hua maal (jab RM-used rows hon); phir usme se scrap minus
     var usedRows = document.querySelectorAll('#rt-mats .rt-used[data-counts="1"]');
     if (!DEFER_PREV && usedRows.length) { cameIn = 0; usedRows.forEach(function (i) { cameIn += parseFloat(i.value) || 0; }); }
-    document.getElementById('rt-qty-in').textContent = Math.round(cameIn * 10000) / 10000;
+    document.getElementById('rt-qty-in').textContent = Math.round((PCS_WA ? cameIn / PCS_WA : cameIn) * (PCS_WA ? 100 : 10000)) / (PCS_WA ? 100 : 10000);      // piece: 2 decimal
+    document.getElementById('rt-qty-ref').textContent = PCS_WA ? '(about ' + Math.round(cameIn * 10000) / 10000 + ' KG)' : '';
     document.getElementById('rt-prev-type').required = prevScrap > 0;
     var good = Math.max(cameIn - scrapNow, 0);
     // Packing material (spool / box): is stage ka good output KG se pack ginti (jab tak operator khud badal na de)
@@ -622,12 +630,13 @@
       var avg = good / made, diff = (avg - per) / per * 100;
       tr.style.display = 'table-row';
       var txt = 'Average <b>' + (Math.round(avg * 1000) / 1000) + ' KG</b> per pack (plan ' + per + ' KG): ' + Math.round(good * 10000) / 10000 + ' KG / ' + made + '.';
-      if (diff > 1) { row.style.color = '#B42318'; txt += ' More wire per pack than planned. Please re-check.'; }
+      if (avg > per * (1 + 1e-6)) { row.style.color = '#B42318'; txt += ' One pack holds at most ' + per + ' KG, so this count cannot be right. Count again, or use more packs.'; C13_BAD = true; }      // C13: hard block
       else if (diff < -1) { row.style.color = '#1F7A4D'; txt += ' Less per pack than planned, so extra packs came out.'; }
       else { row.style.color = ''; }
       row.innerHTML = txt;
     });
-    document.getElementById('rt-qty-out').textContent = (Math.round(good * 10000) / 10000);
+    document.getElementById('rt-qty-out').textContent = Math.round((PCS_WA ? good / PCS_WA : good) * (PCS_WA ? 100 : 10000)) / (PCS_WA ? 100 : 10000);
+    document.getElementById('rt-submit').disabled = C13_BAD || BILLET_USED_BAD || BILLET_OVER;
     var has = scrapNow > 0;
     document.getElementById('rt-scrap-box').style.display = has ? 'block' : 'none';
     document.getElementById('rt-scrap-type').required = has;

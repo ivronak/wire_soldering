@@ -12,6 +12,7 @@ from app.models import FGBatch, Product, ProductCategories, ProductionOrder, Pro
 from app.production_orders.scheduler import persist_schedule, renumber_queue
 from app.production_orders.yield_info import short_info
 from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, leftover_rows, material_table, packed_lines, post_output, wip_lines
+from app.routing.pcs import kg_per_piece, pcs_start_stage
 from app.routing.routes import order_summary, side_stage_info
 
 production_output_bp = Blueprint("production_output", __name__, template_folder="templates")
@@ -51,6 +52,18 @@ def output_plan(order):
     counted = next((p["qty"] for p in packed if p["unit"] == unit and unit.upper() not in ("KG", "KGS")), None)
     if counted is not None:
         good = round(counted, 4)
+    # C15: Spooling par PCS tick ho to Spooling ke baad ke stages (Testing, Packing) ka scrap PCS me hai (asli KG per piece se):
+    # Good = bane hue spool - baad me reject hue spool; scrap / loss me wahi PCS jodte hain (pehle ke stages KG / nominal weight se, jaise pehle).
+    start = pcs_start_stage(order)
+    if start is not None and counted is not None:
+        wa = kg_per_piece(order, start) or weight
+        before = [s for s in metal if s.sort_order <= start.sort_order]
+        after = [s for s in metal if s.sort_order > start.sort_order]
+        scrap = round(sum(s.scrap_qty or 0 for s in before if s.scrap_kind != "Process loss") / weight
+                      + sum(s.scrap_qty or 0 for s in after if s.scrap_kind != "Process loss") / wa, 2)       # piece poore hote hain: 2 decimal tak
+        loss = round(sum(s.scrap_qty or 0 for s in before if s.scrap_kind == "Process loss") / weight
+                     + sum(s.scrap_qty or 0 for s in after if s.scrap_kind == "Process loss") / wa, 2)
+        good = round(max(counted - sum(s.scrap_qty or 0 for s in after) / wa, 0), 2)
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": unit, "packed": packed, "counted_from_packing": counted is not None, "unit_weight": weight,

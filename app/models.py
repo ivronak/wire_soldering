@@ -101,6 +101,9 @@ class WorkStage(CreatedAtMixin, db.Model):
     billet_weight = db.Column(db.Float, nullable=True)
     # Is stage me scrap hota hi nahi (Extrusion, Wire Drawing): complete form me scrap box nahi aata, scrap hamesha 0
     no_scrap = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    # C15: is stage (Spooling) par maal ki ginti PCS me ho jaati hai (spool = pieces). Iske baad ke stages (Testing, Packing) PCS me chalte hain,
+    # KG sirf reference. Sirf PCS wale product me lagu; KG product (jaise Flux) me kuch nahi badalta.
+    counts_pcs = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
 
 class RmCategories(CreatedAtMixin, db.Model):
     __tablename__='rm_categories'

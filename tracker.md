@@ -18,7 +18,8 @@ Yeh file **live progress tracker** hai. Har module/step complete hote hi yahan u
 - **Batch 2 committed (a644d6c).** **Batch 3 BUILT (local, commit pending user review):** C19 correction auto "used" + C14 "Left over, return to store" (Material issue section + KPI, return drawer Used/Left over columns + prefill, routing card chip, output link). Live test 17 Nov.
 - **Batch 3 committed (4839bba).** **Batch 4 BUILT (local, commit pending user review):** C7 stage-wise material gate — order Start = pehle stage ka maal poora, har stage Start par uska maal poora (Posted issue), red "will wait" warning + routing alert. Auto-test 8/8, detail demo_changes_2026_11_16.md.
 - **Batch 4 committed (ceb07e4).** **Batch 5 BUILT (local, commit pending user review):** C18 FINAL — order form "Make extra for scrap?" + learned loss hint, Completed card Short/Extra + Cover from stock / Make balance order / Close as is, output page "180 of 200". Migration a5c1e7b3d9f2. Auto-test 25/25.
-- **Agla (Current Focus):** user review Batch 5 -> commit; phir C15 (PCS from Spooling), C8/C11/C12 (busy machine, alternate machine, hot-metal timer), baaki small items.
+- **Batch 5 committed (ca5d221).** **Batch 6 BUILT (local, commit pending user review):** C15 PCS from Spooling (work stage tick `counts_pcs`, Testing/Packing in PCS with KG reference, output good = spools - rejected) + C13 hard block (wire per spool/box > capacity). Migration b6d2f8a4c1e7; live par Spooling tick karna hoga. Auto-test 25/25.
+- **Agla (Current Focus):** user review Batch 6 -> commit; phir C8/C11/C12 (busy machine, alternate machine, hot-metal timer), baaki small items.
 
 ### 2026-11-04 — CLIENT MEETING 2 (15 changes, ek ek karke; har item ka flow user se verify karke) — file: Downloads/erp_client_meeting_2_transcript_and_changes.md
 - Plan order (user ne haan kaha): #8 -> #4 -> #3 -> #13 -> #14 ... Conflicts jo user ne confirm kiye: spare % ab Product Master me (order me pre-filled + editable).
