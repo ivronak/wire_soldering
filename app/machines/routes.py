@@ -39,13 +39,25 @@ def machines_list():
     )
 
 
-def read_capacity():
-    # Capacity ke teen number padho: ek ghante me kitna, kis unit me, din me kitne ghante. (values, error) wapas deta hai.
+def read_capacity(work_stage=None):
+    # Capacity ke number padho: ek ghante me kitna, kis unit me, din me kitne ghante. (values, error) wapas deta hai.
+    # C8a: batch stage (furnace) ki machine me "Batch capacity" + "Hours per batch" bhi aate hain; tab per-hour apne aap = capacity / hours.
     per_hour = request.form.get('capacity_per_hour', type=float)
     unit_id = request.form.get('capacity_unit_id', type=int)
     hours = request.form.get('hours_per_day', type=float)
+    batch_kg = request.form.get('batch_capacity', type=float)
+    batch_hours = request.form.get('hours_per_batch', type=float)
     if hours is None:
         hours = 8
+    is_batch = bool(work_stage is not None and work_stage.is_batch)
+    if not is_batch:
+        batch_kg = batch_hours = None            # continuous machine: batch numbers ka matlab nahi
+    elif (batch_kg is None) != (batch_hours is None):
+        return None, "Fill both Batch capacity and Hours per batch, or leave both empty."
+    elif batch_kg is not None:
+        if batch_kg <= 0 or batch_hours <= 0:
+            return None, "Batch capacity and Hours per batch must be more than 0."
+        per_hour = round(batch_kg / batch_hours, 4)
     if per_hour is not None and per_hour <= 0:
         return None, "Output per hour must be more than 0."
     if per_hour is not None and not unit_id:
@@ -54,7 +66,7 @@ def read_capacity():
         return None, "Choose a valid unit."
     if not (0 < hours <= 24):
         return None, "Working hours per day must be between 0 and 24."
-    return {"per_hour": per_hour, "unit_id": unit_id if per_hour is not None else None, "hours": hours}, None
+    return {"per_hour": per_hour, "unit_id": unit_id if per_hour is not None else None, "hours": hours, "batch_kg": batch_kg, "batch_hours": batch_hours}, None
 
 
 @machines_bp.route("/machines/add", methods=['POST'])
@@ -76,7 +88,7 @@ def machines_add():
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
-    cap, cap_error = read_capacity()
+    cap, cap_error = read_capacity(work_stage)
     if cap_error:
         flash(cap_error, "error")
         return redirect(url_for('machines.machines_list'))
@@ -90,6 +102,7 @@ def machines_add():
             existing.line_id = line_id
             existing.capacity =  capacity
             existing.capacity_per_hour, existing.capacity_unit_id, existing.hours_per_day = cap["per_hour"], cap["unit_id"], cap["hours"]
+            existing.batch_capacity_kg, existing.hours_per_batch = cap["batch_kg"], cap["batch_hours"]
             existing.installed_date = installed_date
             existing.status =  status
             db.session.commit()
@@ -107,6 +120,8 @@ def machines_add():
         capacity_per_hour=cap["per_hour"],
         capacity_unit_id=cap["unit_id"],
         hours_per_day=cap["hours"],
+        batch_capacity_kg=cap["batch_kg"],
+        hours_per_batch=cap["batch_hours"],
         installed_date=installed_date,
         status=status,
         is_deleted=False,
@@ -147,7 +162,7 @@ def machines_edit(machine_id):
         return redirect(url_for('machines.machines_list'))
 
     work_stage = WorkStage.query.get_or_404(work_stage_id)
-    cap, cap_error = read_capacity()
+    cap, cap_error = read_capacity(work_stage)
     if cap_error:
         flash(cap_error, "error")
         return redirect(url_for('machines.machines_list'))
@@ -157,6 +172,7 @@ def machines_edit(machine_id):
     m.line_id = line_id
     m.capacity = capacity
     m.capacity_per_hour, m.capacity_unit_id, m.hours_per_day = cap["per_hour"], cap["unit_id"], cap["hours"]
+    m.batch_capacity_kg, m.hours_per_batch = cap["batch_kg"], cap["batch_hours"]
     m.status = status
     m.installed_date = installed_date
     db.session.commit()

@@ -60,13 +60,20 @@ class Machines(CreatedAtMixin, db.Model):
     capacity_unit_id = db.Column(db.Integer, db.ForeignKey("units.id"), nullable=True)
     capacity_unit = db.relationship("Unit", foreign_keys=[capacity_unit_id])
     hours_per_day = db.Column(db.Float, default=8, server_default="8", nullable=False)
+    # C8a: batch machine (furnace / mixer: Work stage me "Batch stage" tick) ke liye: ek melt me kitna (capacity_unit me, jaise KG) aur ek batch me kitne ghante.
+    # Per-hour rate (capacity_per_hour) tab apne aap = batch_capacity_kg / hours_per_batch — isliye scheduler ko kuch badalna nahi padta.
+    batch_capacity_kg = db.Column(db.Float, nullable=True)
+    hours_per_batch = db.Column(db.Float, nullable=True)
     installed_date = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(20), default="active", nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
     def capacity_text(self):
-        # Screen par: "120 KG/hr · 8 h/day". Numeric nahi bhara to purana text.
+        # Screen par: "120 KG/hr · 8 h/day". Numeric nahi bhara to purana text. Batch machine: "500 KG per batch · 5 h per batch · 8 h/day"
+        if self.batch_capacity_kg and self.hours_per_batch:
+            unit = self.capacity_unit.code if self.capacity_unit else ""
+            return f"{self.batch_capacity_kg:g} {unit} per batch · {self.hours_per_batch:g} h per batch · {self.hours_per_day:g} h/day"
         if self.capacity_per_hour:
             unit = self.capacity_unit.code if self.capacity_unit else ""
             return f"{self.capacity_per_hour:g} {unit}/hr · {self.hours_per_day:g} h/day"

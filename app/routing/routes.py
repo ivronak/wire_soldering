@@ -14,6 +14,7 @@ from app.production_orders.planning import next_working_day
 from app.production_orders.stage_material import gap_text, stage_material_gap
 from app.routing.pcs import pcs_mode, spools_made, to_pcs
 from app.production_orders.scheduler import now_ist, today_ist
+from app.routing.batch import melt_plan
 from app.routing.busy import busy_machines
 from app.routing.handoff import metal_wait, stage_clash
 
@@ -123,6 +124,10 @@ def stage_plan(order, stage):
              "unit": l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else ""} for l in lines]
     lots = []
     cap = stage.capacity_per_hour or 0
+    lot_hours = None
+    mp = melt_plan(order, stage, batch_kg)          # C8a: machine me batch capacity bhari ho to lot = wahi (aur har lot ke ghante)
+    if mp is not None:
+        cap, lot_hours = mp["cap"], mp["hours"]
     if stage.work_stage and stage.work_stage.is_batch and cap > 0 and batch_kg > 0:
         count = math.ceil(batch_kg / cap - 1e-9)
         left = batch_kg
@@ -132,7 +137,15 @@ def stage_plan(order, stage):
             lots.append({"n": n, "kg": kg, "mats": [{"name": m["name"], "qty": round(m["qty"] * kg / batch_kg, 3), "unit": m["unit"]} for m in mats]})
     if not mats and not lots:
         return None
-    return {"materials": mats, "lots": lots, "lot_kg": cap if lots else None}
+    return {"materials": mats, "lots": lots, "lot_kg": cap if lots else None, "lot_hours": lot_hours,
+            "unused_kg": mp["unused_kg"] if mp else 0, "suggest": mp["suggest"] if mp else []}
+
+
+def waste_payload(mp):
+    # C8a: melt_plan ka JS ke liye rup; furnace poori bhar rahi ho (unused 0) to None
+    if mp is None or mp["unused_kg"] <= 0.0005:
+        return None
+    return {"cap": mp["cap"], "melts": len(mp["lots"]), "unused": mp["unused_kg"], "machine": mp["machine"], "suggest": mp["suggest"]}
 
 
 def wait_payload(wait):
@@ -340,6 +353,8 @@ def routing_list():
             "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
             # C12: Melting ke baad garam maal kab se ruka hai (Work Stage me limit bhari ho to); limit paar ho to Start par wajah likhni padti hai
             "wait": wait_payload(metal_wait(o, cur)),
+            # C8a: furnace poori nahi bhar rahi (capacity waste) — Melting Start par wajah likhni padti hai; suggestion me same-alloy orders
+            "waste": waste_payload(melt_plan(o, cur, order_batch_kg(o))) if cur.status == "Pending" and side is None else None,
         }
         # C7: Pending stage ka maal poora issue nahi hua to card par laal alert (Start tab tak block rehta hai)
         if cur.status == "Pending":
@@ -460,6 +475,13 @@ def routing_start(stage_id):
         flash(f"{stage.stage_name} cannot start yet: the metal from {wait['prev_name']} has waited {round(wait['minutes'])} min (limit {wait['limit']} min). "
               f"Write what was done (for example re-heated) in the Start form.", "error")
         return _back()
+    # C8a: furnace (batch machine) poori nahi bhar rahi to Start tabhi hoga jab wajah (kam se kam 3 akshar) likhi ho; wajah stage notes me jaati hai
+    waste = waste_payload(melt_plan(order, stage, order_batch_kg(order))) if side_stage_info(order, stage) is None else None
+    waste_reason = (request.form.get("waste_reason") or "").strip()[:100]
+    if waste is not None and len(waste_reason) < 3:
+        flash(f"{stage.stage_name} cannot start yet: the furnace holds {waste['cap']:g} KG per melt but this order fills {waste['melts'] * waste['cap'] - waste['unused']:g} KG "
+              f"({waste['unused']:g} KG unused). Write the reason in the Start form (for example no other order of the same alloy is ready).", "error")
+        return _back()
     started_at, error = _read_when("started_at")
     if error:
         flash(error, "error")
@@ -487,6 +509,8 @@ def routing_start(stage_id):
     notes = (request.form.get("notes") or "").strip()
     if clash is not None:
         notes = (notes + " | " if notes else "") + f"Timing clash overridden ({clash['machine_name']} due for {clash['other_order']}): {clash_reason}"
+    if waste is not None:
+        notes = (notes + " | " if notes else "") + f"Furnace not full ({waste['unused']:g} KG unused): {waste_reason}"
     if wait is not None and wait["over"]:
         notes = (notes + " | " if notes else "") + f"Metal waited {round(wait['minutes'])} min (limit {wait['limit']}): {rewait_reason}"
     if machine_note:

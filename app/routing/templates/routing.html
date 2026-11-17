@@ -193,7 +193,7 @@
               {% if sp %}
               <div class="rt-meta rt-stage-mat" style="margin-top:6px;color:#0F2F32"><b>Material for this stage:</b> {% for m in sp.materials %}{{ m.name }} {{ '%g'|format(m.qty) }} {{ m.unit }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
               {% if sp.lots %}
-              <div class="rt-meta rt-lots" style="color:#8A4A1C"><b>Furnace lots:</b> {{ sp.lots|length }} lot{{ 's' if sp.lots|length != 1 else '' }} of up to {{ '%g'|format(sp.lot_kg) }} KG (one lot per hour)
+              <div class="rt-meta rt-lots" style="color:#8A4A1C"><b>Furnace lots:</b> {{ sp.lots|length }} lot{{ 's' if sp.lots|length != 1 else '' }} of up to {{ '%g'|format(sp.lot_kg) }} KG ({% if sp.lot_hours %}each lot takes {{ '%g'|format(sp.lot_hours) }} h{% else %}one lot per hour{% endif %}){% if sp.unused_kg > 0.0005 %} <span style="color:#B42318">· {{ '%g'|format(sp.unused_kg) }} KG of furnace capacity unused</span>{% endif %}
                 {% for lot in sp.lots %}<div>Lot {{ lot.n }}: {{ '%g'|format(lot.kg) }} KG — {% for m in lot.mats %}{{ m.name }} {{ '%g'|format(m.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}</div>
               {% endif %}
               {% endif %}
@@ -349,6 +349,13 @@
             <select name="swap_machine_id" id="rt-down-swap" class="rt-input"></select>
           </div>
         </div>
+        {# C8a: furnace poori nahi bhar rahi — wajah likhe bina Melting Start nahi #}
+        <div id="rt-waste-box" style="display:none" class="rounded-lg p-3" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#8A4A1C">Furnace will not be full</div>
+          <p id="rt-waste-text" class="text-[12.5px] mt-1" style="color:#7A4A1C"></p>
+          <label class="rt-label mt-2" for="rt-waste-reason">Why start now? *</label>
+          <input type="text" name="waste_reason" id="rt-waste-reason" maxlength="100" class="rt-input" placeholder="e.g. no other order of the same alloy is ready" autocomplete="off" />
+        </div>
         {# C12: garam maal limit se zyada ruka — wajah likhe bina Start nahi #}
         <div id="rt-wait-box" style="display:none" class="rounded-lg p-3" role="alert">
           <div class="text-[13px] font-semibold" style="color:#B42318">Molten metal waited too long</div>
@@ -486,6 +493,14 @@
       downSel.innerHTML = '<option value="">Choose a machine</option>' + (down.swaps || []).map(function (m) { return '<option value="' + m.id + '">' + esc(m.name) + '</option>'; }).join('');
     } else { downSel.innerHTML = ''; }
     document.getElementById('rt-submit').disabled = !!(down && down.all_down && !(down.swaps || []).length);      // koi doosri Active machine nahi to Start band
+    // C8a: furnace poori nahi bhar rahi to wajah zaroori (aur same-alloy order ka suggestion)
+    var wasteBox = document.getElementById('rt-waste-box'), wasteIn = document.getElementById('rt-waste-reason');
+    var waste = start && a.waste ? a.waste : null;
+    wasteBox.style.display = waste ? 'block' : 'none';
+    wasteBox.style.background = '#FFF7ED'; wasteBox.style.border = '1px solid #F5D9B5';
+    wasteIn.value = ''; wasteIn.disabled = !waste; wasteIn.required = !!waste;
+    document.getElementById('rt-waste-text').textContent = waste ? ('The furnace (' + waste.machine + ') holds ' + waste.cap + ' KG per melt. This order leaves ' + waste.unused + ' KG of it unused'
+      + (waste.suggest.length ? '. These orders of the same alloy could share the melt: ' + waste.suggest.map(function (s) { return s.prod_no + ' (' + s.kg + ' KG)'; }).join(', ') + '.' : '.')) : '';
     // C12: garam maal ka intezaar limit paar ho gaya to wajah zaroori
     var waitBox = document.getElementById('rt-wait-box'), waitIn = document.getElementById('rt-wait-reason');
     var wait = start && a.wait && a.wait.over ? a.wait : null;

@@ -259,6 +259,8 @@
                       data-per-hour="{{ m.capacity_per_hour if m.capacity_per_hour else '' }}"
                       data-unit-id="{{ m.capacity_unit_id or '' }}"
                       data-hours="{{ m.hours_per_day if m.hours_per_day else 8 }}"
+                      data-batch-kg="{{ m.batch_capacity_kg if m.batch_capacity_kg else '' }}"
+                      data-batch-hours="{{ m.hours_per_batch if m.hours_per_batch else '' }}"
                       data-installed="{{ m.installed_date or '' }}"
                       data-status="{{ m.status }}">
                       Edit
@@ -365,7 +367,7 @@
             class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
             <option value="">Select work stage</option>
             {% for s in stages %}
-            <option value="{{ s.id }}">{{ s.code }} — {{ s.name }}</option>
+            <option value="{{ s.id }}" data-batch="{{ 1 if s.is_batch else 0 }}">{{ s.code }} — {{ s.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -390,7 +392,22 @@
               {% for u in units %}<option value="{{ u.id }}">{{ u.code }}</option>{% endfor %}
             </select>
           </div>
-          <p class="text-[11.5px] text-ink-faint mt-1">How much this machine can make in one hour. Used to plan production time.</p>
+          <p class="text-[11.5px] text-ink-faint mt-1" id="machine-per-hour-help">How much this machine can make in one hour. Used to plan production time.</p>
+        </div>
+        {# C8a: sirf batch stage (furnace / mixer) ki machine me — ek melt me kitna aur ek batch me kitne ghante; per-hour inse apne aap banta hai #}
+        <div id="machine-batch-box" class="hidden rounded border border-copper-border bg-copper-soft p-3 space-y-3">
+          <div>
+            <label for="machine-batch-kg" class="block text-[12.5px] font-semibold text-ink mb-1">Batch capacity (per melt)</label>
+            <input type="number" id="machine-batch-kg" name="batch_capacity" min="0" step="any" placeholder="e.g. 500" autocomplete="off"
+              class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            <p class="text-[11.5px] text-ink-faint mt-1">The most this machine can melt or mix in one go, in the unit chosen above (for example 500 KG).</p>
+          </div>
+          <div>
+            <label for="machine-batch-hours" class="block text-[12.5px] font-semibold text-ink mb-1">Hours per batch</label>
+            <input type="number" id="machine-batch-hours" name="hours_per_batch" min="0" step="any" placeholder="e.g. 5" autocomplete="off"
+              class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+            <p class="text-[11.5px] text-ink-faint mt-1">How long one full batch takes. Output per hour is worked out from these two numbers (500 / 5 = 100 per hour).</p>
+          </div>
         </div>
         <div>
           <label for="machine-hours" class="block text-[12.5px] font-semibold text-ink mb-1">Working hours per day</label>
@@ -489,6 +506,25 @@
     retired: { label: 'Retired', classes: 'bg-neutral-bg text-neutral border-neutral-border', dot: 'bg-neutral' }
   };
 
+  // C8a: Work stage "Batch stage" ho to Batch capacity + Hours per batch dikhao; Output per hour tab apne aap (capacity / hours) aur lock
+  function syncBatchBox() {
+    var sel = document.getElementById('machine-stage');
+    var opt = sel.options[sel.selectedIndex];
+    var isBatch = !!opt && opt.getAttribute('data-batch') === '1';
+    var kg = parseFloat(document.getElementById('machine-batch-kg').value), hrs = parseFloat(document.getElementById('machine-batch-hours').value);
+    var perHour = document.getElementById('machine-per-hour');
+    document.getElementById('machine-batch-box').classList.toggle('hidden', !isBatch);
+    var derived = isBatch && kg > 0 && hrs > 0;
+    perHour.readOnly = derived;
+    perHour.style.background = derived ? '#F2F4F7' : '';
+    if (derived) perHour.value = Math.round(kg / hrs * 10000) / 10000;
+    document.getElementById('machine-per-hour-help').textContent = derived ? 'Worked out from Batch capacity and Hours per batch.' : 'How much this machine can make in one hour. Used to plan production time.';
+  }
+  ['machine-stage', 'machine-batch-kg', 'machine-batch-hours'].forEach(function (id) {
+    var el = document.getElementById(id);
+    el.addEventListener(id === 'machine-stage' ? 'change' : 'input', syncBatchBox);
+  });
+
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -498,6 +534,7 @@
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     form.reset();
+    syncBatchBox();
   }
   var addAction = "{{ url_for('machines.machines_add') }}";
   var modalTitle = document.getElementById('modal-title');
@@ -506,6 +543,7 @@
     form.action = addAction;
     modalTitle.textContent = 'Add machine';
     form.reset();
+    syncBatchBox();
     openModal();
   }
 
@@ -520,6 +558,9 @@
     document.getElementById('machine-per-hour').value = btn.getAttribute('data-per-hour') || '';
     document.getElementById('machine-unit').value = btn.getAttribute('data-unit-id') || '';
     document.getElementById('machine-hours').value = btn.getAttribute('data-hours') || '8';
+    document.getElementById('machine-batch-kg').value = btn.getAttribute('data-batch-kg') || '';
+    document.getElementById('machine-batch-hours').value = btn.getAttribute('data-batch-hours') || '';
+    syncBatchBox();
     document.getElementById('machine-installed').value = btn.getAttribute('data-installed') || '';
     document.getElementById('machine-status').value = btn.getAttribute('data-status') || 'active';
     openModal();
