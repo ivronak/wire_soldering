@@ -11,7 +11,7 @@ import math
 from datetime import datetime, timedelta
 
 from app.extensions import db
-from app.models import ProductionOrder
+from app.models import MachineExtraHours, ProductionOrder
 from app.production_orders.materials import check_materials
 from app.production_orders.planning import add_working_days, next_working_day
 
@@ -43,15 +43,48 @@ def date_at(origin, index):
     return add_working_days(origin, index + 1)
 
 
+def extra_hours_map(today):
+    # C10: {(machine_id, date): extra ghante} — aaj se aage ke din jinme raat ki / extra shift tay hai
+    rows = MachineExtraHours.query.filter(MachineExtraHours.work_date >= today, MachineExtraHours.extra_hours > 0).all()
+    return {(r.machine_id, r.work_date): r.extra_hours for r in rows}
+
+
+def day_factor(machines, day, extras):
+    """Us din stage ki machines normal se kitni guna kaam karengi (1.0 = normal). machines = [(machine_id, capacity_per_hour, hours_per_day)].
+    Jaise 8 ghante ki machine par 4 extra ghante => 1.5. Kai machines ho to unki capacity ke hisaab se weighted (capacity na ho to barabar)."""
+    base = extra = 0.0
+    for machine_id, per_hour, hours in machines:
+        weight = (per_hour or 1.0) * (hours or 8.0)
+        base += weight
+        extra += weight * (1 + extras.get((machine_id, day), 0.0) / (hours or 8.0))
+    return extra / base if base else 1.0
+
+
+def advance(start_pos, days, factor_at):
+    """days = normal-capacity ke din ka kaam. factor_at(i) = i-th kaam ke din ki capacity (normal = 1.0, extra shift = zyada).
+    Wapas end position. Sab din 1.0 ho to start_pos + days (pehle jaisa hi)."""
+    pos, remaining, guard = start_pos, days, 0
+    while remaining > 1e-9 and guard < 2000:
+        guard += 1
+        index = int(math.floor(pos + 1e-9))
+        room = (index + 1) - pos                    # is din me kitna hissa bacha
+        factor = factor_at(index)
+        if room * factor >= remaining - 1e-9:
+            return pos + remaining / factor
+        remaining -= room * factor
+        pos = index + 1
+    return pos + remaining
+
+
 def schedule_stages(stage_specs, start_pos, machine_free):
-    """stage_specs: [{"days": float, "machine_ids": [...]}] (order me). start_pos: kaam ke din (float) se pehle shuru nahi.
+    """stage_specs: [{"days": float, "machine_ids": [...], "factor": callable (optional, C10 extra shift)}] (order me). start_pos: kaam ke din (float) se pehle shuru nahi.
     machine_free: {machine_id: position} — badalta hai (ye order ke baad machines kab free). Wapas: [(start_pos, end_pos)] har stage ka."""
     position = start_pos
     windows = []
     for spec in stage_specs:
         free = max([machine_free.get(machine_id, 0.0) for machine_id in spec["machine_ids"]] or [0.0])
         start = max(position, free)
-        end = start + spec["days"]
+        end = advance(start, spec["days"], spec["factor"]) if spec.get("factor") else start + spec["days"]
         windows.append((start, end))
         for machine_id in spec["machine_ids"]:
             machine_free[machine_id] = end
@@ -81,7 +114,8 @@ def _stage_specs(order):
     for stage in order.stages:
         if not stage.daily_capacity or stage.daily_capacity <= 0 or not stage.machines:
             return None
-        specs.append({"days": batch_kg / stage.daily_capacity, "machine_ids": [m.machine_id for m in stage.machines]})
+        specs.append({"days": batch_kg / stage.daily_capacity, "machine_ids": [m.machine_id for m in stage.machines],
+                      "machines": [(m.machine_id, m.capacity_per_hour, m.hours_per_day) for m in stage.machines]})
     return specs or None
 
 
@@ -96,6 +130,7 @@ def live_schedule(today=None, ordered=None, earliest_override=None):
     materials = check_materials(ordered)
     machine_free = {}
     schedule = {}
+    extras = extra_hours_map(today)
     for order in ordered:
         stored = [(s.start_date, s.end_date) for s in order.stages]
         frozen = order.status == "In production" and order.id not in earliest_override and stored and all(a and b for a, b in stored)
@@ -115,6 +150,12 @@ def live_schedule(today=None, ordered=None, earliest_override=None):
         material_date = materials.get(order.id, {}).get("ready_date")
         wanted = max([d for d in (earliest, material_date, today) if d])
         start_pos = float(working_index(origin, wanted))
+        if extras:
+            # C10: jin machines par extra shift tay hai un stages ke liye din-wise capacity (baaki stages normal)
+            extra_ids = {key[0] for key in extras}
+            for spec in specs:
+                if any(m[0] in extra_ids for m in spec["machines"]):
+                    spec["factor"] = (lambda i, s=spec: day_factor(s["machines"], date_at(origin, i), extras))
         positions = schedule_stages(specs, start_pos, machine_free)
         windows = [_window_dates(origin, a, b) for a, b in positions]
         total_days = sum(spec["days"] for spec in specs)

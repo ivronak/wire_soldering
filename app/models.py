@@ -1966,6 +1966,21 @@ class FixedCostPeriod(CreatedAtMixin, db.Model):
     note = db.Column(db.String(255), nullable=True)
 
 
+class MachineExtraHours(CreatedAtMixin, db.Model):
+    # C10: kisi ek din machine ke extra ghante (raat ki shift). Machine ka normal hours_per_day nahi badalta; scheduler sirf us tareekh ko lamba maanta hai.
+    # Row delete nahi hoti: extra_hours 0 kar do to wo din wapas normal ho jaata hai.
+    __tablename__ = "machine_extra_hours"
+    __table_args__ = (db.UniqueConstraint("machine_id", "work_date", name="uq_machine_extra_hours_day"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    machine_id = db.Column(db.Integer, db.ForeignKey("machines.id"), nullable=False)
+    machine = db.relationship("Machines")
+    work_date = db.Column(db.Date, nullable=False)
+    extra_hours = db.Column(db.Float, nullable=False, default=0)
+    reason = db.Column(db.String(120), nullable=True)
+    set_by = db.Column(db.String(60), nullable=True)
+
+
 class FixedCostMonth(CreatedAtMixin, db.Model):
     # Mahina finalize: asli (final) fixed kharcha, us mahine ke total good KG se bhaga = final per KG. Ek mahina ek baar hi finalize hota hai.
     __tablename__ = "fixed_cost_months"

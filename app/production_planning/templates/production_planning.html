@@ -46,6 +46,12 @@
   .pp-btn.danger { background: #fff; color: #B42318; border-color: #F1C4C0; } .pp-btn.danger:hover { background: #FDECEC; }
   .pp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
   .pp-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  /* C10: Tomorrow tab */
+  .pp-day { display: grid; grid-template-columns: minmax(200px, 1.1fr) minmax(220px, 2fr) 260px; gap: 14px; align-items: center; background: #fff; border: 1px solid #D1D9D8; border-left: 4px solid #2A6B6E; border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+  .pp-day.idle { border-left-color: #C46B2D; background: #FFFCF8; }
+  .pp-day.extra { border-left-color: #1F7A4D; }
+  .pp-day input[type=number], .pp-day input[type=text] { border: 1px solid #D1D9D8; border-radius: 7px; padding: 5px 8px; font-size: 13px; background: #fff; }
+  @media (max-width: 1100px) { .pp-day { grid-template-columns: 1fr; } }
   @media (max-width: 1100px) { .pp-card { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
@@ -158,11 +164,51 @@
     <a href="{{ url_for('production_planning.production_planning_page', tab='needs') }}" class="{{ 'on' if tab == 'needs' else '' }}">Needs planning<span>{{ needs_count }}</span></a>
     <a href="{{ url_for('production_planning.production_planning_page', tab='ready') }}" class="{{ 'on' if tab == 'ready' else '' }}">Ready to release<span>{{ ready_count }}</span></a>
     <a href="{{ url_for('production_planning.production_planning_page', tab='queue') }}" class="{{ 'on' if tab == 'queue' else '' }}">Released &amp; running<span>{{ queue_count }}</span></a>
+    <a href="{{ url_for('production_planning.production_planning_page', tab='tomorrow') }}" class="{{ 'on' if tab == 'tomorrow' else '' }}" id="pp-tab-tomorrow">Tomorrow's plan</a>
   </div>
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
-  {% if tab == 'queue' %}
+  {% if tab == 'tomorrow' %}
+    <div class="flex flex-wrap items-end gap-3 mb-3">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Plan for</div>
+        <div class="text-[18px] font-bold text-ink">{{ day.strftime('%A, %d %B %Y') }}{% if (day - today).days == 1 %} <span class="text-[13px] font-semibold" style="color:#8A4A1C">(tomorrow)</span>{% endif %}</div>
+      </div>
+      <form method="get" action="{{ url_for('production_planning.production_planning_page') }}" class="flex items-end gap-2">
+        <input type="hidden" name="tab" value="tomorrow" />
+        <div><label class="text-[11.5px] text-ink-faint block" for="pp-day-pick">Another day</label>
+          <input type="date" id="pp-day-pick" name="date" value="{{ day.isoformat() }}" min="{{ today.isoformat() }}" class="border rounded-md px-2 py-1 text-[13px]" style="border-color:#D1D9D8" /></div>
+        <button type="submit" class="pp-btn sm ghost">Show</button>
+      </form>
+      <div class="flex gap-2 ml-auto flex-wrap">
+        <span class="pp-chip rel"><i></i>{{ day_kpi.running }} machine{{ '' if day_kpi.running == 1 else 's' }} working</span>
+        <span class="pp-chip {{ 'warn' if day_kpi.idle else 'ok' }}"><i></i>{{ day_kpi.idle }} idle</span>
+        <span class="pp-chip ok"><i></i>{{ day_kpi.extra }} with extra shift</span>
+      </div>
+    </div>
+    <p class="text-[12.5px] text-ink-muted mb-3">Machines with no order that day are marked idle. If a machine should run longer (for example a night shift), type the extra hours and save: the dates of the waiting orders are worked out again. Orders that are already in production keep their dates.</p>
+    {% for r in day_rows %}
+      {% if loop.first or day_rows[loop.index0 - 1].line_name != r.line_name %}<div class="pp-group">{{ r.line_name }}</div>{% endif %}
+      <div class="pp-day {{ 'idle' if not r.jobs else '' }} {{ 'extra' if r.extra_hours > 0 else '' }}">
+        <div>
+          <div class="pp-no">{{ r.machine.name }}</div>
+          <div class="pp-meta">{{ r.stage_name }} · {{ '%g'|format(r.normal_hours) }} h a day{% if r.extra_hours > 0 %} + <b style="color:#1F7A4D">{{ '%g'|format(r.extra_hours) }} h extra</b>{% endif %}</div>
+        </div>
+        <div>
+          {% if r.jobs %}{% for j in r.jobs %}<div class="text-[13px]"><span class="pp-no" style="font-size:13px">{{ j.prod_no }}</span> <span class="pp-prod">{{ j.product }}</span> <span class="pp-meta">· {{ j.stage }}</span> <span class="pp-chip {{ 'run' if j.status == 'In production' else ('rel' if j.status == 'Released' else 'warn') }}" style="margin-left:4px"><i></i>{{ j.status }}</span></div>{% endfor %}
+          {% else %}<span class="pp-chip warn"><i></i>Idle — nothing planned</span>{% endif %}
+        </div>
+        <form method="post" action="{{ url_for('production_planning.production_planning_extra_hours') }}" class="flex items-center gap-2 flex-wrap">
+          <input type="hidden" name="machine_id" value="{{ r.machine.id }}" /><input type="hidden" name="work_date" value="{{ day.isoformat() }}" />
+          <input type="number" name="extra_hours" step="0.5" min="0" max="{{ 24 - r.normal_hours }}" value="{{ '%g'|format(r.extra_hours) if r.extra_hours else '' }}" placeholder="Extra h" style="width:74px" aria-label="Extra hours for {{ r.machine.name }}" />
+          <input type="text" name="reason" maxlength="120" value="{{ r.reason }}" placeholder="Reason (optional)" style="width:130px" aria-label="Reason" />
+          <button type="submit" class="pp-btn sm teal">Save</button>
+        </form>
+      </div>
+    {% endfor %}
+    {% if not day_rows %}<div class="pp-empty"><h3>No active machines</h3><p>Add machines in the Machine master first.</p></div>{% endif %}
+  {% elif tab == 'queue' %}
     {% set running = orders | selectattr('status', 'equalto', 'In production') | list %}
     {% set waiting = orders | rejectattr('status', 'equalto', 'In production') | list %}
     {% if running %}<div class="pp-group">In production <b>{{ running|length }}</b></div>
@@ -172,7 +218,7 @@
   {% else %}
     {% for o in orders %}{{ plan_card(o) }}{% endfor %}
   {% endif %}
-  {% if not orders %}
+  {% if not orders and tab != 'tomorrow' %}
   <div class="pp-empty">
     {% if tab == 'needs' %}<h3>Nothing waiting to be planned</h3><p>New orders from the Production order page show up here.</p>
     {% elif tab == 'ready' %}<h3>No planned order is waiting for release</h3><p>Plan an order first, then release it from here.</p>
