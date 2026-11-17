@@ -474,3 +474,10 @@ Learned average = (ordered - good) / ordered, pichhle 3 completed orders, produc
 - **Test:** auto 15/15 (b15). b4-b14 pass. Live demo nahi (user ne bola khud test kar lo).
 - **Backlog (user decision chahiye):** G16 (Testing scrap par photo?), G17 (Reopen to Pending), C10 (night / tomorrow plan + extra shift, bada design), G21 / G22 / G32 / C17+.
 
+## BUILD LOG — Batch 16 (17 Nov 2026): G21, G32, G22  (local, commit pending user review; NO migration)
+- **G21:** Material issue ("To issue") card par jab status Need to buy / PO coming / Will be made ho, chips ke neeche link "What to do? Open Material plan →" (wahan order-wise kami + PO banana / ghar me banana). Stock OK card par link nahi.
+- **G32:** Products table me `min-width: 900px` — narrow window me columns kat-te nahi, table scroll hoti hai (Actions tak).
+- **G22 (verify):** mahina Finalise hone ke baad usi mahine ka naya / late output `apply_fixed_cost` se Final rate (final per KG) par jaata hai, basis "Final"; wahi mahina dobara finalise nahi hota ("already finalised"). Code badla nahi, test add kiya.
+- **Test:** auto 8/8 (b16). b4-b15 pass. Live demo nahi.
+- **Ab baaki (sab bade / decision wale):** C10 (night/tomorrow plan + extra shift), G17 (Reopen ko Pending), G16 split (Testing: Samples used / Rejected after test), G29 (live Tin purity data), live deploy + migrations.
+

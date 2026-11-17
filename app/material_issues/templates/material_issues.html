@@ -179,6 +179,8 @@
         {% else %}<span class="mi-chip ok"><i></i>Stock OK</span>{% endif %}
         {% set short_names = plan.lines | selectattr('short') | map(attribute='name') | list %}
         {% if short_names %}<div class="mi-meta mt-1">{{ short_names | join(', ') }}</div>{% endif %}
+        {# G21: maal kam ho to operator ko rasta: Material plan (PO / ghar me banana) #}
+        {% if mat and mat.status in ('buy', 'coming', 'making') %}<div class="mi-meta mt-1"><a href="{{ url_for('material_plan.material_plan_page') }}" style="color:#8A4A1C;font-weight:600;text-decoration:underline">What to do? Open Material plan →</a></div>{% endif %}
       </div>
       <div class="mi-act">
         <button type="button" class="btn-issue mi-btn primary" data-plan='{{ plan|tojson }}'>Issue material</button>
