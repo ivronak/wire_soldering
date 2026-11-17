@@ -4,7 +4,8 @@
 import math
 
 from app.extensions import db
-from app.models import Machines, ProductionOrder
+from app.models import Machines, MeltGroup, ProductionOrder
+from app.production_orders.scheduler import today_ist
 
 
 def batch_info(stage):
@@ -53,9 +54,74 @@ def melt_plan(order, stage, batch_kg):
                                               ProductionOrder.status.in_(("Draft", "Released", "In production"))).order_by(ProductionOrder.id).all()
         for other in others:
             other_stage = next((s for s in other.stages if s.work_stage_id == stage.work_stage_id), None)
-            if other_stage is None or other_stage.status != "Pending" or signature is None:
+            if other_stage is None or other_stage.status != "Pending" or signature is None or other_stage.melt_group_id is not None:
                 continue
             other_kg = round((other.planned_qty or 0) * (other.unit_weight or 0), 3)
             if other_kg <= unused + 0.0005 and melt_signature(other, stage.work_stage_id) == signature:
-                suggest.append({"prod_no": other.prod_no, "kg": other_kg})
+                # in_production = routing page se abhi jod sakte hain; warna sirf suggestion (order abhi chalu nahi hua)
+                suggest.append({"prod_no": other.prod_no, "kg": other_kg, "stage_id": other_stage.id, "in_production": other.status == "In production"})
     return {"cap": cap, "hours": info["hours"], "machine": info["machine"], "lots": lots, "unused_kg": unused, "suggest": suggest}
+
+
+# ---------------- C9 phase 2: melt group (heat number) ----------------
+def stage_kg(stage):
+    # Is Melting stage ke order ka batch KG
+    order = stage.production_order
+    return round((order.planned_qty or 0) * (order.unit_weight or 0), 4)
+
+
+def melt_members(stage):
+    # Is stage ke melt ke saare stages (apna bhi). Group nahi hai to sirf apna.
+    if stage.melt_group_id:
+        return list(stage.melt_group.stages)
+    return [stage]
+
+
+def melt_kg(stage):
+    # Poore melt ka KG (sab members ke order ka jod)
+    return round(sum(stage_kg(member) for member in melt_members(stage)), 4)
+
+
+def next_heat_no():
+    # HT-2026-001: saal ke hisaab se
+    year = today_ist().year
+    count = MeltGroup.query.filter(MeltGroup.heat_no.like(f"HT-{year}-%")).count()
+    return f"HT-{year}-{count + 1:03d}"
+
+
+def ensure_melt_group(stage):
+    # Is Melting stage ka group (nahi hai to naya, naye heat number ke saath). Commit caller karega.
+    if stage.melt_group_id is None:
+        group = MeltGroup(heat_no=next_heat_no(), work_stage_id=stage.work_stage_id)
+        db.session.add(group)
+        db.session.flush()
+        stage.melt_group_id = group.id
+        db.session.flush()
+        db.session.refresh(stage)
+    return stage.melt_group
+
+
+def combine_error(stage, other):
+    """Do Pending Melting stages ek melt me jud sakte hain? Nahi to wajah (English text, user ko dikhta hai), ho sakta ho to None."""
+    if other.id == stage.id:
+        return "A melt cannot be combined with itself."
+    if stage.melt_group_id and stage.melt_group_id == other.melt_group_id:
+        return f"{other.production_order.prod_no} is already in this melt."
+    if other.melt_group_id is not None:
+        return f"{other.production_order.prod_no} is already part of another melt ({other.melt_group.heat_no})."
+    if stage.status != "Pending" or other.status != "Pending" or any(m.status != "Pending" for m in melt_members(stage)):
+        return "Orders can be combined only before the melt starts."
+    if stage.work_stage_id != other.work_stage_id or not (stage.work_stage and stage.work_stage.is_batch):
+        return "Only the same batch stage (the furnace melt) can be combined."
+    for member_stage in (stage, other):
+        order = member_stage.production_order
+        if order is None or order.is_deleted or order.status != "In production":
+            return f"{order.prod_no if order else 'The order'} is not in production yet, so it cannot join a melt."
+    if melt_signature(stage.production_order, stage.work_stage_id) != melt_signature(other.production_order, other.work_stage_id):
+        return "These orders are not the same alloy, so they cannot share one melt."
+    plan = melt_plan(stage.production_order, stage, melt_kg(stage))
+    if plan is None:
+        return "The furnace has no batch capacity set, so orders cannot be combined."
+    if stage_kg(other) > plan["unused_kg"] + 0.0005:
+        return f"{other.production_order.prod_no} ({stage_kg(other):g} KG) does not fit: only {plan['unused_kg']:g} KG of the furnace is free in this melt."
+    return None

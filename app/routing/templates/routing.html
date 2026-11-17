@@ -196,6 +196,26 @@
               <div class="rt-meta rt-lots" style="color:#8A4A1C"><b>Furnace lots:</b> {{ sp.lots|length }} lot{{ 's' if sp.lots|length != 1 else '' }} of up to {{ '%g'|format(sp.lot_kg) }} KG ({% if sp.lot_hours %}each lot takes {{ '%g'|format(sp.lot_hours) }} h{% else %}one lot per hour{% endif %}){% if sp.unused_kg > 0.0005 %} <span style="color:#B42318">· {{ '%g'|format(sp.unused_kg) }} KG of furnace capacity unused</span>{% endif %}
                 {% for lot in sp.lots %}<div>Lot {{ lot.n }}: {{ '%g'|format(lot.kg) }} KG — {% for m in lot.mats %}{{ m.name }} {{ '%g'|format(m.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}</div>
               {% endif %}
+              {# C9 phase 2: melt (heat number) — same alloy ke orders ek melt me jodo; shuru hone ke baad heat number dikhta hai #}
+              {% if sp.melt %}{% set me = sp.melt %}
+              <div class="rt-meta rt-melt" style="margin-top:6px;padding:8px 10px;border:1px solid #CFE0E2;background:#F3FAFA;border-radius:8px;color:#0F2F32">
+                <b>Melt{% if me.heat_no %} · Heat number {{ me.heat_no }}{% else %} · heat number is given when it starts{% endif %}</b>
+                {% if me.members|length > 1 %}
+                <div>Melted together ({{ '%g'|format(me.total_kg) }} KG):
+                  {% for m in me.members %}<span style="font-weight:600">{{ m.prod_no }}</span> ({{ '%g'|format(m.kg) }} KG){% if me.can_edit %}
+                    <form method="post" action="{{ url_for('routing.routing_uncombine', stage_id=m.stage_id) }}" style="display:inline"><button type="submit" class="rt-btn" style="padding:1px 8px;font-size:11.5px">Remove</button></form>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
+                </div>
+                {% endif %}
+                {% if me.can_edit and st.status == 'Pending' %}
+                  {% for c in me.candidates %}
+                  <form method="post" action="{{ url_for('routing.routing_combine', stage_id=st.id) }}" style="display:inline-block;margin:4px 6px 0 0">
+                    <input type="hidden" name="other_stage_id" value="{{ c.stage_id }}" />
+                    <button type="submit" class="rt-btn teal" style="padding:3px 10px;font-size:12px">Melt together with {{ c.prod_no }} ({{ '%g'|format(c.kg) }} KG)</button></form>
+                  {% endfor %}
+                  {% if me.others %}<div>Same alloy but not in production yet: {% for c in me.others %}{{ c.prod_no }} ({{ '%g'|format(c.kg) }} KG){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+                {% endif %}
+              </div>
+              {% endif %}
               {% endif %}
               {% if st.work_stage and st.work_stage.requires_lab_qc %}
               <div class="rt-labqc" style="margin-top:8px;padding:8px 10px;border:1px solid {{ '#B7E0C7' if lab_qc_passed(st) else '#F5D9B5' }};background:{{ '#F3FAF6' if lab_qc_passed(st) else '#FFF4E5' }};border-radius:8px">
@@ -499,7 +519,7 @@
     wasteBox.style.display = waste ? 'block' : 'none';
     wasteBox.style.background = '#FFF7ED'; wasteBox.style.border = '1px solid #F5D9B5';
     wasteIn.value = ''; wasteIn.disabled = !waste; wasteIn.required = !!waste;
-    document.getElementById('rt-waste-text').textContent = waste ? ('The furnace (' + waste.machine + ') holds ' + waste.cap + ' KG per melt. This order leaves ' + waste.unused + ' KG of it unused'
+    document.getElementById('rt-waste-text').textContent = waste ? ('The furnace (' + waste.machine + ') holds ' + waste.cap + ' KG per melt. This melt leaves ' + waste.unused + ' KG of it unused'
       + (waste.suggest.length ? '. These orders of the same alloy could share the melt: ' + waste.suggest.map(function (s) { return s.prod_no + ' (' + s.kg + ' KG)'; }).join(', ') + '.' : '.')) : '';
     // C12: garam maal ka intezaar limit paar ho gaya to wajah zaroori
     var waitBox = document.getElementById('rt-wait-box'), waitIn = document.getElementById('rt-wait-reason');

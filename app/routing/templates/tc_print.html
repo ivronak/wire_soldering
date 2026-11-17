@@ -35,7 +35,9 @@
       <div><span class="lbl">Tested by</span><span class="val">{{ qc.tested_by }}</span></div>
       <div><span class="lbl">Stage</span><span class="val">{{ stage.stage_name }}</span></div>
       <div><span class="lbl">Batch</span><span class="val">{{ '%g'|format(batch_kg) }} KG</span></div>
+      {% if heat_no %}<div><span class="lbl">Heat number</span><span class="val">{{ heat_no }}</span></div>{% endif %}
     </div>
+    {% if melt_orders %}<div class="remarks"><span class="lbl">This melt (heat {{ heat_no }}) also covers</span><p>{% for m in melt_orders %}{{ m.prod_no }} ({{ '%g'|format(m.kg) }} KG){% if not loop.last %}, {% endif %}{% endfor %}</p></div>{% endif %}
     <div class="supplier">
       {% if party %}<span class="lbl">Issued to</span><strong>{{ party }}</strong><div style="height:10px"></div>{% endif %}
       <span class="lbl">Product</span>

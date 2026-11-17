@@ -14,7 +14,7 @@ from app.production_orders.planning import next_working_day
 from app.production_orders.stage_material import gap_text, stage_material_gap
 from app.routing.pcs import pcs_mode, spools_made, to_pcs
 from app.production_orders.scheduler import now_ist, today_ist
-from app.routing.batch import melt_plan
+from app.routing.batch import combine_error, ensure_melt_group, melt_kg, melt_members, melt_plan, stage_kg
 from app.routing.busy import busy_machines
 from app.routing.handoff import metal_wait, stage_clash
 
@@ -119,7 +119,10 @@ def stage_plan(order, stage):
     Material = order ki wo lines jinka work_stage_id is stage ka hai. Lot = machine capacity (KG/hr) ke hisaab se, har lot me material
     batch ke hisaab se barabar hissa. Dono khaali ho to None (template kuch nahi dikhata)."""
     lines = [l for l in order.lines if l.work_stage_id and l.work_stage_id == stage.work_stage_id]
-    batch_kg = order_batch_kg(order)
+    # C9 phase 2: combined melt me furnace ke lot poore melt (sab orders) ke KG par bante hain; akele order me melt_kg = order ka KG
+    is_melt_stage = bool(stage.work_stage and stage.work_stage.is_batch and side_stage_info(order, stage) is None)
+    batch_kg = melt_kg(stage) if is_melt_stage else order_batch_kg(order)
+    combined = is_melt_stage and len(melt_members(stage)) > 1
     mats = [{"name": l.raw_material.name if l.raw_material else "", "qty": round(l.required_qty, 3),
              "unit": l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else ""} for l in lines]
     lots = []
@@ -134,11 +137,48 @@ def stage_plan(order, stage):
         for n in range(1, count + 1):
             kg = round(min(cap, left), 3)
             left = round(left - kg, 3)
-            lots.append({"n": n, "kg": kg, "mats": [{"name": m["name"], "qty": round(m["qty"] * kg / batch_kg, 3), "unit": m["unit"]} for m in mats]})
+            # Combined melt me ek lot me kai orders ka maal hota hai — lot ke andar ka material order-wise yahan nahi dikhate
+            lots.append({"n": n, "kg": kg, "mats": [] if combined else [{"name": m["name"], "qty": round(m["qty"] * kg / batch_kg, 3), "unit": m["unit"]} for m in mats]})
     if not mats and not lots:
         return None
     return {"materials": mats, "lots": lots, "lot_kg": cap if lots else None, "lot_hours": lot_hours,
-            "unused_kg": mp["unused_kg"] if mp else 0, "suggest": mp["suggest"] if mp else []}
+            "unused_kg": mp["unused_kg"] if mp else 0, "suggest": mp["suggest"] if mp else [], "melt": melt_info(order, stage) if is_melt_stage else None}
+
+
+def melt_info(order, stage):
+    """C9 phase 2: Melting stage ke liye melt (heat number) ki jaankari: heat no, members, aur jo orders abhi jud sakte hain.
+    can_edit = melt shuru nahi hua (sab members Pending) aur ye stage Pending."""
+    members = melt_members(stage)
+    started = any(m.status != "Pending" for m in members)
+    info = {"heat_no": stage.melt_group.heat_no if stage.melt_group_id else None, "started": started,
+            "members": [{"stage_id": m.id, "prod_no": m.production_order.prod_no, "kg": stage_kg(m), "me": m.id == stage.id} for m in members],
+            "total_kg": melt_kg(stage), "can_edit": False, "candidates": [], "others": []}
+    if started or stage.status != "Pending":
+        return info
+    info["can_edit"] = True
+    plan = melt_plan(order, stage, melt_kg(stage))
+    if plan is not None:
+        info["candidates"] = [s for s in plan["suggest"] if s["in_production"]]
+        info["others"] = [s for s in plan["suggest"] if not s["in_production"]]
+    return info
+
+
+def _member_start_problem(member):
+    # Combined melt ke doosre member ka Start rukne ka kaaran (text) ya None. Wahi shartein jo akele stage par lagti hain.
+    order = member.production_order
+    if order is None or order.is_deleted or order.status != "In production":
+        return "is not in production."
+    if member.status != "Pending":
+        return "has already started."
+    not_done = [s.stage_name for s in _previous_stages(order, member) if s.status != "Done"]
+    if not_done:
+        return f"has not finished {not_done[0]} yet."
+    gaps = stage_material_gap(order, member.work_stage_id)
+    if gaps:
+        return f"does not have its material fully issued ({gap_text(gaps)})."
+    if lab_qc_blocker(order, member) is not None:
+        return "is waiting for an earlier lab test."
+    return None
 
 
 def waste_payload(mp):
@@ -354,7 +394,9 @@ def routing_list():
             # C12: Melting ke baad garam maal kab se ruka hai (Work Stage me limit bhari ho to); limit paar ho to Start par wajah likhni padti hai
             "wait": wait_payload(metal_wait(o, cur)),
             # C8a: furnace poori nahi bhar rahi (capacity waste) — Melting Start par wajah likhni padti hai; suggestion me same-alloy orders
-            "waste": waste_payload(melt_plan(o, cur, order_batch_kg(o))) if cur.status == "Pending" and side is None else None,
+            "waste": waste_payload(melt_plan(o, cur, melt_kg(cur))) if cur.status == "Pending" and side is None else None,
+            "heat": ({"no": cur.melt_group.heat_no, "orders": [m.production_order.prod_no for m in melt_members(cur)]}
+                     if cur.melt_group_id and len(melt_members(cur)) > 1 else None),
         }
         # C7: Pending stage ka maal poora issue nahi hua to card par laal alert (Start tab tak block rehta hai)
         if cur.status == "Pending":
@@ -476,10 +518,20 @@ def routing_start(stage_id):
               f"Write what was done (for example re-heated) in the Start form.", "error")
         return _back()
     # C8a: furnace (batch machine) poori nahi bhar rahi to Start tabhi hoga jab wajah (kam se kam 3 akshar) likhi ho; wajah stage notes me jaati hai
-    waste = waste_payload(melt_plan(order, stage, order_batch_kg(order))) if side_stage_info(order, stage) is None else None
+    is_melt = side_stage_info(order, stage) is None and bool(stage.work_stage and stage.work_stage.is_batch)
+    waste = waste_payload(melt_plan(order, stage, melt_kg(stage))) if side_stage_info(order, stage) is None else None
+    # C9 phase 2: combined melt me baaki members bhi start ke layak hon (warna poora melt rukta hai)
+    members = melt_members(stage) if is_melt else [stage]
+    for member in members:
+        if member.id == stage.id:
+            continue
+        member_problem = _member_start_problem(member)
+        if member_problem:
+            flash(f"The combined melt cannot start: {member.production_order.prod_no} {member_problem} Fix it, or remove it from the melt.", "error")
+            return _back()
     waste_reason = (request.form.get("waste_reason") or "").strip()[:100]
     if waste is not None and len(waste_reason) < 3:
-        flash(f"{stage.stage_name} cannot start yet: the furnace holds {waste['cap']:g} KG per melt but this order fills {waste['melts'] * waste['cap'] - waste['unused']:g} KG "
+        flash(f"{stage.stage_name} cannot start yet: the furnace holds {waste['cap']:g} KG per melt but this melt fills {waste['melts'] * waste['cap'] - waste['unused']:g} KG "
               f"({waste['unused']:g} KG unused). Write the reason in the Start form (for example no other order of the same alloy is ready).", "error")
         return _back()
     started_at, error = _read_when("started_at")
@@ -515,9 +567,72 @@ def routing_start(stage_id):
         notes = (notes + " | " if notes else "") + f"Metal waited {round(wait['minutes'])} min (limit {wait['limit']}): {rewait_reason}"
     if machine_note:
         notes = (notes + " | " if notes else "") + machine_note
+    # C9 phase 2: har melt ko heat number; combined melt ke baaki members saath hi start (wahi operator / time, apna apna qty_in)
+    heat_text = ""
+    if is_melt:
+        group = ensure_melt_group(stage)
+        heat_text = f" Heat number {group.heat_no}."
+        notes = (notes + " | " if notes else "") + f"Heat {group.heat_no}"
+        for member in members:
+            if member.id == stage.id:
+                continue
+            member.status = "In progress"
+            member.started_at = started_at
+            member.operator = operator
+            member.qty_in = main_input(member.production_order, member)
+            _add_note(member, f"Heat {group.heat_no}, melted together with {order.prod_no}")
+        if len(members) > 1:
+            heat_text += " Started together with " + ", ".join(m.production_order.prod_no for m in members if m.id != stage.id) + "."
     stage.notes = notes[:255] or None
     db.session.commit()
-    flash(f"{stage.stage_name} started for {order.prod_no}." + (f" {machine_note}." if machine_note else ""), "success")
+    flash(f"{stage.stage_name} started for {order.prod_no}." + (f" {machine_note}." if machine_note else "") + heat_text, "success")
+    return _back()
+
+
+def _running_members(stage):
+    # Hold / resume / cancel ek saath poore melt par lagte hain: is stage ke melt ke sab members (apna bhi)
+    if stage.work_stage and stage.work_stage.is_batch and stage.melt_group_id:
+        return melt_members(stage)
+    return [stage]
+
+
+@routing_bp.route("/routing/combine/<int:stage_id>", methods=["POST"])
+def routing_combine(stage_id):
+    # C9 phase 2: is Pending Melting stage ke melt me doosre order ka Melting stage jodo (same alloy, furnace me jagah ho, melt shuru hone se pehle)
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    other = db.session.get(ProductionOrderStage, request.form.get("other_stage_id", type=int) or 0)
+    if other is None:
+        flash("Choose the order to add to this melt.", "error")
+        return _back()
+    problem = combine_error(stage, other)
+    if problem:
+        flash(problem, "error")
+        return _back()
+    group = ensure_melt_group(stage)
+    other.melt_group_id = group.id
+    db.session.commit()
+    flash(f"{other.production_order.prod_no} will be melted together with {order.prod_no} (heat number {group.heat_no}).", "success")
+    return _back()
+
+
+@routing_bp.route("/routing/uncombine/<int:stage_id>", methods=["POST"])
+def routing_uncombine(stage_id):
+    # Melt shuru hone se pehle kisi order ko melt se hatao.
+    stage = db.session.get(ProductionOrderStage, stage_id)
+    if stage is None or stage.melt_group_id is None:
+        flash("This order is not part of a combined melt.", "error")
+        return _back()
+    members = melt_members(stage)
+    if any(m.status != "Pending" for m in members):
+        flash("The melt has already started, so orders cannot be removed.", "error")
+        return _back()
+    # Melt (heat number) delete nahi karte: akela member bacha to wo apne heat number ke saath akela melt ban jaata hai (number kabhi dobara nahi banta)
+    stage.melt_group_id = None
+    db.session.commit()
+    flash(f"{stage.production_order.prod_no} was removed from the melt.", "success")
     return _back()
 
 
@@ -548,11 +663,15 @@ def routing_hold(stage_id):
     if held_at < stage.started_at:
         flash("The hold time cannot be before the start time.", "error")
         return _back()
-    stage.status = "On hold"
-    stage.held_at = held_at
-    stage.hold_reason = reason
+    members = [m for m in _running_members(stage) if m.status == "In progress"]
+    for member in members:
+        if member.started_at and held_at < member.started_at:
+            continue
+        member.status = "On hold"
+        member.held_at = held_at
+        member.hold_reason = reason
     db.session.commit()
-    flash(f"{stage.stage_name} of {order.prod_no} is on hold. The timer has stopped.", "success")
+    flash(f"{stage.stage_name} of {order.prod_no} is on hold. The timer has stopped." + (" The other orders of this melt are on hold too." if len(members) > 1 else ""), "success")
     return _back()
 
 
@@ -573,14 +692,16 @@ def routing_resume(stage_id):
     if resumed_at < stage.held_at:
         flash("The resume time cannot be before the hold time.", "error")
         return _back()
-    minutes = (resumed_at - stage.held_at).total_seconds() / 60
-    stage.hold_minutes = round((stage.hold_minutes or 0) + minutes, 2)
-    _add_note(stage, f"Held {int(round(minutes))} min ({stage.hold_reason})")
-    stage.status = "In progress"
-    stage.held_at = None
-    stage.hold_reason = None
+    members = [m for m in _running_members(stage) if m.status == "On hold" and m.held_at is not None and resumed_at >= m.held_at]
+    for member in members:
+        minutes = (resumed_at - member.held_at).total_seconds() / 60
+        member.hold_minutes = round((member.hold_minutes or 0) + minutes, 2)
+        _add_note(member, f"Held {int(round(minutes))} min ({member.hold_reason})")
+        member.status = "In progress"
+        member.held_at = None
+        member.hold_reason = None
     db.session.commit()
-    flash(f"{stage.stage_name} of {order.prod_no} resumed.", "success")
+    flash(f"{stage.stage_name} of {order.prod_no} resumed." + (" The other orders of this melt resumed too." if len(members) > 1 else ""), "success")
     return _back()
 
 
@@ -598,18 +719,21 @@ def routing_cancel_start(stage_id):
     if len(reason) < 3:
         flash("Write the reason for cancelling the run.", "error")
         return _back()
-    if stage.lab_qcs:
+    members = [m for m in _running_members(stage) if m.status in ("In progress", "On hold")]
+    if any(m.lab_qcs for m in members):
         flash(f"{stage.stage_name} has a lab test recorded, so the run cannot be cancelled. Put it on hold, or finish it.", "error")
         return _back()
-    _add_note(stage, f"Run cancelled ({reason}) - was started {stage.started_at.strftime('%d %b %H:%M')}")
-    stage.status = "Pending"
-    stage.started_at = None
-    stage.qty_in = None
-    stage.held_at = None
-    stage.hold_reason = None
-    stage.hold_minutes = 0
+    for member in members:
+        _add_note(member, f"Run cancelled ({reason}) - was started {member.started_at.strftime('%d %b %H:%M')}")
+        member.status = "Pending"
+        member.started_at = None
+        member.qty_in = None
+        member.held_at = None
+        member.hold_reason = None
+        member.hold_minutes = 0
     db.session.commit()
-    flash(f"{stage.stage_name} of {order.prod_no} is back to waiting to start. Start it again when the machine really starts.", "success")
+    flash(f"{stage.stage_name} of {order.prod_no} is back to waiting to start. Start it again when the machine really starts."
+          + (" The other orders of this melt went back too." if len(members) > 1 else ""), "success")
     return _back()
 
 
@@ -1013,7 +1137,19 @@ def routing_lab_qc(stage_id):
         name = secure_filename(tc.filename) or ("tc." + ext)
         tc.save(os.path.join(folder, name))
         row.tc_file = "lab_qc/" + str(row.id) + "/" + name         # DB me hamesha "/"
+    # C9 phase 2: ek melt ka ek hi lab test — wahi result + wahi TC file melt ke baaki orders ke stage par bhi (corrections sirf is order par, double issue nahi)
+    mirrored = []
+    if stage.melt_group_id:
+        for member in melt_members(stage):
+            if member.id == stage.id or member.status == "Pending":
+                continue
+            copy = StageLabQC(stage_id=member.id, tested_at=tested_at, tested_by=tested_by, result=result, tc_file=row.tc_file,
+                              remarks=((remarks + " | ") if remarks else "") + f"Heat {stage.melt_group.heat_no}, tested with {order.prod_no}"[:255])
+            db.session.add(copy)
+            mirrored.append(member.production_order.prod_no)
     db.session.commit()
+    if mirrored:
+        flash(f"The same lab result and TC were also saved for {', '.join(mirrored)} (same melt).", "success")
     added_text = (" Extra issued from the store: " + ", ".join(f"{c['qty']:g} {c['unit']} {c['material']}".replace("  ", " ") for c in corrections) + ".") if corrections else ""
     if result == "Pass":
         flash(f"Lab test passed for {stage.stage_name} ({order.prod_no}) and the TC is saved. The next stage can start.{added_text}", "success")
@@ -1044,7 +1180,10 @@ def routing_tc_print(qc_id):
     order = stage.production_order
     ext = row.tc_file.rsplit(".", 1)[-1].lower() if "." in row.tc_file else ""
     party = (request.args.get("party") or "").strip()[:80]
-    return render_template("tc_print.html", qc=row, stage=stage, order=order, party=party, is_pdf=(ext == "pdf"), batch_kg=order_batch_kg(order))
+    members = melt_members(stage) if stage.melt_group_id else []
+    return render_template("tc_print.html", qc=row, stage=stage, order=order, party=party, is_pdf=(ext == "pdf"), batch_kg=order_batch_kg(order),
+                           heat_no=stage.melt_group.heat_no if stage.melt_group_id else None,
+                           melt_orders=[{"prod_no": m.production_order.prod_no, "kg": stage_kg(m)} for m in members] if len(members) > 1 else [])
 
 
 @routing_bp.route("/routing/scrap_photo/<int:stage_id>")

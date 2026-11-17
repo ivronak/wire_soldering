@@ -1823,6 +1823,17 @@ class ProductRoutingStage(CreatedAtMixin, db.Model):
 
 
 
+class MeltGroup(CreatedAtMixin, db.Model):
+    # C9 phase 2: ek melt (furnace ki ek chal) = ek heat number. Same alloy ke kai orders ke Melting stages ek group me jud sakte hain (members),
+    # wo saath start hote hain, saath hold / resume hote hain, aur ek hi lab test / TC unsabhi par lagta hai. Har melt (akele order ka bhi) ko heat no milta hai.
+    __tablename__ = "melt_groups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    heat_no = db.Column(db.String(20), unique=True, nullable=False)          # HT-2026-001
+    work_stage_id = db.Column(db.Integer, db.ForeignKey("work_stage.id"), nullable=False)
+    work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
+
+
 class ProductionOrderStage(CreatedAtMixin, db.Model):
     # Order ka routing: us din ke stages ki copy (product ka routing badle to purana order nahi badlega) + unka planned time
     __tablename__ = "production_order_stages"
@@ -1835,6 +1846,9 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     work_stage = db.relationship("WorkStage", foreign_keys=[work_stage_id])
     stage_name = db.Column(db.String(100), nullable=False)
     sort_order = db.Column(db.Integer, default=0, nullable=False)
+    # C9 phase 2: Melting stage kis melt (heat number) ka hissa hai. Khaali = abhi koi melt nahi (Start par apne aap banta hai)
+    melt_group_id = db.Column(db.Integer, db.ForeignKey("melt_groups.id"), nullable=True)
+    melt_group = db.relationship("MeltGroup", foreign_keys=[melt_group_id], backref=db.backref("stages", order_by="ProductionOrderStage.id"))
 
     capacity_per_hour = db.Column(db.Float, nullable=True)       # chune hue machines ka jod, KG / hr
     daily_capacity = db.Column(db.Float, nullable=True)          # KG / din
