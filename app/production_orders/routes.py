@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionLine, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
 from app.production_orders.planning import plan_stages
+from app.production_orders.stage_material import gap_text, later_stage_gaps, stage_material_gap
 from app.production_lines.status import line_board
 from app.inventory.alerts import store_stock_by_material
 from app.production_orders.timeline import build_timeline
@@ -370,6 +371,7 @@ def production_orders_list():
         timeline=timeline,
         by=by,
         store_stock={str(k): v for k, v in store_stock_by_material().items()},
+        issue_gaps={o.id: later_stage_gaps(o) for o in orders if o.status in ("Released", "In production")},
         line_board=line_board(today),
         resched=resched,
         bundles=bundles,
@@ -764,6 +766,12 @@ def production_orders_start(order_id):
         return redirect(url_for("production_orders.production_orders_list"))
     if not order.stages:
         flash("This order has no production plan (stages and machines). Add one with Reschedule first.", "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    # C7: order tab start hota hai jab pehle stage (Melting: Tin / Lead) ka maal poora issue ho — kam metal = chhota output. Baad ke stage ka maal partial chalega.
+    first_gaps = stage_material_gap(order, order.stages[0].work_stage_id)
+    if first_gaps:
+        flash(f"{order.prod_no} cannot start yet: {order.stages[0].stage_name} needs all its material first ({gap_text(first_gaps)}). "
+              f"Issue the rest from the Material issue page.", "error")
         return redirect(url_for("production_orders.production_orders_list"))
     today = today_ist()
     # Is order ko frozen waalon ke turant baad rakh ke aaj se schedule karo, uski dates save karo

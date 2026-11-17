@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models import Machines, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, ScrapType, StageLabQC
 from app.production_orders.planning import next_working_day
+from app.production_orders.stage_material import gap_text, stage_material_gap
 from app.production_orders.scheduler import now_ist, today_ist
 from app.routing.handoff import stage_clash
 
@@ -270,6 +271,7 @@ def routing_list():
            "late": len([o for o in running if summaries[o.id]["delay"] > 0]), "ready": len(finished)}
     # Drawers ke liye: har stage ka data (JS) — sirf jo abhi kuch kar sakte hain (current stage)
     actions = {}
+    material_alerts = {}         # {stage id: text} — C7: card par "material not fully issued" alert
     machine_alerts = {}          # {stage id: text} — card par laal "machine not working" line (G27)
     # C14: stage ke baad jo maal bacha (issued - used) uska chhota text, card par "return to store" chip ke liye
     from app.material_issues.routes import leftover_items
@@ -303,6 +305,11 @@ def routing_list():
             # Stage timing clash lock: shuru karne par kisi doosre order ke garam maal se takrao ho to uska message (start drawer me dikhta hai)
             "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
         }
+        # C7: Pending stage ka maal poora issue nahi hua to card par laal alert (Start tab tak block rehta hai)
+        if cur.status == "Pending":
+            gaps = stage_material_gap(o, cur.work_stage_id)
+            if gaps:
+                material_alerts[cur.id] = gap_text(gaps)
         # G27: stage ki machine kharab / maintenance me ho to Start drawer me "Use this machine instead" aur card par laal alert
         problem = stage_machine_problem(cur)
         if problem is not None:
@@ -323,7 +330,7 @@ def routing_list():
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
-        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, leftover_text=leftover_text,
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"), next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
     )
 
 
@@ -376,6 +383,11 @@ def routing_start(stage_id):
     not_done = [s.stage_name for s in previous if s.status != "Done"]
     if not_done:
         flash(f"Finish {not_done[0]} first. Stages run one after another.", "error")
+        return _back()
+    # C7: is stage ka maal (recipe me jo isi stage ke saamne hai) poora issue hona chahiye
+    material_gaps = stage_material_gap(order, stage.work_stage_id)
+    if material_gaps:
+        flash(f"{stage.stage_name} cannot start yet: its material is not fully issued ({gap_text(material_gaps)}). Issue the rest from the Material issue page.", "error")
         return _back()
     blocker = lab_qc_blocker(order, stage)
     if blocker is not None:

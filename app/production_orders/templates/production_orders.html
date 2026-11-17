@@ -157,6 +157,8 @@
         {% elif mat.status == 'buy' %}<span class="po-chip bad"><i></i>Need to buy</span>
         {% elif mat.status == 'coming' %}<span class="po-chip warn"><i></i>PO coming</span>
         {% else %}<span class="po-chip ok"><i></i>{{ 'Material issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
+        {# C7: baad ke stage ka maal abhi poora issue nahi hua — wo stage tab tak start nahi hoga #}
+        {% for stage_name, gaps in issue_gaps.get(o.id, []) %}<div class="po-meta mt-1" style="color:#B42318;font-weight:600">{{ stage_name }} will wait: {% for g in gaps %}{{ g.name }} {{ '%g'|format(g.short) }} {{ g.unit }} not issued{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
         {% if mat and mat.status == 'buy' %}
         <div class="po-meta mt-1">{% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} −{{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
         {% elif mat and mat.status == 'coming' %}

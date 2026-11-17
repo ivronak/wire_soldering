@@ -128,6 +128,8 @@
         <div class="rt-meta">{{ '%g'|format(o.planned_qty * o.unit_weight) }} KG batch{% if o.started_date %} · started {{ dshort(o.started_date) }}{% endif %}</div>
         {# C14: stage complete ke baad jo maal bacha wo store ko lautana hai #}
         {% if leftover_text.get(o.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FFF7ED;border-color:#F5D9B5;color:#8A4A1C">Left over, return to store: {{ leftover_text[o.id] }} · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Return now</a></div>{% endif %}
+        {# C7: is stage ka maal poora issue nahi hua — stage Start tab tak block #}
+        {% if cur and material_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">{{ cur.stage_name }} cannot start: material not fully issued ({{ material_alerts[cur.id] }}) · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Issue it</a></div>{% endif %}
         {# G27: is stage ki machine kharab / maintenance me hai #}
         {% if cur and machine_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">Machine not working: {{ machine_alerts[cur.id] }}</div>{% endif %}
       </div>
