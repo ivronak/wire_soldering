@@ -1,0 +1,102 @@
+{# Plan / Reschedule drawer + Start (line chuno) ka JS. Pehle _plan_js.html include karo aur page me var RESCHED = {...} define karo. #}
+<script>
+  var rsBox = document.getElementById('rs-plan');
+  var rsStart = document.getElementById('rs-start');
+  var rsPlan = makePlanWidget(rsBox, rsStart);
+
+  // ---------- Reschedule ----------
+  var rsModal = document.getElementById('rs-modal');
+  var rsForm = document.getElementById('rs-form');
+  var rsCurrent = null;
+  function rsRefresh() {
+    if (!rsCurrent) return;
+    // Chuni hui line ki machines tick. Line wahi hai jo order ki thi to purani chuni machines, badli to us line ki sab machines
+    var rsLineSel = document.getElementById('rs-line');
+    var same = !rsLineSel || String(rsCurrent.data.line_id || '') === rsLineSel.value;
+    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, same ? rsCurrent.data.chosen : null, rsCurrent.data.batch_kg, rsCurrent.data.prod_no,
+      rsLineSel ? rsLineSel.value : undefined);
+  }
+  function rsClose() { rsModal.style.display = 'none'; rsModal.setAttribute('aria-hidden', 'true'); rsCurrent = null; }
+  document.querySelectorAll('.btn-resched').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-id');
+      var data = RESCHED[id];
+      if (!data) return;
+      rsCurrent = { id: id, data: data };
+      rsForm.action = '/production_orders/reschedule/' + id;
+      document.getElementById('rs-no').textContent = data.prod_no + (data.line ? ' · ' + data.line : '');
+      rsStart.value = data.start;
+      if (document.getElementById('rs-line')) document.getElementById('rs-line').value = data.line_id || '';
+      document.getElementById('rs-needed').value = data.needed_by || '';
+      rsPlan.reset('');
+      rsModal.style.display = 'flex'; rsModal.setAttribute('aria-hidden', 'false');
+      rsRefresh();
+    });
+  });
+  rsStart.addEventListener('input', rsRefresh);
+  if (document.getElementById('rs-line')) document.getElementById('rs-line').addEventListener('change', rsRefresh);
+  rsBox.addEventListener('change', function (event) {
+    if (event.target.classList.contains('plan-machine')) rsRefresh();
+  });
+  ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', rsClose); });
+
+  // Purane link ?plan=<id> se bhi drawer seedha khul jaaye
+  (function () {
+    var planId = new URLSearchParams(window.location.search).get('plan');
+    if (!planId) return;
+    var target = document.querySelector('.btn-resched[data-id="' + planId + '"]');
+    if (target) target.click();
+  })();
+
+  // ---------- Start production: line chuno ----------
+  (function () {
+    var modal = document.getElementById('start-modal');
+    if (!modal) return;
+    var form = document.getElementById('start-form');
+    function close() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+    // Chuni hui line ki daily capacity se kam kaam ho to wajah wala box dikhao (aur zaroori karo)
+    function refreshUnder() {
+      var box = document.getElementById('start-under'), reason = document.getElementById('start-reason');
+      var picked = form.querySelector('input[name=line_id]:checked');
+      var kg = parseFloat(modal.getAttribute('data-kg')) || 0, gap = 0, name = '';
+      if (picked) {
+        var card = picked.closest('.start-line');
+        var cap = parseFloat(card.getAttribute('data-cap')) || 0, left = parseFloat(card.getAttribute('data-left')) || 0;
+        gap = Math.round((cap - (left + kg)) * 100) / 100;
+        name = card.getAttribute('data-name');
+        document.getElementById('start-under-text').textContent = name + ' can make ' + cap + ' KG a day, but only ' + Math.round((left + kg) * 100) / 100 + ' KG is planned. ' + gap + ' KG of capacity stays unused.';
+      }
+      var need = gap > 0.0001;
+      box.classList.toggle('hidden', !need);
+      reason.required = need;
+    }
+    form.addEventListener('change', refreshUnder);
+    document.querySelectorAll('.btn-start-line').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var kg = parseFloat(btn.getAttribute('data-kg')) || 0;
+        form.action = '/production_orders/start/' + btn.getAttribute('data-id');
+        document.getElementById('start-no').textContent = btn.getAttribute('data-no');
+        document.getElementById('start-kg').textContent = kg;
+        form.reset();
+        modal.setAttribute('data-kg', kg);
+        // Order ki line planner me chuni thi: wahi tick, baaki lines disabled (machines usi line ki chuni hain)
+        var fixed = btn.getAttribute('data-line');
+        form.querySelectorAll('input[name=line_id]').forEach(function (r) {
+          r.disabled = !!fixed && r.value !== fixed;
+          r.checked = !!fixed && r.value === fixed;
+          r.closest('.start-line').style.opacity = r.disabled ? '0.45' : '1';
+        });
+        refreshUnder();
+        modal.querySelectorAll('.start-line').forEach(function (card) {
+          var cap = parseFloat(card.getAttribute('data-cap')) || 0;
+          var d = card.querySelector('.start-days');
+          if (d && cap > 0) d.textContent = 'This order alone needs about ' + Math.max(1, Math.ceil(kg / cap - 1e-9)) + ' day(s) on this line.';
+        });
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+      });
+    });
+    document.getElementById('btn-cancel-start').addEventListener('click', close);
+    document.getElementById('start-backdrop').addEventListener('click', close);
+  })();
+</script>

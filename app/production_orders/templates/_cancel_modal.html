@@ -1,0 +1,34 @@
+{# Cancel order drawer (wajah zaroori). Orders page: sirf Draft ka Cancel; Production planning page: Draft + Released ka Cancel (cancel_next='planning'). #}
+{# ---- Cancel order: wajah zaroori ---- #}
+<div id="co-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4" aria-hidden="true" style="display:none">
+  <div id="co-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl">
+    <div class="px-5 py-4 border-b border-slate-200"><h2 class="text-[17px] font-bold text-ink">Cancel <span id="co-no" class="font-mono"></span>?</h2>
+      <p class="text-[12.5px] text-ink-faint mt-1">The order moves to the Cancelled tab and its place in the queue and its machines become free. If material was already issued, cancel those issues first.</p></div>
+    <form id="co-form" method="post" class="px-5 py-4 space-y-3">
+      {% if cancel_next %}<input type="hidden" name="next" value="{{ cancel_next }}" /><input type="hidden" name="tab" value="{{ tab }}" />{% endif %}
+      <div>
+        <label for="co-reason" class="po-label">Reason *</label>
+        <input type="text" id="co-reason" name="reason" maxlength="255" required class="po-input" />
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="co-close" class="po-btn ghost">Keep order</button>
+        <button type="submit" class="po-btn" style="background:#B42318;color:#fff;border-color:#8F1B12">Cancel order</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+    var coModal = document.getElementById('co-modal');
+    function coClose() { coModal.style.display = 'none'; coModal.setAttribute('aria-hidden', 'true'); }
+    document.querySelectorAll('.btn-cancel-order').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.getElementById('co-form').action = '/production_orders/cancel/' + btn.getAttribute('data-id');
+        document.getElementById('co-no').textContent = btn.getAttribute('data-no');
+        document.getElementById('co-reason').value = '';
+        coModal.style.display = 'flex'; coModal.setAttribute('aria-hidden', 'false');
+        document.getElementById('co-reason').focus();
+      });
+    });
+    ['co-close', 'co-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', coClose); });
+</script>

@@ -20,7 +20,7 @@
   .po-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; transition: box-shadow .15s, border-color .15s; }
   .po-card:hover { border-color: #BFC9C8; box-shadow: 0 2px 8px rgba(15,47,50,.07); }
   .po-card.is-run { border-left: 4px solid #C46B2D; }
-  .po-row { display: grid; grid-template-columns: 62px minmax(220px, 1.6fr) minmax(150px, 1fr) minmax(210px, 1.3fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px; cursor: pointer; }
+  .po-row { display: grid; grid-template-columns: 62px minmax(220px, 1.6fr) minmax(210px, 1.3fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px; cursor: pointer; }
   .po-pos { display: flex; flex-direction: column; align-items: center; gap: 1px; }
   .po-pos .n { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #8A4A1C; line-height: 1.2; }
   .po-pos button { width: 24px; height: 16px; line-height: 1; font-size: 11px; color: #98A5A4; border-radius: 4px; border: 0; background: transparent; }
@@ -73,7 +73,7 @@
   .po-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
   @media (max-width: 1100px) {
     .po-row { grid-template-columns: 56px 1fr auto 28px; }
-    .po-row .po-mcol, .po-row .po-scol { grid-column: 2 / 4; }
+    .po-row .po-scol { grid-column: 2 / 4; }
   }
   /* Timeline (Gantt) */
   .po-tl { --dw: 92px; --lw: 210px; background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; overflow: hidden; }
@@ -132,15 +132,11 @@
 
 {% macro order_card(o) %}
   {% set sc = schedule.get(o.id) %}
-  {% set mat = materials.get(o.id) %}
-  {% set late_days = (sc.end - o.needed_by_date).days if (sc and o.needed_by_date and sc.end > o.needed_by_date) else 0 %}
   <article class="po-card {{ 'is-run' if o.status == 'In production' else '' }}">
     <div class="po-row">
       <div class="po-pos">
         {% if o.status in ('Draft', 'Released') %}
-        <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='up') }}"><button type="submit" title="Move up (higher priority)" aria-label="Move up">▲</button></form>
-        <div class="n">{{ o.queue_position }}</div>
-        <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='down') }}"><button type="submit" title="Move down" aria-label="Move down">▼</button></form>
+        <div class="n" title="Place in the queue. Change it on the Production planning page.">{{ o.queue_position }}</div>
         {% elif o.status == 'In production' %}
         <div class="n">{{ o.queue_position }}</div>
         {% else %}<div class="n" style="color:#98A5A4">—</div>{% endif %}
@@ -150,24 +146,6 @@
         <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}{% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="po-chip bnd" title="Show only the orders of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
         <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
         <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}{% if o.extra_percent %} · +{{ '%g'|format(o.extra_percent) }}% metal for scrap{% endif %}{% if o.balance_for %} · balance of {{ o.balance_for.prod_no }}{% endif %}</div>
-      </div>
-
-      <div class="po-mcol">
-        {% if o.status == 'Cancelled' or not mat %}<span class="po-meta">—</span>
-        {% elif mat.status == 'buy' %}<span class="po-chip bad"><i></i>Need to buy</span>
-        {% elif mat.status == 'coming' %}<span class="po-chip warn"><i></i>PO coming</span>
-        {% elif mat.status == 'making' %}<span class="po-chip warn"><i></i>Will be made</span>
-        {% else %}<span class="po-chip ok"><i></i>{{ 'Material issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
-        {# C7: baad ke stage ka maal abhi poora issue nahi hua — wo stage tab tak start nahi hoga #}
-        {% for stage_name, gaps in issue_gaps.get(o.id, []) %}<div class="po-meta mt-1" style="color:#B42318;font-weight:600">{{ stage_name }} will wait: {% for g in gaps %}{{ g.name }} {{ '%g'|format(g.short) }} {{ g.unit }} not issued{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
-        {# C6 / G9: in-house maal (Flux) ka make-order queue me — "Will be made by PROD-X"; peeche ho to laal warning #}
-        {% if mat %}{% for l in mat.lines if l.from_make %}<div class="po-meta mt-1">{{ l.name }}: will be made by {% for m in l.from_make %}{{ m[0] }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
-        {% for b in mat.make_behind %}<div class="po-meta mt-1" style="color:#B42318;font-weight:600">{{ b.name }} is made by {{ b.prod_no }}, which is behind this order. Move it up, or this order will wait for it.</div>{% endfor %}{% endif %}
-        {% if mat and mat.status == 'buy' %}
-        <div class="po-meta mt-1">{% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} −{{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-        {% elif mat and mat.status == 'coming' %}
-        <div class="po-meta mt-1">{% for l in mat.lines if l.from_po %}{% for po in l.from_po %}{{ po[0] }}{% if po[2] %} · {{ dshort(po[2]) }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-        {% endif %}
       </div>
 
       <div class="po-scol">
@@ -209,47 +187,21 @@
         <div class="po-bar" title="{{ progress.get(o.id, 0) }}%"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>
         {% if sn %}<div class="po-meta mt-1"><a href="{{ url_for('routing.routing_list') }}" style="color:#8A4A1C;font-weight:600;text-decoration:none">{{ sn.done }}/{{ sn.total }} stages done{% if sn.name %} · {{ sn.name }} {{ 'running' if sn.state == 'In progress' else 'next' }}{% endif %}</a></div>{% endif %}
         {% endif %}
-        <div class="flex flex-wrap gap-1 mt-1.5">
-          {% if late_days %}<span class="po-chip bad"><i></i>Late {{ late_days }}d · needed {{ dshort(o.needed_by_date) }}</span>
-          {% elif o.needed_by_date %}<span class="po-chip ok"><i></i>On time · needed {{ dshort(o.needed_by_date) }}</span>{% endif %}
-          {% if sc.waits_for_material %}<span class="po-chip warn"><i></i>Waits for material till {{ dshort(sc.waits_for_material) }}</span>{% endif %}
-        </div>
         {% else %}<span class="po-meta">No plan · set stages in Product Master</span>{% endif %}
       </div>
 
       <div class="po-act">
-        {% if o.status == 'Draft' and not o.plan_confirmed %}
-        {# Line + machines abhi chuni nahi (order form me nahi poochte): pehle plan, phir Release #}
-        <button type="button" class="po-btn primary btn-resched" data-id="{{ o.id }}">Plan</button>
-        {% elif o.status == 'Draft' %}
-        <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
-              data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.{% if mat and mat.status == 'buy' %} Material is short: {% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} {{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}. You can still release, but only the available stock can be issued until the rest is bought.{% endif %}">
-          <button type="submit" class="po-btn teal">Release</button></form>
-        {% elif o.status == 'Released' %}
-        {% if line_board and not (o.product and o.product.output_rm_id) %}
-        {# Lines bani hain: Start par pehle line chunni padti hai (live status ke saath). In-house product (Flux) ko line / capacity ka sawaal nahi #}
-        <button type="button" class="po-btn primary btn-start-line" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" data-line="{{ o.line_id or '' }}" data-kg="{{ '%g'|format(o.planned_qty * o.unit_weight) }}">Start</button>
-        {% else %}
-        <form method="post" action="{{ url_for('production_orders.production_orders_start', order_id=o.id) }}" class="js-confirm-submit"
-              data-confirm-title="Start production" data-confirm-ok="Start" data-confirm-message="Start {{ o.prod_no }} now? Its dates are fixed from today and other orders in the queue are planned around it.">
-          <button type="submit" class="po-btn primary">Start</button></form>
-        {% endif %}
-        {% elif o.status == 'In production' %}
-        <a href="{{ url_for('material_issues.material_issues_list') }}" class="po-btn ghost">Material issue</a>
-        {% endif %}
-        {# Client ka kehna (2026-10-26): kaam ke buttons seedha bahar dikhein, menu me dhoondhna na pade. Menu me sirf kam-use wale bache. #}
+        {# C1: Plan, Release, Make first, Reschedule, Start, Material issue sab Production planning page par. Yahan: Print, planning par jaane ka link aur Draft ka Cancel. #}
         {% if o.status != 'Cancelled' %}
         <a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank" class="po-btn ghost sm">Print order</a>
         {% if o.status in ('Draft', 'Released') %}
-        <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><button type="submit" class="po-btn ghost sm">Make first</button></form>
-        <button type="button" class="po-btn ghost sm btn-resched" data-id="{{ o.id }}">Reschedule</button>
+        <a href="{{ url_for('production_planning.production_planning_page', tab=('queue' if o.status == 'Released' else ('ready' if o.plan_confirmed else 'needs'))) }}" class="po-btn ghost sm" title="Plan, release, start and reorder orders on the Production planning page">Planning &rarr;</a>
         {% endif %}
-        {% if o.status in ('Draft', 'Released', 'In production') %}
+        {% if o.status in ('Draft', 'In production') %}
         <details class="po-menu"><summary aria-label="More actions">⋯</summary>
           <div class="items">
             {% if o.status == 'In production' %}<a href="{{ url_for('routing.routing_list') }}">Routing / stages</a>{% endif %}
-            {% if o.status == 'Released' %}<a href="{{ url_for('material_issues.material_issues_list') }}">Issue material</a>{% endif %}
-            {% if o.status in ('Draft', 'Released') %}
+            {% if o.status == 'Draft' %}
             <button type="button" class="btn-cancel-order danger" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>
             {% endif %}
           </div>
@@ -281,16 +233,9 @@
         <div>
           <h4>Raw material</h4>
           {% for line in o.lines %}
-          {% set ml = mat.lines[loop.index0] if mat else None %}
           <div class="po-mat">
             <div style="min-width:0"><div class="font-semibold text-ink">{{ line.raw_material.name if line.raw_material else '—' }}{% if line.is_extra %} <span class="po-meta">(added)</span>{% elif line.is_packing %} <span class="po-meta">(packing)</span>{% endif %}</div>
               <div class="po-meta">{{ line.raw_material.code if line.raw_material else '' }} · need {{ '%.2f'|format(line.required_qty) }}{% if line.allowance_qty > 0 %} + {{ '%.2f'|format(line.allowance_qty) }} spare{% endif %} {{ line.raw_material.base_unit.code if line.raw_material and line.raw_material.base_unit else '' }}{% if line.issued_qty > 0 %} · issued {{ '%.2f'|format(line.issued_qty) }}{% endif %}</div></div>
-            {% if o.status != 'Cancelled' and ml %}
-              {% if ml.issued_all %}<span class="po-chip ok"><i></i>Issued</span>
-              {% elif ml.buy > 0.000001 %}<span class="po-chip bad" title="{% for po in ml.from_po %}{{ po[0] }} {{ '%.2f'|format(po[1]) }}; {% endfor %}"><i></i>Buy {{ '%.2f'|format(ml.buy) }}</span>
-              {% elif ml.from_po %}<span class="po-chip warn"><i></i>{{ ml.from_po[0][0] }}{% if ml.from_po[0][2] %} · {{ dshort(ml.from_po[0][2]) }}{% endif %}</span>
-              {% else %}<span class="po-chip ok"><i></i>In stock</span>{% endif %}
-            {% endif %}
           </div>
           {% endfor %}
         </div>
@@ -310,18 +255,16 @@
   <div>
     <div class="text-[12.5px] text-ink-faint font-medium">Manufacturing / Production orders</div>
     <h1 class="text-[22px] font-bold text-ink leading-tight">Production queue</h1>
-    <p class="text-[13px] text-ink-faint">Orders run top to bottom. Dates come from the queue, the machines and the raw material in store.</p>
+    <p class="text-[13px] text-ink-faint">Add orders here and see what happened to each one. Planning, release, queue order and start are done on the <a href="{{ url_for('production_planning.production_planning_page') }}" class="underline" style="color:#8A4A1C">Production planning</a> page.</p>
   </div>
   <button type="button" id="btn-add-mo" class="po-btn primary" style="padding:10px 18px;font-size:14px;box-shadow:0 1px 2px rgba(15,47,50,.2)">
     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>New production order
   </button>
 </div>
 
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+<div class="grid grid-cols-2 gap-3 shrink-0" style="max-width:520px">
   <div class="po-kpi"><span class="k">In the queue</span><span class="v">{{ open_count }}</span><span class="h">{{ open_count - kpi.running }} waiting to start</span></div>
   <div class="po-kpi {{ 'warn' if kpi.running else '' }}"><span class="k">In production</span><span class="v">{{ kpi.running }}</span><span class="h">dates are fixed</span></div>
-  <div class="po-kpi {{ 'bad' if kpi.buy else ('warn' if kpi.material else '') }}"><span class="k">Need material</span><span class="v">{{ kpi.material }}</span><span class="h">{{ kpi.buy }} need buying</span></div>
-  <div class="po-kpi {{ 'bad' if kpi.late else '' }}"><span class="k">Running late</span><span class="v">{{ kpi.late }}</span><span class="h">after the needed-by date</span></div>
 </div>
 
 <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
@@ -564,110 +507,12 @@
   </div>
 </div>
 
-{# ---- Reschedule: earliest start, needed by aur machines badlo ---- #}
-<div id="rs-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true" style="display:none">
-  <div id="rs-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
-      <div><h2 class="text-[17px] font-bold text-ink">Reschedule <span id="rs-no" class="font-mono"></span></h2>
-        <p class="text-[12.5px] text-ink-faint">Change the earliest start, the needed-by date or the machines. Quantity and materials stay the same. To change priority use the arrows in the queue.</p></div>
-      <button type="button" id="rs-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
-    </div>
-    <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-mist">
-      <div class="po-step grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div><label for="rs-start" class="po-label">Earliest start date</label><input type="date" id="rs-start" name="start_date" class="po-input" /></div>
-        <div><label for="rs-needed" class="po-label">Needed by (optional)</label><input type="date" id="rs-needed" name="needed_by" class="po-input" /></div>
-        {% if line_board %}
-        {# Order ko dusri line me bhi daal sakte hain: line badalte hi us line ki machines tick hoti hain #}
-        <div class="sm:col-span-2"><label for="rs-line" class="po-label">Production line *</label>
-          <select id="rs-line" name="line_id" required class="po-input bg-white">
-            <option value="">Choose a line</option>
-            {% for ln in line_board %}<option value="{{ ln.id }}">{{ ln.name }} · {{ '%g'|format(ln.capacity) }} KG/day</option>{% endfor %}
-          </select></div>
-        {% endif %}
-      </div>
-      <div class="po-step"><div id="rs-plan" class="text-[13px] text-ink-faint"></div></div>
-    </form>
-    <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
-      <button type="button" id="rs-cancel" class="po-btn ghost">Close</button>
-      <button type="submit" form="rs-form" class="po-btn primary" style="padding:8px 20px">Save plan</button>
-    </div>
-  </div>
-</div>
-
-{# ---- Start production: line chuno (live status) ---- #}
-{% if line_board %}
-<div id="start-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
-  <div id="start-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" aria-labelledby="start-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-5 py-4 border-b border-slate-200 bg-copper-soft shrink-0">
-      <h2 id="start-title" class="text-[17px] font-bold text-ink">Start <span id="start-no" class="font-mono"></span> — choose a line</h2>
-      <p class="text-[12.5px] text-ink-faint mt-1">This order is <b id="start-kg"></b> KG. Pick the line it will run on. Each line shows what is running now and when it is free.</p>
-    </div>
-    <form id="start-form" method="post" action="" class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-      {% for ln in line_board %}
-      <label class="start-line block border border-slate-300 rounded-lg p-3 cursor-pointer hover:border-copper" data-cap="{{ ln.capacity }}" data-left="{{ ln.left_kg }}" data-name="{{ ln.name }}">
-        <div class="flex items-start gap-3">
-          <input type="radio" name="line_id" value="{{ ln.id }}" class="mt-1" {% if loop.first %}required{% endif %} />
-          <div class="flex-1">
-            <div class="flex items-center justify-between gap-2">
-              <div class="font-semibold text-ink">{{ ln.name }} <span class="font-mono text-[11.5px] text-ink-faint">{{ ln.code }}</span></div>
-              <div class="text-[12.5px] font-semibold tabular-nums">{{ '%g'|format(ln.capacity) }} KG/day</div>
-            </div>
-            <div class="text-[12px] text-ink-faint">{{ ln.machines }} machine{{ 's' if ln.machines != 1 else '' }}{% if ln.handler %} · {{ ln.handler }}{% endif %}</div>
-            {% if ln.running %}
-            <div class="mt-2 space-y-1">
-              {% for r in ln.running %}
-              <div class="text-[12.5px] text-ink"><span class="font-mono font-semibold">{{ r.prod_no }}</span> running · {{ '%g'|format(r.left_kg) }} of {{ '%g'|format(r.batch_kg) }} KG left{% if r.ends %} · plan ends {{ r.ends }}{% endif %}</div>
-              {% endfor %}
-            </div>
-            <div class="mt-1.5 text-[12.5px] font-semibold" style="color:#8A4A1C">Busy {{ ln.busy_days }} day{{ 's' if ln.busy_days != 1 else '' }} · free from {{ ln.free_from }}</div>
-            {% else %}
-            <div class="mt-2 text-[12.5px] font-semibold text-success">Free now</div>
-            {% endif %}
-            <div class="start-days mt-1 text-[12px] text-ink-muted"></div>
-          </div>
-        </div>
-      </label>
-      {% endfor %}
-      <div id="start-under" class="hidden rounded-lg p-3" style="background:#FFF4E5;border:1px solid #F5D9B5">
-        <div class="text-[13px] font-semibold" style="color:#7A4A12">Line will run below its daily capacity</div>
-        <p id="start-under-text" class="text-[12.5px] mt-1" style="color:#7A4A12"></p>
-        <label for="start-reason" class="block text-[12.5px] font-semibold text-ink mt-2 mb-1">Why is the capacity not fully used? *</label>
-        <textarea id="start-reason" name="under_reason" rows="2" maxlength="255" placeholder="e.g. No other order waiting; remaining capacity kept for a sample / own stock"
-          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
-        <p class="text-[11.5px] mt-1" style="color:#7A4A12">Tip: you can also add another order first, so the line is fully used.</p>
-      </div>
-    </form>
-    <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
-      <button type="button" id="btn-cancel-start" class="po-btn ghost">Cancel</button>
-      <button type="submit" form="start-form" class="po-btn primary">Start production</button>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ---- Cancel order: wajah zaroori ---- #}
-<div id="co-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4" aria-hidden="true" style="display:none">
-  <div id="co-backdrop" class="absolute inset-0 bg-ink/40"></div>
-  <div role="dialog" class="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl">
-    <div class="px-5 py-4 border-b border-slate-200"><h2 class="text-[17px] font-bold text-ink">Cancel <span id="co-no" class="font-mono"></span>?</h2>
-      <p class="text-[12.5px] text-ink-faint mt-1">The order moves to the Cancelled tab and its place in the queue and its machines become free. If material was already issued, cancel those issues first.</p></div>
-    <form id="co-form" method="post" class="px-5 py-4 space-y-3">
-      <div>
-        <label for="co-reason" class="po-label">Reason *</label>
-        <input type="text" id="co-reason" name="reason" maxlength="255" required class="po-input" />
-      </div>
-      <div class="flex justify-end gap-2">
-        <button type="button" id="co-close" class="po-btn ghost">Keep order</button>
-        <button type="submit" class="po-btn" style="background:#B42318;color:#fff;border-color:#8F1B12">Cancel order</button>
-      </div>
-    </form>
-  </div>
-</div>
+{# Draft ka Cancel yahin rehta hai; Plan / Start / Released ka Cancel Production planning page par (C1) #}
+{% include "_cancel_modal.html" %}
 {% endblock %}
 
 {% block page_js %}
+{% include "_plan_js.html" %}
 <script>
   var planner = {{ planner | tojson }};
   var materialOptions = {{ material_options | tojson }};
@@ -730,12 +575,6 @@
     extraBody.innerHTML = '<tr id="mo-extra-empty"><td colspan="4" class="text-ink-faint">No extra materials yet.</td></tr>';
   }
 
-  function esc(text) {
-    return String(text == null ? '' : text)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
   // ---------- Product ka cascade: category -> attribute 1 -> attribute 2 -> ... ----------
   // Har step ke options sirf wahi hain jo pichhle chune hue attributes wale products me maujood hain.
   // Jaise Alloy 60/40 chuna to Thickness me sirf 60/40 ke products ki thickness aayengi.
@@ -876,153 +715,8 @@
     }).join('');
   }
 
-  // ---------- Production plan (kitne ghante / din, kab tak, machine clash) ----------
-  // Formula app/production_orders/planning.py ka JS mirror: stage ek ke baad ek, stage ki capacity = chuni machines ka jod,
-  // kaam ke din Monday-Saturday (Sunday off). Ek hi widget naye order form aur Reschedule dono me chalta hai.
-  var RESCHED = {{ resched | tojson }};     // {order_id: {prod_no, batch_kg, routing, chosen, start}}
   var planBox = document.getElementById('mo-plan');
   var startInput = document.getElementById('mo-start');
-  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  function parseIso(text) {
-    var parts = String(text || '').split('-');
-    if (parts.length !== 3) return null;
-    return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
-  }
-  function nextWorkingDay(day) {
-    var d = new Date(day.getTime());
-    while (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1);   // Sunday off
-    return d;
-  }
-  function addWorkingDays(start, count) {
-    var d = nextWorkingDay(start);
-    var remaining = count - 1;
-    while (remaining > 0) {
-      d.setUTCDate(d.getUTCDate() + 1);
-      d = nextWorkingDay(d);
-      remaining -= 1;
-    }
-    return d;
-  }
-  function isoOf(d) { return d.toISOString().slice(0, 10); }
-  function fmtDate(d) { return String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
-  function fmtShort(iso) { var d = parseIso(iso); return String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()]; }
-  function round2(x) { return Math.round((x + 1e-9) * 100) / 100; }
-
-  // stages: [{machines: [{per_hour, hours_per_day}]}] (sirf chuni hui machines). Wapas: stage-wise ghante / din / window + total
-  function planFor(batchKg, stages, startIso) {
-    var rows = [], rawDays = [], totalHours = 0, totalDays = 0, bottleneck = null;
-    stages.forEach(function (stage) {
-      var perHour = 0, perDay = 0;
-      stage.machines.forEach(function (m) { perHour += m.per_hour; perDay += m.per_hour * m.hours_per_day; });
-      var hours = perHour > 0 ? batchKg / perHour : 0;
-      var days = perDay > 0 ? batchKg / perDay : 0;
-      totalHours += hours; totalDays += days;
-      var row = { name: stage.name, perHour: perHour, perDay: perDay, hours: round2(hours), days: round2(days), startIso: null, endIso: null };
-      rows.push(row);
-      rawDays.push(days);
-      if (perDay > 0 && (bottleneck === null || perDay < bottleneck.perDay)) bottleneck = row;
-    });
-    var start = parseIso(startIso);
-    var workingDays = rows.length ? Math.max(Math.ceil(totalDays - 1e-9), 1) : 0;
-    if (start && rows.length) {
-      // Har stage ka window (planning.py jaisa): pichhle stages ke din jod ke
-      var passed = 0;
-      rows.forEach(function (row, i) {
-        var first = Math.floor(passed + 1e-9);
-        passed += rawDays[i];
-        var last = Math.max(Math.ceil(passed - 1e-9) - 1, first);
-        row.startIso = isoOf(addWorkingDays(start, first + 1));
-        row.endIso = isoOf(addWorkingDays(start, last + 1));
-      });
-    }
-    return {
-      stages: rows, totalHours: round2(totalHours), workingDays: workingDays,
-      start: (start && rows.length) ? nextWorkingDay(start) : null,
-      end: (start && rows.length) ? addWorkingDays(start, workingDays) : null,
-      dailyCapacity: bottleneck ? round2(bottleneck.perDay) : null, bottleneck: bottleneck ? bottleneck.name : null
-    };
-  }
-
-  // Ek jagah ka planner widget: box ke andar stage table + summary banata hai. key badle to naye sire se render.
-  function makePlanWidget(box, startEl) {
-    var w = { key: null, clash: false, plan: null };
-    w.reset = function (text) {
-      w.key = null; w.clash = false; w.plan = null;
-      box.className = 'text-[13px] text-ink-faint';
-      box.textContent = text;
-    };
-    w.render = function (routing, chosen, lineId) {
-      // chosen: {stage_id: [machine ids]} ya null (sab usable machines tick)
-      // lineId: order ki Production Line. Ho to sirf usi line ki machines tick / chunne layak; dusri line ki disabled. Lines hain par line nahi chuni (lineId == '') to koi tick nahi.
-      var linesOn = lineId !== undefined && lineId !== null;
-      box.className = 'space-y-2';
-      var html = '<div class="overflow-x-auto border border-slate-200 rounded"><table class="lines-table"><thead><tr><th style="width:4%">#</th><th style="width:22%">Stage</th><th>Machines to use</th><th style="width:12%">Time</th></tr></thead><tbody>';
-      routing.forEach(function (stage, index) {
-        var picked = chosen && chosen[String(stage.stage_id)];
-        var boxes = stage.machines.length ? stage.machines.map(function (m) {
-          var inLine = !linesOn || (lineId !== '' && String(m.line_id) === String(lineId));
-          var usable = m.ok && inLine;
-          var on = usable && (!picked || picked.indexOf(m.id) !== -1);
-          // G27: Breakdown / Maintenance machine grey hoti hai aur uska kaaran likha aata hai
-          var down = m.status && m.status !== 'active';
-          var note = down ? '<b style="color:' + (m.status === 'breakdown' ? '#B42318' : '#B45309') + '">' + (m.status === 'breakdown' ? 'Under breakdown' : 'Under maintenance') + '</b> · cannot be chosen' : !m.ok ? 'set output per hour in Machines' : (!inLine ? (lineId === '' ? 'choose a line first' : (m.line ? m.line + ' (not this line)' : 'not on any line')) : m.per_hour + ' KG/hr' + (linesOn && m.line ? ' · ' + esc(m.line) : ''));
-          return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (usable ? 'text-ink' : 'text-ink-faint') + '">' +
-            '<input type="checkbox" class="plan-machine" name="machines_' + stage.stage_id + '" value="' + m.id + '" data-stage="' + stage.stage_id + '" data-name="' + esc(m.name) + '" data-per-hour="' + m.per_hour + '" data-hours="' + m.hours_per_day + '"' +
-            (on ? ' checked' : '') + (usable ? '' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + note + '</span></label>';
-        }).join('') : '<span class="text-ink-faint">No active machine for this stage. Add one in Machines.</span>';
-        html += '<tr><td class="text-ink-faint tabular-nums">' + (index + 1) + '</td><td class="font-semibold">' + esc(stage.name) + '</td><td>' + boxes + '</td>' +
-          '<td class="plan-time tabular-nums text-right">—</td></tr>';
-      });
-      html += '</tbody></table></div><div class="plan-summary rounded border border-brand-border bg-brand-soft px-3 py-2.5 text-[13px] text-ink space-y-0.5"></div>';
-      box.innerHTML = html;
-    };
-    w.chosen = function (routing) {
-      return routing.map(function (stage) {
-        var machines = [];
-        box.querySelectorAll('input.plan-machine[data-stage="' + stage.stage_id + '"]:checked').forEach(function (input) {
-          machines.push({ id: parseInt(input.value, 10), name: input.getAttribute('data-name'),
-            per_hour: parseFloat(input.getAttribute('data-per-hour')), hours_per_day: parseFloat(input.getAttribute('data-hours')) });
-        });
-        return { stage_id: stage.stage_id, name: stage.name, machines: machines };
-      });
-    };
-    w.sync = function (key, routing, chosenMap, batchKg, ownOrder, lineId) {
-      // key me line bhi: line badalte hi tick naye sire se (us line ki machines)
-      var fullKey = String(key) + '|' + String(lineId);
-      if (String(w.key) !== fullKey) {
-        w.key = fullKey;
-        if (!routing.length) {
-          w.clash = false;
-          box.className = 'text-[13px] text-ink-faint';
-          box.textContent = 'No production stages are set for this product, so there is no time plan. Set them with the Production stages button in Product Master.';
-          return;
-        }
-        w.render(routing, chosenMap, lineId);
-      }
-      if (!routing.length) return;
-      var chosen = w.chosen(routing);
-      var plan = planFor(batchKg, chosen, startEl.value);
-      w.plan = plan;
-      box.querySelectorAll('.plan-time').forEach(function (cell, i) {
-        var row = plan.stages[i];
-        cell.textContent = row.perHour > 0 ? row.hours + ' h' : 'pick a machine';
-      });
-      var summaryEl = box.querySelector('.plan-summary');
-      var missing = plan.stages.filter(function (r) { return r.perHour <= 0; });
-      if (missing.length) {
-        w.clash = false;
-        summaryEl.innerHTML = '<span class="text-stop">Choose at least one machine for: ' + missing.map(function (r) { return esc(r.name); }).join(', ') + '.</span>';
-        return;
-      }
-      // Start / finish date yahan nahi: wo queue me is order ki jagah, machines aur raw material se nikalti hai (save ke baad list me dikhti hai)
-      summaryEl.innerHTML =
-        '<div>Takes <strong>' + plan.totalHours + ' hours</strong> of work (' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's') + ', Sunday off) once it starts</div>' +
-        '<div>Most you can make per day: <strong>' + plan.dailyCapacity + ' KG</strong> <span class="text-ink-faint">(slowest stage: ' + esc(plan.bottleneck) + ')</span></div>' +
-        '<div class="text-[12px] text-ink-faint">The start and finish dates follow this order\'s place in the queue.</div>';
-    };
-    return w;
-  }
   var mainPlan = makePlanWidget(planBox, startInput);
   var lineSel = document.getElementById('mo-line');      // lines bani na ho to select hi nahi hota (null)
 
@@ -1079,10 +773,6 @@
         ? '<span class="po-chip bad"><i></i>' + short.length + ' short</span><div class="text-[12px] text-ink-faint mt-1">' + short.map(function (l) { return esc(l.name); }).join(', ') + '. Orders ahead in the queue may use stock first.</div>'
         : '<span class="po-chip ok"><i></i>All in store</span><div class="text-[12px] text-ink-faint mt-1">Before orders ahead in the queue take their share.</div>');
   }
-  var rsBox = document.getElementById('rs-plan');
-  var rsStart = document.getElementById('rs-start');
-  var rsPlan = makePlanWidget(rsBox, rsStart);
-
   function todayIso() {
     var d = new Date();
     var m = String(d.getMonth() + 1).padStart(2, '0');
@@ -1270,42 +960,6 @@
     if (event.target.classList.contains('plan-machine')) refreshPlan();
   });
 
-  // ---------- Reschedule ----------
-  var rsModal = document.getElementById('rs-modal');
-  var rsForm = document.getElementById('rs-form');
-  var rsCurrent = null;
-  function rsRefresh() {
-    if (!rsCurrent) return;
-    // Chuni hui line ki machines tick. Line wahi hai jo order ki thi to purani chuni machines, badli to us line ki sab machines
-    var rsLineSel = document.getElementById('rs-line');
-    var same = !rsLineSel || String(rsCurrent.data.line_id || '') === rsLineSel.value;
-    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, same ? rsCurrent.data.chosen : null, rsCurrent.data.batch_kg, rsCurrent.data.prod_no,
-      rsLineSel ? rsLineSel.value : undefined);
-  }
-  function rsClose() { rsModal.style.display = 'none'; rsModal.setAttribute('aria-hidden', 'true'); rsCurrent = null; }
-  document.querySelectorAll('.btn-resched').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var id = btn.getAttribute('data-id');
-      var data = RESCHED[id];
-      if (!data) return;
-      rsCurrent = { id: id, data: data };
-      rsForm.action = '/production_orders/reschedule/' + id;
-      document.getElementById('rs-no').textContent = data.prod_no + (data.line ? ' · ' + data.line : '');
-      rsStart.value = data.start;
-      if (document.getElementById('rs-line')) document.getElementById('rs-line').value = data.line_id || '';
-      document.getElementById('rs-needed').value = data.needed_by || '';
-      rsPlan.reset('');
-      rsModal.style.display = 'flex'; rsModal.setAttribute('aria-hidden', 'false');
-      rsRefresh();
-    });
-  });
-  rsStart.addEventListener('input', rsRefresh);
-  if (document.getElementById('rs-line')) document.getElementById('rs-line').addEventListener('change', rsRefresh);
-  rsBox.addEventListener('change', function (event) {
-    if (event.target.classList.contains('plan-machine')) rsRefresh();
-  });
-  ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', rsClose); });
-
   // 'Save & add another item' ke baad / bundle ke '+ Add item' se (?add_to=BND-...): form seedha khule, bundle ke saath. Sab setup ke baad, isliye yahan.
   {% if bundle_ctx %}openModal({{ bundle_ctx | tojson }});{% endif %}
 
@@ -1332,90 +986,6 @@
   })();
   {% endif %}
 
-  // Production planning page se aaye (?plan=<id>&back=planning): drawer seedha khol do; save ke baad wahin wapas (hidden next=planning),
-  // aur Cancel / close dabane par bhi planning page par wapas.
-  (function () {
-    var params = new URLSearchParams(window.location.search);
-    var planId = params.get('plan');
-    if (!planId) return;
-    var fromPlanning = params.get('back') === 'planning';
-    if (fromPlanning) {
-      var nextInput = document.createElement('input');
-      nextInput.type = 'hidden'; nextInput.name = 'next'; nextInput.value = 'planning';
-      rsForm.appendChild(nextInput);
-      ['rs-close', 'rs-cancel', 'rs-backdrop'].forEach(function (id) {
-        document.getElementById(id).addEventListener('click', function () { window.location.href = '/production_planning'; });
-      });
-    }
-    var target = document.querySelector('.btn-resched[data-id="' + planId + '"]');
-    if (target) target.click();
-  })();
-
-  // ---------- Start production: line chuno ----------
-  (function () {
-    var modal = document.getElementById('start-modal');
-    if (!modal) return;
-    var form = document.getElementById('start-form');
-    function close() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
-    // Chuni hui line ki daily capacity se kam kaam ho to wajah wala box dikhao (aur zaroori karo)
-    function refreshUnder() {
-      var box = document.getElementById('start-under'), reason = document.getElementById('start-reason');
-      var picked = form.querySelector('input[name=line_id]:checked');
-      var kg = parseFloat(modal.getAttribute('data-kg')) || 0, gap = 0, name = '';
-      if (picked) {
-        var card = picked.closest('.start-line');
-        var cap = parseFloat(card.getAttribute('data-cap')) || 0, left = parseFloat(card.getAttribute('data-left')) || 0;
-        gap = Math.round((cap - (left + kg)) * 100) / 100;
-        name = card.getAttribute('data-name');
-        document.getElementById('start-under-text').textContent = name + ' can make ' + cap + ' KG a day, but only ' + Math.round((left + kg) * 100) / 100 + ' KG is planned. ' + gap + ' KG of capacity stays unused.';
-      }
-      var need = gap > 0.0001;
-      box.classList.toggle('hidden', !need);
-      reason.required = need;
-    }
-    form.addEventListener('change', refreshUnder);
-    document.querySelectorAll('.btn-start-line').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var kg = parseFloat(btn.getAttribute('data-kg')) || 0;
-        form.action = '/production_orders/start/' + btn.getAttribute('data-id');
-        document.getElementById('start-no').textContent = btn.getAttribute('data-no');
-        document.getElementById('start-kg').textContent = kg;
-        form.reset();
-        modal.setAttribute('data-kg', kg);
-        // Order ki line planner me chuni thi: wahi tick, baaki lines disabled (machines usi line ki chuni hain)
-        var fixed = btn.getAttribute('data-line');
-        form.querySelectorAll('input[name=line_id]').forEach(function (r) {
-          r.disabled = !!fixed && r.value !== fixed;
-          r.checked = !!fixed && r.value === fixed;
-          r.closest('.start-line').style.opacity = r.disabled ? '0.45' : '1';
-        });
-        refreshUnder();
-        modal.querySelectorAll('.start-line').forEach(function (card) {
-          var cap = parseFloat(card.getAttribute('data-cap')) || 0;
-          var d = card.querySelector('.start-days');
-          if (d && cap > 0) d.textContent = 'This order alone needs about ' + Math.max(1, Math.ceil(kg / cap - 1e-9)) + ' day(s) on this line.';
-        });
-        modal.classList.remove('hidden');
-        modal.setAttribute('aria-hidden', 'false');
-      });
-    });
-    document.getElementById('btn-cancel-start').addEventListener('click', close);
-    document.getElementById('start-backdrop').addEventListener('click', close);
-  })();
-
-  // ---------- Cancel order ----------
-  var coModal = document.getElementById('co-modal');
-  function coClose() { coModal.style.display = 'none'; coModal.setAttribute('aria-hidden', 'true'); }
-  document.querySelectorAll('.btn-cancel-order').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.getElementById('co-form').action = '/production_orders/cancel/' + btn.getAttribute('data-id');
-      document.getElementById('co-no').textContent = btn.getAttribute('data-no');
-      document.getElementById('co-reason').value = '';
-      coModal.style.display = 'flex'; coModal.setAttribute('aria-hidden', 'false');
-      document.getElementById('co-reason').focus();
-    });
-  });
-  ['co-close', 'co-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', coClose); });
   document.getElementById('mo-form').addEventListener('submit', function (event) {
     if (!productSel.value) {
       event.preventDefault();

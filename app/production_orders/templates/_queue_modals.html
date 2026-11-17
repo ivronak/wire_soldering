@@ -1,0 +1,97 @@
+<style>
+  /* Plan / Start drawers ke liye zaroori styles (orders page ka CSS yahan load nahi hota) */
+  .po-step { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .po-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
+  .po-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .po-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
+  .po-btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .po-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .po-btn.primary:hover { background: #A35522; }
+  .po-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .po-btn.ghost:hover { background: #F4F6F5; }
+  .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 8px; border: 1px solid #D1D9D8; text-align: left; }
+  .lines-table td { padding: 7px 8px; border: 1px solid #E2E8E7; }
+</style>
+{# ---- Plan / Reschedule drawer (C1: Production planning page par): line, earliest start, needed by aur machines. Data: resched + line_board ---- #}
+<div id="rs-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true" style="display:none">
+  <div id="rs-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
+      <div><h2 class="text-[17px] font-bold text-ink">Reschedule <span id="rs-no" class="font-mono"></span></h2>
+        <p class="text-[12.5px] text-ink-faint">Change the earliest start, the needed-by date or the machines. Quantity and materials stay the same. To change priority use the arrows in the queue.</p></div>
+      <button type="button" id="rs-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
+    </div>
+    <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-mist">
+      <input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" />
+      <div class="po-step grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div><label for="rs-start" class="po-label">Earliest start date</label><input type="date" id="rs-start" name="start_date" class="po-input" /></div>
+        <div><label for="rs-needed" class="po-label">Needed by (optional)</label><input type="date" id="rs-needed" name="needed_by" class="po-input" /></div>
+        {% if line_board %}
+        {# Order ko dusri line me bhi daal sakte hain: line badalte hi us line ki machines tick hoti hain #}
+        <div class="sm:col-span-2"><label for="rs-line" class="po-label">Production line *</label>
+          <select id="rs-line" name="line_id" required class="po-input bg-white">
+            <option value="">Choose a line</option>
+            {% for ln in line_board %}<option value="{{ ln.id }}">{{ ln.name }} · {{ '%g'|format(ln.capacity) }} KG/day</option>{% endfor %}
+          </select></div>
+        {% endif %}
+      </div>
+      <div class="po-step"><div id="rs-plan" class="text-[13px] text-ink-faint"></div></div>
+    </form>
+    <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="rs-cancel" class="po-btn ghost">Close</button>
+      <button type="submit" form="rs-form" class="po-btn primary" style="padding:8px 20px">Save plan</button>
+    </div>
+  </div>
+</div>
+
+{# ---- Start production: line chuno (live status) ---- #}
+{% if line_board %}
+<div id="start-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="start-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="start-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-5 py-4 border-b border-slate-200 bg-copper-soft shrink-0">
+      <h2 id="start-title" class="text-[17px] font-bold text-ink">Start <span id="start-no" class="font-mono"></span> — choose a line</h2>
+      <p class="text-[12.5px] text-ink-faint mt-1">This order is <b id="start-kg"></b> KG. Pick the line it will run on. Each line shows what is running now and when it is free.</p>
+    </div>
+    <form id="start-form" method="post" action="" class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      <input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" />
+      {% for ln in line_board %}
+      <label class="start-line block border border-slate-300 rounded-lg p-3 cursor-pointer hover:border-copper" data-cap="{{ ln.capacity }}" data-left="{{ ln.left_kg }}" data-name="{{ ln.name }}">
+        <div class="flex items-start gap-3">
+          <input type="radio" name="line_id" value="{{ ln.id }}" class="mt-1" {% if loop.first %}required{% endif %} />
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-semibold text-ink">{{ ln.name }} <span class="font-mono text-[11.5px] text-ink-faint">{{ ln.code }}</span></div>
+              <div class="text-[12.5px] font-semibold tabular-nums">{{ '%g'|format(ln.capacity) }} KG/day</div>
+            </div>
+            <div class="text-[12px] text-ink-faint">{{ ln.machines }} machine{{ 's' if ln.machines != 1 else '' }}{% if ln.handler %} · {{ ln.handler }}{% endif %}</div>
+            {% if ln.running %}
+            <div class="mt-2 space-y-1">
+              {% for r in ln.running %}
+              <div class="text-[12.5px] text-ink"><span class="font-mono font-semibold">{{ r.prod_no }}</span> running · {{ '%g'|format(r.left_kg) }} of {{ '%g'|format(r.batch_kg) }} KG left{% if r.ends %} · plan ends {{ r.ends }}{% endif %}</div>
+              {% endfor %}
+            </div>
+            <div class="mt-1.5 text-[12.5px] font-semibold" style="color:#8A4A1C">Busy {{ ln.busy_days }} day{{ 's' if ln.busy_days != 1 else '' }} · free from {{ ln.free_from }}</div>
+            {% else %}
+            <div class="mt-2 text-[12.5px] font-semibold text-success">Free now</div>
+            {% endif %}
+            <div class="start-days mt-1 text-[12px] text-ink-muted"></div>
+          </div>
+        </div>
+      </label>
+      {% endfor %}
+      <div id="start-under" class="hidden rounded-lg p-3" style="background:#FFF4E5;border:1px solid #F5D9B5">
+        <div class="text-[13px] font-semibold" style="color:#7A4A12">Line will run below its daily capacity</div>
+        <p id="start-under-text" class="text-[12.5px] mt-1" style="color:#7A4A12"></p>
+        <label for="start-reason" class="block text-[12.5px] font-semibold text-ink mt-2 mb-1">Why is the capacity not fully used? *</label>
+        <textarea id="start-reason" name="under_reason" rows="2" maxlength="255" placeholder="e.g. No other order waiting; remaining capacity kept for a sample / own stock"
+          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        <p class="text-[11.5px] mt-1" style="color:#7A4A12">Tip: you can also add another order first, so the line is fully used.</p>
+      </div>
+    </form>
+    <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="btn-cancel-start" class="po-btn ghost">Cancel</button>
+      <button type="submit" form="start-form" class="po-btn primary">Start production</button>
+    </div>
+  </div>
+</div>
+{% endif %}

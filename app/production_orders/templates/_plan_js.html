@@ -1,0 +1,154 @@
+{# Shared plan helpers (C1): Production order page ka naya-order form aur Production planning page ka Plan / Reschedule drawer, dono yahi JS use karte hain. #}
+<script>
+  function esc(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // ---------- Production plan (kitne ghante / din, kab tak, machine clash) ----------
+  // Formula app/production_orders/planning.py ka JS mirror: stage ek ke baad ek, stage ki capacity = chuni machines ka jod,
+  // kaam ke din Monday-Saturday (Sunday off). Ek hi widget naye order form aur Reschedule dono me chalta hai.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function parseIso(text) {
+    var parts = String(text || '').split('-');
+    if (parts.length !== 3) return null;
+    return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+  }
+  function nextWorkingDay(day) {
+    var d = new Date(day.getTime());
+    while (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1);   // Sunday off
+    return d;
+  }
+  function addWorkingDays(start, count) {
+    var d = nextWorkingDay(start);
+    var remaining = count - 1;
+    while (remaining > 0) {
+      d.setUTCDate(d.getUTCDate() + 1);
+      d = nextWorkingDay(d);
+      remaining -= 1;
+    }
+    return d;
+  }
+  function isoOf(d) { return d.toISOString().slice(0, 10); }
+  function fmtDate(d) { return String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+  function fmtShort(iso) { var d = parseIso(iso); return String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()]; }
+  function round2(x) { return Math.round((x + 1e-9) * 100) / 100; }
+
+  // stages: [{machines: [{per_hour, hours_per_day}]}] (sirf chuni hui machines). Wapas: stage-wise ghante / din / window + total
+  function planFor(batchKg, stages, startIso) {
+    var rows = [], rawDays = [], totalHours = 0, totalDays = 0, bottleneck = null;
+    stages.forEach(function (stage) {
+      var perHour = 0, perDay = 0;
+      stage.machines.forEach(function (m) { perHour += m.per_hour; perDay += m.per_hour * m.hours_per_day; });
+      var hours = perHour > 0 ? batchKg / perHour : 0;
+      var days = perDay > 0 ? batchKg / perDay : 0;
+      totalHours += hours; totalDays += days;
+      var row = { name: stage.name, perHour: perHour, perDay: perDay, hours: round2(hours), days: round2(days), startIso: null, endIso: null };
+      rows.push(row);
+      rawDays.push(days);
+      if (perDay > 0 && (bottleneck === null || perDay < bottleneck.perDay)) bottleneck = row;
+    });
+    var start = parseIso(startIso);
+    var workingDays = rows.length ? Math.max(Math.ceil(totalDays - 1e-9), 1) : 0;
+    if (start && rows.length) {
+      // Har stage ka window (planning.py jaisa): pichhle stages ke din jod ke
+      var passed = 0;
+      rows.forEach(function (row, i) {
+        var first = Math.floor(passed + 1e-9);
+        passed += rawDays[i];
+        var last = Math.max(Math.ceil(passed - 1e-9) - 1, first);
+        row.startIso = isoOf(addWorkingDays(start, first + 1));
+        row.endIso = isoOf(addWorkingDays(start, last + 1));
+      });
+    }
+    return {
+      stages: rows, totalHours: round2(totalHours), workingDays: workingDays,
+      start: (start && rows.length) ? nextWorkingDay(start) : null,
+      end: (start && rows.length) ? addWorkingDays(start, workingDays) : null,
+      dailyCapacity: bottleneck ? round2(bottleneck.perDay) : null, bottleneck: bottleneck ? bottleneck.name : null
+    };
+  }
+
+  // Ek jagah ka planner widget: box ke andar stage table + summary banata hai. key badle to naye sire se render.
+  function makePlanWidget(box, startEl) {
+    var w = { key: null, clash: false, plan: null };
+    w.reset = function (text) {
+      w.key = null; w.clash = false; w.plan = null;
+      box.className = 'text-[13px] text-ink-faint';
+      box.textContent = text;
+    };
+    w.render = function (routing, chosen, lineId) {
+      // chosen: {stage_id: [machine ids]} ya null (sab usable machines tick)
+      // lineId: order ki Production Line. Ho to sirf usi line ki machines tick / chunne layak; dusri line ki disabled. Lines hain par line nahi chuni (lineId == '') to koi tick nahi.
+      var linesOn = lineId !== undefined && lineId !== null;
+      box.className = 'space-y-2';
+      var html = '<div class="overflow-x-auto border border-slate-200 rounded"><table class="lines-table"><thead><tr><th style="width:4%">#</th><th style="width:22%">Stage</th><th>Machines to use</th><th style="width:12%">Time</th></tr></thead><tbody>';
+      routing.forEach(function (stage, index) {
+        var picked = chosen && chosen[String(stage.stage_id)];
+        var boxes = stage.machines.length ? stage.machines.map(function (m) {
+          var inLine = !linesOn || (lineId !== '' && String(m.line_id) === String(lineId));
+          var usable = m.ok && inLine;
+          var on = usable && (!picked || picked.indexOf(m.id) !== -1);
+          // G27: Breakdown / Maintenance machine grey hoti hai aur uska kaaran likha aata hai
+          var down = m.status && m.status !== 'active';
+          var note = down ? '<b style="color:' + (m.status === 'breakdown' ? '#B42318' : '#B45309') + '">' + (m.status === 'breakdown' ? 'Under breakdown' : 'Under maintenance') + '</b> · cannot be chosen' : !m.ok ? 'set output per hour in Machines' : (!inLine ? (lineId === '' ? 'choose a line first' : (m.line ? m.line + ' (not this line)' : 'not on any line')) : m.per_hour + ' KG/hr' + (linesOn && m.line ? ' · ' + esc(m.line) : ''));
+          return '<label class="inline-flex items-center gap-1.5 mr-3 text-[13px] ' + (usable ? 'text-ink' : 'text-ink-faint') + '">' +
+            '<input type="checkbox" class="plan-machine" name="machines_' + stage.stage_id + '" value="' + m.id + '" data-stage="' + stage.stage_id + '" data-name="' + esc(m.name) + '" data-per-hour="' + m.per_hour + '" data-hours="' + m.hours_per_day + '"' +
+            (on ? ' checked' : '') + (usable ? '' : ' disabled') + '> ' + esc(m.name) + ' <span class="text-[11.5px] text-ink-faint">' + note + '</span></label>';
+        }).join('') : '<span class="text-ink-faint">No active machine for this stage. Add one in Machines.</span>';
+        html += '<tr><td class="text-ink-faint tabular-nums">' + (index + 1) + '</td><td class="font-semibold">' + esc(stage.name) + '</td><td>' + boxes + '</td>' +
+          '<td class="plan-time tabular-nums text-right">—</td></tr>';
+      });
+      html += '</tbody></table></div><div class="plan-summary rounded border border-brand-border bg-brand-soft px-3 py-2.5 text-[13px] text-ink space-y-0.5"></div>';
+      box.innerHTML = html;
+    };
+    w.chosen = function (routing) {
+      return routing.map(function (stage) {
+        var machines = [];
+        box.querySelectorAll('input.plan-machine[data-stage="' + stage.stage_id + '"]:checked').forEach(function (input) {
+          machines.push({ id: parseInt(input.value, 10), name: input.getAttribute('data-name'),
+            per_hour: parseFloat(input.getAttribute('data-per-hour')), hours_per_day: parseFloat(input.getAttribute('data-hours')) });
+        });
+        return { stage_id: stage.stage_id, name: stage.name, machines: machines };
+      });
+    };
+    w.sync = function (key, routing, chosenMap, batchKg, ownOrder, lineId) {
+      // key me line bhi: line badalte hi tick naye sire se (us line ki machines)
+      var fullKey = String(key) + '|' + String(lineId);
+      if (String(w.key) !== fullKey) {
+        w.key = fullKey;
+        if (!routing.length) {
+          w.clash = false;
+          box.className = 'text-[13px] text-ink-faint';
+          box.textContent = 'No production stages are set for this product, so there is no time plan. Set them with the Production stages button in Product Master.';
+          return;
+        }
+        w.render(routing, chosenMap, lineId);
+      }
+      if (!routing.length) return;
+      var chosen = w.chosen(routing);
+      var plan = planFor(batchKg, chosen, startEl.value);
+      w.plan = plan;
+      box.querySelectorAll('.plan-time').forEach(function (cell, i) {
+        var row = plan.stages[i];
+        cell.textContent = row.perHour > 0 ? row.hours + ' h' : 'pick a machine';
+      });
+      var summaryEl = box.querySelector('.plan-summary');
+      var missing = plan.stages.filter(function (r) { return r.perHour <= 0; });
+      if (missing.length) {
+        w.clash = false;
+        summaryEl.innerHTML = '<span class="text-stop">Choose at least one machine for: ' + missing.map(function (r) { return esc(r.name); }).join(', ') + '.</span>';
+        return;
+      }
+      // Start / finish date yahan nahi: wo queue me is order ki jagah, machines aur raw material se nikalti hai (save ke baad list me dikhti hai)
+      summaryEl.innerHTML =
+        '<div>Takes <strong>' + plan.totalHours + ' hours</strong> of work (' + plan.workingDays + ' working day' + (plan.workingDays === 1 ? '' : 's') + ', Sunday off) once it starts</div>' +
+        '<div>Most you can make per day: <strong>' + plan.dailyCapacity + ' KG</strong> <span class="text-ink-faint">(slowest stage: ' + esc(plan.bottleneck) + ')</span></div>' +
+        '<div class="text-[12px] text-ink-faint">The start and finish dates follow this order\'s place in the queue.</div>';
+    };
+    return w;
+  }
+</script>

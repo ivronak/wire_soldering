@@ -9,7 +9,7 @@ from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionLine, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, RawMaterial)
 from app.production_orders.planning import plan_stages
-from app.production_orders.stage_material import gap_text, later_stage_gaps, stage_material_gap
+from app.production_orders.stage_material import gap_text, stage_material_gap
 from app.production_orders.yield_info import learned_loss, short_info
 from app.production_lines.status import line_board
 from app.inventory.alerts import store_stock_by_material
@@ -259,6 +259,50 @@ def _new_bundle_no(year):
     return f"{prefix}{biggest + 1:03d}"
 
 
+def progress_info(queue, schedule, today):
+    # Queue ke har "In production" order ka progress % aur routing ka haal (kitne stage ho chuke, abhi kaun sa).
+    # Production orders page (status) aur Production planning page (queue tab) dono yahi use karte hain.
+    progress = {}
+    for o in queue:
+        info = schedule.get(o.id)
+        if o.status == "In production" and info:
+            total = max((info["end"] - info["start"]).days + 1, 1)
+            progress[o.id] = int(min(max((today - info["start"]).days + 1, 0) / total, 1) * 100)
+    stage_now = {}
+    for o in queue:
+        if o.status == "In production" and o.stages:
+            done = len([st for st in o.stages if st.status == "Done"])
+            current = next((st for st in o.stages if st.status != "Done"), None)
+            stage_now[o.id] = {"done": done, "total": len(o.stages), "name": current.stage_name if current else None, "state": current.status if current else "Done"}
+            if any(st.status != "Pending" for st in o.stages):
+                progress[o.id] = int(100 * done / len(o.stages))
+    return progress, stage_now
+
+
+def resched_data(orders):
+    # Plan / Reschedule drawer ke liye har open (Draft / Released) order ka data: kaun se stages, kaun si machines chuni hain, batch KG.
+    # C1 ke baad ye drawer Production planning page par hai; helper yahin rehta hai kyunki plan ke baaki helpers (_machine_row, _routing_for) yahin hain.
+    resched = {}
+    for o in orders:
+        if o.status not in ACTIVE_STATUSES:
+            continue
+        if o.stages:
+            routing = []
+            for st in o.stages:
+                machines = Machines.query.filter(Machines.work_stage_id == st.work_stage_id, Machines.is_deleted == False,
+                                                 Machines.status.in_(PLANNER_MACHINE_STATUSES)).order_by(Machines.code).all()
+                routing.append({"stage_id": st.work_stage_id, "name": st.stage_name, "machines": [_machine_row(m) for m in machines]})
+            chosen = {str(st.work_stage_id): [m.machine_id for m in st.machines] for st in o.stages}
+        else:
+            routing = _routing_for(o.product) if o.product else []
+            chosen = {}
+        earliest = o.earliest_start_date or o.planned_start_date or o.order_date
+        resched[str(o.id)] = {"prod_no": o.prod_no, "batch_kg": o.planned_qty * o.unit_weight, "routing": routing, "chosen": chosen,
+                              "line_id": o.line_id, "line": o.line.name if o.line else "",
+                              "start": earliest.isoformat(), "needed_by": o.needed_by_date.isoformat() if o.needed_by_date else ""}
+    return resched
+
+
 @production_orders_bp.route("/production_orders")
 def production_orders_list():
     # Open = queue me saare orders (Draft / Released / In production), Cancelled = alag tab (aage Completed bhi yahin judega)
@@ -306,48 +350,11 @@ def production_orders_list():
     # Completed tab: har order ka "Short by / Extra" (C18)
     shorts = {o.id: short_info(o) for o in orders if o.status == "Completed"}
     today = today_ist()
-    # Upar ke chhote cards (KPI): kitne chal rahe, kitno ko material chahiye, kitne der se
-    kpi = {"running": len([o for o in queue if o.status == "In production"]),
-           "material": len([o for o in queue if materials.get(o.id, {}).get("status") in ("making", "coming", "buy")]),
-           "buy": len([o for o in queue if materials.get(o.id, {}).get("status") == "buy"]),
-           "late": len([o for o in queue if o.needed_by_date and schedule.get(o.id) and schedule[o.id]["end"] > o.needed_by_date])}
-    # "In production" order ka progress % (aaj kitna din beet chuka us ke start se end tak)
-    progress = {}
-    for o in queue:
-        info = schedule.get(o.id)
-        if o.status == "In production" and info:
-            total = max((info["end"] - info["start"]).days + 1, 1)
-            progress[o.id] = int(min(max((today - info["start"]).days + 1, 0) / total, 1) * 100)
-    # Routing tracker ka haal (kitne stage ho chuke, abhi kaun sa) — progress bar ab asli stages se, jab kaam shuru ho chuka ho
-    stage_now = {}
-    for o in queue:
-        if o.status == "In production" and o.stages:
-            done = len([st for st in o.stages if st.status == "Done"])
-            current = next((st for st in o.stages if st.status != "Done"), None)
-            stage_now[o.id] = {"done": done, "total": len(o.stages), "name": current.stage_name if current else None, "state": current.status if current else "Done"}
-            if any(st.status != "Pending" for st in o.stages):
-                progress[o.id] = int(100 * done / len(o.stages))
+    # Upar ke chhote cards (KPI): kitne queue me, kitne chal rahe (material / late wale cards C1 me Production planning par gaye)
+    kpi = {"running": len([o for o in queue if o.status == "In production"])}
+    progress, stage_now = progress_info(queue, schedule, today)
     timeline = build_timeline(queue, schedule, today, by) if tab == "timeline" else None
     products, planner = _planner_products()
-    # Reschedule ke liye har open order ka data: kaun se stages, kaun si machines chuni hain, batch KG
-    resched = {}
-    for o in orders:
-        if o.status not in ACTIVE_STATUSES:
-            continue
-        if o.stages:
-            routing = []
-            for st in o.stages:
-                machines = Machines.query.filter(Machines.work_stage_id == st.work_stage_id, Machines.is_deleted == False,
-                                                 Machines.status.in_(PLANNER_MACHINE_STATUSES)).order_by(Machines.code).all()
-                routing.append({"stage_id": st.work_stage_id, "name": st.stage_name, "machines": [_machine_row(m) for m in machines]})
-            chosen = {str(st.work_stage_id): [m.machine_id for m in st.machines] for st in o.stages}
-        else:
-            routing = _routing_for(o.product) if o.product else []
-            chosen = {}
-        earliest = o.earliest_start_date or o.planned_start_date or o.order_date
-        resched[str(o.id)] = {"prod_no": o.prod_no, "batch_kg": o.planned_qty * o.unit_weight, "routing": routing, "chosen": chosen,
-                              "line_id": o.line_id, "line": o.line.name if o.line else "",
-                              "start": earliest.isoformat(), "needed_by": o.needed_by_date.isoformat() if o.needed_by_date else ""}
     categories = (
         ProductCategories.query.filter(
             ProductCategories.is_deleted == False,
@@ -378,7 +385,6 @@ def production_orders_list():
         total_count=len(orders),
         result_count=len(orders),
         schedule=schedule,
-        materials=materials,
         today=today,
         kpi=kpi,
         progress=progress,
@@ -386,9 +392,6 @@ def production_orders_list():
         timeline=timeline,
         by=by,
         store_stock={str(k): v for k, v in store_stock_by_material().items()},
-        issue_gaps={o.id: later_stage_gaps(o) for o in orders if o.status in ("Released", "In production")},
-        line_board=line_board(today),
-        resched=resched,
         bundles=bundles,
         bundle_filter=bundle_filter,
         bundle_ctx=bundle_ctx,
@@ -712,7 +715,9 @@ def production_orders_expected():
 def _back_url():
     # Production planning page se aaye hain (form me next=planning) to wahin wapas bhejo; sirf yahi ek value allowed (open redirect nahi)
     if request.form.get("next") == "planning":
-        return url_for("production_planning.production_planning_page")
+        # Jis tab se kaam kiya wahi tab wapas khulta hai (sirf ye 3 tab allowed)
+        tab = request.form.get("tab")
+        return url_for("production_planning.production_planning_page", tab=tab if tab in ("needs", "ready", "queue") else None)
     return url_for("production_orders.production_orders_list")
 
 
@@ -742,18 +747,18 @@ def production_orders_cancel(order_id):
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
     if order.status not in ACTIVE_STATUSES:
         flash("Only a draft or released production order can be cancelled.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     reason = (request.form.get("reason") or "").strip()
     if not reason:
         flash("Enter the reason for cancelling.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     # Draft issue pada ho, ya production me abhi maal (issue - return) bacha ho to cancel nahi: pehle wo store me wapas karo
     drafts = [i.issue_no for i in order.issues if not i.is_deleted and i.status == "Draft"]
     in_wip = [l for l in order.lines if l.issued_qty > 0.00005]
     if drafts or in_wip:
         flash(f"{order.prod_no} still has material issued to production" + (f" ({', '.join(drafts)} draft)" if drafts else "") +
               ". Return the unused material to the store (Material issue, Return) or cancel the issues first, then cancel the order.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     order.status = "Cancelled"
     order.cancel_reason = reason[:255]
     order.cancelled_at = datetime.utcnow()
@@ -762,7 +767,7 @@ def production_orders_cancel(order_id):
     persist_schedule()
     db.session.commit()
     flash(f"Production order {order.prod_no} cancelled. Its place in the queue and its machines are free again.", "success")
-    return redirect(url_for("production_orders.production_orders_list"))
+    return redirect(_back_url())
 
 
 @production_orders_bp.route("/production_orders/reschedule/<int:order_id>", methods=["POST"])
@@ -807,7 +812,7 @@ def production_orders_move(order_id, direction):
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
     if order.status not in ACTIVE_STATUSES:
         flash("Only a draft or released order can be moved in the queue.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     if direction not in ("up", "down", "first"):
         abort(404)
     waiting = [o for o in queue_orders() if o.status in ACTIVE_STATUSES]
@@ -825,7 +830,7 @@ def production_orders_move(order_id, direction):
     persist_schedule()
     db.session.commit()
     flash(f"{order.prod_no} is now number {order.queue_position} in the queue.", "success")
-    return redirect(url_for("production_orders.production_orders_list"))
+    return redirect(_back_url())
 
 
 @production_orders_bp.route("/production_orders/start/<int:order_id>", methods=["POST"])
@@ -834,23 +839,23 @@ def production_orders_start(order_id):
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
     if order.status != "Released":
         flash("Only a released production order can be started.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     if order.issue_status == "Not issued":
         flash(f"Issue material for {order.prod_no} first (Material issue page), then start production.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     if posted_issued_qty(order) <= 0.00005:
         # Draft issue stock nahi hilata — production ke paas maal tab hi hai jab issue Post ho chuka ho
         flash(f"{order.prod_no} only has a draft material issue. Post it (Material issue page) so the material reaches production, then start.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     if not order.stages:
         flash("This order has no production plan (stages and machines). Add one with Reschedule first.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     # C7: order tab start hota hai jab pehle stage (Melting: Tin / Lead) ka maal poora issue ho — kam metal = chhota output. Baad ke stage ka maal partial chalega.
     first_gaps = stage_material_gap(order, order.stages[0].work_stage_id)
     if first_gaps:
         flash(f"{order.prod_no} cannot start yet: {order.stages[0].stage_name} needs all its material first ({gap_text(first_gaps)}). "
               f"Issue the rest from the Material issue page.", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     today = today_ist()
     # Is order ko frozen waalon ke turant baad rakh ke aaj se schedule karo, uski dates save karo
     queue = queue_orders()
@@ -860,7 +865,7 @@ def production_orders_start(order_id):
     info = schedule.get(order.id)
     if not info:
         flash("This order's plan is incomplete (a stage has no machine capacity).", "error")
-        return redirect(url_for("production_orders.production_orders_list"))
+        return redirect(_back_url())
     for stage, (start, end) in zip(order.stages, info["windows"]):
         stage.start_date = start
         stage.end_date = end
@@ -874,7 +879,7 @@ def production_orders_start(order_id):
         if line_id not in {row["id"] for row in board}:
             flash("The production line of this order is not active any more. Turn it on in Production Lines first." if order.line_id
                   else "Choose the production line for this order.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
+            return redirect(_back_url())
         order.line_id = line_id
         # Line ki daily capacity se kam kaam (is order + us line par baaki chalte orders) ho to wajah likhna zaroori
         chosen = next(row for row in board if row["id"] == line_id)
@@ -885,7 +890,7 @@ def production_orders_start(order_id):
             if len(reason) < 3:
                 flash(f"{chosen['name']} can make {chosen['capacity']:g} KG a day but only {chosen['left_kg'] + batch_kg:g} KG is planned. "
                       f"Write why {gap:g} KG of its capacity is unused (or add another order first).", "error")
-                return redirect(url_for("production_orders.production_orders_list"))
+                return redirect(_back_url())
             order.under_capacity_kg = gap
             order.under_capacity_reason = reason
         else:
@@ -901,7 +906,7 @@ def production_orders_start(order_id):
     db.session.commit()
     line_text = f" on {order.line.name}" if order.line else ""
     flash(f"{order.prod_no} is now in production{line_text}. Planned finish: {info['end'].strftime('%d %b %Y')}.", "success")
-    return redirect(url_for("production_orders.production_orders_list"))
+    return redirect(_back_url())
 
 
 @production_orders_bp.route("/production_orders/<int:order_id>/print")
