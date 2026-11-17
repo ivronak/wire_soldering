@@ -13,25 +13,29 @@ material_plan_bp = Blueprint("material_plan", __name__, template_folder="templat
 
 @material_plan_bp.route("/material_plan")
 def material_plan_page():
-    view = request.args.get("view", "short")
-    if view not in ("short", "all"):
-        view = "short"
+    # C2: 3 tab — "orders" (production order ke hisaab se), "all" (har material ka total), "po" (purchase order banao). Purana ?view=short = All materials, sirf kami wale.
+    view = request.args.get("view", "orders")
+    only_short = request.args.get("only") == "short" or view == "short"
+    if view == "short":
+        view = "all"
+    if view not in ("orders", "all", "po"):
+        view = "orders"
     # Dropdown se badla hua vendor URL me aata hai: ?pick_<material id>=<vendor id>
     picks = {}
     for key, value in request.args.items():
         if key.startswith("pick_") and key[5:].isdigit() and value.isdigit():
             picks[int(key[5:])] = int(value)
     plan = material_plan(picks=picks)
-    # "short" = jinme kami hai, jinke PO ki date nahi likhi, ya jo date nikal chuke (overdue) PO ke bharose covered hain; "all" = 30 din ke saare materials
-    rows = [r for r in plan["rows"] if view == "all" or r["short_date"] or r["undated"] > 0 or r["overdue"]]
-    return render_template("material_plan.html", active_nav="material_plan", plan=plan, rows=rows, view=view, horizon=HORIZON_DAYS)
+    # All materials tab: kami wale pehle (plan me pehle se sorted); "Only short" me sirf wo jinme kami hai, jinke PO ki date nahi likhi, ya jo date nikal chuke (overdue) PO ke bharose covered hain
+    rows = [r for r in plan["rows"] if not only_short or r["short_date"] or r["undated"] > 0 or r["overdue"]]
+    return render_template("material_plan.html", active_nav="material_plan", plan=plan, rows=rows, view=view, only_short=only_short, horizon=HORIZON_DAYS)
 
 
 @material_plan_bp.route("/material_plan/create_po", methods=["POST"])
 def material_plan_create_po():
     # Ek vendor ka Draft PO. Rate / tax / unit supplier ki pichli PO line se (form ke bharose nahi); qty form se (badal sakte hain, 0 = hata do).
     # PO Draft me banta hai: Purchase orders page par rate dekh ke vendor ka bill laga ke confirm karna hai.
-    back = redirect(url_for("material_plan.material_plan_page"))
+    back = redirect(url_for("material_plan.material_plan_page", view="po"))     # PO banane ke baad wahi tab (baaki vendors ke PO bhi banane ho sakte hain)
     vendor = db.session.get(Vendor, request.form.get("vendor_id", type=int) or 0)
     if vendor is None or vendor.is_deleted or not vendor.is_active:
         flash("Choose an active vendor for the purchase order.", "error")

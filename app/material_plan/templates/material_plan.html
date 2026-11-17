@@ -56,25 +56,71 @@
   <p class="text-[13px] text-ink-faint">What is in the store, plus what is coming on open purchase orders, minus what the production queue will use, day by day until {{ plan.end.strftime('%d %b %Y') }}. Where it runs short, you see the date it runs out and when to place the PO.</p>
 </div>
 
-<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
-  <div class="mp-kpi {{ 'bad' if plan.kpi.late else '' }}"><span class="k">Place PO now</span><span class="v">{{ plan.kpi.late }}</span><span class="h">already past the "place by" date</span></div>
-  <div class="mp-kpi {{ 'warn' if plan.kpi.soon else '' }}"><span class="k">Place PO soon</span><span class="v">{{ plan.kpi.soon }}</span><span class="h">within the next 7 days</span></div>
-  <div class="mp-kpi {{ 'warn' if plan.kpi.no_lead else '' }}"><span class="k">Short, no lead time</span><span class="v">{{ plan.kpi.no_lead }}</span><span class="h">set the vendor's lead time</span></div>
-  <div class="mp-kpi {{ 'warn' if plan.kpi.undated else '' }}"><span class="k">PO without date</span><span class="v">{{ plan.kpi.undated }}</span><span class="h">goods on order, no expected date</span></div>
-  <div class="mp-kpi {{ 'bad' if plan.kpi.overdue else '' }}"><span class="k">Overdue PO</span><span class="v">{{ plan.kpi.overdue }}</span><span class="h">expected date passed, goods not received</span></div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+  <div class="mp-kpi {{ 'bad' if plan.kpi.short else '' }}"><span class="k">Materials short</span><span class="v">{{ plan.kpi.short }}</span><span class="h">will run out within {{ horizon }} days</span></div>
+  <div class="mp-kpi {{ 'warn' if plan.kpi.orders_short else '' }}"><span class="k">Orders affected</span><span class="v">{{ plan.kpi.orders_short }}</span><span class="h">of {{ plan.kpi.orders }} in the queue, missing some material</span></div>
+  <div class="mp-kpi {{ 'bad' if plan.kpi.late else '' }}"><span class="k">Buy now</span><span class="v">{{ plan.kpi.late }}</span><span class="h">PO should have been placed already</span></div>
+  <div class="mp-kpi {{ 'warn' if plan.kpi.chase else '' }}"><span class="k">Chase vendor</span><span class="v">{{ plan.kpi.chase }}</span><span class="h">goods on order are late or have no date</span></div>
 </div>
 
 <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
   <div class="mp-tabs">
-    <a href="{{ url_for('material_plan.material_plan_page', view='short') }}" class="{{ 'on' if view == 'short' else '' }}">Needs attention</a>
+    <a href="{{ url_for('material_plan.material_plan_page', view='orders') }}" class="{{ 'on' if view == 'orders' else '' }}">By production order</a>
     <a href="{{ url_for('material_plan.material_plan_page', view='all') }}" class="{{ 'on' if view == 'all' else '' }}">All materials ({{ plan.kpi.materials }})</a>
+    <a href="{{ url_for('material_plan.material_plan_page', view='po') }}" class="{{ 'on' if view == 'po' else '' }}">Create purchase orders ({{ plan.suggested|length }})</a>
   </div>
   <div class="text-[12.5px] text-ink-faint">{{ plan.kpi.orders }} order{{ '' if plan.kpi.orders == 1 else 's' }} in the queue · store stock only (material already given to production is not counted)</div>
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
   {# Kami wale materials vendor ke hisaab se: ek vendor = ek PO (kai orders ka maal ek saath). Draft banta hai, Purchase orders page par confirm hota hai #}
-  {% if plan.suggested %}
+  {% if view == 'orders' %}
+  {# C2 tab 1: production order ke hisaab se — kis order ko kaun sa maal kitna kam padega #}
+  {% for o in plan.orders %}
+  <article class="mp-card" style="padding:12px 16px">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div><span class="mp-name font-mono">{{ o.order.prod_no }}</span>
+        <span class="mp-chip {{ 'warn' if o.order.status == 'In production' else 'gone' }} ml-1"><i></i>{{ o.order.status }}</span>
+        <span class="mp-meta ml-1">{{ o.order.product.name if o.order.product else '' }} · {{ '%g'|format(o.order.planned_qty) }} {{ o.order.product.base_unit.code if o.order.product and o.order.product.base_unit else '' }}{% if o.start %} · starts {{ o.start.strftime('%d %b') }}{% endif %}</span></div>
+      {% if o.short_lines %}<span class="mp-chip bad"><i></i>Short of {{ o.short_lines|length }} material{{ '' if o.short_lines|length == 1 else 's' }}</span>
+      {% elif o.lines %}<span class="mp-chip ok"><i></i>All material available</span>
+      {% else %}<span class="mp-chip gone"><i></i>Nothing to buy for the next {{ horizon }} days</span>{% endif %}
+    </div>
+    {% if o.lines %}
+    <div class="overflow-x-auto mt-2">
+      <table class="mp-table">
+        <thead><tr><th>Material</th><th class="r" style="width:13%">Needed</th><th class="r" style="width:13%">Short</th><th style="width:15%">Needed from</th><th style="width:30%">What to do</th></tr></thead>
+        <tbody>
+          {% for l in o.lines %}
+          {% set r = plan.by_material.get(l.material.id) %}
+          <tr>
+            <td><b>{{ l.material.name }}</b> <span class="mp-meta">{{ l.material.code }}</span></td>
+            <td class="r">{{ '%g'|format(l.need) }} {{ l.unit }}</td>
+            <td class="r" {% if l.short > 0.000001 %}style="color:#B42318;font-weight:700"{% endif %}>{% if l.short > 0.000001 %}{{ '%g'|format(l.short) }} {{ l.unit }}{% else %}—{% endif %}</td>
+            <td>{{ l.when.strftime('%d %b') }}</td>
+            <td class="mp-meta">
+              {% if l.short <= 0.000001 %}Covered by store stock / PO on the way
+              {% elif r and r.maker %}<a class="text-copper-text font-semibold hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">Make {{ r.maker.name }}</a> in house
+              {% elif r and r.urgency == 'late' %}<span style="color:#B42318;font-weight:600">Place PO now</span> · {{ r.days_late }} day{{ '' if r.days_late == 1 else 's' }} late
+              {% elif r and r.place_by %}Place PO before {{ r.place_by.strftime('%d %b') }}
+              {% elif r and r.vendor is none %}No supplier yet: raise the PO by hand
+              {% else %}Set the vendor lead time{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if o.short_lines and plan.suggested %}<div class="mt-2 text-right"><a href="{{ url_for('material_plan.material_plan_page', view='po') }}" class="text-[12.5px] font-semibold text-copper-text hover:underline">Create purchase orders &rarr;</a></div>{% endif %}
+    {% endif %}
+  </article>
+  {% else %}
+  <div class="mp-empty"><h3>No orders in the production queue</h3><p>Add production orders to see which material each one needs.</p></div>
+  {% endfor %}
+  {% endif %}
+
+  {# C2 tab 3: vendor ke hisaab se Draft PO banao. Ek vendor = ek PO (kai orders ka maal ek saath). Draft banta hai, Purchase orders page par confirm hota hai #}
+  {% if view == 'po' and plan.suggested %}
   <div class="mp-card mb-3" style="padding:14px 16px">
     <div class="mp-name">Suggested purchase orders</div>
     <p class="mp-meta mb-2">One PO per vendor for everything that runs short, so several orders are bought together. Change the quantities if you want, then create the draft. It is saved as a Draft on the Purchase orders page; the rate, tax and unit are taken from the last PO of that material.</p>
@@ -120,10 +166,18 @@
     <p class="mp-meta">No supplier yet (never bought before): {{ plan.no_supplier|map(attribute='material.name')|join(', ') }}. Raise these POs by hand on the Purchase orders page.</p>
     {% endif %}
   </div>
-  {% elif plan.no_supplier %}
+  {% elif view == 'po' and not plan.suggested and not plan.no_supplier %}
+  <div class="mp-empty"><h3>Nothing to buy</h3><p>No material runs short in the next {{ horizon }} days, so no purchase order is needed.</p></div>
+  {% elif view == 'po' and plan.no_supplier %}
   <div class="mp-card mb-3" style="padding:12px 16px"><p class="mp-meta">No supplier yet (never bought before): {{ plan.no_supplier|map(attribute='material.name')|join(', ') }}. Raise these POs by hand on the Purchase orders page.</p></div>
   {% endif %}
-  {% for r in rows %}
+  {% if view == 'all' %}
+  <div class="flex items-center gap-2 mb-2 text-[12.5px]">
+    <a href="{{ url_for('material_plan.material_plan_page', view='all') }}" class="mp-chip {{ 'gone' if only_short else 'ok' }}" style="text-decoration:none">All {{ plan.kpi.materials }}</a>
+    <a href="{{ url_for('material_plan.material_plan_page', view='all', only='short') }}" class="mp-chip {{ 'bad' if only_short else 'gone' }}" style="text-decoration:none">Only needing attention</a>
+  </div>
+  {% endif %}
+  {% for r in (rows if view == 'all' else []) %}
   <article class="mp-card">
     <div class="mp-head">
       <div><div class="mp-name">{{ r.material.name }}</div><div class="mp-meta">{{ r.material.code }} · {{ r.unit }}</div></div>
@@ -172,10 +226,12 @@
     </details>
   </article>
   {% else %}
-  <div class="mp-empty"><h3>{{ 'Nothing needs attention' if view == 'short' else 'No material is used in the next ' ~ horizon ~ ' days' }}</h3>
+  {% if view == 'all' %}
+  <div class="mp-empty"><h3>{{ 'Nothing needs attention' if only_short else 'No material is used in the next ' ~ horizon ~ ' days' }}</h3>
     <p>{% if plan.kpi.orders == 0 %}There are no orders in the production queue, so nothing will be used. Add production orders to see the plan.
-      {% elif view == 'short' %}Every material in the queue is covered by the store stock and the purchase orders on the way for the next {{ horizon }} days.
+      {% elif only_short %}Every material in the queue is covered by the store stock and the purchase orders on the way for the next {{ horizon }} days.
       {% else %}Add production orders to the queue to see the plan.{% endif %}</p></div>
+  {% endif %}
   {% endfor %}
 </div>
 {% endblock %}

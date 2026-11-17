@@ -1,6 +1,7 @@
 # 30-din ka forward material plan (client change #3, MRP): har material ka stock + aane wale PO - queue ke orders ka maal = kitna bachega / kami kab.
 # Sirf padhta hai, kuch save nahi karta. Hisaab: store (RM) stock se shuru -> din ke hisaab se PO ka aana (+) aur order ki zaroorat (-).
 # Order ki zaroorat us din jab uska stage shuru hota hai (recipe line stage se juda ho to us stage ki date, warna order ki start date).
+# C2: har order ka apna hisaab bhi (kis order ko kaun sa maal kitna kam padega) — wahi day-by-day plan, sirf order ke hisaab se kaata hua.
 import math
 from datetime import timedelta
 
@@ -116,6 +117,7 @@ def material_plan(today=None, picks=None):
                 events.setdefault(line.raw_material_id, []).append((when, 1, "need", order.prod_no, -need))
 
     rows = []
+    order_lines = {}      # {prod_no: [{material, unit, need, short, when}]} — C2: order-wise kami
     material_ids = set(events) | {m for m, q in stock.items() if q > EPS} | set(undated)
     for material in RawMaterial.query.filter(RawMaterial.id.in_(material_ids), RawMaterial.is_deleted == False).order_by(RawMaterial.name).all():
         have = float(stock.get(material.id, 0.0))
@@ -125,6 +127,13 @@ def material_plan(today=None, picks=None):
         timeline = [{"date": today, "kind": "stock", "ref": "In store now", "qty": have, "balance": have}]
         need_total = coming_total = 0.0
         for when, _order, kind, ref, qty in sorted(events.get(material.id, []), key=lambda e: (e[0], e[1], e[3])):
+            if kind == "need":
+                # Order ko us din jitna maal mil sakta hai (store + us din tak aaya PO - pehle ke orders) utna covered; baaki us order ki kami.
+                # Jo PO baad me aata hai wo pichhli kami bharta hai, naye order ki nahi — isliye kami double nahi ginti.
+                available = max(balance, 0.0)
+                short_part = max(-qty - available, 0.0)
+                order_lines.setdefault(ref, []).append({"material": material, "unit": material.base_unit.code if material.base_unit else "",
+                                                        "need": round(-qty, 4), "short": round(short_part, 4), "when": when})
             balance += qty
             if qty < 0:
                 need_total += -qty
@@ -174,7 +183,17 @@ def material_plan(today=None, picks=None):
     kpi = {"short": len([r for r in rows if r["short_date"]]), "late": len([r for r in rows if r["urgency"] == "late"]),
            "soon": len([r for r in rows if r["urgency"] == "soon"]), "no_lead": len([r for r in rows if r["urgency"] == "no_lead"]),
            "undated": len([r for r in rows if r["undated"] > EPS]), "overdue": len([r for r in rows if r["overdue"]]), "orders": len(ordered), "materials": len(rows)}
-    return {"rows": rows, "kpi": kpi, "today": today, "end": end, "suggested": suggested_pos(rows, today), "no_supplier": [r for r in rows if r["short_date"] and r["vendor"] is None and r["maker"] is None]}
+    by_material = {r["material"].id: r for r in rows}
+    order_rows = []
+    for index, order in enumerate(ordered):
+        lines = sorted(order_lines.get(order.prod_no, []), key=lambda l: (-l["short"], l["when"], l["material"].name))
+        info = schedule.get(order.id)
+        order_rows.append({"order": order, "lines": lines, "short_lines": [l for l in lines if l["short"] > EPS], "start": info["start"] if info else None, "index": index})
+    order_rows.sort(key=lambda o: (0 if o["short_lines"] else 1, o["index"]))
+    kpi["orders_short"] = len([o for o in order_rows if o["short_lines"]])
+    kpi["chase"] = len([r for r in rows if r["undated"] > EPS or r["overdue"]])
+    return {"rows": rows, "kpi": kpi, "today": today, "end": end, "orders": order_rows, "by_material": by_material,
+            "suggested": suggested_pos(rows, today), "no_supplier": [r for r in rows if r["short_date"] and r["vendor"] is None and r["maker"] is None]}
 
 
 def suggested_qty(shortage):
