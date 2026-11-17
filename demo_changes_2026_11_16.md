@@ -502,3 +502,9 @@ Learned average = (ordered - good) / ordered, pichhle 3 completed orders, produc
 - **Test:** b19 4/4; b4-b18 pass. Live demo nahi.
 - **Ab sirf deploy + live data:** G29 (Tin Purity Min 100.5 -> sahi value) aur live setup (Spooling "Counted in pieces", Melting "Max wait", furnace batch capacity + hours per batch). Live par 6 migrations. Ye user ke bolne par; backup + rollback plan ke saath.
 
+## BUILD LOG — Batch 20 (17 Nov 2026): deploy readiness  (local; koi app code nahi, sirf check + doc)
+- **Live-jaisi DB par migration test:** `erp.db.before-batch1-demo` (alembic `f4b8d0c2e6a9` = live ka head, 69 tables, 640 rows) ko head `f1b6d3e8a4c9` tak upgrade: **koi row gum / badli nahi**, naye tables `melt_groups`, `machine_extra_hours`. Saari 6 migrations additive.
+- **Purani baat (naya nahi):** bilkul khaali DB par `flask db upgrade` `baseline` migration par fail hota hai (wo tables pehle se maanta hai). Is build me baseline chhua nahi (git diff: sirf 6 nayi migration files). Live par asar nahi.
+- **Doc:** `DEPLOY_READINESS_2026_11_17.md` — kya live jaayega (20 commits, f6ff725 ke baad), 6 migrations ki table, kya test hua / kya nahi (server Python 3.9), deploy method (bundle + backup + auto-rollback), live data checklist, client ko dikhne wale badlav.
+- Push / deploy abhi bhi nahi hua; user ke bolne par hi.
+
