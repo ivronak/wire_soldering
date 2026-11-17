@@ -16,6 +16,17 @@ def output_kg(output):
     return (output.good_qty or 0) * weight
 
 
+def is_inhouse(output):
+    # C16: in-house maal (jaise Flux: output RM store me jaata hai) bikne wala finished product nahi — fixed cost ka hissa nahi leta, KG ginti me nahi aata
+    product = output.production_order.product if output.production_order else None
+    return bool(product is not None and product.output_rm_id)
+
+
+def costed_kg(output):
+    # Fixed cost jis KG par bantta hai: sirf bikne wala finished product; in-house maal ka 0
+    return 0 if is_inhouse(output) else output_kg(output)
+
+
 def month_start(day):
     return day.replace(day=1)
 
@@ -38,7 +49,7 @@ def next_month(start):
 
 def apply_fixed_cost(output):
     """Naye output par fixed cost lagao. Fixed cost set nahi (ya KG zero) ho to kuch nahi (basis khaali = 'Material only')."""
-    kg = output_kg(output)
+    kg = costed_kg(output)
     output.fixed_cost_per_kg, output.fixed_cost_total, output.fixed_cost_basis = 0, 0, None
     if kg <= 0:
         return
@@ -52,7 +63,7 @@ def apply_fixed_cost(output):
         if not period or not period.working_days:
             return
         # Us din ka total good KG (is output samet): din ka kharcha usi par baantta hai
-        day_kg = kg + sum(output_kg(o) for o in posted_outputs(day, date.fromordinal(day.toordinal() + 1)) if o.id != output.id)
+        day_kg = kg + sum(costed_kg(o) for o in posted_outputs(day, date.fromordinal(day.toordinal() + 1)) if o.id != output.id)
         per_kg, basis = (period.monthly_amount / period.working_days) / day_kg, "Approx"
     output.fixed_cost_per_kg = round(per_kg, 4)
     output.fixed_cost_total = round(per_kg * kg, 2)
@@ -68,14 +79,16 @@ def finalize_month(start, final_amount):
     if final_amount <= 0:
         return False, "Final fixed cost must be greater than zero."
     outputs = posted_outputs(start, next_month(start))
-    total_kg = sum(output_kg(o) for o in outputs)
+    total_kg = sum(costed_kg(o) for o in outputs)
     if total_kg <= 0:
         return False, "No good output was recorded in this month, so a final cost per KG cannot be worked out."
     per_kg = final_amount / total_kg
     row = FixedCostMonth(month_start=start, final_amount=round(final_amount, 2), total_kg=round(total_kg, 4), final_per_kg=round(per_kg, 4))
     db.session.add(row)
     for o in outputs:
-        kg = output_kg(o)
+        kg = costed_kg(o)
+        if kg <= 0:
+            continue                # in-house maal par fixed cost nahi lagta
         o.fixed_cost_per_kg = row.final_per_kg
         o.fixed_cost_total = round(row.final_per_kg * kg, 2)
         o.fixed_cost_basis = "Final"

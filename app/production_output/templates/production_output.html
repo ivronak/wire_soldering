@@ -199,7 +199,7 @@
             </div>
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-3">
               <div><label class="ou-label">Output date *</label><input type="date" name="output_date" id="ou-date" class="ou-input" required /></div>
-              <div><label class="ou-label">Rack</label><select name="rack_id" id="ou-rack" class="ou-input"><option value="">No rack</option></select>
+              <div id="ou-rack-wrap"><label class="ou-label">Rack</label><select name="rack_id" id="ou-rack" class="ou-input"><option value="">No rack</option></select>
                 <p class="ou-help">Where the good goods are kept in the finished goods warehouse.</p></div>
               <div><label class="ou-label">Recorded by</label><input type="text" name="recorded_by" id="ou-by" maxlength="60" class="ou-input" /></div>
               <div><label class="ou-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="ou-input" /></div>
@@ -218,7 +218,7 @@
           <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint mb-1">What happens when you record</div>
           <ol>
             <li>The raw material given to production is <b>marked as used</b>.</li>
-            <li><b id="ou-s-good">0</b> good goes into <b>finished goods</b> with its own batch number.</li>
+            <li id="ou-s-fg-li"><b id="ou-s-good">0</b> good goes into <b>finished goods</b> with its own batch number.</li>
             <li id="ou-s-scrap-li"><b id="ou-s-scrap">0</b> scrap goes to the <b>scrap yard</b>.</li>
             <li>The order is marked <b>Completed</b>.</li>
           </ol>
@@ -280,11 +280,17 @@
     // PCS product: Good = Spooling me gine hue spool; ye bhi dikhao ki kitne KG ke barabar hai
     document.getElementById('ou-good-help').textContent = current.counted_from_packing
       ? 'Filled from the ' + current.unit + ' counted at the spooling stage. Ready to sell; this becomes finished goods stock.'
-      : 'Ready to sell. This becomes finished goods stock.';
+      : (current.goes_to_store ? 'This becomes raw material stock of ' + current.goes_to_store + '.' : 'Ready to sell. This becomes finished goods stock.');
     document.getElementById('ou-rework').value = 0;
     document.getElementById('ou-scrap').value = current.scrap;
     document.getElementById('ou-loss').value = current.loss || 0;
     document.getElementById('ou-by').value = current.operator || '';
+    // G2: in-house maal (Flux) FG me nahi, raw material store me jaata hai — rack nahi, aur side ki line bhi alag
+    var inhouse = !!current.goes_to_store;
+    document.getElementById('ou-rack-wrap').style.display = inhouse ? 'none' : '';
+    document.getElementById('ou-s-fg-li').innerHTML = inhouse
+      ? '<b id="ou-s-good">0</b> good goes into the <b>raw material store</b> as <b>' + esc(current.goes_to_store) + '</b>, ready to be issued to other orders.'
+      : '<b id="ou-s-good">0</b> good goes into <b>finished goods</b> with its own batch number.';
     // Rack dropdown: is order ke FG warehouse ke racks (optional)
     document.getElementById('ou-rack').innerHTML = '<option value="">No rack</option>' + (current.racks || []).map(function (r) {
       return '<option value="' + r.id + '">' + esc(r.name) + '</option>';

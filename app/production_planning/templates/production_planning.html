@@ -86,7 +86,11 @@
       {% if not mat %}<span class="pp-meta">—</span>
       {% elif mat.status == 'buy' %}<span class="pp-chip bad"><i></i>Need to buy</span><div class="pp-meta">{% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} −{{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
       {% elif mat.status == 'coming' %}<span class="pp-chip warn"><i></i>PO coming</span>
+      {% elif mat.status == 'making' %}<span class="pp-chip warn"><i></i>Will be made</span>
       {% else %}<span class="pp-chip ok"><i></i>Stock OK</span>{% endif %}
+      {# C6 / G9: in-house maal (Flux) ka make-order queue me — "Will be made by PROD-X"; peeche ho to laal warning #}
+      {% if mat %}{% for l in mat.lines if l.from_make %}<div class="pp-meta">{{ l.name }}: will be made by {% for m in l.from_make %}{{ m[0] }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
+      {% for b in mat.make_behind %}<div class="pp-meta" style="color:#B42318;font-weight:600">{{ b.name }} is made by {{ b.prod_no }}, which is behind this order. Move {{ b.prod_no }} up.</div>{% endfor %}{% endif %}
       {% if sc and sc.waits_for_material %}<div><span class="pp-chip warn"><i></i>Waits for material till {{ dshort(sc.waits_for_material) }}</span></div>{% endif %}
     </div>
     <div class="flex gap-2 justify-end flex-wrap">

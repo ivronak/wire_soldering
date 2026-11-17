@@ -156,9 +156,13 @@
         {% if o.status == 'Cancelled' or not mat %}<span class="po-meta">—</span>
         {% elif mat.status == 'buy' %}<span class="po-chip bad"><i></i>Need to buy</span>
         {% elif mat.status == 'coming' %}<span class="po-chip warn"><i></i>PO coming</span>
+        {% elif mat.status == 'making' %}<span class="po-chip warn"><i></i>Will be made</span>
         {% else %}<span class="po-chip ok"><i></i>{{ 'Material issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
         {# C7: baad ke stage ka maal abhi poora issue nahi hua — wo stage tab tak start nahi hoga #}
         {% for stage_name, gaps in issue_gaps.get(o.id, []) %}<div class="po-meta mt-1" style="color:#B42318;font-weight:600">{{ stage_name }} will wait: {% for g in gaps %}{{ g.name }} {{ '%g'|format(g.short) }} {{ g.unit }} not issued{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
+        {# C6 / G9: in-house maal (Flux) ka make-order queue me — "Will be made by PROD-X"; peeche ho to laal warning #}
+        {% if mat %}{% for l in mat.lines if l.from_make %}<div class="po-meta mt-1">{{ l.name }}: will be made by {% for m in l.from_make %}{{ m[0] }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
+        {% for b in mat.make_behind %}<div class="po-meta mt-1" style="color:#B42318;font-weight:600">{{ b.name }} is made by {{ b.prod_no }}, which is behind this order. Move it up, or this order will wait for it.</div>{% endfor %}{% endif %}
         {% if mat and mat.status == 'buy' %}
         <div class="po-meta mt-1">{% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} −{{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
         {% elif mat and mat.status == 'coming' %}

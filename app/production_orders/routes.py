@@ -308,7 +308,7 @@ def production_orders_list():
     today = today_ist()
     # Upar ke chhote cards (KPI): kitne chal rahe, kitno ko material chahiye, kitne der se
     kpi = {"running": len([o for o in queue if o.status == "In production"]),
-           "material": len([o for o in queue if materials.get(o.id, {}).get("status") in ("coming", "buy")]),
+           "material": len([o for o in queue if materials.get(o.id, {}).get("status") in ("making", "coming", "buy")]),
            "buy": len([o for o in queue if materials.get(o.id, {}).get("status") == "buy"]),
            "late": len([o for o in queue if o.needed_by_date and schedule.get(o.id) and schedule[o.id]["end"] > o.needed_by_date])}
     # "In production" order ka progress % (aaj kitna din beet chuka us ke start se end tak)

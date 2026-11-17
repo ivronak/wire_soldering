@@ -125,7 +125,7 @@
           </a>
           <a href="{{ url_for('purchase_orders.purchase_orders_list', tab='completed') }}"
             class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
-            Completed <span class="tabular-nums">({{ completed_count }})</span>
+            Confirmed <span class="tabular-nums">({{ completed_count }})</span>
           </a>
         </div>
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">

@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from app.costing.fixed import finalize_month, month_start, next_month, output_kg, period_for, posted_outputs, product_cost_per_unit
+from app.costing.fixed import costed_kg, finalize_month, month_start, next_month, output_kg, period_for, posted_outputs, product_cost_per_unit
 from app.extensions import db
 from app.models import FixedCostMonth, FixedCostPeriod, ProductionOutput
 
@@ -73,7 +73,7 @@ def costing_page():
         final = finals.get(start)
         last_day = min(today, date.fromordinal(next_month(start).toordinal() - 1))
         period = period_for(last_day)
-        months.append({"start": start, "key": _month_key(start), "kg": sum(output_kg(o) for o in outs), "absorbed": sum(o.fixed_cost_total or 0 for o in outs),
+        months.append({"start": start, "key": _month_key(start), "kg": sum(costed_kg(o) for o in outs), "absorbed": sum(o.fixed_cost_total or 0 for o in outs),
                        "outputs": len(outs), "final": final, "estimate": period.monthly_amount if period else None,
                        "can_finalize": final is None and start <= month_start(today) and bool(outs)})
     return render_template("costing.html", active_nav="costing", tab=tab, today=today, batch_rows=batch_rows, kpi=kpi, any_approx=any_approx,

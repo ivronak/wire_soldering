@@ -175,6 +175,7 @@
       <div>
         {% if mat and mat.status == 'buy' %}<span class="mi-chip bad"><i></i>Need to buy</span>
         {% elif mat and mat.status == 'coming' %}<span class="mi-chip warn"><i></i>PO coming</span>
+        {% elif mat and mat.status == 'making' %}<span class="mi-chip warn"><i></i>Will be made</span>
         {% else %}<span class="mi-chip ok"><i></i>Stock OK</span>{% endif %}
         {% set short_names = plan.lines | selectattr('short') | map(attribute='name') | list %}
         {% if short_names %}<div class="mi-meta mt-1">{{ short_names | join(', ') }}</div>{% endif %}

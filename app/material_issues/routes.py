@@ -176,7 +176,7 @@ def material_issues_list():
     leftovers = {o.id: leftover_items(o) for o in can_return}
     to_return = [o for o in can_return if leftovers[o.id]]
     kpi = {"orders": len(to_issue), "drafts": len(draft_issues),
-           "short": len([o for o in to_issue if materials.get(o.id, {}).get("status") in ("coming", "buy")]),
+           "short": len([o for o in to_issue if materials.get(o.id, {}).get("status") in ("making", "coming", "buy")]),
            "returnable": len(to_return)}
     return render_template(
         "material_issues.html", active_nav="material_issues", tab=tab,
