@@ -16,7 +16,7 @@ from app.routing.pcs import pcs_mode, spools_made, to_pcs
 from app.production_orders.scheduler import now_ist, today_ist
 from app.routing.batch import combine_error, ensure_melt_group, melt_kg, melt_members, melt_plan, stage_kg
 from app.routing.busy import busy_machines
-from app.routing.handoff import metal_wait, stage_clash
+from app.routing.handoff import casting_ahead, metal_wait, stage_clash
 
 routing_bp = Blueprint("routing", __name__, template_folder="templates")
 
@@ -194,6 +194,13 @@ def wait_payload(wait):
         return None
     return {"since": wait["since"].strftime("%H:%M" if wait["since"].date() == now_ist().date() else "%d %b %H:%M"), "minutes": round(wait["minutes"]),
             "limit": wait["limit"], "over": wait["over"], "prev": wait["prev_name"]}
+
+
+def cast_payload(cast):
+    # G14-4: casting_ahead ka JS ke liye saaf rup. None = kuch dikhana nahi.
+    if cast is None:
+        return None
+    return {"text": cast["message"], "needs_reason": cast["needs_reason"]}
 
 
 def pcs_cells(order, stage):
@@ -393,6 +400,8 @@ def routing_list():
             "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
             # C12: Melting ke baad garam maal kab se ruka hai (Work Stage me limit bhari ho to); limit paar ho to Start par wajah likhni padti hai
             "wait": wait_payload(metal_wait(o, cur)),
+            # G14-4: Melting Start par — melt taiyar hone par Casting machine free hogi? Nahi to message (aur limit se zyada ho to wajah zaroori)
+            "cast": cast_payload(casting_ahead(o, cur)) if side is None else None,
             # C8a: furnace poori nahi bhar rahi (capacity waste) — Melting Start par wajah likhni padti hai; suggestion me same-alloy orders
             "waste": waste_payload(melt_plan(o, cur, melt_kg(cur))) if cur.status == "Pending" and side is None else None,
             "heat": ({"no": cur.melt_group.heat_no, "orders": [m.production_order.prod_no for m in melt_members(cur)]}
@@ -538,6 +547,12 @@ def routing_start(stage_id):
     if error:
         flash(error, "error")
         return _back()
+    # G14-4: melt taiyar hone par Casting machine free nahi hogi (aur garam maal limit se zyada rukega) to wajah likhni padti hai; wajah stage notes me
+    cast = casting_ahead(order, stage, started_at) if is_melt else None
+    cast_reason = (request.form.get("cast_reason") or "").strip()[:100]
+    if cast is not None and cast["needs_reason"] and len(cast_reason) < 3:
+        flash(f"{stage.stage_name} cannot start yet. {cast['message']} Write why you start now (for example the casting machine will be freed early) in the Start form.", "error")
+        return _back()
     if previous and previous[-1].completed_at and started_at < previous[-1].completed_at:
         flash(f"{stage.stage_name} cannot start before {previous[-1].stage_name} finished ({previous[-1].completed_at.strftime('%d %b %H:%M')}).", "error")
         return _back()
@@ -565,6 +580,8 @@ def routing_start(stage_id):
         notes = (notes + " | " if notes else "") + f"Furnace not full ({waste['unused']:g} KG unused): {waste_reason}"
     if wait is not None and wait["over"]:
         notes = (notes + " | " if notes else "") + f"Metal waited {round(wait['minutes'])} min (limit {wait['limit']}): {rewait_reason}"
+    if cast is not None and cast["needs_reason"]:
+        notes = (notes + " | " if notes else "") + f"Casting machine busy at melt end ({cast['next_name']}, wait {'?' if cast['delay_minutes'] is None else round(cast['delay_minutes'])} min): {cast_reason}"
     if machine_note:
         notes = (notes + " | " if notes else "") + machine_note
     # C9 phase 2: har melt ko heat number; combined melt ke baaki members saath hi start (wahi operator / time, apna apna qty_in)

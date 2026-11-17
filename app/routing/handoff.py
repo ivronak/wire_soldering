@@ -2,7 +2,11 @@
 # agle stage (Ingot Casting) ki machine par kuch hi der me aane wala ho, aur us machine par koi doosra lamba kaam shuru kar diya jaye,
 # to garam maal rukke ghatt jayega. Isliye aisa kaam shuru hone se pehle roka jaata hai (kaam us gap me poora ho sakta ho to allow).
 # Sirf padhta hai, kuch save nahi karta. Use: routing_start (lock), dashboard (machine par "incoming" dikhana).
+from datetime import timedelta
+
+from app.models import Machines
 from app.production_orders.scheduler import now_ist
+from app.routing.busy import busy_machines
 
 
 def hours_text(minutes):
@@ -79,3 +83,50 @@ def stage_clash(order, stage, orders, now=None):
                f"{worst['stage'].stage_name}, and hot metal cannot wait. {stage.stage_name} of {order.prod_no} takes about {hours_text(needed)}, "
                f"so it would block the machine. Start it after {worst['order'].prod_no} has started {worst['stage'].stage_name}, or write a reason to start anyway.")
     return {"message": message, "machine_name": worst["machine_name"], "other_order": worst["order"].prod_no, "minutes_left": worst["minutes_left"]}
+
+
+def casting_ahead(order, stage, start_at=None, now=None):
+    """G14-4: Melting (batch stage) shuru karne se pehle dekho ki melt taiyar hone par agle stage (Ingot Casting) ki koi machine free hogi ya nahi.
+    Melt taiyar hone ka time = start + planned_hours. Agle stage ki koi bhi chalu machine (kisi bhi line ki) us time tak free ho to None.
+    Warna {message, delay_minutes, needs_reason, ready_at}: delay = sabse jaldi free hone wali machine us time ke kitne baad free hogi
+    (hold par / free time pata nahi ho to delay None = pata nahi). needs_reason tab jab delay Work Stage ke "Max wait" se zyada ho (limit na ho to jab bhi delay)."""
+    now = now or now_ist()
+    if stage.status != "Pending" or not (stage.work_stage and stage.work_stage.is_batch) or not stage.planned_hours:
+        return None
+    later = [s for s in order.stages if s.sort_order > stage.sort_order]
+    if not later or later[0].status != "Pending":
+        return None
+    nxt = later[0]
+    machines = Machines.query.filter(Machines.work_stage_id == nxt.work_stage_id, Machines.is_deleted == False, Machines.status == "active").all()
+    if not machines:
+        return None             # koi chalu machine hi nahi: wo alag (G27) message deta hai
+    ready_at = (start_at or now) + timedelta(hours=stage.planned_hours)
+    busy = busy_machines(order, nxt)
+    soonest = None              # (free_at, machine name, prod_no) — sabse jaldi free hone wali jiska time pata ho
+    unknown = []
+    for machine in machines:
+        info = busy.get(machine.id)
+        if info is None:
+            return None         # ek machine abhi free hai: melt ke baad wahi chalegi
+        if info["free_at"] is None:
+            unknown.append(f"{machine.name} ({info['text']})")
+        elif info["free_at"] <= ready_at:
+            return None         # melt taiyar hone se pehle free ho jaayegi
+        elif soonest is None or info["free_at"] < soonest[0]:
+            soonest = (info["free_at"], machine.name, info["prod_no"])
+    fmt = lambda d: d.strftime("%H:%M") if d.date() == now.date() else d.strftime("%d %b %H:%M")
+    limit = stage.work_stage.max_wait_minutes
+    if soonest is not None:
+        delay = (soonest[0] - ready_at).total_seconds() / 60
+        message = (f"This melt will be ready at about {fmt(ready_at)}, but every {nxt.stage_name} machine is busy then. The first to be free is "
+                   f"{soonest[1]} (busy with {soonest[2]}) at about {fmt(soonest[0])}, so the molten metal would wait about {hours_text(delay)}.")
+        needs = (not limit) or delay > limit
+    else:
+        delay = None
+        message = (f"This melt will be ready at about {fmt(ready_at)}, but every {nxt.stage_name} machine is busy and none has a known free time: "
+                   f"{', '.join(unknown)}. The molten metal may have to wait.")
+        needs = True
+    if limit and delay is not None and not needs:
+        message += f" This is within the {limit} min limit for molten metal."
+    return {"message": message, "delay_minutes": round(delay, 1) if delay is not None else None, "needs_reason": needs, "ready_at": ready_at,
+            "next_name": nxt.stage_name}

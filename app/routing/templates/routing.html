@@ -376,6 +376,15 @@
           <label class="rt-label mt-2" for="rt-waste-reason">Why start now? *</label>
           <input type="text" name="waste_reason" id="rt-waste-reason" maxlength="100" class="rt-input" placeholder="e.g. no other order of the same alloy is ready" autocomplete="off" />
         </div>
+        {# G14-4: melt taiyar hone par Casting machine free nahi — limit se zyada wait ho to wajah likhe bina Start nahi #}
+        <div id="rt-cast-box" style="display:none" class="rounded-lg p-3" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#8A4A1C">Casting machine will be busy</div>
+          <p id="rt-cast-text" class="text-[12.5px] mt-1" style="color:#7A4A1C"></p>
+          <div id="rt-cast-reason-wrap" style="display:none">
+            <label class="rt-label mt-2" for="rt-cast-reason">Why start the melt now? *</label>
+            <input type="text" name="cast_reason" id="rt-cast-reason" maxlength="100" class="rt-input" placeholder="e.g. casting machine will be freed early, or metal can be held hot" autocomplete="off" />
+          </div>
+        </div>
         {# C12: garam maal limit se zyada ruka — wajah likhe bina Start nahi #}
         <div id="rt-wait-box" style="display:none" class="rounded-lg p-3" role="alert">
           <div class="text-[13px] font-semibold" style="color:#B42318">Molten metal waited too long</div>
@@ -521,6 +530,14 @@
     wasteIn.value = ''; wasteIn.disabled = !waste; wasteIn.required = !!waste;
     document.getElementById('rt-waste-text').textContent = waste ? ('The furnace (' + waste.machine + ') holds ' + waste.cap + ' KG per melt. This melt leaves ' + waste.unused + ' KG of it unused'
       + (waste.suggest.length ? '. These orders of the same alloy could share the melt: ' + waste.suggest.map(function (s) { return s.prod_no + ' (' + s.kg + ' KG)'; }).join(', ') + '.' : '.')) : '';
+    // G14-4: Casting machine melt ke baad free nahi hogi — batao; limit se zyada wait ho to wajah zaroori
+    var castBox = document.getElementById('rt-cast-box'), castIn = document.getElementById('rt-cast-reason');
+    var cast = start && a.cast ? a.cast : null;
+    castBox.style.display = cast ? 'block' : 'none';
+    castBox.style.background = '#FFF7ED'; castBox.style.border = '1px solid #F5D9B5';
+    castIn.value = ''; castIn.disabled = !(cast && cast.needs_reason); castIn.required = !!(cast && cast.needs_reason);
+    document.getElementById('rt-cast-reason-wrap').style.display = cast && cast.needs_reason ? 'block' : 'none';
+    document.getElementById('rt-cast-text').textContent = cast ? cast.text : '';
     // C12: garam maal ka intezaar limit paar ho gaya to wajah zaroori
     var waitBox = document.getElementById('rt-wait-box'), waitIn = document.getElementById('rt-wait-reason');
     var wait = start && a.wait && a.wait.over ? a.wait : null;
