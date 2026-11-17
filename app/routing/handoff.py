@@ -33,10 +33,29 @@ def hot_handoffs(orders, now=None):
                 left = 0.0              # garam maal taiyar hai, ab casting ka intezaar (waiting)
             else:
                 continue
+            wait = metal_wait(order, stage, now) if prev.status == "Done" else None
             for row in stage.machines:
                 out.append({"machine_id": row.machine_id, "machine_name": row.machine_name, "order": order, "stage": stage, "prev_stage": prev,
-                            "minutes_left": round(left, 1), "waiting": prev.status == "Done"})
+                            "minutes_left": round(left, 1), "waiting": prev.status == "Done", "wait": wait})
     return out
+
+
+def metal_wait(order, stage, now=None):
+    """C12: stage Pending hai aur uska pichhla stage (Melting) Done hai jiske Work Stage me "Max wait before next stage (minutes)" bhara hai
+    to garam maal kab se ruka hai: {since, minutes, limit, over, prev_name}. Warna None. Timer pichhle stage ke completed_at se chalta hai
+    (beech ka Lab QC intezaar bhi ginta hai, kyunki maal tab bhi thanda ho raha hai)."""
+    if stage.status != "Pending":
+        return None
+    now = now or now_ist()
+    previous = [s for s in order.stages if s.sort_order < stage.sort_order]
+    if not previous:
+        return None
+    prev = previous[-1]
+    limit = prev.work_stage.max_wait_minutes if prev.work_stage else None
+    if prev.status != "Done" or not prev.completed_at or not limit:
+        return None
+    minutes = max((now - prev.completed_at).total_seconds() / 60, 0.0)
+    return {"since": prev.completed_at, "minutes": round(minutes, 1), "limit": int(limit), "over": minutes > limit, "prev_name": prev.stage_name}
 
 
 def stage_clash(order, stage, orders, now=None):

@@ -85,8 +85,10 @@ def incoming_by_machine(now):
     out = {}
     for h in hot_handoffs(orders, now):
         out.setdefault(h["machine_id"], []).append({"prod_no": h["order"].prod_no, "stage": h["stage"].stage_name, "prev_stage": h["prev_stage"].stage_name,
-                                                    "minutes_left": h["minutes_left"],
-                                                    "text": "now" if h["minutes_left"] <= 0.5 else "in " + handoff_text(h["minutes_left"])})
+                                                    "minutes_left": h["minutes_left"], "waiting": h["waiting"], "over": bool(h["wait"] and h["wait"]["over"]),
+                                                    # C12: maal taiyar hai aur casting ka intezaar: "waiting 35 m (limit 60 m)" — limit paar ho to laal
+                                                    "text": ("waiting " + handoff_text(h["wait"]["minutes"]) + " (limit " + handoff_text(h["wait"]["limit"]) + ")") if h["wait"]
+                                                    else ("now" if h["minutes_left"] <= 0.5 else "in " + handoff_text(h["minutes_left"]))})
     for rows in out.values():
         rows.sort(key=lambda r: r["minutes_left"])
     return out

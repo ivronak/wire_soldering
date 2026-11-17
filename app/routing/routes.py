@@ -14,7 +14,8 @@ from app.production_orders.planning import next_working_day
 from app.production_orders.stage_material import gap_text, stage_material_gap
 from app.routing.pcs import pcs_mode, spools_made, to_pcs
 from app.production_orders.scheduler import now_ist, today_ist
-from app.routing.handoff import stage_clash
+from app.routing.busy import busy_machines
+from app.routing.handoff import metal_wait, stage_clash
 
 routing_bp = Blueprint("routing", __name__, template_folder="templates")
 
@@ -134,6 +135,14 @@ def stage_plan(order, stage):
     return {"materials": mats, "lots": lots, "lot_kg": cap if lots else None}
 
 
+def wait_payload(wait):
+    # C12: metal_wait ka JS ke liye saaf rup (datetime nahi, text). None = kuch dikhana nahi.
+    if wait is None:
+        return None
+    return {"since": wait["since"].strftime("%H:%M" if wait["since"].date() == now_ist().date() else "%d %b %H:%M"), "minutes": round(wait["minutes"]),
+            "limit": wait["limit"], "over": wait["over"], "prev": wait["prev_name"]}
+
+
 def pcs_cells(order, stage):
     """C15: stage table ke liye PCS rup: None (KG hi) ya {"kind", "in", "out", "scrap"} (PCS me). Spooling (kind "out") me wire KG hi aata hai,
     nikalti hai spool ki ginti (jo operator ne likhi, nahi to KG / nominal weight). Baad ke stages me in / out / scrap sab PCS."""
@@ -205,19 +214,27 @@ def stage_machine_problem(stage):
     None = sab theek. Warna {"names": "Furnace 2 (under breakdown)", "all_down": sab ki sab kharab?, "swaps": usi work stage ki Active machines jo is stage me nahi, "rows": [(row, machine)]}.
     all_down hone par stage Start nahi hota jab tak doosri machine na chuni jaye; kuch hi kharab ho to unhe hata kar baaki se chalta hai."""
     rows = list(stage.machines)
+    # C8 / C11: Pending stage ki machine par doosre order ka stage abhi chal raha ho to wo bhi "available nahi" (busy) gini jaati hai
+    busy = busy_machines(stage.production_order, stage) if stage.status == "Pending" else {}
     down = []
+    reasons = []
     for row in rows:
         machine = db.session.get(Machines, row.machine_id)
         if machine is not None and (machine.is_deleted or machine.status != "active"):
             down.append((row, machine))
+            reasons.append(f"{machine.name} ({MACHINE_STATUS_TEXT.get(machine.status, 'not available')})")
+        elif machine is not None and row.machine_id in busy:
+            down.append((row, machine))
+            reasons.append(f"{machine.name} ({busy[row.machine_id]['text']})")
     if not down:
         return None
     planned_ids = {row.machine_id for row in rows}
     others = Machines.query.filter(Machines.work_stage_id == stage.work_stage_id, Machines.is_deleted == False,
                                    Machines.status == "active").order_by(Machines.code).all()
-    return {"names": ", ".join(f"{m.name} ({MACHINE_STATUS_TEXT.get(m.status, 'not available')})" for _, m in down),
+    return {"names": ", ".join(reasons),
             "all_down": len(down) == len(rows),
-            "swaps": [{"id": m.id, "name": m.name} for m in others if m.id not in planned_ids],
+            # Badli machine: usi work stage ki Active machine jo plan me nahi aur abhi khali (busy nahi) hai
+            "swaps": [{"id": m.id, "name": m.name} for m in others if m.id not in planned_ids and m.id not in busy],
             "rows": down}
 
 
@@ -321,6 +338,8 @@ def routing_list():
             "pcs": ({"kind": pm["kind"], "w": pm["w"], "wa": pm["wa"]} if (pm := (None if side else pcs_mode(o, cur))) else None),
             # Stage timing clash lock: shuru karne par kisi doosre order ke garam maal se takrao ho to uska message (start drawer me dikhta hai)
             "clash": (stage_clash(o, cur, clash_orders) or {}).get("message") if cur.status == "Pending" else None,
+            # C12: Melting ke baad garam maal kab se ruka hai (Work Stage me limit bhari ho to); limit paar ho to Start par wajah likhni padti hai
+            "wait": wait_payload(metal_wait(o, cur)),
         }
         # C7: Pending stage ka maal poora issue nahi hua to card par laal alert (Start tab tak block rehta hai)
         if cur.status == "Pending":
@@ -347,7 +366,7 @@ def routing_list():
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
         operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed,
-        now=now_ist().strftime("%Y-%m-%dT%H:%M"), pcs_cells=pcs_cells, next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
+        now=now_ist().strftime("%Y-%m-%dT%H:%M"), pcs_cells=pcs_cells, wait_payload=wait_payload, metal_wait=metal_wait, next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
     )
 
 
@@ -417,7 +436,10 @@ def routing_start(stage_id):
     if problem is not None and problem["all_down"]:
         swap_id = request.form.get("swap_machine_id", type=int)
         if not any(option["id"] == swap_id for option in problem["swaps"]):
-            flash(f"{stage.stage_name} cannot start: {problem['names']}. Choose another machine in the Start form (Use this machine instead).", "error")
+            if problem["swaps"]:
+                flash(f"{stage.stage_name} cannot start: {problem['names']}. Choose another machine in the Start form (Use this machine instead).", "error")
+            else:
+                flash(f"{stage.stage_name} cannot start: {problem['names']}. No other free machine is available for this stage, so wait until it is free.", "error")
             return _back()
         swap_machine = db.session.get(Machines, swap_id)
     operator = (request.form.get("operator") or "").strip()[:60]
@@ -430,6 +452,13 @@ def routing_start(stage_id):
     clash_reason = (request.form.get("clash_reason") or "").strip()[:150]
     if clash is not None and len(clash_reason) < 3:
         flash(f"{stage.stage_name} cannot start now. " + clash["message"], "error")
+        return _back()
+    # C12: garam maal limit se zyada ruka ho to Start tabhi hoga jab wajah (kam se kam 3 akshar) likhi ho; wajah stage notes me jaati hai
+    wait = metal_wait(order, stage)
+    rewait_reason = (request.form.get("rewait_reason") or "").strip()[:100]
+    if wait is not None and wait["over"] and len(rewait_reason) < 3:
+        flash(f"{stage.stage_name} cannot start yet: the metal from {wait['prev_name']} has waited {round(wait['minutes'])} min (limit {wait['limit']} min). "
+              f"Write what was done (for example re-heated) in the Start form.", "error")
         return _back()
     started_at, error = _read_when("started_at")
     if error:
@@ -449,7 +478,7 @@ def routing_start(stage_id):
                                                        is_planned=True, used=False))
             machine_note = f"Machine changed at start: {problem['names']} -> {swap_machine.name}"
         else:
-            machine_note = f"Not working, left out: {problem['names']}"
+            machine_note = f"Not available, left out: {problem['names']}"
     stage.status = "In progress"
     stage.started_at = started_at
     stage.operator = operator
@@ -458,6 +487,8 @@ def routing_start(stage_id):
     notes = (request.form.get("notes") or "").strip()
     if clash is not None:
         notes = (notes + " | " if notes else "") + f"Timing clash overridden ({clash['machine_name']} due for {clash['other_order']}): {clash_reason}"
+    if wait is not None and wait["over"]:
+        notes = (notes + " | " if notes else "") + f"Metal waited {round(wait['minutes'])} min (limit {wait['limit']}): {rewait_reason}"
     if machine_note:
         notes = (notes + " | " if notes else "") + machine_note
     stage.notes = notes[:255] or None

@@ -104,6 +104,9 @@ class WorkStage(CreatedAtMixin, db.Model):
     # C15: is stage (Spooling) par maal ki ginti PCS me ho jaati hai (spool = pieces). Iske baad ke stages (Testing, Packing) PCS me chalte hain,
     # KG sirf reference. Sirf PCS wale product me lagu; KG product (jaise Flux) me kuch nahi badalta.
     counts_pcs = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    # C12: is stage (Melting) ke complete hone ke baad agla stage (Ingot Casting) itni minute ke andar shuru hona chahiye, warna garam maal thanda hota hai.
+    # Khaali = koi limit nahi. Limit paar ho to agla stage Start karte waqt wajah likhni padti hai (stage notes me jaati hai).
+    max_wait_minutes = db.Column(db.Integer, nullable=True)
 
 class RmCategories(CreatedAtMixin, db.Model):
     __tablename__='rm_categories'

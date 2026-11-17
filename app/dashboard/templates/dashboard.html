@@ -165,7 +165,7 @@
             <div class="db-idle">Idle, ready for work.</div>
           {% endif %}
           {% if t.incoming %}
-          <div class="db-hot" title="Another order's hot metal goes to this machine. A long job started here now would block it.">Hot metal due {{ t.incoming.text }}: <b>{{ t.incoming.prod_no }}</b> &middot; {{ t.incoming.prev_stage }} &rarr; {{ t.incoming.stage }}</div>
+          <div class="db-hot" title="Another order's hot metal goes to this machine. A long job started here now would block it.">{% if t.incoming.waiting %}<span style="{{ 'color:#B42318' if t.incoming.over else '' }}">Hot metal {{ t.incoming.text }}{% if t.incoming.over %} &middot; limit crossed{% endif %}</span>{% else %}Hot metal due {{ t.incoming.text }}{% endif %}: <b>{{ t.incoming.prod_no }}</b> &middot; {{ t.incoming.prev_stage }} &rarr; {{ t.incoming.stage }}</div>
           {% endif %}
           {% if t.next %}
           <div class="db-next">Next: <b>{{ t.next.prod_no }}</b> from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more{% endif %}</div>

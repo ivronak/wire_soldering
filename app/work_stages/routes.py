@@ -45,6 +45,18 @@ def read_billet_fields():
     return is_billet, (weight if is_billet else None), no_scrap
 
 
+def read_max_wait():
+    # C12: "Max wait before next stage (minutes)" — khaali / 0 / galat = koi limit nahi (None)
+    raw = (request.form.get('max_wait_minutes') or '').strip()
+    if not raw:
+        return None
+    try:
+        value = int(float(raw))
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
 @work_stages_bp.route('/work_stages/add', methods=['POST'])
 def work_stages_add():
     # Code ab auto-generated hai — form se nahi aata
@@ -55,6 +67,7 @@ def work_stages_add():
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
     scrap_after_next = request.form.get('scrap_after_next') == 'on'
     counts_pcs = request.form.get('counts_pcs') == 'on'
+    max_wait_minutes = read_max_wait()
     is_billet_stage, billet_weight, no_scrap = read_billet_fields()
 
     if not name:
@@ -71,6 +84,7 @@ def work_stages_add():
             existing.requires_lab_qc = requires_lab_qc
             existing.scrap_after_next = scrap_after_next
             existing.counts_pcs = counts_pcs
+            existing.max_wait_minutes = max_wait_minutes
             existing.is_billet_stage, existing.billet_weight, existing.no_scrap = is_billet_stage, billet_weight, no_scrap
             existing.is_active = True
             db.session.commit()
@@ -88,6 +102,7 @@ def work_stages_add():
         requires_lab_qc=requires_lab_qc,
         scrap_after_next=scrap_after_next,
         counts_pcs=counts_pcs,
+        max_wait_minutes=max_wait_minutes,
         is_billet_stage=is_billet_stage,
         billet_weight=billet_weight,
         no_scrap=no_scrap,
@@ -108,6 +123,7 @@ def work_stages_edit(stage_id):
     requires_lab_qc = request.form.get('requires_lab_qc') == 'on'
     scrap_after_next = request.form.get('scrap_after_next') == 'on'
     counts_pcs = request.form.get('counts_pcs') == 'on'
+    max_wait_minutes = read_max_wait()
     is_billet_stage, billet_weight, no_scrap = read_billet_fields()
 
     if not name:
@@ -120,6 +136,7 @@ def work_stages_edit(stage_id):
     s.requires_lab_qc = requires_lab_qc
     s.scrap_after_next = scrap_after_next
     s.counts_pcs = counts_pcs
+    s.max_wait_minutes = max_wait_minutes
     s.is_billet_stage, s.billet_weight, s.no_scrap = is_billet_stage, billet_weight, no_scrap
     db.session.commit()
     flash("Work Stage Updated", "success")
