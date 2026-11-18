@@ -1,0 +1,144 @@
+{# Quotation drawer ka JS (list ke "New" aur detail ke "Edit / Revise" dono me). Python se: products, customers, charges, branch state; edit hoto prefill data. #}
+<script>
+  // Python se aaya data: products (last rate, GST), customers (state, payment terms), charges, apni branch ka state (IGST ya CGST+SGST)
+  var PRODUCTS = {{ products|tojson }};
+  var CUSTOMERS = {{ customer_rows|tojson }};
+  var COMPANY_STATE = {{ company_state_id|tojson }};
+  var CHARGES = [{% for c in charges %}{id: {{ c.id }}, name: {{ c.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+  var EDIT = {{ (edit if (edit is defined and edit) else none)|tojson }};
+  var OPEN_NEW = {{ 'true' if (open_new is defined and open_new) else 'false' }};
+  var OPEN_EDIT = {{ 'true' if (open_edit is defined and open_edit) else 'false' }};
+</script>
+<script>
+  // ---------- Quotation drawer ----------
+  var modal = document.getElementById('q-modal');
+  var tbody = document.getElementById('lines'), cbody = document.getElementById('charges');
+  var lineCount = 0, chargeCount = 0;
+  function money(n) { return n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+
+  function openDrawer() { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); if (!tbody.children.length) addLine(); }
+  function closeDrawer() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+  ['btn-add-q', 'btn-add-q-empty', 'btn-edit-q'].forEach(function (id) { var b = document.getElementById(id); if (b) b.addEventListener('click', openDrawer); });
+  ['btn-close-q', 'btn-cancel-q', 'q-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeDrawer); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
+
+  function addLine() {
+    var i = lineCount++;
+    var tr = document.createElement('tr');
+    var opts = '<option value="">Select product…</option>' + PRODUCTS.map(function (p) { return '<option value="' + p.id + '">' + p.code + ' — ' + p.name + '</option>'; }).join('');
+    tr.innerHTML =
+      '<td><select class="ql-input p-sel" name="product_id_' + i + '">' + opts + '</select><div class="ql-hint p-hint"></div></td>' +
+      '<td><input class="ql-input num q-in" type="number" step="any" min="0" name="qty_' + i + '"><div class="ql-hint u-hint"></div></td>' +
+      '<td><input class="ql-input num r-in" type="number" step="any" min="0" name="rate_' + i + '"></td>' +
+      '<td><input class="ql-input num d-in" type="number" step="any" min="0" max="100" value="0" name="discount_' + i + '"></td>' +
+      '<td class="pt-2"><input type="hidden" class="t-id" name="tax_rate_id_' + i + '"><div class="t-show text-[13px] text-ink-muted leading-tight">Set in Product master</div></td>' +
+      '<td class="num pt-3 amt tabular-nums">0.00</td>' +
+      '<td class="text-center"><button type="button" class="rm text-stop text-[18px] leading-none px-1" title="Remove this line">&times;</button></td>';
+    tbody.appendChild(tr);
+    document.getElementById('line-count').value = lineCount;
+    tr.querySelector('.p-sel').addEventListener('change', function () { onProduct(tr); });
+    tr.querySelectorAll('input,select').forEach(function (el) { el.addEventListener('input', recalc); el.addEventListener('change', recalc); });
+    tr.querySelector('.rm').addEventListener('click', function () { tr.remove(); recalc(); });
+    return tr;
+  }
+  function addCharge() {
+    var i = chargeCount++;
+    var tr = document.createElement('tr');
+    var opts = '<option value="">Select charge…</option>' + CHARGES.map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
+    tr.innerHTML =
+      '<td><select class="ql-input c-sel" name="charge_id_' + i + '">' + opts + '</select></td>' +
+      '<td><input class="ql-input num c-amt" type="number" step="any" min="0" name="charge_amount_' + i + '"></td>' +
+      '<td><select class="ql-input c-eff" name="charge_effect_' + i + '"><option value="add">Add (+)</option><option value="minus">Minus (−)</option></select></td>' +
+      '<td class="text-center"><button type="button" class="rm text-stop text-[18px] leading-none px-1" title="Remove this charge">&times;</button></td>';
+    cbody.appendChild(tr);
+    document.getElementById('charge-count').value = chargeCount;
+    tr.querySelectorAll('input,select').forEach(function (el) { el.addEventListener('input', recalc); el.addEventListener('change', recalc); });
+    tr.querySelector('.rm').addEventListener('click', function () { tr.remove(); recalc(); });
+    return tr;
+  }
+  function onProduct(tr) {
+    var p = PRODUCTS.filter(function (x) { return String(x.id) === tr.querySelector('.p-sel').value; })[0];
+    tr.querySelector('.u-hint').textContent = p ? 'in ' + p.unit : '';
+    tr.querySelector('.p-hint').textContent = (p && p.last_rate) ? 'Last quoted rate: ₹ ' + p.last_rate : '';
+    // GST product master se aata hai (Tax Master ka rate) — yahan badalte nahi; badalna ho to Product master me
+    tr.querySelector('.t-id').value = p ? p.tax_rate_id : '';
+    tr.querySelector('.t-id').setAttribute('data-pct', p ? p.tax_pct : 0);
+    tr.querySelector('.t-show').textContent = p ? p.tax_label + ' · ' + p.tax_pct + '%' : 'Set in Product master';
+    if (p) {
+      if (p.last_rate && !tr.querySelector('.r-in').value) tr.querySelector('.r-in').value = p.last_rate;
+    }
+    recalc();
+  }
+
+  // Hisaab server (app/tax.py) jaisa: line discount -> charges (items ki value ke anupaat me lines me bant-te hain) -> GST har line apne rate se
+  function recalc() {
+    var lines = [], gross = 0, disc = 0, items = 0;
+    tbody.querySelectorAll('tr').forEach(function (tr) {
+      var q = parseFloat(tr.querySelector('.q-in').value) || 0, r = parseFloat(tr.querySelector('.r-in').value) || 0, d = parseFloat(tr.querySelector('.d-in').value) || 0;
+      var g = r2(q * r), dd = r2(g * d / 100), net = r2(g - dd);
+      tr.querySelector('.amt').textContent = money(net);
+      lines.push({net: net, pct: parseFloat(tr.querySelector('.t-id').getAttribute('data-pct')) || 0}); gross += g; disc += dd; items += net;
+    });
+    var chargeNet = 0, chargeHtml = '';
+    cbody.querySelectorAll('tr').forEach(function (tr) {
+      var amt = parseFloat(tr.querySelector('.c-amt').value) || 0, eff = tr.querySelector('.c-eff').value;
+      var sel = tr.querySelector('.c-sel'), name = sel.value ? sel.selectedOptions[0].text : '';
+      if (!amt || !name) return;
+      chargeNet += eff === 'minus' ? -amt : amt;
+      chargeHtml += '<div class="flex justify-between"><span class="text-ink-muted">' + name + '</span><span class="tabular-nums">' + (eff === 'minus' ? '− ' : '+ ') + money(amt) + '</span></div>';
+    });
+    chargeNet = r2(chargeNet);
+    var tax = 0, given = 0;
+    lines.forEach(function (ln, idx) {
+      var share = items === 0 ? 0 : (idx === lines.length - 1 ? r2(chargeNet - given) : r2(chargeNet * ln.net / items));
+      given += share; tax += r2((ln.net + share) * ln.pct / 100);
+    });
+    tax = r2(tax);
+    var taxable = r2(items + chargeNet);
+    var cust = CUSTOMERS.filter(function (c) { return String(c.id) === document.getElementById('customer_id').value; })[0];
+    var inter = !(cust && COMPANY_STATE && cust.state_id === COMPANY_STATE);
+    var gst = '';
+    if (tax > 0) {
+      if (inter) gst = '<div class="flex justify-between"><span class="text-ink-muted">IGST</span><span class="tabular-nums">' + money(tax) + '</span></div>';
+      else { var c = r2(tax / 2); gst = '<div class="flex justify-between"><span class="text-ink-muted">CGST</span><span class="tabular-nums">' + money(c) + '</span></div><div class="flex justify-between"><span class="text-ink-muted">SGST</span><span class="tabular-nums">' + money(r2(tax - c)) + '</span></div>'; }
+    }
+    document.getElementById('t-gross').textContent = money(gross);
+    document.getElementById('t-disc').textContent = disc ? '− ' + money(disc) : '0.00';
+    document.getElementById('t-charge-rows').innerHTML = chargeHtml;
+    document.getElementById('t-taxable').textContent = money(taxable);
+    document.getElementById('t-gst-rows').innerHTML = gst;
+    document.getElementById('t-grand').textContent = money(r2(taxable + tax));
+  }
+
+  document.getElementById('customer_id').addEventListener('change', function () {
+    var cust = CUSTOMERS.filter(function (c) { return String(c.id) === this.value; }, this)[0];
+    if (cust && cust.payment_terms_id) document.getElementById('payment_terms_id').value = cust.payment_terms_id;
+    recalc();
+  });
+  document.getElementById('add-line').addEventListener('click', addLine);
+  document.getElementById('add-charge').addEventListener('click', addCharge);
+  document.getElementById('q-form').addEventListener('submit', function (e) {
+    var filled = Array.from(tbody.querySelectorAll('.p-sel')).filter(function (s) { return s.value; });
+    if (!filled.length) { e.preventDefault(); showToast('Add at least one product line.', 'error'); }
+  });
+
+  // Edit / Revise: drawer pehle se bhara hua (purani quotation ki values)
+  if (EDIT) {
+    document.getElementById('customer_id').value = EDIT.customer_id;
+    ['quote_date', 'valid_until', 'needed_by_date', 'payment_terms_id', 'delivery_terms', 'terms', 'notes'].forEach(function (id) {
+      document.getElementById(id).value = EDIT[id] === undefined ? '' : EDIT[id];
+    });
+    EDIT.lines.forEach(function (ln) {
+      var tr = addLine();
+      tr.querySelector('.q-in').value = ln.qty; tr.querySelector('.r-in').value = ln.rate; tr.querySelector('.d-in').value = ln.discount;
+      tr.querySelector('.p-sel').value = ln.product_id; onProduct(tr);
+    });
+    EDIT.charges.forEach(function (ch) {
+      var tr = addCharge();
+      tr.querySelector('.c-sel').value = ch.charge_id; tr.querySelector('.c-amt').value = ch.amount; tr.querySelector('.c-eff').value = ch.effect;
+    });
+    recalc();
+  }
+  if (OPEN_NEW || OPEN_EDIT) openDrawer();
+</script>

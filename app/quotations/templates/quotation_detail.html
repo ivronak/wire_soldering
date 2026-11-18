@@ -43,6 +43,12 @@
             {% endif %}
           </form>
           {% endfor %}
+          {% if edit %}
+          <button type="button" id="btn-edit-q" class="px-4 py-2.5 text-[13.5px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">
+            {{ 'Revise (R' ~ edit.next_revision ~ ')' if edit.revising else 'Edit' }}
+          </button>
+          {% endif %}
+          <a href="{{ url_for('quotations.quotations_print', quotation_id=q.id) }}" target="_blank" class="px-4 py-2.5 text-[13.5px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Print</a>
           <a href="{{ url_for('quotations.quotations_list') }}" class="px-4 py-2.5 text-[13.5px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Back</a>
         </div>
       </div>
@@ -96,5 +102,38 @@
 
         {% if q.terms %}<div><div class="qd-label">Other terms</div><div class="whitespace-pre-line">{{ q.terms }}</div></div>{% endif %}
         {% if q.notes %}<div><div class="qd-label">Internal note</div><div class="text-ink-muted">{{ q.notes }}</div></div>{% endif %}
+
+        {# Revision history: har Revise par purana roop yahan jama hota hai, naya upar #}
+        <div id="revision-history">
+          <div class="qd-label mb-2">Revision history</div>
+          {% if revisions %}
+          <div class="space-y-2">
+            {% for r in revisions %}
+            <div class="border border-slate-200 rounded p-3 bg-white">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-semibold text-ink">R{{ r.revision_no }} <span class="text-ink-faint font-normal text-[13px]">· {{ r.created_at|ist }}</span></div>
+                <div class="text-[13px] tabular-nums text-ink-muted">Total ₹ {{ '{:,.2f}'.format(r.old_total or 0) }} → <b class="text-ink">₹ {{ '{:,.2f}'.format(r.new_total or 0) }}</b></div>
+              </div>
+              <div class="text-[13.5px] text-ink mt-1">{{ r.note }}</div>
+              {% if r.changes %}
+              <ul class="mt-1 text-[13px] text-ink-muted list-disc pl-5">
+                {% for change in r.changes.split('\n') %}<li>{{ change }}</li>{% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-[13px] text-ink-faint">No revisions yet. If a quotation that was already sent is changed, the old version is kept here.</p>
+          {% endif %}
+        </div>
       </div>
+{% endblock %}
+
+{% block modals %}
+{% if edit %}{% include '_quote_drawer.html' %}{% endif %}
+{% endblock %}
+
+{% block page_js %}
+{% if edit %}{% include '_quote_drawer_js.html' %}{% endif %}
 {% endblock %}

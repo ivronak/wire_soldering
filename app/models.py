@@ -2228,3 +2228,19 @@ class QuotationCharge(CreatedAtMixin, db.Model):
     amount = db.Column(db.Float, nullable=False)
     effect = db.Column(db.String(10), nullable=False)
 
+
+
+class QuotationRevision(CreatedAtMixin, db.Model):
+    # Sales S1.2: Sent quotation badli gayi to R1, R2 ... — number wahi, purana roop snapshot (JSON) me yahan rehta hai, taaki "500 se 350" jaisi history dikhe.
+    # revision_no = naya revision (R1 ban raha ho to 1). snapshot = ISS SE PEHLE ka roop (lines, charges, terms, total). changes = auto likha farak, note = user ki wajah.
+    __tablename__ = "quotation_revisions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=False)
+    quotation = db.relationship("Quotation", foreign_keys=[quotation_id], backref=db.backref("revisions", order_by="QuotationRevision.id"))
+    revision_no = db.Column(db.Integer, nullable=False)
+    note = db.Column(db.String(255), nullable=False)
+    changes = db.Column(db.Text, nullable=True)
+    snapshot = db.Column(db.JSON, nullable=False)
+    old_total = db.Column(db.Float, nullable=True)
+    new_total = db.Column(db.Float, nullable=True)
