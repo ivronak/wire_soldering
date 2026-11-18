@@ -2125,3 +2125,106 @@ class ScrapPackItem(CreatedAtMixin, db.Model):
     pack = db.relationship("ScrapPack", foreign_keys=[pack_id], backref="items")
     batch_id = db.Column(db.Integer, db.ForeignKey("fg_batches.id"), nullable=False)
     batch = db.relationship("FGBatch", foreign_keys=[batch_id])
+
+
+class Quotation(CreatedAtMixin, db.Model):
+    # Sales S1: customer ko bheji jaane wali quotation. Aage chalkar (Finalize) yahi document "Order" ban jaata hai aur Production order banata hai.
+    # Revision (rate badalna) isi number ke andar rahegi (revision_no) — alag number nahi. Customer Master se juda hai; lines me product + rate.
+    __tablename__ = "quotations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    quote_no = db.Column(db.String(20), unique=True, nullable=False)          # QT-2026-001
+
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False)
+    customer = db.relationship("Customer", foreign_keys=[customer_id])
+
+    quote_date = db.Column(db.Date, nullable=False)
+    valid_until = db.Column(db.Date, nullable=True)                           # is date ke baad quotation ka rate valid nahi
+    needed_by_date = db.Column(db.Date, nullable=True)                        # customer ko maal kab tak chahiye (Finalize par production order me jaayegi)
+
+    payment_terms_id = db.Column(db.Integer, db.ForeignKey("payment_terms.id"), nullable=True)
+    payment_terms = db.relationship("PaymentTerm", foreign_keys=[payment_terms_id])
+    delivery_terms = db.Column(db.String(255), nullable=True)                 # jaise "Ex-works, 15 days after PO"
+    terms = db.Column(db.String(500), nullable=True)                          # baaki shartein (packing, TC, quality)
+    notes = db.Column(db.String(255), nullable=True)                          # andar ke liye note (customer ko print me nahi)
+
+    # Draft -> Sent -> Approved / Rejected ; Draft -> Cancelled. (Approved ke baad Finalize = agla step)
+    status = db.Column(db.String(20), default="Draft", nullable=False)
+    revision_no = db.Column(db.Integer, default=0, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def is_inter_state(self):
+        # Customer ka state aur apni (pehli active) branch ka state alag ho to IGST, warna CGST + SGST
+        branch = Branch.query.filter_by(is_deleted=False, is_active=True).order_by(Branch.id).first()
+        customer_state = self.customer.state if self.customer else None
+        branch_state = branch.state if branch else None
+        if customer_state and branch_state and customer_state.id == branch_state.id:
+            return False
+        return True
+
+    @property
+    def summary(self):
+        # Quotation ka hisaab ek jagah (list, view, print). Order: line ka discount PEHLE, phir charges (Add / Minus, Charges Master se),
+        # phir GST items + charges ke total par (app/tax.py, PO jaisa hi rule).
+        tax_lines = [(line.net_value, line.tax_rate.rate_percent if line.tax_rate else 0) for line in self.lines]
+        net = 0
+        for row in self.charge_rows:
+            net += -row["amount"] if row["effect"] == "minus" else row["amount"]
+        result = calc_tax(tax_lines, round(net, 2))
+        result["cgst"], result["sgst"] = split_tax(result["tax_total"])
+        result["inter"] = self.is_inter_state
+        result["discount_total"] = round(sum(line.discount_amount for line in self.lines), 2)
+        result["gross_total"] = round(sum(line.gross_value for line in self.lines), 2)
+        result["charge_rows"] = self.charge_rows
+        return result
+
+    @property
+    def charge_rows(self):
+        # Charges ki list (naam, amount, add / minus) — display aur hisaab dono yahin se
+        return [{"name": row.charge.name if row.charge else "Charge", "amount": row.amount, "effect": row.effect} for row in self.charge_lines]
+
+
+class QuotationLine(CreatedAtMixin, db.Model):
+    __tablename__ = "quotation_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=False)
+    quotation = db.relationship("Quotation", foreign_keys=[quotation_id], backref=db.backref("lines", order_by="QuotationLine.id"))
+
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product = db.relationship("Product", foreign_keys=[product_id])
+
+    qty = db.Column(db.Float, nullable=False)                                 # product ki apni unit me (KG / PCS)
+    rate = db.Column(db.Float, nullable=False)                                # per unit, tax se pehle
+    discount_percent = db.Column(db.Float, default=0, nullable=False)
+    tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=True)
+    tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
+    remarks = db.Column(db.String(150), nullable=True)
+
+    @property
+    def gross_value(self):
+        return line_value(self.qty or 0, self.rate or 0)
+
+    @property
+    def discount_amount(self):
+        return round(self.gross_value * (self.discount_percent or 0) / 100, 2)
+
+    @property
+    def net_value(self):
+        # Discount ke baad, GST se pehle
+        return round(self.gross_value - self.discount_amount, 2)
+
+
+class QuotationCharge(CreatedAtMixin, db.Model):
+    # Quotation ke charges (Shipping, Labour ...) — Charges Master se, PO ke PurchaseOrderCharge jaisa. effect: "add" total me judta hai, "minus" katta hai.
+    __tablename__ = "quotation_charges"
+
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=False)
+    quotation = db.relationship("Quotation", foreign_keys=[quotation_id], backref=db.backref("charge_lines", order_by="QuotationCharge.id"))
+    charge_id = db.Column(db.Integer, db.ForeignKey("charges.id"), nullable=False)
+    charge = db.relationship("Charge", foreign_keys=[charge_id])
+    amount = db.Column(db.Float, nullable=False)
+    effect = db.Column(db.String(10), nullable=False)
+

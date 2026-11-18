@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ q.quote_no }}{% endblock %}
+
+{% block page_css %}
+<style>
+  .qd-label { font-size: 12px; font-weight: 600; color: #6B7F82; text-transform: uppercase; letter-spacing: 0.03em; }
+  .qd-table { width: 100%; border-collapse: collapse; }
+  .qd-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 9px 10px; text-align: left; }
+  .qd-table td { padding: 9px 10px; border-bottom: 1px solid #E2E8E7; font-size: 14px; }
+  .qd-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .q-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid; }
+  .q-chip.Draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .q-chip.Sent { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .q-chip.Approved { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .q-chip.Rejected, .q-chip.Cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .q-chip.Expired { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('quotations.quotations_list') }}" class="hover:underline">Sales / Quotations</a> / {{ q.quote_no }}</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight flex items-center gap-2">
+            {{ q.quote_no }}{% if q.revision_no %} <span class="text-ink-faint text-[15px] font-normal">R{{ q.revision_no }}</span>{% endif %}
+            <span class="q-chip {{ q.status }}">{{ q.status }}</span>
+            {% if expired %}<span class="q-chip Expired">Expired</span>{% endif %}
+          </h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          {% for to in next_statuses %}
+          <form method="post" action="{{ url_for('quotations.quotations_status', quotation_id=q.id) }}"
+                {% if to in ('Rejected', 'Cancelled') %}onsubmit="return confirm('Mark {{ q.quote_no }} as {{ to }}? This cannot be undone.');"{% endif %}>
+            <input type="hidden" name="to" value="{{ to }}">
+            {% if to in ('Sent', 'Approved') %}
+            <button type="submit" class="px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+              {{ 'Mark as Sent to customer' if to == 'Sent' else 'Customer approved' }}
+            </button>
+            {% else %}
+            <button type="submit" class="px-4 py-2.5 text-[13.5px] font-semibold text-stop bg-white rounded border border-stop-border hover:bg-stop-bg">
+              {{ 'Customer rejected' if to == 'Rejected' else 'Cancel quotation' }}
+            </button>
+            {% endif %}
+          </form>
+          {% endfor %}
+          <a href="{{ url_for('quotations.quotations_list') }}" class="px-4 py-2.5 text-[13.5px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Back</a>
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-auto bg-white border border-slate-300 rounded-lg shadow-sm p-4 space-y-5">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div><div class="qd-label">Customer</div><div class="font-semibold text-ink">{{ q.customer.name }}</div><div class="text-[13px] text-ink-faint">{{ q.customer.state.name if q.customer.state else '' }}{% if q.customer.gstin %} · GSTIN {{ q.customer.gstin }}{% endif %}</div></div>
+          <div><div class="qd-label">Quotation date</div><div>{{ q.quote_date.strftime('%d %b %Y') }}</div></div>
+          <div><div class="qd-label">Valid until</div><div>{{ q.valid_until.strftime('%d %b %Y') if q.valid_until else '—' }}</div></div>
+          <div><div class="qd-label">Customer needs it by</div><div>{{ q.needed_by_date.strftime('%d %b %Y') if q.needed_by_date else '—' }}</div></div>
+          <div><div class="qd-label">Payment terms</div><div>{{ q.payment_terms.name if q.payment_terms else '—' }}</div></div>
+          <div class="md:col-span-3"><div class="qd-label">Delivery terms</div><div>{{ q.delivery_terms or '—' }}</div></div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="qd-table" style="min-width: 640px;">
+            <thead><tr><th>#</th><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for line in q.lines %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td><b>{{ line.product.name }}</b> <span class="text-ink-faint text-[12.5px]">{{ line.product.code }}</span></td>
+                <td class="num">{{ '{:,.3f}'.format(line.qty).rstrip('0').rstrip('.') }} {{ line.product.base_unit.code if line.product.base_unit else '' }}</td>
+                <td class="num">{{ '{:,.2f}'.format(line.rate) }}</td>
+                <td class="num">{{ '%g'|format(line.discount_percent) }}</td>
+                <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
+                <td class="num font-semibold">{{ '{:,.2f}'.format(line.net_value) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex justify-end">
+          <div class="w-full md:w-96 text-[14px] space-y-1 bg-mist border border-slate-200 rounded p-3">
+            <div class="flex justify-between"><span class="text-ink-muted">Items total</span><span class="tabular-nums">{{ '{:,.2f}'.format(summary.gross_total) }}</span></div>
+            {% if summary.discount_total %}<div class="flex justify-between"><span class="text-ink-muted">Discount</span><span class="tabular-nums">− {{ '{:,.2f}'.format(summary.discount_total) }}</span></div>{% endif %}
+            {% for row in summary.charge_rows %}
+            <div class="flex justify-between"><span class="text-ink-muted">{{ row.name }}</span><span class="tabular-nums">{{ '− ' if row.effect == 'minus' else '+ ' }}{{ '{:,.2f}'.format(row.amount) }}</span></div>
+            {% endfor %}
+            <div class="flex justify-between"><span class="text-ink-muted">Taxable value</span><span class="tabular-nums">{{ '{:,.2f}'.format(summary.taxable_total) }}</span></div>
+            {% if summary.inter %}
+            <div class="flex justify-between"><span class="text-ink-muted">IGST</span><span class="tabular-nums">{{ '{:,.2f}'.format(summary.tax_total) }}</span></div>
+            {% else %}
+            <div class="flex justify-between"><span class="text-ink-muted">CGST</span><span class="tabular-nums">{{ '{:,.2f}'.format(summary.cgst) }}</span></div>
+            <div class="flex justify-between"><span class="text-ink-muted">SGST</span><span class="tabular-nums">{{ '{:,.2f}'.format(summary.sgst) }}</span></div>
+            {% endif %}
+            <div class="flex justify-between border-t border-slate-300 pt-1 font-bold text-ink text-[16px]"><span>Grand total</span><span class="tabular-nums">₹ {{ '{:,.2f}'.format(summary.grand_total) }}</span></div>
+          </div>
+        </div>
+
+        {% if q.terms %}<div><div class="qd-label">Other terms</div><div class="whitespace-pre-line">{{ q.terms }}</div></div>{% endif %}
+        {% if q.notes %}<div><div class="qd-label">Internal note</div><div class="text-ink-muted">{{ q.notes }}</div></div>{% endif %}
+      </div>
+{% endblock %}

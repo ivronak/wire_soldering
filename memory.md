@@ -557,3 +557,9 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 ### 2026-09-15
 - User ne apna background clarify kiya: sirf thoda Flask aata hai, React/Laravel/JS nahi aata, dost Laravel jaanta hai but usse permanently dependent nahi hona chahta. Yeh context tracker/memory/CLAUDE.md teeno me capture kiya gaya hai.
 - `development.md`, `tracker.md`, `memory.md`, `CLAUDE.md` — yeh 4 project-management files banayi taaki multi-session project ka context kabhi na khoye.
+
+### Decision: Sales module flow — ek document (Quotation = Sales Order), step-by-step (2026-11-18)
+**Kya:** Sales ek ek chhote step me banega, har step ka live demo, aakhir me poora flow live demo. Flow: Quotation -> customer Approved -> Finalize (party ka PO no + PO copy + final rate + payment / delivery terms) -> Production order seedha queue me (Draft / Needs planning) -> Dispatch (partial, extra free stock se) -> Invoice (+ loss gate) . Quotation aur Sales Order alag document nahi: Finalize par wahi document "Order" ban jaata hai. Kai products = har product ka alag production order. Revision same number ke andar (R1, R2). Approval abhi office manually mark karta hai.
+**Kyun:** user ko simple / easy chahiye; spec §10 aur §28.11-28.12 me do alag document the, par ek hi rakhne se double entry nahi hoti. FG stock hone par sirf kami banana ("Cover from stock") Dispatch step ke saath judega.
+**How to apply:** S1 Quotation bana (app/quotations). Agla S1.2 revisions + print, phir S2 Finalize. Quotation line me product sirf sellable (active, output_rm_id khaali). Rate / GST app/tax.py se; IGST jab customer ka state pehli active Branch ke state se alag.
+
