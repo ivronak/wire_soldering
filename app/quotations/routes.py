@@ -11,6 +11,7 @@ from app.extensions import db
 from app.models import Charge, Customer, PaymentTerm, Product, Quotation, QuotationCharge, QuotationLine, QuotationRevision, TaxRate
 from app.tax import line_value
 from app.dispatch.stock import dispatch_state, dispatched_qty
+from app.sales_invoices.billing import billing_state
 from app.production_orders.routes import _new_bundle_no, build_order, default_allowances, read_plan, unit_weight_for
 from app.production_orders.scheduler import persist_schedule, today_ist
 
@@ -356,6 +357,7 @@ def quotations_detail(quotation_id):
                            open_finalize=request.args.get("finalize") == "1" and quotation.status == "Approved",
                            po_file_name=os.path.basename(quotation.po_file) if quotation.po_file else None,
                            dispatch_status=dispatch_state(quotation),
+                           billing_status=billing_state(quotation),
                            sent_qty={line.id: dispatched_qty(line) for line in quotation.lines} if quotation.status == "Ordered" else {},
                            **(form_context() if editable else {}), **(finalize_context() if quotation.status == "Approved" else {}))
 

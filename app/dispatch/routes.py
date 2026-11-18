@@ -116,6 +116,9 @@ def dispatch_cancel(challan_id):
     if challan.status != "Dispatched":
         flash("This challan is already cancelled.", "error")
         return back
+    if challan.invoice_id is not None:
+        flash(f"This challan is billed in invoice {challan.invoice.invoice_no}. Cancel the invoice first.", "error")
+        return back
     reason = (request.form.get("reason") or "").strip()[:255]
     if len(reason) < 3:
         flash("Write why the challan is cancelled.", "error")

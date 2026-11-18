@@ -2271,6 +2271,9 @@ class DeliveryChallan(CreatedAtMixin, db.Model):
     status = db.Column(db.String(12), default="Dispatched", nullable=False)   # Dispatched / Cancelled
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    # S4: jis Sales Invoice me is challan ka maal bill hua. Khaali = abhi bill nahi bana (invoice cancel hone par wapas khaali)
+    invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=True)
+    invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("challans", order_by="DeliveryChallan.id"))
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
 
@@ -2288,3 +2291,119 @@ class DeliveryChallanLine(CreatedAtMixin, db.Model):
     qty = db.Column(db.Float, nullable=False)
     unit_cost = db.Column(db.Float, default=0, nullable=False)
     from_own_order = db.Column(db.Boolean, default=True, nullable=False)       # False = free (Own) stock se nikala gaya extra
+
+
+class SalesInvoice(CreatedAtMixin, db.Model):
+    # Sales S4: Tax Invoice — dispatch (challan) hue maal ka bill. Quotation ki rate / discount / GST se banta hai (invoice par badal sakte hain).
+    # Status: "Posted" (customer ledger me Dr) / "Waiting approval" (rate cost se kam — Owner approve kare tab Posted) / "Cancelled".
+    __tablename__ = "sales_invoices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_no = db.Column(db.String(20), unique=True, nullable=False)         # INV-2026-001
+    quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=False)
+    quotation = db.relationship("Quotation", foreign_keys=[quotation_id], backref=db.backref("invoices", order_by="SalesInvoice.id"))
+    invoice_date = db.Column(db.Date, nullable=False)
+    tax_type = db.Column(db.String(10), nullable=False)                        # "intra" = CGST + SGST, "inter" = IGST (bill ke din ki copy)
+    status = db.Column(db.String(20), default="Posted", nullable=False)
+    remarks = db.Column(db.String(255), nullable=True)
+
+    # Totals bill banate waqt server nikaal ke rakhta hai (rupee, 2 decimal)
+    subtotal = db.Column(db.Float, default=0, nullable=False)                  # discount ke baad, tax aur charges se pehle
+    charges_total = db.Column(db.Float, default=0, nullable=False)             # Add (+) aur Minus (-) ka jod
+    tax_total = db.Column(db.Float, default=0, nullable=False)
+    total_amount = db.Column(db.Float, default=0, nullable=False)              # customer se lena baaki
+
+    # Loss gate: cost_total = dispatch ke din ki batch cost ka jod. has_loss = koi line cost se kam rate par. loss_amount = us line-wise kami ka jod.
+    cost_total = db.Column(db.Float, default=0, nullable=False)
+    has_loss = db.Column(db.Boolean, default=False, nullable=False)
+    loss_amount = db.Column(db.Float, default=0, nullable=False)
+    loss_note = db.Column(db.String(255), nullable=True)                       # Owner ne approve karte waqt jo wajah likhi
+    loss_approved_at = db.Column(db.DateTime, nullable=True)
+
+    cancel_reason = db.Column(db.String(255), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def is_inter_state(self):
+        return self.tax_type == "inter"
+
+    @property
+    def charge_rows(self):
+        return [{"name": row.charge.name if row.charge else "Charge", "amount": row.amount, "effect": row.effect} for row in self.charge_lines]
+
+    @property
+    def summary(self):
+        # Quotation.summary jaisa hi hisaab: line discount pehle, phir charges, phir GST (app/tax.py)
+        tax_lines = [(line.net_value, line.tax_rate.rate_percent if line.tax_rate else 0) for line in self.lines]
+        net = 0
+        for row in self.charge_rows:
+            net += -row["amount"] if row["effect"] == "minus" else row["amount"]
+        result = calc_tax(tax_lines, round(net, 2))
+        result["cgst"], result["sgst"] = split_tax(result["tax_total"])
+        result["inter"] = self.is_inter_state
+        result["discount_total"] = round(sum(line.discount_amount for line in self.lines), 2)
+        result["gross_total"] = round(sum(line.gross_value for line in self.lines), 2)
+        result["charge_rows"] = self.charge_rows
+        return result
+
+
+class SalesInvoiceLine(CreatedAtMixin, db.Model):
+    # Invoice ki ek row = quotation ki ek line ka itna dispatched maal. qty challans ke jod se aati hai; unit_cost challan ki cost ka weighted average.
+    __tablename__ = "sales_invoice_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=False)
+    invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("lines", order_by="SalesInvoiceLine.id"))
+    quotation_line_id = db.Column(db.Integer, db.ForeignKey("quotation_lines.id"), nullable=False)
+    quotation_line = db.relationship("QuotationLine", foreign_keys=[quotation_line_id])
+    qty = db.Column(db.Float, nullable=False)
+    rate = db.Column(db.Float, nullable=False)                                 # per unit, discount aur tax se pehle
+    discount_percent = db.Column(db.Float, default=0, nullable=False)
+    tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=True)
+    tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
+    unit_cost = db.Column(db.Float, default=0, nullable=False)                 # per unit asli cost (loss gate isi se)
+
+    @property
+    def product(self):
+        return self.quotation_line.product
+
+    @property
+    def gross_value(self):
+        return line_value(self.qty or 0, self.rate or 0)
+
+    @property
+    def discount_amount(self):
+        return round(self.gross_value * (self.discount_percent or 0) / 100, 2)
+
+    @property
+    def net_value(self):
+        return round(self.gross_value - self.discount_amount, 2)
+
+    @property
+    def net_unit_price(self):
+        # Discount ke baad per unit bikri bhaav (loss gate cost se isi ko milata hai)
+        return round((self.rate or 0) * (1 - (self.discount_percent or 0) / 100), 4)
+
+    @property
+    def loss_per_unit(self):
+        # Cost bhaav se upar ho to kami (rupee, paise tak round), warna 0
+        gap = round(self.unit_cost or 0, 2) - round(self.net_unit_price, 2)
+        return round(gap, 2) if gap > 0 else 0
+
+    @property
+    def loss_value(self):
+        return round(self.loss_per_unit * (self.qty or 0), 2)
+
+
+class SalesInvoiceCharge(CreatedAtMixin, db.Model):
+    # Invoice ke charges (Shipping, Labour ...) — Charges Master se. Pehle invoice par quotation ke charges aate hain, baad ke invoices par nahi.
+    __tablename__ = "sales_invoice_charges"
+
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=False)
+    invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("charge_lines", order_by="SalesInvoiceCharge.id"))
+    charge_id = db.Column(db.Integer, db.ForeignKey("charges.id"), nullable=False)
+    charge = db.relationship("Charge", foreign_keys=[charge_id])
+    amount = db.Column(db.Float, nullable=False)
+    effect = db.Column(db.String(10), nullable=False)

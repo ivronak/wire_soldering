@@ -95,7 +95,8 @@
               {% for c in challans %}
               <tr>
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ c.challan_no }}</span>
-                  <div class="text-[12px] text-ink-faint mt-1"><a class="hover:underline" href="{{ url_for('quotations.quotations_detail', quotation_id=c.quotation_id) }}">{{ c.quotation.quote_no }}</a></div></td>
+                  <div class="text-[12px] text-ink-faint mt-1"><a class="hover:underline" href="{{ url_for('quotations.quotations_detail', quotation_id=c.quotation_id) }}">{{ c.quotation.quote_no }}</a></div>
+                  {% if c.invoice %}<div class="text-[12px] mt-1"><span class="q-chip Done">Billed {{ c.invoice.invoice_no }}</span></div>{% elif tab == 'done' %}<div class="text-[12px] mt-1"><a class="q-chip Not hover:underline" href="{{ url_for('sales_invoices.invoices_list', q=c.quotation_id) }}">Not billed yet</a></div>{% endif %}</td>
                 <td>{{ c.challan_date.strftime('%d %b %Y') }}</td>
                 <td class="font-semibold text-ink">{{ c.quotation.customer.name }}</td>
                 <td>
@@ -107,7 +108,7 @@
                 <td class="text-[13px] text-ink-muted">{% if tab == 'done' %}{{ c.vehicle_no or '—' }}{% if c.transporter %}<div class="text-[12px] text-ink-faint">{{ c.transporter }}</div>{% endif %}{% else %}{{ c.cancel_reason }}{% endif %}</td>
                 <td>
                   <a href="{{ url_for('dispatch.dispatch_print', challan_id=c.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">Print</a>
-                  {% if tab == 'done' %}<button type="button" class="btn-cancel-c mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ c.id }}" data-no="{{ c.challan_no }}">Cancel</button>{% endif %}
+                  {% if tab == 'done' and not c.invoice %}<button type="button" class="btn-cancel-c mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ c.id }}" data-no="{{ c.challan_no }}">Cancel</button>{% endif %}
                 </td>
               </tr>
               {% endfor %}

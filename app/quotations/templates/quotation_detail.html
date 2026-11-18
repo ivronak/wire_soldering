@@ -140,6 +140,29 @@
           <p class="text-[13px] text-ink-faint">Nothing dispatched yet.</p>
           {% endif %}
         </div>
+
+        {% if q.challans %}
+        <div id="invoice-list">
+          <div class="flex items-center justify-between mb-2">
+            <div class="qd-label">Invoices {% if billing_status %}<span class="q-chip {{ 'Approved' if billing_status == 'Billed' else ('Expired' if billing_status == 'Partly billed' else 'Draft') }} ml-1">{{ billing_status }}</span>{% endif %}</div>
+            {% if billing_status != 'Billed' %}<a href="{{ url_for('sales_invoices.invoices_list', q=q.id) }}" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Create invoice</a>{% endif %}
+          </div>
+          {% if q.invoices %}
+          <div class="space-y-1">
+            {% for i in q.invoices %}
+            <div class="flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded px-3 py-2 text-[13.5px]">
+              <div><b class="font-mono">{{ i.invoice_no }}</b> <span class="text-ink-faint">· {{ i.invoice_date.strftime('%d %b %Y') }}</span>
+                {% if i.status == 'Cancelled' %}<span class="q-chip Rejected ml-1">Cancelled</span>{% elif i.status == 'Waiting approval' %}<span class="q-chip Rejected ml-1">Waiting for Owner</span>{% endif %}</div>
+              <div class="text-ink-muted">₹ {{ '{:,.2f}'.format(i.total_amount) }}</div>
+              {% if i.status == 'Posted' %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="text-copper-text font-semibold hover:underline">Print</a>{% else %}<span></span>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-[13px] text-ink-faint">Nothing billed yet.</p>
+          {% endif %}
+        </div>
+        {% endif %}
         {% endif %}
 
         {# Revision history: har Revise par purana roop yahan jama hota hai, naya upar #}
