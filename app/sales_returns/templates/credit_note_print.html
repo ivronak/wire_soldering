@@ -1,0 +1,65 @@
+{% extends "print_base.html" %}
+{# Sales S7: Credit note (A4 letterhead) — customer ko jo credit mila. Cost kahin nahi chhapti. IRN / QR baad ke step me judenge. #}
+{% set doc_title = 'Credit note ' ~ ret.return_no %}
+{% set back_url = url_for('sales_returns.returns_list') %}
+{% set eyebrow = 'Credit note' %}
+{% set docno = ret.return_no %}
+{% set status = ret.status %}
+
+{% block sheet_body %}
+    <section class="meta">
+      <div><span class="lbl">Credit note date</span><span class="val">{{ ret.return_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Against invoice</span><span class="val">{{ inv.invoice_no }}</span></div>
+      <div><span class="lbl">Invoice date</span><span class="val">{{ inv.invoice_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Customer PO</span><span class="val">{{ q.customer_po_no or '—' }}</span></div>
+    </section>
+
+    <section class="supplier">
+      <span class="lbl">Credited to</span>
+      <strong>{{ q.customer.name }}</strong>
+      {% if q.customer.address %}<p>{{ q.customer.address }}</p>{% endif %}
+      <p>{{ q.customer.state.name if q.customer.state else '' }}{% if q.customer.gstin %} &nbsp;·&nbsp; GSTIN {{ q.customer.gstin }}{% endif %}</p>
+      <p>Reason: {{ ret.reason }}</p>
+    </section>
+
+    <div class="sec">Goods returned</div>
+    <table class="lines">
+      <thead>
+        <tr><th>#</th><th>Product</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th></tr>
+      </thead>
+      <tbody>
+        {% for g in ret.groups %}
+        {% set line = g.invoice_line %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><span class="mat-name">{{ line.product.name }}</span><span class="mat-sub">{{ line.product.code }}</span></td>
+          <td>{{ line.product.hsn_code or '—' }}</td>
+          <td class="num">{{ '{:,.3f}'.format(g.qty).rstrip('0').rstrip('.') }} {{ line.product.base_unit.code if line.product.base_unit else '' }}</td>
+          <td class="num">{{ '{:,.2f}'.format(line.rate) }}</td>
+          <td class="num">{{ '%g'|format(line.discount_percent) if line.discount_percent else '—' }}</td>
+          <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
+          <td class="num amt">{{ '{:,.2f}'.format(g.net) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="close">
+      <div class="side">
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs"><div class="sign"><div class="name"></div><div class="line">Authorised signatory</div></div></div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Items total</span><span class="num">{{ '{:,.2f}'.format(summary.gross_total) }}</span></div>
+        {% if summary.discount_total %}<div class="row"><span>Discount</span><span class="num">− {{ '{:,.2f}'.format(summary.discount_total) }}</span></div>{% endif %}
+        <div class="row"><span>Taxable value</span><span class="num">{{ '{:,.2f}'.format(summary.taxable_total) }}</span></div>
+        {% if summary.inter %}
+        <div class="row"><span>IGST</span><span class="num">{{ '{:,.2f}'.format(summary.tax_total) }}</span></div>
+        {% else %}
+        <div class="row"><span>CGST</span><span class="num">{{ '{:,.2f}'.format(summary.cgst) }}</span></div>
+        <div class="row"><span>SGST</span><span class="num">{{ '{:,.2f}'.format(summary.sgst) }}</span></div>
+        {% endif %}
+        <div class="grand"><span>Credit total</span><span class="num">₹ {{ '{:,.2f}'.format(summary.grand_total) }}</span></div>
+      </div>
+    </div>
+{% endblock %}

@@ -17,6 +17,7 @@
   .q-chip.Paid { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .q-chip.Part { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .q-chip.Unpaid { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .q-chip.Credited { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
   #i-modal.hidden, #a-modal.hidden, #x-modal.hidden { display: none; }
   #i-modal, #a-modal, #x-modal { display: flex; }
   .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
@@ -100,6 +101,7 @@
                 </td>
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(i.total_amount) }}
                   {% if tab == 'done' %}<div class="mt-1"><span class="q-chip {{ 'Part' if i.payment_state == 'Part paid' else i.payment_state }}">{{ i.payment_state }}</span></div>
+                  {% if i.credited > 0 %}<div class="text-[12px] text-ink-faint font-normal mt-1">Credit note ₹ {{ '{:,.2f}'.format(i.credited) }}</div>{% endif %}
                   {% if i.outstanding > 0 %}<div class="text-[12px] text-ink-faint font-normal mt-1">₹ {{ '{:,.2f}'.format(i.outstanding) }} due by {{ i.due_on.strftime('%d %b %Y') }}{% if i.days_overdue(today_date) > 0 %} · <span class="text-stop font-semibold">{{ i.days_overdue(today_date) }} days late</span>{% endif %}</div>{% endif %}{% endif %}
                   {% if tab == 'waiting' %}<div class="mt-1"><span class="q-chip Waiting">Loss ₹{{ '{:,.2f}'.format(i.loss_amount) }}</span></div>{% endif %}</td>
                 <td>
@@ -107,7 +109,8 @@
                   <button type="button" class="btn-approve px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-id="{{ i.id }}" data-no="{{ i.invoice_no }}" data-loss="{{ '{:,.2f}'.format(i.loss_amount) }}">Owner approve</button>
                   {% endif %}
                   {% if tab != 'cancelled' %}
-                  {% if tab == 'done' %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">Print</a>{% endif %}
+                  {% if tab == 'done' %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">Print</a>
+                  {% if i.returnable_total > 0 %}<a href="{{ url_for('sales_returns.returns_list', i=i.id) }}" class="inline-block mt-1 px-3 py-1.5 text-[13px] font-semibold text-copper-text bg-white border border-copper-border rounded hover:bg-copper-soft">Return goods</a>{% endif %}{% endif %}
                   <button type="button" class="btn-cancel-i mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ i.id }}" data-no="{{ i.invoice_no }}">Cancel</button>
                   {% endif %}
                 </td>

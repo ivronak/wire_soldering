@@ -148,6 +148,8 @@ def cancel_invoice(invoice, reason):
         raise BillingError("This invoice is already cancelled.")
     if invoice.paid > 0.004:
         raise BillingError(f"Money of ₹{invoice.paid:,.2f} is already received against this invoice. Cancel that receipt first.")
+    if invoice.credited > 0.004:
+        raise BillingError("A credit note (sales return) exists against this invoice. Cancel that credit note first.")
     if invoice.status == "Posted":
         ledger = invoice.quotation.customer.ledger
         ledger.current_balance = round(ledger.current_balance + invoice.total_amount, 2)

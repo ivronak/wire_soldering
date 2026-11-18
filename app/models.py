@@ -2346,19 +2346,34 @@ class SalesInvoice(CreatedAtMixin, db.Model):
         return round(sum(a.amount for a in self.allocations if a.receipt and a.receipt.status == "Posted"), 2)
 
     @property
+    def credited(self):
+        # S7: is invoice ke against Posted Credit Notes (Sales Return) ka jod. Cancelled return nahi ginte
+        return round(sum(r.total_amount for r in self.returns if r.status == "Posted" and not r.is_deleted), 2)
+
+    @property
+    def returnable_total(self):
+        # S7: is invoice ka kitna maal abhi wapas aa sakta hai (qty ka jod). 0 = sab wapas aa chuka
+        total = 0.0
+        for line in self.lines:
+            back = sum(r.qty for r in line.return_lines if r.sales_return.status == "Posted" and not r.sales_return.is_deleted)
+            total += max(line.qty - back, 0)
+        return round(total, 4)
+
+    @property
     def outstanding(self):
-        # Customer se abhi lena baaki. Posted nahi (Waiting / Cancelled) invoice par kuch lena nahi
+        # Customer se abhi lena baaki = total - mila paisa - credit note. Posted nahi (Waiting / Cancelled) invoice par kuch lena nahi.
+        # Credit note baaki se zyada ho (invoice pehle hi paid tha) to baaki 0 — wo extra customer ledger me credit ban kar rehta hai
         if self.status != "Posted":
             return 0.0
-        return round(self.total_amount - self.paid, 2)
+        return max(round(self.total_amount - self.paid - self.credited, 2), 0.0)
 
     @property
     def payment_state(self):
-        # "Paid" / "Part paid" / "Unpaid" (sirf Posted invoice ke liye)
+        # "Paid" / "Credited" (sirf credit note se nipta) / "Part paid" / "Unpaid" (sirf Posted invoice ke liye)
         if self.status != "Posted":
             return None
         if self.outstanding <= 0.004:
-            return "Paid"
+            return "Credited" if self.paid <= 0.004 and self.credited > 0.004 else "Paid"
         return "Part paid" if self.paid > 0.004 else "Unpaid"
 
     @property
@@ -2493,3 +2508,76 @@ class SalesReceiptAllocation(CreatedAtMixin, db.Model):
     invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=False)
     invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("allocations", order_by="SalesReceiptAllocation.id"))
     amount = db.Column(db.Float, nullable=False)
+
+
+class SalesReturn(CreatedAtMixin, db.Model):
+    # Sales S7: Sales Return / Credit Note — Posted invoice ka maal customer ne wapas bheja. Customer ledger me Cr (lena kam), invoice ka baaki kam.
+    # Achha maal usi batch me wapas FG stock me (fg_movements, type SALES_RETURN); kharab maal stock me nahi aata (sirf credit milta hai).
+    # Cancel = ledger wapas + stock ki ulti rows.
+    __tablename__ = "sales_returns"
+
+    id = db.Column(db.Integer, primary_key=True)
+    return_no = db.Column(db.String(20), unique=True, nullable=False)          # CN-2026-001
+    invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=False)
+    invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("returns", order_by="SalesReturn.id"))
+    return_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(12), default="Posted", nullable=False)         # Posted / Cancelled
+    subtotal = db.Column(db.Float, default=0, nullable=False)                   # discount ke baad, tax se pehle
+    tax_total = db.Column(db.Float, default=0, nullable=False)
+    total_amount = db.Column(db.Float, default=0, nullable=False)               # customer ko itna credit
+    cancel_reason = db.Column(db.String(255), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def customer(self):
+        return self.invoice.quotation.customer
+
+    @property
+    def groups(self):
+        # Invoice line ke hisaab se jod (ek line ka maal kai batch se aaya ho to kai rows) — credit isi se nikalta hai
+        order, rows = [], {}
+        for row in self.lines:
+            if row.invoice_line_id not in rows:
+                rows[row.invoice_line_id] = {"invoice_line": row.invoice_line, "qty": 0.0, "good_qty": 0.0}
+                order.append(row.invoice_line_id)
+            rows[row.invoice_line_id]["qty"] += row.qty
+            rows[row.invoice_line_id]["good_qty"] += row.good_qty
+        out = []
+        for key in order:
+            g = rows[key]
+            line = g["invoice_line"]
+            gross = line_value(round(g["qty"], 4), line.rate or 0)
+            disc = round(gross * (line.discount_percent or 0) / 100, 2)
+            g.update({"qty": round(g["qty"], 4), "good_qty": round(g["good_qty"], 4), "damaged_qty": round(g["qty"] - g["good_qty"], 4),
+                      "gross": gross, "discount": disc, "net": round(gross - disc, 2)})
+            out.append(g)
+        return out
+
+    @property
+    def summary(self):
+        tax_lines = [(g["net"], g["invoice_line"].tax_rate.rate_percent if g["invoice_line"].tax_rate else 0) for g in self.groups]
+        result = calc_tax(tax_lines, 0)
+        result["cgst"], result["sgst"] = split_tax(result["tax_total"])
+        result["inter"] = self.invoice.is_inter_state
+        result["discount_total"] = round(sum(g["discount"] for g in self.groups), 2)
+        result["gross_total"] = round(sum(g["gross"] for g in self.groups), 2)
+        return result
+
+
+class SalesReturnLine(CreatedAtMixin, db.Model):
+    # Return ki ek row = invoice line ka itna maal, ek challan row (ek batch) se wapas. good_qty = stock me wapas gaya, baaki kharab (stock me nahi).
+    __tablename__ = "sales_return_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    return_id = db.Column(db.Integer, db.ForeignKey("sales_returns.id"), nullable=False)
+    sales_return = db.relationship("SalesReturn", foreign_keys=[return_id], backref=db.backref("lines", order_by="SalesReturnLine.id"))
+    invoice_line_id = db.Column(db.Integer, db.ForeignKey("sales_invoice_lines.id"), nullable=False)
+    invoice_line = db.relationship("SalesInvoiceLine", foreign_keys=[invoice_line_id], backref="return_lines")
+    challan_line_id = db.Column(db.Integer, db.ForeignKey("delivery_challan_lines.id"), nullable=False)
+    challan_line = db.relationship("DeliveryChallanLine", foreign_keys=[challan_line_id], backref="return_lines")
+    batch_id = db.Column(db.Integer, db.ForeignKey("fg_batches.id"), nullable=False)
+    batch = db.relationship("FGBatch", foreign_keys=[batch_id])
+    qty = db.Column(db.Float, nullable=False)
+    good_qty = db.Column(db.Float, default=0, nullable=False)

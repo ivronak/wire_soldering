@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Sales returns{% endblock %}
+
+{# Sales S7: Sales returns (Credit notes). Customer ne jo maal wapas bheja: achha maal batch me wapas stock me, customer ko credit. #}
+{% block page_css %}
+<style>
+  .d-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D1D9D8; }
+  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .d-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .d-table .num { text-align: right; }
+  #s-modal.hidden, #x-modal.hidden { display: none; }
+  #s-modal, #x-modal { display: flex; }
+  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
+  .ql-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .ql-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
+  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .ql-table .num { text-align: right; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+  .ql-hint { font-size: 11.5px; color: #6B7F82; margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Sales / Sales returns</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Sales returns</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">Goods a customer sends back · credit note · good goods go back into stock</p>
+        </div>
+        <button type="button" id="btn-new" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New sales return</button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          {% for key, label in (('done', 'Credit notes'), ('cancelled', 'Cancelled')) %}
+          <a href="{{ url_for('sales_returns.returns_list', tab=key) }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
+          </a>
+          {% endfor %}
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="d-table">
+            <colgroup><col style="width:13%"><col style="width:16%"><col style="width:13%"><col style="width:26%"><col style="width:12%"><col style="width:20%"></colgroup>
+            <thead><tr><th>Credit note</th><th>Customer</th><th>Invoice</th><th>Goods returned</th><th class="num">Credit (₹)</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for r in returns %}
+              <tr>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ r.return_no }}</span>
+                  <div class="text-[12px] text-ink-faint mt-1">{{ r.return_date.strftime('%d %b %Y') }}</div></td>
+                <td class="font-semibold text-ink">{{ r.customer.name }}</td>
+                <td><span class="font-mono font-bold">{{ r.invoice.invoice_no }}</span></td>
+                <td>
+                  {% for g in r.groups %}
+                  <div class="text-[13.5px]">{{ g.invoice_line.product.name }} — <b>{{ '%g'|format(g.qty) }}</b>
+                    <span class="text-ink-faint text-[12px]">({% if g.good_qty %}{{ '%g'|format(g.good_qty) }} back in stock{% endif %}{% if g.good_qty and g.damaged_qty %}, {% endif %}{% if g.damaged_qty %}{{ '%g'|format(g.damaged_qty) }} damaged{% endif %})</span></div>
+                  {% endfor %}
+                  <div class="text-[12px] text-ink-faint mt-1">Reason: {{ r.reason }}</div>
+                  {% if r.status == 'Cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled: {{ r.cancel_reason }}</div>{% endif %}
+                </td>
+                <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.total_amount) }}</td>
+                <td>
+                  {% if tab == 'done' %}
+                  <a href="{{ url_for('sales_returns.returns_print', return_id=r.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-copper-text bg-white border border-copper-border rounded hover:bg-copper-soft">Print</a>
+                  <button type="button" class="btn-cancel-r mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ r.id }}" data-no="{{ r.return_no }}">Cancel</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if not returns %}
+          <div class="p-12 text-center">
+            <p class="font-semibold text-ink text-[15px]">{{ 'No sales returns yet' if tab == 'done' else 'No cancelled credit notes' }}</p>
+            <p class="text-[13px] text-ink-faint mt-1">{{ 'Use New sales return when a customer sends goods back.' if tab == 'done' else 'Cancelled credit notes show up here with the reason.' }}</p>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span>Credit = quantity × the invoice rate (after discount) + GST. Charges on the invoice (shipping etc.) are not returned.</span>
+          <span class="text-ink-muted">Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="s-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="s-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="s-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="s-title" class="text-[16px] font-bold text-ink">New sales return</h2>
+        <p class="text-[12.5px] text-ink-faint">Credit note number is made automatically</p>
+      </div>
+      <button type="button" id="s-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="s-form" method="post" action="{{ url_for('sales_returns.returns_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="md:col-span-2">
+          <label for="invoice_id" class="block text-[12.5px] font-semibold text-ink mb-1">Invoice *</label>
+          <select class="ql-input" name="invoice_id" id="invoice_id" required>
+            <option value="">Select invoice…</option>
+            {% for i in invoices %}<option value="{{ i.id }}">{{ i.no }} · {{ i.customer }} · {{ i.date }}</option>{% endfor %}
+          </select>
+          <div class="ql-hint" id="s-hint"></div>
+        </div>
+        <div>
+          <label for="return_date" class="block text-[12.5px] font-semibold text-ink mb-1">Returned on *</label>
+          <input class="ql-input" type="date" name="return_date" id="return_date" value="{{ today }}" max="{{ today }}" required>
+        </div>
+        <div>
+          <label for="reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason *</label>
+          <input class="ql-input" type="text" name="reason" id="reason" maxlength="255" minlength="3" required placeholder="e.g. Wrong size, damaged in transit">
+        </div>
+      </div>
+      <div>
+        <p class="form-section-title mb-2">Goods returned</p>
+        <table class="ql-table">
+          <colgroup><col style="width:30%"><col style="width:14%"><col style="width:16%"><col style="width:16%"><col style="width:24%"></colgroup>
+          <thead><tr><th>Product</th><th class="num">Can return</th><th class="num">Returned qty</th><th class="num">Damaged qty</th><th class="num">Credit (₹)</th></tr></thead>
+          <tbody id="s-lines"></tbody>
+        </table>
+        <div id="s-empty" class="ql-hint">Choose an invoice to see its goods.</div>
+        <div class="ql-hint mt-2">Good goods go back into the batch they were sent from. Damaged goods do not go back into stock; the customer still gets the credit.</div>
+        <div class="mt-2 flex justify-end gap-4 text-[13.5px]"><span>Taxable: <b id="s-taxable" class="tabular-nums">0.00</b></span><span>GST: <b id="s-gst" class="tabular-nums">0.00</b></span><span>Credit total: <b id="s-total" class="tabular-nums">0.00</b></span></div>
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 bg-mist flex items-center justify-end gap-2 shrink-0">
+      <button type="button" id="s-cancel" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Close</button>
+      <button type="submit" form="s-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Save credit note</button>
+    </div>
+  </div>
+</div>
+
+<div id="x-modal" class="hidden fixed inset-0 z-50 items-center justify-center" aria-hidden="true">
+  <div id="x-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <form method="post" id="x-form" class="relative bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md p-4 space-y-3">
+    <h2 class="text-[16px] font-bold text-ink" id="x-title">Cancel credit note</h2>
+    <p class="text-[13px] text-ink-muted">The credit is taken back from the customer account and the goods that went back into stock are taken out again.</p>
+    <div>
+      <label for="x-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Why is it cancelled? *</label>
+      <input class="ql-input" type="text" name="reason" id="x-reason" maxlength="255" required minlength="3">
+    </div>
+    <div class="flex justify-end gap-2">
+      <button type="button" id="x-close" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Keep credit note</button>
+      <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold text-white bg-stop rounded border border-stop-border hover:opacity-90">Cancel credit note</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var INVOICES = {{ invoices|tojson }};
+  var OPEN_I = {{ open_invoice|tojson }};
+  var sModal = document.getElementById('s-modal'), xModal = document.getElementById('x-modal');
+  function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+  function money(n) { return r2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  function curInvoice() {
+    var id = Number(document.getElementById('invoice_id').value);
+    return INVOICES.filter(function (i) { return i.id === id; })[0];
+  }
+  // Credit ka live hisaab: server jaisa hi (qty x rate-after-discount, GST us line ke rate se)
+  function totals() {
+    var inv = curInvoice(), taxable = 0, gst = 0;
+    (inv ? inv.lines : []).forEach(function (l) {
+      var q = parseFloat(document.getElementById('qty_' + l.id).value) || 0;
+      var net = r2(q * l.net_unit), tax = r2(net * l.gst / 100);
+      document.getElementById('cr_' + l.id).textContent = q > 0 ? money(net + tax) : '—';
+      taxable += net; gst += tax;
+    });
+    document.getElementById('s-taxable').textContent = money(taxable);
+    document.getElementById('s-gst').textContent = money(gst);
+    document.getElementById('s-total').textContent = money(taxable + gst);
+  }
+  function drawLines() {
+    var inv = curInvoice(), body = document.getElementById('s-lines'); body.innerHTML = '';
+    document.getElementById('s-hint').textContent = inv ? ('Customer: ' + inv.customer + ' · ' + (inv.inter ? 'IGST invoice' : 'CGST + SGST invoice')) : '';
+    document.getElementById('s-empty').classList.toggle('hidden', !!inv);
+    (inv ? inv.lines : []).forEach(function (l) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><b>' + l.product + '</b><div class="ql-hint">' + l.code + ' · billed ' + l.qty + (l.returned ? ', already returned ' + l.returned : '') + '</div></td>' +
+        '<td class="num pt-2 tabular-nums">' + l.left + ' ' + l.unit + '</td>' +
+        '<td><input class="ql-input num" type="number" step="any" min="0" max="' + l.left + '" name="qty_' + l.id + '" id="qty_' + l.id + '"></td>' +
+        '<td><input class="ql-input num" type="number" step="any" min="0" max="' + l.left + '" name="damaged_' + l.id + '" id="damaged_' + l.id + '"></td>' +
+        '<td class="num pt-2 tabular-nums" id="cr_' + l.id + '">—</td>';
+      tr.querySelector('#qty_' + l.id).addEventListener('input', totals);
+      body.appendChild(tr);
+    });
+    totals();
+  }
+  function openReturn(iid) {
+    document.getElementById('invoice_id').value = iid || '';
+    drawLines();
+    sModal.classList.remove('hidden'); sModal.setAttribute('aria-hidden', 'false');
+    document.getElementById(iid ? 'reason' : 'invoice_id').focus();
+  }
+  function closeAll() { sModal.classList.add('hidden'); xModal.classList.add('hidden'); }
+  document.getElementById('invoice_id').addEventListener('change', drawLines);
+  document.getElementById('btn-new').addEventListener('click', function () { openReturn(null); });
+  ['s-close', 's-cancel', 's-backdrop', 'x-close', 'x-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeAll); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+  document.querySelectorAll('.btn-cancel-r').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.getElementById('x-title').textContent = 'Cancel ' + b.getAttribute('data-no');
+      document.getElementById('x-form').action = '/sales_returns/' + b.getAttribute('data-id') + '/cancel';
+      xModal.classList.remove('hidden'); xModal.setAttribute('aria-hidden', 'false');
+      document.getElementById('x-reason').focus();
+    });
+  });
+  if (OPEN_I) openReturn(OPEN_I);
+</script>
+{% endblock %}
