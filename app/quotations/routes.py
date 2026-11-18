@@ -12,6 +12,7 @@ from app.models import Charge, Customer, PaymentTerm, Product, Quotation, Quotat
 from app.tax import line_value
 from app.dispatch.stock import dispatch_state, dispatched_qty
 from app.sales_invoices.billing import billing_state
+from app.costing.full_cost import last_costs
 from app.production_orders.routes import _new_bundle_no, build_order, default_allowances, read_plan, unit_weight_for
 from app.production_orders.scheduler import persist_schedule, today_ist
 
@@ -63,9 +64,12 @@ def form_context():
     last_rate = {}
     for line in QuotationLine.query.join(Quotation).filter(Quotation.is_deleted == False).order_by(QuotationLine.id.desc()).all():
         last_rate.setdefault(line.product_id, line.rate)
+    sellable = sellable_products()
+    costs = last_costs([p.id for p in sellable])        # product ki sabse nayi poori cost (andaaza) — rate us se kam ho to warning
     products = [{"id": p.id, "code": p.code, "name": p.name, "unit": p.base_unit.code if p.base_unit else "",
                  "tax_rate_id": p.tax_rate_id, "tax_label": p.tax_rate.label if p.tax_rate else "", "tax_pct": p.tax_rate.rate_percent if p.tax_rate else 0,
-                 "last_rate": last_rate.get(p.id)} for p in sellable_products()]
+                 "last_rate": last_rate.get(p.id), "last_cost": costs[p.id]["cost"] if p.id in costs else None,
+                 "cost_note": f"batch {costs[p.id]['batch_no']}, {costs[p.id]['date']}" if p.id in costs else ""} for p in sellable]
     return {
         "customers": customers, "products": products,
         "customer_rows": [{"id": c.id, "state_id": c.state_id, "payment_terms_id": c.payment_terms_id} for c in customers],
@@ -78,6 +82,24 @@ def form_context():
 def finalize_context():
     # Finalize drawer ke liye: payment terms ki list aur aaj ki date
     return {"payment_terms": PaymentTerm.query.filter_by(is_deleted=False, is_active=True).order_by(PaymentTerm.name).all(), "today": date.today().isoformat()}
+
+
+def line_cost_map(quotation):
+    # {line_id: product ki sabse nayi poori cost per unit} — Finalize drawer me rate badalte hi live check ke liye
+    costs = last_costs([line.product_id for line in quotation.lines])
+    return {line.id: costs[line.product_id]["cost"] for line in quotation.lines if line.product_id in costs}
+
+
+def below_cost_lines(quotation):
+    """{line_id: {"cost", "price"}} — jin lines ka (discount ke baad) rate product ki sabse nayi poori cost se kam hai. Sirf chetavni, save nahi rukta."""
+    costs = last_costs([line.product_id for line in quotation.lines])
+    out = {}
+    for line in quotation.lines:
+        info = costs.get(line.product_id)
+        price = round((line.rate or 0) * (1 - (line.discount_percent or 0) / 100), 2)
+        if info and info["cost"] > price:
+            out[line.id] = {"cost": info["cost"], "price": price, "note": f"batch {info['batch_no']}, {info['date']}"}
+    return out
 
 
 @quotations_bp.route("/quotations")
@@ -358,6 +380,8 @@ def quotations_detail(quotation_id):
                            po_file_name=os.path.basename(quotation.po_file) if quotation.po_file else None,
                            dispatch_status=dispatch_state(quotation),
                            billing_status=billing_state(quotation),
+                           below_cost=below_cost_lines(quotation) if quotation.status in ("Draft", "Sent", "Approved") else {},
+                           line_costs=line_cost_map(quotation) if quotation.status == "Approved" else {},
                            sent_qty={line.id: dispatched_qty(line) for line in quotation.lines} if quotation.status == "Ordered" else {},
                            **(form_context() if editable else {}), **(finalize_context() if quotation.status == "Approved" else {}))
 

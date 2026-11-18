@@ -78,6 +78,14 @@
         </div>
         {% endif %}
 
+        {% if below_cost %}
+        <div id="cost-warning" class="rounded border px-3 py-2 text-[13.5px]" style="background:#FCEBEA;border-color:#F0C4C0;color:#B42318">
+          <b>Price below cost.</b> The rate is lower than the last production cost of:
+          {% for line in q.lines if line.id in below_cost %}<span class="block">· {{ line.product.name }}: price ₹ {{ '{:,.2f}'.format(below_cost[line.id].price) }} against cost ₹ {{ '{:,.2f}'.format(below_cost[line.id].cost) }} <span class="opacity-75">({{ below_cost[line.id].note }})</span></span>{% endfor %}
+          <span class="block mt-1 text-[12.5px]">You can still continue. The invoice of such an order waits for the Owner's approval.</span>
+        </div>
+        {% endif %}
+
         <div class="overflow-x-auto">
           <table class="qd-table" style="min-width: 640px;">
             <thead><tr><th>#</th><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th>{% if q.status == 'Ordered' %}<th class="num">Sent</th><th>Production order</th>{% endif %}</tr></thead>
@@ -87,7 +95,7 @@
                 <td>{{ loop.index }}</td>
                 <td><b>{{ line.product.name }}</b> <span class="text-ink-faint text-[12.5px]">{{ line.product.code }}</span></td>
                 <td class="num">{{ '{:,.3f}'.format(line.qty).rstrip('0').rstrip('.') }} {{ line.product.base_unit.code if line.product.base_unit else '' }}</td>
-                <td class="num">{{ '{:,.2f}'.format(line.rate) }}</td>
+                <td class="num">{{ '{:,.2f}'.format(line.rate) }}{% if line.id in below_cost %}<div class="text-[11.5px] font-semibold" style="color:#B42318">Below cost</div>{% endif %}</td>
                 <td class="num">{{ '%g'|format(line.discount_percent) }}</td>
                 <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
                 <td class="num font-semibold">{{ '{:,.2f}'.format(line.net_value) }}</td>

@@ -30,7 +30,7 @@
     tr.innerHTML =
       '<td><select class="ql-input p-sel" name="product_id_' + i + '">' + opts + '</select><div class="ql-hint p-hint"></div></td>' +
       '<td><input class="ql-input num q-in" type="number" step="any" min="0" name="qty_' + i + '"><div class="ql-hint u-hint"></div></td>' +
-      '<td><input class="ql-input num r-in" type="number" step="any" min="0" name="rate_' + i + '"></td>' +
+      '<td><input class="ql-input num r-in" type="number" step="any" min="0" name="rate_' + i + '"><div class="ql-hint w-hint" style="color:#B42318;font-weight:600"></div></td>' +
       '<td><input class="ql-input num d-in" type="number" step="any" min="0" max="100" value="0" name="discount_' + i + '"></td>' +
       '<td class="pt-2"><input type="hidden" class="t-id" name="tax_rate_id_' + i + '"><div class="t-show text-[13px] text-ink-muted leading-tight">Set in Product master</div></td>' +
       '<td class="num pt-3 amt tabular-nums">0.00</td>' +
@@ -60,7 +60,7 @@
   function onProduct(tr) {
     var p = PRODUCTS.filter(function (x) { return String(x.id) === tr.querySelector('.p-sel').value; })[0];
     tr.querySelector('.u-hint').textContent = p ? 'in ' + p.unit : '';
-    tr.querySelector('.p-hint').textContent = (p && p.last_rate) ? 'Last quoted rate: ₹ ' + p.last_rate : '';
+    tr.querySelector('.p-hint').textContent = ((p && p.last_rate) ? 'Last quoted rate: ₹ ' + p.last_rate : '') + ((p && p.last_cost) ? ((p.last_rate ? ' · ' : '') + 'Last made cost: ₹ ' + p.last_cost + ' (' + p.cost_note + ')') : '');
     // GST product master se aata hai (Tax Master ka rate) — yahan badalte nahi; badalna ho to Product master me
     tr.querySelector('.t-id').value = p ? p.tax_rate_id : '';
     tr.querySelector('.t-id').setAttribute('data-pct', p ? p.tax_pct : 0);
@@ -73,9 +73,13 @@
 
   // Hisaab server (app/tax.py) jaisa: line discount -> charges (items ki value ke anupaat me lines me bant-te hain) -> GST har line apne rate se
   function recalc() {
-    var lines = [], gross = 0, disc = 0, items = 0;
+    var lines = [], gross = 0, disc = 0, items = 0, lossNames = [];
     tbody.querySelectorAll('tr').forEach(function (tr) {
       var q = parseFloat(tr.querySelector('.q-in').value) || 0, r = parseFloat(tr.querySelector('.r-in').value) || 0, d = parseFloat(tr.querySelector('.d-in').value) || 0;
+      // Price below cost: (discount ke baad) rate product ki sabse nayi poori cost se kam ho to laal chetavni (save nahi rukta)
+      var prod = PRODUCTS.filter(function (x) { return String(x.id) === tr.querySelector('.p-sel').value; })[0];
+      var net1 = r2(r * (1 - d / 100)), wh = tr.querySelector('.w-hint');
+      if (prod && prod.last_cost && r > 0 && prod.last_cost > net1) { wh.textContent = 'Below cost ₹ ' + prod.last_cost; lossNames.push(prod.name); } else { wh.textContent = ''; }
       var g = r2(q * r), dd = r2(g * d / 100), net = r2(g - dd);
       tr.querySelector('.amt').textContent = money(net);
       lines.push({net: net, pct: parseFloat(tr.querySelector('.t-id').getAttribute('data-pct')) || 0}); gross += g; disc += dd; items += net;
@@ -109,6 +113,9 @@
     document.getElementById('t-taxable').textContent = money(taxable);
     document.getElementById('t-gst-rows').innerHTML = gst;
     document.getElementById('t-grand').textContent = money(r2(taxable + tax));
+    var cw = document.getElementById('cost-warn');
+    if (lossNames.length) { cw.textContent = 'Price below cost: ' + lossNames.join(', ') + '. You can still save, but this order will sell at a loss and its invoice will need approval from the Owner.'; cw.classList.remove('hidden'); }
+    else { cw.classList.add('hidden'); }
   }
 
   document.getElementById('customer_id').addEventListener('change', function () {

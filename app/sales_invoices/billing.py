@@ -10,6 +10,7 @@
 #   * Ledger sign rule (project): Cr = plus, Dr = minus. Customer se paisa LENA hai => Dr => current_balance ghatta hai.
 from datetime import datetime
 
+from app.costing.full_cost import batch_full_cost
 from app.extensions import db
 from app.models import DeliveryChallan, SalesInvoice, SalesInvoiceCharge, SalesInvoiceLine
 
@@ -28,13 +29,14 @@ def active_invoices(quotation):
 
 
 def challan_totals(challans):
-    """{quotation_line: {"qty": jod, "cost": weighted per-unit cost}} — challan lines ko quotation line ke hisaab se jodta hai."""
+    """{quotation_line: {"qty": jod, "cost": weighted per-unit cost}} — challan lines ko quotation line ke hisaab se jodta hai.
+    Cost = batch ki POORI cost abhi ki (material + fixed overhead; mahina finalize hua ho to Final rate) — sirf material nahi, warna loss chhoot jaata hai."""
     out = {}
     for challan in challans:
         for cl in challan.lines:
             row = out.setdefault(cl.quotation_line, {"qty": 0.0, "value": 0.0})
             row["qty"] += cl.qty
-            row["value"] += cl.qty * cl.unit_cost
+            row["value"] += cl.qty * batch_full_cost(cl.batch)
     for row in out.values():
         row["cost"] = round(row["value"] / row["qty"], 4) if row["qty"] else 0
     return out
