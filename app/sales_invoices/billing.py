@@ -139,6 +139,8 @@ def cancel_invoice(invoice, reason):
     """Invoice cancel: Posted tha to ledger ka asar wapas; challan phir 'bill nahi bana' ho jaate hain (dobara bill ban sakta hai)."""
     if invoice.status == "Cancelled":
         raise BillingError("This invoice is already cancelled.")
+    if invoice.paid > 0.004:
+        raise BillingError(f"Money of ₹{invoice.paid:,.2f} is already received against this invoice. Cancel that receipt first.")
     if invoice.status == "Posted":
         ledger = invoice.quotation.customer.ledger
         ledger.current_balance = round(ledger.current_balance + invoice.total_amount, 2)

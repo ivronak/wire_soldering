@@ -26,6 +26,8 @@ from app.production_orders.routes import production_orders_bp
 from app.production_planning.routes import production_planning_bp
 from app.costing.routes import costing_bp
 from app.payment_terms.routes import payment_terms_bp
+from app.payment_modes.routes import payment_modes_bp
+from app.receipts.routes import receipts_bp
 from app.party_documents.routes import party_documents_bp
 from app.purchase_invoices.routes import purchase_invoices_bp
 from app.purchase_returns.routes import purchase_returns_bp
@@ -108,6 +110,8 @@ def create_app():
     app.register_blueprint(production_planning_bp)
     app.register_blueprint(costing_bp)
     app.register_blueprint(payment_terms_bp)
+    app.register_blueprint(payment_modes_bp)
+    app.register_blueprint(receipts_bp)
     app.register_blueprint(party_documents_bp)
     app.register_blueprint(purchase_invoices_bp)
     app.register_blueprint(purchase_returns_bp)

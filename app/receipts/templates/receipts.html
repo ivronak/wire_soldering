@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}Receipts{% endblock %}
+
+{# Sales S5: Receipts. To collect = customers jinse invoice ka paisa baaki. Receipt = customer se mila paisa, invoice ke against ya On account. #}
+{% block page_css %}
+<style>
+  .d-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D1D9D8; }
+  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .d-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .d-table .num { text-align: right; }
+  .q-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid; }
+  .q-chip.Adv { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
+  #r-modal.hidden, #p-modal.hidden, #x-modal.hidden { display: none; }
+  #r-modal, #p-modal, #x-modal { display: flex; }
+  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
+  .ql-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .ql-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
+  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .ql-table .num { text-align: right; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+  .ql-hint { font-size: 11.5px; color: #6B7F82; margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Sales / Receipts</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Receipts</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">Money received from customers · applied to invoices, anything left stays on account</p>
+        </div>
+        <button type="button" id="btn-new" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New receipt</button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          {% for key, label in (('todo', 'To collect'), ('done', 'Receipts'), ('cancelled', 'Cancelled')) %}
+          <a href="{{ url_for('receipts.receipts_list', tab=key) }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
+          </a>
+          {% endfor %}
+          {% if tab == 'todo' %}<span class="ml-auto pb-2 text-[13px] text-ink-muted">Total to collect: <b class="text-ink tabular-nums">₹ {{ '{:,.2f}'.format(total_due) }}</b></span>{% endif %}
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          {% if tab == 'todo' %}
+          <table class="d-table">
+            <colgroup><col style="width:20%"><col style="width:40%"><col style="width:14%"><col style="width:12%"><col style="width:14%"></colgroup>
+            <thead><tr><th>Customer</th><th>Invoices not paid</th><th class="num">Due (₹)</th><th class="num">Advance (₹)</th><th>Action</th></tr></thead>
+            <tbody>
+              {% for r in todo %}
+              <tr>
+                <td class="font-semibold text-ink">{{ r.name }}</td>
+                <td>
+                  {% for i in r.invoices %}
+                  <div class="text-[13.5px] mb-1"><span class="font-mono font-bold">{{ i.no }}</span> <span class="text-ink-faint text-[12px]">{{ i.date }}</span>
+                    — ₹ {{ '{:,.2f}'.format(i.due) }} due{% if i.paid > 0 %} <span class="text-ink-faint text-[12px]">(₹ {{ '{:,.2f}'.format(i.paid) }} of {{ '{:,.2f}'.format(i.total) }} paid)</span>{% endif %}</div>
+                  {% endfor %}
+                </td>
+                <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.due) }}</td>
+                <td class="num tabular-nums">{{ '{:,.2f}'.format(r.advance) if r.advance else '—' }}</td>
+                <td><button type="button" class="btn-receive px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-c="{{ r.id }}">Receive payment</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if not todo %}
+          <div class="p-12 text-center">
+            <p class="font-semibold text-ink text-[15px]">Nothing to collect</p>
+            <p class="text-[13px] text-ink-faint mt-1">Posted invoices that are not fully paid show up here.</p>
+          </div>
+          {% endif %}
+
+          {% else %}
+          <table class="d-table">
+            <colgroup><col style="width:14%"><col style="width:17%"><col style="width:17%"><col style="width:26%"><col style="width:12%"><col style="width:14%"></colgroup>
+            <thead><tr><th>Receipt</th><th>Customer</th><th>Mode</th><th>Against</th><th class="num">Amount (₹)</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for r in receipts %}
+              <tr>
+                <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ r.receipt_no }}</span>
+                  <div class="text-[12px] text-ink-faint mt-1">{{ r.receipt_date.strftime('%d %b %Y') }}</div></td>
+                <td class="font-semibold text-ink">{{ r.customer.name }}</td>
+                <td>{{ r.payment_mode.name }}{% if r.reference %}<div class="text-[12px] text-ink-faint">{{ r.reference }}</div>{% endif %}</td>
+                <td>
+                  {% for a in r.allocations %}<div class="text-[13.5px]"><span class="font-mono font-bold">{{ a.invoice.invoice_no }}</span> — ₹ {{ '{:,.2f}'.format(a.amount) }}</div>{% endfor %}
+                  {% if r.status == 'Posted' and r.on_account > 0.004 %}<div class="mt-1"><span class="q-chip Adv">On account ₹ {{ '{:,.2f}'.format(r.on_account) }}</span></div>{% endif %}
+                  {% if r.status == 'Cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled: {{ r.cancel_reason }}</div>{% endif %}
+                  {% if r.notes %}<div class="text-[12px] text-ink-faint mt-1">{{ r.notes }}</div>{% endif %}
+                </td>
+                <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.amount) }}</td>
+                <td>
+                  {% if tab == 'done' %}
+                  {% if r.on_account > 0.004 and alloc_data.get(r.id) and alloc_data[r.id].invoices %}<button type="button" class="btn-apply px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-id="{{ r.id }}">Apply to invoices</button>{% endif %}
+                  <button type="button" class="btn-cancel-r mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ r.id }}" data-no="{{ r.receipt_no }}">Cancel</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if not receipts %}
+          <div class="p-12 text-center">
+            <p class="font-semibold text-ink text-[15px]">{{ 'No receipts yet' if tab == 'done' else 'No cancelled receipts' }}</p>
+            <p class="text-[13px] text-ink-faint mt-1">{{ 'Use New receipt or Receive payment to record money from a customer.' if tab == 'done' else 'Cancelled receipts show up here with the reason.' }}</p>
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
+
+        <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
+          <span>Oldest invoices are filled first; you can change the amounts. Money not applied to an invoice stays on account.</span>
+          <span class="text-ink-muted">Live data</span>
+        </div>
+      </div>
+{% endblock %}
+
+{% block modals %}
+<div id="r-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="r-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="r-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="r-title" class="text-[16px] font-bold text-ink">New receipt</h2>
+        <p class="text-[12.5px] text-ink-faint">Receipt number is made automatically</p>
+      </div>
+      <button type="button" id="r-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="r-form" method="post" action="{{ url_for('receipts.receipts_add') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="md:col-span-2">
+          <label for="customer_id" class="block text-[12.5px] font-semibold text-ink mb-1">Customer *</label>
+          <select class="ql-input" name="customer_id" id="customer_id" required>
+            <option value="">Select customer…</option>
+            {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+          <div class="ql-hint" id="r-cust-hint"></div>
+        </div>
+        <div>
+          <label for="receipt_date" class="block text-[12.5px] font-semibold text-ink mb-1">Received on *</label>
+          <input class="ql-input" type="date" name="receipt_date" id="receipt_date" value="{{ today }}" max="{{ today }}" required>
+        </div>
+        <div>
+          <label for="amount" class="block text-[12.5px] font-semibold text-ink mb-1">Amount received (₹) *</label>
+          <input class="ql-input" type="number" step="any" min="0" name="amount" id="amount" required>
+        </div>
+        <div>
+          <label for="payment_mode_id" class="block text-[12.5px] font-semibold text-ink mb-1">Payment mode *</label>
+          <select class="ql-input" name="payment_mode_id" id="payment_mode_id" required>
+            <option value="">Select mode…</option>
+            {% for m in modes %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="reference" class="block text-[12.5px] font-semibold text-ink mb-1">Reference</label>
+          <input class="ql-input" type="text" name="reference" id="reference" maxlength="60" placeholder="UTR / cheque number">
+        </div>
+        <div class="md:col-span-2">
+          <label for="notes" class="block text-[12.5px] font-semibold text-ink mb-1">Note</label>
+          <input class="ql-input" type="text" name="notes" id="notes" maxlength="255">
+        </div>
+      </div>
+      <div>
+        <p class="form-section-title mb-2">Apply to invoices</p>
+        <table class="ql-table">
+          <colgroup><col style="width:30%"><col style="width:20%"><col style="width:22%"><col style="width:28%"></colgroup>
+          <thead><tr><th>Invoice</th><th class="num">Total</th><th class="num">Due</th><th class="num">Apply now</th></tr></thead>
+          <tbody id="r-lines"></tbody>
+        </table>
+        <div id="r-empty" class="ql-hint hidden">This customer has no unpaid invoices. The whole amount will stay on account.</div>
+        <div class="mt-2 flex justify-end gap-4 text-[13.5px]"><span>Applied: <b id="r-applied" class="tabular-nums">0.00</b></span><span>On account: <b id="r-left" class="tabular-nums">0.00</b></span></div>
+      </div>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 bg-mist flex items-center justify-end gap-2 shrink-0">
+      <button type="button" id="r-cancel" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Close</button>
+      <button type="submit" form="r-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Save receipt</button>
+    </div>
+  </div>
+</div>
+
+<div id="p-modal" class="hidden fixed inset-0 z-50 items-center justify-center" aria-hidden="true">
+  <div id="p-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <form method="post" id="p-form" class="relative bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-xl p-4 space-y-3">
+    <h2 class="text-[16px] font-bold text-ink" id="p-title">Apply to invoices</h2>
+    <p class="text-[13px] text-ink-muted" id="p-text"></p>
+    <table class="ql-table">
+      <colgroup><col style="width:34%"><col style="width:26%"><col style="width:40%"></colgroup>
+      <thead><tr><th>Invoice</th><th class="num">Due</th><th class="num">Apply now</th></tr></thead>
+      <tbody id="p-lines"></tbody>
+    </table>
+    <div class="flex justify-end gap-2">
+      <button type="button" id="p-close" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Close</button>
+      <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold text-white bg-copper rounded border border-copper-dark hover:bg-copper-dark">Apply</button>
+    </div>
+  </form>
+</div>
+
+<div id="x-modal" class="hidden fixed inset-0 z-50 items-center justify-center" aria-hidden="true">
+  <div id="x-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <form method="post" id="x-form" class="relative bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md p-4 space-y-3">
+    <h2 class="text-[16px] font-bold text-ink" id="x-title">Cancel receipt</h2>
+    <p class="text-[13px] text-ink-muted">The money is taken back from the customer account and the invoices become unpaid again.</p>
+    <div>
+      <label for="x-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Why is it cancelled? *</label>
+      <input class="ql-input" type="text" name="reason" id="x-reason" maxlength="255" required minlength="3">
+    </div>
+    <div class="flex justify-end gap-2">
+      <button type="button" id="x-close" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Keep receipt</button>
+      <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold text-white bg-stop rounded border border-stop-border hover:opacity-90">Cancel receipt</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  var CUSTOMERS = {{ customers|tojson }};
+  var ALLOC = {{ alloc_data|tojson }};
+  var OPEN_C = {{ open_customer|tojson }};
+  var rModal = document.getElementById('r-modal'), pModal = document.getElementById('p-modal'), xModal = document.getElementById('x-modal');
+  function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+  function money(n) { return r2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  var userEdited = false;
+
+  function curCustomer() {
+    var id = Number(document.getElementById('customer_id').value);
+    return CUSTOMERS.filter(function (c) { return c.id === id; })[0];
+  }
+  // Rakam likhte hi sabse purane invoice se bharte jaate hain (jab tak user khud amount na badle)
+  function autofill() {
+    var c = curCustomer(), amt = parseFloat(document.getElementById('amount').value) || 0, left = amt;
+    (c ? c.invoices : []).forEach(function (i) {
+      var put = Math.min(left, i.due); left = r2(left - put);
+      var inp = document.getElementById('alloc_' + i.id); if (inp) inp.value = put > 0 ? r2(put) : '';
+    });
+    totals();
+  }
+  function totals() {
+    var c = curCustomer(), applied = 0;
+    (c ? c.invoices : []).forEach(function (i) { var inp = document.getElementById('alloc_' + i.id); if (inp) applied += parseFloat(inp.value) || 0; });
+    var amt = parseFloat(document.getElementById('amount').value) || 0;
+    document.getElementById('r-applied').textContent = money(applied);
+    var left = r2(amt - applied), el = document.getElementById('r-left');
+    el.textContent = money(left); el.style.color = left < -0.005 ? '#B42318' : '';
+  }
+  function drawLines() {
+    var c = curCustomer(), body = document.getElementById('r-lines'); body.innerHTML = '';
+    document.getElementById('r-cust-hint').textContent = c ? ('Account balance: ' + (c.balance < 0 ? money(-c.balance) + ' to receive' : money(c.balance) + ' credit') + (c.advance ? ' · advance on account ' + money(c.advance) : '')) : '';
+    document.getElementById('r-empty').classList.toggle('hidden', !c || c.invoices.length > 0);
+    (c ? c.invoices : []).forEach(function (i) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><b class="font-mono">' + i.no + '</b><div class="ql-hint">' + i.date + '</div></td><td class="num pt-2 tabular-nums">' + money(i.total) + '</td><td class="num pt-2 tabular-nums">' + money(i.due) + '</td>' +
+        '<td><input class="ql-input num" type="number" step="any" min="0" max="' + i.due + '" name="alloc_' + i.id + '" id="alloc_' + i.id + '"></td>';
+      tr.querySelector('input').addEventListener('input', totals);
+      body.appendChild(tr);
+    });
+    autofill();
+  }
+  function openReceipt(cid) {
+    document.getElementById('customer_id').value = cid || '';
+    drawLines();
+    rModal.classList.remove('hidden'); rModal.setAttribute('aria-hidden', 'false');
+    document.getElementById(cid ? 'amount' : 'customer_id').focus();
+  }
+  function closeAll() { rModal.classList.add('hidden'); pModal.classList.add('hidden'); xModal.classList.add('hidden'); }
+  document.getElementById('customer_id').addEventListener('change', drawLines);
+  document.getElementById('amount').addEventListener('input', autofill);
+  document.getElementById('btn-new').addEventListener('click', function () { openReceipt(null); });
+  document.querySelectorAll('.btn-receive').forEach(function (b) { b.addEventListener('click', function () { openReceipt(b.getAttribute('data-c')); }); });
+  ['r-close', 'r-cancel', 'r-backdrop', 'p-close', 'p-backdrop', 'x-close', 'x-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeAll); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+
+  document.querySelectorAll('.btn-apply').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var a = ALLOC[b.getAttribute('data-id')]; if (!a) return;
+      document.getElementById('p-title').textContent = 'Apply ' + a.no + ' to invoices';
+      document.getElementById('p-text').textContent = a.customer + ' · ' + money(a.left) + ' is on account. Choose how much goes to each invoice.';
+      document.getElementById('p-form').action = '/receipts/' + b.getAttribute('data-id') + '/allocate';
+      var body = document.getElementById('p-lines'), left = a.left; body.innerHTML = '';
+      a.invoices.forEach(function (i) {
+        var put = Math.min(left, i.due); left = r2(left - put);
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td><b class="font-mono">' + i.no + '</b><div class="ql-hint">' + i.date + '</div></td><td class="num pt-2 tabular-nums">' + money(i.due) + '</td>' +
+          '<td><input class="ql-input num" type="number" step="any" min="0" max="' + i.due + '" name="alloc_' + i.id + '" value="' + (put > 0 ? r2(put) : '') + '"></td>';
+        body.appendChild(tr);
+      });
+      pModal.classList.remove('hidden'); pModal.setAttribute('aria-hidden', 'false');
+    });
+  });
+  document.querySelectorAll('.btn-cancel-r').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.getElementById('x-title').textContent = 'Cancel ' + b.getAttribute('data-no');
+      document.getElementById('x-form').action = '/receipts/' + b.getAttribute('data-id') + '/cancel';
+      xModal.classList.remove('hidden'); xModal.setAttribute('aria-hidden', 'false');
+      document.getElementById('x-reason').focus();
+    });
+  });
+  if (OPEN_C) openReceipt(OPEN_C);
+</script>
+{% endblock %}

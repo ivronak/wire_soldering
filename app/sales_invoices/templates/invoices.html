@@ -14,6 +14,9 @@
   .q-chip.Posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .q-chip.Waiting { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
   .q-chip.Cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .q-chip.Paid { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .q-chip.Part { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .q-chip.Unpaid { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   #i-modal.hidden, #a-modal.hidden, #x-modal.hidden { display: none; }
   #i-modal, #a-modal, #x-modal { display: flex; }
   .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
@@ -96,6 +99,8 @@
                   {% if tab == 'cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled: {{ i.cancel_reason }}</div>{% endif %}
                 </td>
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(i.total_amount) }}
+                  {% if tab == 'done' %}<div class="mt-1"><span class="q-chip {{ 'Part' if i.payment_state == 'Part paid' else i.payment_state }}">{{ i.payment_state }}</span></div>
+                  {% if i.outstanding > 0 %}<div class="text-[12px] text-ink-faint font-normal mt-1">₹ {{ '{:,.2f}'.format(i.outstanding) }} due</div>{% endif %}{% endif %}
                   {% if tab == 'waiting' %}<div class="mt-1"><span class="q-chip Waiting">Loss ₹{{ '{:,.2f}'.format(i.loss_amount) }}</span></div>{% endif %}</td>
                 <td>
                   {% if tab == 'waiting' %}

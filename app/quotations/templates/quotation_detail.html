@@ -161,7 +161,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded px-3 py-2 text-[13.5px]">
               <div><b class="font-mono">{{ i.invoice_no }}</b> <span class="text-ink-faint">· {{ i.invoice_date.strftime('%d %b %Y') }}</span>
                 {% if i.status == 'Cancelled' %}<span class="q-chip Rejected ml-1">Cancelled</span>{% elif i.status == 'Waiting approval' %}<span class="q-chip Rejected ml-1">Waiting for Owner</span>{% endif %}</div>
-              <div class="text-ink-muted">₹ {{ '{:,.2f}'.format(i.total_amount) }}</div>
+              <div class="text-ink-muted">₹ {{ '{:,.2f}'.format(i.total_amount) }}{% if i.payment_state %} · <span class="font-semibold">{{ i.payment_state }}</span>{% if i.outstanding > 0 and i.paid > 0 %} (₹ {{ '{:,.2f}'.format(i.outstanding) }} due){% endif %}{% endif %}</div>
               {% if i.status == 'Posted' %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="text-copper-text font-semibold hover:underline">Print</a>{% else %}<span></span>{% endif %}
             </div>
             {% endfor %}

@@ -2329,6 +2329,27 @@ class SalesInvoice(CreatedAtMixin, db.Model):
         return self.tax_type == "inter"
 
     @property
+    def paid(self):
+        # Is invoice ke against mila paisa (Cancelled receipt ki allocation nahi ginte)
+        return round(sum(a.amount for a in self.allocations if a.receipt and a.receipt.status == "Posted"), 2)
+
+    @property
+    def outstanding(self):
+        # Customer se abhi lena baaki. Posted nahi (Waiting / Cancelled) invoice par kuch lena nahi
+        if self.status != "Posted":
+            return 0.0
+        return round(self.total_amount - self.paid, 2)
+
+    @property
+    def payment_state(self):
+        # "Paid" / "Part paid" / "Unpaid" (sirf Posted invoice ke liye)
+        if self.status != "Posted":
+            return None
+        if self.outstanding <= 0.004:
+            return "Paid"
+        return "Part paid" if self.paid > 0.004 else "Unpaid"
+
+    @property
     def charge_rows(self):
         return [{"name": row.charge.name if row.charge else "Charge", "amount": row.amount, "effect": row.effect} for row in self.charge_lines]
 
@@ -2407,3 +2428,56 @@ class SalesInvoiceCharge(CreatedAtMixin, db.Model):
     charge = db.relationship("Charge", foreign_keys=[charge_id])
     amount = db.Column(db.Float, nullable=False)
     effect = db.Column(db.String(10), nullable=False)
+
+
+class PaymentMode(CreatedAtMixin, db.Model):
+    # Payment Modes master (Cash, Bank transfer, UPI, Cheque ...) — Receipt form ke "Payment mode" dropdown ki source (hardcoded list nahi).
+    __tablename__ = "payment_modes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)              # auto serial PM-0001
+    name = db.Column(db.String(100), nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class SalesReceipt(CreatedAtMixin, db.Model):
+    # Sales S5: customer se mila paisa (Receipt). Customer ledger me Cr (balance plus = lena kam). Kuch invoices ke against (allocations),
+    # jo bacha wo "On account" (advance) — baad me kisi invoice se jod sakte hain. Cancel = ledger wapas, allocations khatam.
+    __tablename__ = "sales_receipts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    receipt_no = db.Column(db.String(20), unique=True, nullable=False)        # RC-2026-001
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False)
+    customer = db.relationship("Customer", foreign_keys=[customer_id])
+    receipt_date = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_mode_id = db.Column(db.Integer, db.ForeignKey("payment_modes.id"), nullable=False)
+    payment_mode = db.relationship("PaymentMode", foreign_keys=[payment_mode_id])
+    reference = db.Column(db.String(60), nullable=True)                        # UTR / cheque number / UPI ref
+    notes = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(12), default="Posted", nullable=False)       # Posted / Cancelled
+    cancel_reason = db.Column(db.String(255), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def allocated(self):
+        return round(sum(a.amount for a in self.allocations), 2)
+
+    @property
+    def on_account(self):
+        # Receipt ka wo hissa jo kisi invoice se nahi juda (advance / on account)
+        return round(self.amount - self.allocated, 2)
+
+
+class SalesReceiptAllocation(CreatedAtMixin, db.Model):
+    # Receipt ka itna paisa is invoice ke against laga (bill-by-bill "Against Ref")
+    __tablename__ = "sales_receipt_allocations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    receipt_id = db.Column(db.Integer, db.ForeignKey("sales_receipts.id"), nullable=False)
+    receipt = db.relationship("SalesReceipt", foreign_keys=[receipt_id], backref=db.backref("allocations", order_by="SalesReceiptAllocation.id"))
+    invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=False)
+    invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("allocations", order_by="SalesReceiptAllocation.id"))
+    amount = db.Column(db.Float, nullable=False)
