@@ -30,6 +30,7 @@ from app.payment_modes.routes import payment_modes_bp
 from app.receipts.routes import receipts_bp
 from app.aging.routes import aging_bp
 from app.sales_returns.routes import sales_returns_bp
+from app.customer_statement.routes import customer_statement_bp
 from app.party_documents.routes import party_documents_bp
 from app.purchase_invoices.routes import purchase_invoices_bp
 from app.purchase_returns.routes import purchase_returns_bp
@@ -116,6 +117,7 @@ def create_app():
     app.register_blueprint(receipts_bp)
     app.register_blueprint(aging_bp)
     app.register_blueprint(sales_returns_bp)
+    app.register_blueprint(customer_statement_bp)
     app.register_blueprint(party_documents_bp)
     app.register_blueprint(purchase_invoices_bp)
     app.register_blueprint(purchase_returns_bp)

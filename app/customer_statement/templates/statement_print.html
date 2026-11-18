@@ -1,0 +1,59 @@
+{% extends "print_base.html" %}
+{# Sales S8: Customer statement (A4 letterhead). Cost / margin kabhi nahi. #}
+{% set doc_title = 'Statement ' ~ customer.name %}
+{% set back_url = url_for('customer_statement.statement_page', c=customer.id, **{'from': date_from.isoformat(), 'to': date_to.isoformat()}) %}
+{% set eyebrow = 'Statement of account' %}
+{% set docno = customer.name %}
+{% set status = 'Posted' %}
+
+{% macro bal(v) %}{{ '{:,.2f}'.format(v|abs) }} {{ 'Dr' if v > 0.004 else ('Cr' if v < -0.004 else '') }}{% endmacro %}
+
+{% block sheet_body %}
+    <section class="meta">
+      <div><span class="lbl">From</span><span class="val">{{ date_from.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">To</span><span class="val">{{ date_to.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">GSTIN</span><span class="val">{{ customer.gstin or '—' }}</span></div>
+      <div><span class="lbl">Printed on</span><span class="val">{{ today.strftime('%d %b %Y') }}</span></div>
+    </section>
+
+    <section class="supplier">
+      <span class="lbl">Customer</span>
+      <strong>{{ customer.name }}</strong>
+      {% if customer.address %}<p>{{ customer.address }}</p>{% endif %}
+      <p>{{ customer.state.name if customer.state else '' }}</p>
+    </section>
+
+    <div class="sec">Account</div>
+    <table class="lines">
+      <thead>
+        <tr><th>Date</th><th>Document</th><th>Details</th><th class="num">Debit (₹)</th><th class="num">Credit (₹)</th><th class="num">Balance (₹)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="5"><b>Opening balance</b></td><td class="num amt">{{ bal(data.opening) }}</td></tr>
+        {% for r in data.rows %}
+        <tr>
+          <td>{{ r.date.strftime('%d %b %Y') }}</td>
+          <td><span class="mat-name">{{ r.ref }}</span><span class="mat-sub">{{ r.type }}</span></td>
+          <td>{{ r.text }}</td>
+          <td class="num">{{ '{:,.2f}'.format(r.debit) if r.debit else '' }}</td>
+          <td class="num">{{ '{:,.2f}'.format(r.credit) if r.credit else '' }}</td>
+          <td class="num amt">{{ bal(r.balance) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="close">
+      <div class="side">
+        <div class="remarks"><span class="lbl">Note</span><p>Dr = amount to be paid by the customer. Cr = credit in the customer's favour. Please report any difference within 7 days.</p></div>
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs"><div class="sign"><div class="name"></div><div class="line">Authorised signatory</div></div></div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Opening balance</span><span class="num">{{ bal(data.opening) }}</span></div>
+        <div class="row"><span>Total debit</span><span class="num">{{ '{:,.2f}'.format(data.debit_total) }}</span></div>
+        <div class="row"><span>Total credit</span><span class="num">{{ '{:,.2f}'.format(data.credit_total) }}</span></div>
+        <div class="grand"><span>Closing balance</span><span class="num">₹ {{ bal(data.closing) }}</span></div>
+      </div>
+    </div>
+{% endblock %}
