@@ -227,6 +227,16 @@ def production_output_print(output_id):
     return render_template("production_output_print.html", output=output, order=output.production_order, consumed=consumed)
 
 
+def _batch_party(batch):
+    # Batch kis party / quotation ke order ka hai (Finalize se bana order). Koi quotation nahi = Own stock (free surplus)
+    from app.models import Quotation, QuotationLine
+    line = (QuotationLine.query.join(Quotation, Quotation.id == QuotationLine.quotation_id)
+            .filter(QuotationLine.production_order_id == batch.production_order_id, Quotation.is_deleted == False).first())
+    if line is None:
+        return "Own stock"
+    return f"{line.quotation.customer.name} · {line.quotation.quote_no}"
+
+
 @production_output_bp.route("/finished_goods")
 def finished_goods_list():
     # FG aur Scrap ka stock: batch-wise (kitna abhi maujood hai, kis cost par)
@@ -249,6 +259,7 @@ def finished_goods_list():
         rows.append({"batch": batch, "qty": qty, "value": value, "made": sum(m.qty for m in batch.movements if m.movement_type == "OUTPUT_IN" and m.reverses_movement_id is None),
                      "where": where, "where_type": first_wh.warehouse_type if first_wh else "", "order": order,
                      "rack": batch.rack.name if batch.rack else "",
+                     "party": _batch_party(batch) if kind == "FG" else None,
                      "kg": round(qty * (order.unit_weight or 1), 2) if count_unit and kind == "FG" else None,
                      "packs": [p for p in packed_lines(order) if p["unit"] != batch.unit_code] if kind == "FG" else []})
     fg_in_stock = [r for r in rows if r["qty"] > 0.00005] if tab == "fg" else []

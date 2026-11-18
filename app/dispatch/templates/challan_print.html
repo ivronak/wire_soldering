@@ -1,0 +1,51 @@
+{% extends "print_base.html" %}
+{# Sales S3: Delivery Challan (A4 letterhead). Rate / price nahi chhapta — sirf kya, kitna, kaun sa batch gaya. #}
+{% set doc_title = 'Delivery challan ' ~ c.challan_no %}
+{% set back_url = url_for('dispatch.dispatch_list', tab='done') %}
+{% set eyebrow = 'Delivery challan' %}
+{% set docno = c.challan_no %}
+{% set status = c.status %}
+
+{% block sheet_body %}
+    <section class="meta">
+      <div><span class="lbl">Date</span><span class="val">{{ c.challan_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Quotation</span><span class="val">{{ q.quote_no }}</span></div>
+      <div><span class="lbl">Customer PO</span><span class="val">{{ q.customer_po_no or '—' }}</span></div>
+      <div><span class="lbl">Vehicle</span><span class="val">{{ c.vehicle_no or '—' }}</span></div>
+    </section>
+
+    <section class="supplier">
+      <span class="lbl">Deliver to</span>
+      <strong>{{ q.customer.name }}</strong>
+      {% if q.customer.address %}<p>{{ q.customer.address }}</p>{% endif %}
+      <p>{{ q.customer.state.name if q.customer.state else '' }}{% if q.customer.gstin %} &nbsp;·&nbsp; GSTIN {{ q.customer.gstin }}{% endif %}</p>
+      {% if c.transporter %}<p>Transporter: {{ c.transporter }}</p>{% endif %}
+    </section>
+
+    <div class="sec">Goods</div>
+    <table class="lines">
+      <thead><tr><th>#</th><th>Product</th><th>Batch</th><th class="num">Quantity</th></tr></thead>
+      <tbody>
+        {% for l in c.lines %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><span class="mat-name">{{ l.quotation_line.product.name }}</span><span class="mat-sub">{{ l.quotation_line.product.code }}</span></td>
+          <td>{{ l.batch.batch_no }}{% if not l.from_own_order %} <span class="mat-sub">Extra (over order qty)</span>{% endif %}</td>
+          <td class="num amt">{{ '{:,.3f}'.format(l.qty).rstrip('0').rstrip('.') }} {{ l.batch.unit_code }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="close">
+      <div class="side">
+        {% if c.notes %}<div class="remarks"><span class="lbl">Note</span><p>{{ c.notes }}</p></div>{% endif %}
+        {% if c.status == 'Cancelled' %}<div class="remarks"><span class="lbl">Cancelled</span><p>{{ c.cancel_reason }}</p></div>{% endif %}
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs">
+          <div class="sign"><div class="name"></div><div class="line">Dispatched by</div></div>
+          <div class="sign"><div class="name"></div><div class="line">Received by (sign and stamp)</div></div>
+        </div>
+      </div>
+    </div>
+{% endblock %}

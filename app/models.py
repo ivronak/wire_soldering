@@ -2034,7 +2034,7 @@ class FGMovement(CreatedAtMixin, db.Model):
     warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=False)
     warehouse = db.relationship("Warehouse", foreign_keys=[warehouse_id])
     movement_date = db.Column(db.Date, nullable=False)
-    movement_type = db.Column(db.String(20), nullable=False)                      # OUTPUT_IN (aage Sales me DISPATCH ...)
+    movement_type = db.Column(db.String(20), nullable=False)                      # OUTPUT_IN, DISPATCH (Sales challan, qty minus)
     qty = db.Column(db.Float, nullable=False)
     value = db.Column(db.Float, default=0, nullable=False)
     ref_type = db.Column(db.String(12), nullable=False)
@@ -2253,3 +2253,38 @@ class QuotationRevision(CreatedAtMixin, db.Model):
     snapshot = db.Column(db.JSON, nullable=False)
     old_total = db.Column(db.Float, nullable=True)
     new_total = db.Column(db.Float, nullable=True)
+
+
+class DeliveryChallan(CreatedAtMixin, db.Model):
+    # Sales S3: maal customer ko bhejne ka document (Delivery Challan). Ek Ordered quotation par kai challan ho sakte hain (partial dispatch).
+    # Stock FG ledger (fg_movements, type DISPATCH) me yahin se ghatta hai; cancel = ulti rows.
+    __tablename__ = "delivery_challans"
+
+    id = db.Column(db.Integer, primary_key=True)
+    challan_no = db.Column(db.String(20), unique=True, nullable=False)        # DC-2026-001
+    quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=False)
+    quotation = db.relationship("Quotation", foreign_keys=[quotation_id], backref=db.backref("challans", order_by="DeliveryChallan.id"))
+    challan_date = db.Column(db.Date, nullable=False)
+    transporter = db.Column(db.String(100), nullable=True)
+    vehicle_no = db.Column(db.String(20), nullable=True)
+    notes = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(12), default="Dispatched", nullable=False)   # Dispatched / Cancelled
+    cancel_reason = db.Column(db.String(255), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class DeliveryChallanLine(CreatedAtMixin, db.Model):
+    # Challan ki ek row = quotation ki ek line ka ek batch se itna maal. Cost us din ke batch cost par freeze (Invoice ka loss gate isi se).
+    __tablename__ = "delivery_challan_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    challan_id = db.Column(db.Integer, db.ForeignKey("delivery_challans.id"), nullable=False)
+    challan = db.relationship("DeliveryChallan", foreign_keys=[challan_id], backref=db.backref("lines", order_by="DeliveryChallanLine.id"))
+    quotation_line_id = db.Column(db.Integer, db.ForeignKey("quotation_lines.id"), nullable=False)
+    quotation_line = db.relationship("QuotationLine", foreign_keys=[quotation_line_id], backref="challan_lines")
+    batch_id = db.Column(db.Integer, db.ForeignKey("fg_batches.id"), nullable=False)
+    batch = db.relationship("FGBatch", foreign_keys=[batch_id])
+    qty = db.Column(db.Float, nullable=False)
+    unit_cost = db.Column(db.Float, default=0, nullable=False)
+    from_own_order = db.Column(db.Boolean, default=True, nullable=False)       # False = free (Own) stock se nikala gaya extra

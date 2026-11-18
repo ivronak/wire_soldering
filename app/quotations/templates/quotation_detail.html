@@ -26,6 +26,7 @@
             {{ q.quote_no }}{% if q.revision_no %} <span class="text-ink-faint text-[15px] font-normal">R{{ q.revision_no }}</span>{% endif %}
             <span class="q-chip {{ q.status }}">{{ q.status }}</span>
             {% if expired %}<span class="q-chip Expired">Expired</span>{% endif %}
+            {% if dispatch_status %}<span class="q-chip {{ 'Approved' if dispatch_status == 'Dispatched' else ('Expired' if dispatch_status == 'Partly dispatched' else 'Draft') }}">{{ dispatch_status }}</span>{% endif %}
           </h1>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -79,7 +80,7 @@
 
         <div class="overflow-x-auto">
           <table class="qd-table" style="min-width: 640px;">
-            <thead><tr><th>#</th><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th>{% if q.status == 'Ordered' %}<th>Production order</th>{% endif %}</tr></thead>
+            <thead><tr><th>#</th><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th>{% if q.status == 'Ordered' %}<th class="num">Sent</th><th>Production order</th>{% endif %}</tr></thead>
             <tbody>
               {% for line in q.lines %}
               <tr>
@@ -90,7 +91,7 @@
                 <td class="num">{{ '%g'|format(line.discount_percent) }}</td>
                 <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
                 <td class="num font-semibold">{{ '{:,.2f}'.format(line.net_value) }}</td>
-                {% if q.status == 'Ordered' %}<td>{% if line.production_order %}<a class="font-mono text-[13px] font-bold text-copper-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a> <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}—{% endif %}</td>{% endif %}
+                {% if q.status == 'Ordered' %}<td class="num">{{ '%g'|format(sent_qty[line.id]) }}</td><td>{% if line.production_order %}<a class="font-mono text-[13px] font-bold text-copper-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a> <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}—{% endif %}</td>{% endif %}
               </tr>
               {% endfor %}
             </tbody>
@@ -117,6 +118,29 @@
 
         {% if q.terms %}<div><div class="qd-label">Other terms</div><div class="whitespace-pre-line">{{ q.terms }}</div></div>{% endif %}
         {% if q.notes %}<div><div class="qd-label">Internal note</div><div class="text-ink-muted">{{ q.notes }}</div></div>{% endif %}
+
+        {% if q.status == 'Ordered' %}
+        <div id="challan-list">
+          <div class="flex items-center justify-between mb-2">
+            <div class="qd-label">Dispatch</div>
+            {% if dispatch_status != 'Dispatched' %}<a href="{{ url_for('dispatch.dispatch_list', q=q.id) }}" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Dispatch goods</a>{% endif %}
+          </div>
+          {% if q.challans %}
+          <div class="space-y-1">
+            {% for c in q.challans %}
+            <div class="flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded px-3 py-2 text-[13.5px]">
+              <div><b class="font-mono">{{ c.challan_no }}</b> <span class="text-ink-faint">· {{ c.challan_date.strftime('%d %b %Y') }}</span>
+                {% if c.status == 'Cancelled' %}<span class="q-chip Rejected ml-1">Cancelled</span>{% endif %}</div>
+              <div class="text-ink-muted">{% for l in c.lines %}{{ l.quotation_line.product.name }} {{ '%g'|format(l.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+              <a href="{{ url_for('dispatch.dispatch_print', challan_id=c.id) }}" target="_blank" class="text-copper-text font-semibold hover:underline">Print</a>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-[13px] text-ink-faint">Nothing dispatched yet.</p>
+          {% endif %}
+        </div>
+        {% endif %}
 
         {# Revision history: har Revise par purana roop yahan jama hota hai, naya upar #}
         <div id="revision-history">

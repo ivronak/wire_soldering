@@ -61,7 +61,7 @@
   <tr class="fg-brow {{ 'used-up' if r.qty <= 0.00005 else '' }}">
     <td><div class="fg-no">{{ b.batch_no }}</div>
       {% if r.qty > 0.00005 %}<span class="fg-chip ok"><i></i>In stock</span>{% else %}<span class="fg-chip gone"><i></i>Used up</span>{% endif %}</td>
-    <td><div class="text-ink">{{ r.order.prod_no }}</div><div class="fg-meta">made {{ b.mfg_date.strftime('%d %b %Y') }}</div></td>
+    <td><div class="text-ink">{{ r.order.prod_no }}</div><div class="fg-meta">made {{ b.mfg_date.strftime('%d %b %Y') }}</div>{% if r.party %}<div class="fg-meta">For {{ r.party }}</div>{% endif %}</td>
     <td class="num"><div class="font-bold text-ink text-[15px]">{{ '%g'|format(r.qty) }} {{ b.unit_code }}</div>
       <div class="fg-meta">{{ '%g'|format(r.made) }} made{% if r.kg is not none %} · {{ '%g'|format(r.kg) }} KG{% endif %}</div>
       {% for p in r.packs %}<div class="fg-meta">{{ '%g'|format(p.qty) }} {{ p.unit }} {{ p.name }}</div>{% endfor %}</td>
