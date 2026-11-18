@@ -12,6 +12,7 @@
   .q-chip.Draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .q-chip.Sent { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
   .q-chip.Approved { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .q-chip.Ordered { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
   .q-chip.Rejected, .q-chip.Cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
   .q-chip.Expired { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
 </style>
@@ -43,6 +44,9 @@
             {% endif %}
           </form>
           {% endfor %}
+          {% if finalizable %}
+          <button type="button" id="btn-finalize" class="px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Finalize order</button>
+          {% endif %}
           {% if edit %}
           <button type="button" id="btn-edit-q" class="px-4 py-2.5 text-[13.5px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">
             {{ 'Revise (R' ~ edit.next_revision ~ ')' if edit.revising else 'Edit' }}
@@ -63,9 +67,19 @@
           <div class="md:col-span-3"><div class="qd-label">Delivery terms</div><div>{{ q.delivery_terms or '—' }}</div></div>
         </div>
 
+        {% if q.status == 'Ordered' %}
+        <div class="border border-blue-200 bg-blue-50 rounded p-3 grid grid-cols-2 md:grid-cols-4 gap-4" id="order-card">
+          <div><div class="qd-label">Customer PO</div><div class="font-semibold text-ink">{{ q.customer_po_no or "—" }}</div></div>
+          <div><div class="qd-label">PO date</div><div>{{ q.customer_po_date.strftime('%d %b %Y') if q.customer_po_date else '—' }}</div></div>
+          <div><div class="qd-label">PO copy</div><div>{% if q.po_file %}<a class="text-copper-text font-semibold hover:underline" href="{{ url_for('quotations.quotations_po_file', quotation_id=q.id) }}" target="_blank">{{ po_file_name }}</a>{% else %}—{% endif %}</div></div>
+          <div><div class="qd-label">Finalized</div><div>{{ q.finalized_at|ist }}</div></div>
+          {% if q.bundle_no %}<div class="col-span-2 md:col-span-4 text-[13px] text-ink-muted">All items are in production bundle <b>{{ q.bundle_no }}</b>.</div>{% endif %}
+        </div>
+        {% endif %}
+
         <div class="overflow-x-auto">
           <table class="qd-table" style="min-width: 640px;">
-            <thead><tr><th>#</th><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th></tr></thead>
+            <thead><tr><th>#</th><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Disc. %</th><th>GST</th><th class="num">Amount (₹)</th>{% if q.status == 'Ordered' %}<th>Production order</th>{% endif %}</tr></thead>
             <tbody>
               {% for line in q.lines %}
               <tr>
@@ -76,6 +90,7 @@
                 <td class="num">{{ '%g'|format(line.discount_percent) }}</td>
                 <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
                 <td class="num font-semibold">{{ '{:,.2f}'.format(line.net_value) }}</td>
+                {% if q.status == 'Ordered' %}<td>{% if line.production_order %}<a class="font-mono text-[13px] font-bold text-copper-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a> <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}—{% endif %}</td>{% endif %}
               </tr>
               {% endfor %}
             </tbody>
@@ -132,6 +147,7 @@
 
 {% block modals %}
 {% if edit %}{% include '_quote_drawer.html' %}{% endif %}
+{% if finalizable %}{% include '_finalize_drawer.html' %}{% endif %}
 {% endblock %}
 
 {% block page_js %}

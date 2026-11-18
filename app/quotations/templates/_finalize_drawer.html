@@ -1,0 +1,118 @@
+{# Sales S2: "Finalize order" drawer (sirf Approved quotation par). Customer ka PO number / date / copy, final rate + qty, terms. Save par Production orders ban jaate hain. #}
+<style>
+  #f-modal.hidden { display: none; }
+  #f-modal { display: flex; }
+  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
+  .ql-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .ql-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
+  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .ql-table .num { text-align: right; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+  .ql-hint { font-size: 11.5px; color: #6B7F82; margin-top: 2px; }
+</style>
+<div id="f-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="f-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="f-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="f-title" class="text-[16px] font-bold text-ink">Finalize {{ q.quote_no }}</h2>
+        <p class="text-[12.5px] text-ink-faint">Customer has confirmed the order (PO number is optional). Saving creates the production {{ 'orders' if q.lines|length > 1 else 'order' }} (Draft, needs planning).</p>
+      </div>
+      <button type="button" id="f-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+
+    <form id="f-form" method="post" enctype="multipart/form-data" action="{{ url_for('quotations.quotations_finalize', quotation_id=q.id) }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <div>
+        <p class="form-section-title mb-2">Customer PO</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label for="customer_po_no" class="block text-[12.5px] font-semibold text-ink mb-1">Customer PO number</label>
+            <input class="ql-input" type="text" name="customer_po_no" id="customer_po_no" maxlength="50">
+            <div class="ql-hint">Optional. Leave empty if the customer has no PO.</div>
+          </div>
+          <div>
+            <label for="customer_po_date" class="block text-[12.5px] font-semibold text-ink mb-1">PO date</label>
+            <input class="ql-input" type="date" name="customer_po_date" id="customer_po_date">
+          </div>
+          <div>
+            <label for="po_file" class="block text-[12.5px] font-semibold text-ink mb-1">PO copy</label>
+            <input class="ql-input" type="file" name="po_file" id="po_file" accept=".pdf,.png,.jpg,.jpeg">
+            <div class="ql-hint">PDF, PNG or JPG</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="form-section-title mb-2">Final rate and quantity <span class="normal-case font-normal text-ink-faint">· as per the customer's PO</span></p>
+        <table class="ql-table">
+          <colgroup><col style="width:38%"><col style="width:18%"><col style="width:18%"><col style="width:26%"></colgroup>
+          <thead><tr><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Amount (₹)</th></tr></thead>
+          <tbody>
+            {% for line in q.lines %}
+            <tr class="f-row" data-disc="{{ line.discount_percent }}">
+              <td><b>{{ line.product.name }}</b><div class="ql-hint">{{ line.product.code }} · quoted {{ '{:,.2f}'.format(line.rate) }}{% if line.discount_percent %} less {{ '%g'|format(line.discount_percent) }}%{% endif %}</div></td>
+              <td><input class="ql-input num f-qty" type="number" step="any" min="0" name="qty_{{ line.id }}" value="{{ line.qty }}" required><div class="ql-hint">in {{ line.product.base_unit.code if line.product.base_unit else '' }}</div></td>
+              <td><input class="ql-input num f-rate" type="number" step="any" min="0" name="rate_{{ line.id }}" value="{{ line.rate }}" required></td>
+              <td class="num pt-3 tabular-nums f-amt">0.00</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="mt-2 flex justify-end text-[13.5px] text-ink-muted">Items total (after discount): <b class="ml-2 text-ink tabular-nums" id="f-items">0.00</b></div>
+        <p class="ql-hint">Charges and GST are added on top, exactly as in the quotation. If a rate or quantity changes here, the change is saved in the revision history.</p>
+      </div>
+
+      <div>
+        <p class="form-section-title mb-2">Terms and dates</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label for="f_payment_terms_id" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
+            <select class="ql-input" name="payment_terms_id" id="f_payment_terms_id">
+              <option value="">Select terms…</option>
+              {% for t in payment_terms %}<option value="{{ t.id }}" {% if q.payment_terms_id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="f_needed_by" class="block text-[12.5px] font-semibold text-ink mb-1">Customer needs it by</label>
+            <input class="ql-input" type="date" name="needed_by_date" id="f_needed_by" value="{{ q.needed_by_date.isoformat() if q.needed_by_date else '' }}">
+            <div class="ql-hint">Goes to the production order (shows "Late" if missed)</div>
+          </div>
+          <div>
+            <label for="f_delivery" class="block text-[12.5px] font-semibold text-ink mb-1">Delivery terms</label>
+            <input class="ql-input" type="text" name="delivery_terms" id="f_delivery" maxlength="255" value="{{ q.delivery_terms or '' }}">
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="px-4 py-3 border-t border-slate-200 bg-mist flex items-center justify-end gap-2 shrink-0">
+      <button type="button" id="f-cancel" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Cancel</button>
+      <button type="submit" form="f-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Finalize and create production {{ 'orders' if q.lines|length > 1 else 'order' }}</button>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var modal = document.getElementById('f-modal');
+    function openF() { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); recalcF(); }
+    function closeF() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+    function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+    function money(n) { return n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+    function recalcF() {
+      var total = 0;
+      document.querySelectorAll('.f-row').forEach(function (tr) {
+        var q = parseFloat(tr.querySelector('.f-qty').value) || 0, r = parseFloat(tr.querySelector('.f-rate').value) || 0, d = parseFloat(tr.getAttribute('data-disc')) || 0;
+        var g = r2(q * r), net = r2(g - r2(g * d / 100));
+        tr.querySelector('.f-amt').textContent = money(net); total += net;
+      });
+      document.getElementById('f-items').textContent = money(r2(total));
+    }
+    document.querySelectorAll('.f-qty, .f-rate').forEach(function (el) { el.addEventListener('input', recalcF); });
+    var open = document.getElementById('btn-finalize'); if (open) open.addEventListener('click', openF);
+    ['f-close', 'f-cancel', 'f-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeF); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeF(); });
+    {% if open_finalize %}openF();{% endif %}
+    recalcF();
+  })();
+</script>

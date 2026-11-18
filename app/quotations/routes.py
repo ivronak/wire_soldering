@@ -1,12 +1,17 @@
-# Sales S1 — Quotation: customer ko bhejne wali quotation banana, list, detail aur status (Sent / Approved / Rejected / Cancelled).
-# Customer Master, Product Master, Tax Rates aur Payment Terms se juda hai. Agla step: Finalize -> Production order (is file me abhi nahi).
+# Sales S1 / S1.2 / S2 — Quotation: banana, edit / revise, status, print, aur Finalize (customer PO aane par Production orders banana).
+# Customer Master, Product Master, Tax Rates aur Payment Terms se juda hai; Finalize par production_orders ka build_order() use hota hai.
+import os
 from datetime import date, datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from werkzeug.security import safe_join
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models import Charge, Customer, PaymentTerm, Product, Quotation, QuotationCharge, QuotationLine, QuotationRevision, TaxRate
 from app.tax import line_value
+from app.production_orders.routes import _new_bundle_no, build_order, default_allowances, read_plan, unit_weight_for
+from app.production_orders.scheduler import persist_schedule, today_ist
 
 quotations_bp = Blueprint("quotations", __name__, template_folder="templates")
 
@@ -14,10 +19,13 @@ quotations_bp = Blueprint("quotations", __name__, template_folder="templates")
 NEXT_STATUS = {
     "Draft": ("Sent", "Cancelled"),
     "Sent": ("Approved", "Rejected"),
+    # Approved -> Ordered manual status se nahi, "Finalize" se hota hai (customer PO + production orders)
 }
+PO_FILE_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
 TABS = {
     "open": ("Draft", "Sent"),
     "approved": ("Approved",),
+    "ordered": ("Ordered",),
     "closed": ("Rejected", "Cancelled"),
 }
 
@@ -63,6 +71,11 @@ def form_context():
         "charges": Charge.query.filter_by(is_deleted=False, is_active=True).order_by(Charge.name).all(),
         "payment_terms": PaymentTerm.query.filter_by(is_deleted=False, is_active=True).order_by(PaymentTerm.name).all(),
     }
+
+
+def finalize_context():
+    # Finalize drawer ke liye: payment terms ki list aur aaj ki date
+    return {"payment_terms": PaymentTerm.query.filter_by(is_deleted=False, is_active=True).order_by(PaymentTerm.name).all(), "today": date.today().isoformat()}
 
 
 @quotations_bp.route("/quotations")
@@ -338,7 +351,10 @@ def quotations_detail(quotation_id):
     return render_template("quotation_detail.html", active_nav="quotations", q=quotation, summary=quotation.summary,
                            next_statuses=NEXT_STATUS.get(quotation.status, ()), expired=is_expired(quotation),
                            edit=edit_data(quotation) if editable else None, open_edit=request.args.get("edit") == "1" and editable,
-                           revisions=list(reversed(quotation.revisions)), **(form_context() if editable else {}))
+                           revisions=list(reversed(quotation.revisions)), finalizable=quotation.status == "Approved",
+                           open_finalize=request.args.get("finalize") == "1" and quotation.status == "Approved",
+                           po_file_name=os.path.basename(quotation.po_file) if quotation.po_file else None,
+                           **(form_context() if editable else {}), **(finalize_context() if quotation.status == "Approved" else {}))
 
 
 @quotations_bp.route("/quotations/<int:quotation_id>/print")
@@ -362,3 +378,128 @@ def quotations_status(quotation_id):
                 "Rejected": "marked Rejected.", "Cancelled": "cancelled."}
     flash(f"{quotation.quote_no} {messages[target]}", "success")
     return back
+
+
+@quotations_bp.route("/quotations/<int:quotation_id>/finalize", methods=["POST"])
+def quotations_finalize(quotation_id):
+    """S2 Finalize: customer ne PO bheja -> PO number (+ copy), final rate / qty, terms pakke, aur har product ka Production order seedha
+    Draft ("Needs planning") me banta hai. Quotation = Order. Sab kuch ek saath: koi bhi product ka order na ban sake to kuch save nahi hota."""
+    quotation = Quotation.query.filter_by(id=quotation_id, is_deleted=False).first_or_404()
+    back = redirect(url_for("quotations.quotations_detail", quotation_id=quotation.id, finalize=1))
+    done = redirect(url_for("quotations.quotations_detail", quotation_id=quotation.id))
+    if quotation.status != "Approved":
+        flash("Only an approved quotation can be finalized.", "error")
+        return done
+
+    # Customer PO number optional hai (client ka PO hamesha nahi aata). Diya ho to usi customer par dobara nahi chalega.
+    po_no = (request.form.get("customer_po_no") or "").strip()[:50] or None
+    if po_no:
+        clash = Quotation.query.filter(Quotation.customer_id == quotation.customer_id, Quotation.id != quotation.id, Quotation.is_deleted == False,
+                                       db.func.lower(Quotation.customer_po_no) == po_no.lower()).first()
+        if clash:
+            flash(f"PO {po_no} is already used on {clash.quote_no} for this customer.", "error")
+            return back
+    po_date, error = _read_date("customer_po_date")
+    if error:
+        flash("PO date: " + error, "error")
+        return back
+    needed_by, error = _read_date("needed_by_date")
+    if error:
+        flash("Needed by: " + error, "error")
+        return back
+    terms_id = request.form.get("payment_terms_id", type=int)
+    if terms_id and not PaymentTerm.query.filter_by(id=terms_id, is_deleted=False).first():
+        flash("Choose valid payment terms.", "error")
+        return back
+    upload = request.files.get("po_file")
+    has_file = upload is not None and bool(upload.filename)
+    if has_file:
+        extension = upload.filename.rsplit(".", 1)[1].lower() if "." in upload.filename else ""
+        if extension not in PO_FILE_EXTENSIONS:
+            flash("The PO copy must be a PDF, PNG or JPG file.", "error")
+            return back
+
+    # Final rate / qty har line ka (customer PO ke hisaab se). Jo badle wo revision history me jaata hai.
+    new_values = {}
+    for line in quotation.lines:
+        qty = request.form.get(f"qty_{line.id}", type=float)
+        rate = request.form.get(f"rate_{line.id}", type=float)
+        if qty is None or qty <= 0:
+            flash(f"{line.product.name}: quantity must be more than zero.", "error")
+            return back
+        if rate is None or rate <= 0:
+            flash(f"{line.product.name}: enter the final rate (more than zero).", "error")
+            return back
+        new_values[line.id] = (qty, rate)
+    items_after_discount = sum(round(line_value(new_values[l.id][0], new_values[l.id][1]) * (1 - l.discount_percent / 100), 2) for l in quotation.lines)
+    charges_net = sum(-c.amount if c.effect == "minus" else c.amount for c in quotation.charge_lines)
+    if items_after_discount + charges_net < 0:
+        flash("The charges take the total below zero. Check the final rates.", "error")
+        return back
+
+    before = snapshot(quotation)
+    values_changed = any((l.qty, l.rate) != new_values[l.id] for l in quotation.lines)
+    for line in quotation.lines:
+        line.qty, line.rate = new_values[line.id]
+    quotation.payment_terms_id = terms_id or quotation.payment_terms_id
+    quotation.delivery_terms = (request.form.get("delivery_terms") or "").strip()[:255] or None
+    quotation.needed_by_date = needed_by
+    quotation.customer_po_no = po_no
+    quotation.customer_po_date = po_date
+    db.session.flush()
+    db.session.expire(quotation, ["lines", "charge_lines"])
+    after = snapshot(quotation)
+    if values_changed:
+        quotation.revision_no += 1
+        db.session.add(QuotationRevision(quotation_id=quotation.id, revision_no=quotation.revision_no, note=(f"Final rate / quantity as per customer PO {po_no}" if po_no else "Final rate / quantity at finalize")[:255],
+                                         snapshot=before, changes="\n".join(diff_versions(before, after)) or None,
+                                         old_total=before["grand_total"], new_total=after["grand_total"]))
+
+    # Har product ka production order: Draft, "Needs planning" (andaze ka plan; asli line + machines Production planning page par). Plant ko party ka naam nahi.
+    order_date = today_ist()
+    bundle_no = _new_bundle_no(order_date.year) if len(quotation.lines) > 1 else None
+    created = []
+    for line in quotation.lines:
+        product = line.product
+        if not product.recipe_items:
+            db.session.rollback()
+            flash(f"{product.name} has no recipe in the Product master, so its production order cannot be created. Nothing was saved.", "error")
+            return back
+        unit_weight = unit_weight_for(product)
+        if not unit_weight:
+            db.session.rollback()
+            flash(f"{product.name}: set the weight per unit in the Product master first. Nothing was saved.", "error")
+            return back
+        plan, plan_error = read_plan(product, line.qty * unit_weight, order_date, auto=True, start_date=order_date)
+        if plan_error:
+            db.session.rollback()
+            flash(f"{product.name}: {plan_error} Nothing was saved.", "error")
+            return back
+        order = build_order(product, line.qty, unit_weight, order_date, needed_by, remarks=None, line=None, plan=plan, planning_later=True,
+                            bundle_no=bundle_no, extra_percent=0.0, allowances=default_allowances(product))
+        line.production_order_id = order.id
+        created.append(order.prod_no)
+    quotation.bundle_no = bundle_no
+
+    if has_file:
+        # Path DB me hamesha "/" se (memory.md: file upload paths), disk par os.path.join
+        folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "quotations", str(quotation.id))
+        os.makedirs(folder, exist_ok=True)
+        safe_name = secure_filename(upload.filename) or "po_copy"
+        upload.save(os.path.join(folder, safe_name))
+        quotation.po_file = "quotations/" + str(quotation.id) + "/" + safe_name
+
+    quotation.status = "Ordered"
+    quotation.finalized_at = datetime.utcnow()
+    persist_schedule()
+    db.session.commit()
+    flash(f"{quotation.quote_no} finalized. Production {'orders' if len(created) > 1 else 'order'} {', '.join(created)} created and waiting in Production planning.", "success")
+    return done
+
+
+@quotations_bp.route("/quotations/<int:quotation_id>/po_file")
+def quotations_po_file(quotation_id):
+    quotation = Quotation.query.filter_by(id=quotation_id, is_deleted=False).first_or_404()
+    if not quotation.po_file or safe_join(current_app.config["UPLOAD_FOLDER"], quotation.po_file) is None:
+        return redirect(url_for("quotations.quotations_detail", quotation_id=quotation.id))
+    return send_from_directory(current_app.config["UPLOAD_FOLDER"], quotation.po_file)

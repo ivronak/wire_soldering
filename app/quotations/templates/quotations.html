@@ -18,6 +18,7 @@
   .q-chip.Draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .q-chip.Sent { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
   .q-chip.Approved { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .q-chip.Ordered { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
   .q-chip.Rejected, .q-chip.Cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
   .q-chip.Expired { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   /* Drawer ki styling _quote_drawer.html me hai */
@@ -40,7 +41,7 @@
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
-          {% for key, label in (('open', 'Open'), ('approved', 'Approved'), ('closed', 'Rejected / Cancelled')) %}
+          {% for key, label in (('open', 'Open'), ('approved', 'Approved'), ('ordered', 'Ordered'), ('closed', 'Rejected / Cancelled')) %}
           <a href="{{ url_for('quotations.quotations_list', tab=key) }}"
             class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
@@ -68,7 +69,7 @@
           <details class="help-tip ml-auto text-[12.5px] text-copper-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Draft → Sent (given to the customer) → Approved or Rejected · Discount per product, then charges (shipping, labour), then GST · Click View for the full quotation
+              Draft → Sent (given to the customer) → Approved or Rejected → Finalize when the customer's PO arrives (production orders are created) · Discount per product, then charges (shipping, labour), then GST · Click View for the full quotation
             </p>
           </details>
         </div>
@@ -95,7 +96,7 @@
                 <td class="text-ink-muted">{{ q.lines|length }}</td>
                 <td class="tabular-nums font-semibold">₹ {{ '{:,.2f}'.format(s.grand_total) }}</td>
                 <td><span class="q-chip {{ q.status }}">{{ q.status }}</span>{% if expired %}<br><span class="q-chip Expired mt-1">Expired</span>{% endif %}</td>
-                <td><a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">View</a></td>
+                <td>{% if q.status == 'Approved' %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id, finalize=1) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Finalize</a>{% else %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">View</a>{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -104,7 +105,8 @@
             <p class="font-semibold text-ink text-[15px]">
               {% if quotations %}No quotation matches your search.
               {% elif tab == 'open' %}No open quotations
-              {% elif tab == 'approved' %}No approved quotations yet
+              {% elif tab == 'approved' %}No approved quotations waiting
+              {% elif tab == 'ordered' %}No finalized orders yet
               {% else %}Nothing rejected or cancelled{% endif %}
             </p>
             <p class="text-[13px] text-ink-faint mt-1">

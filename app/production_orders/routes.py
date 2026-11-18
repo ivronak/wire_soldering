@@ -64,7 +64,7 @@ def _routing_for(product):
     return stages
 
 
-def read_plan(product, batch_kg, order_date, routing=None, line=None, auto=False):
+def read_plan(product, batch_kg, order_date, routing=None, line=None, auto=False, start_date=None):
     """Form se production plan padho: har stage ki chuni hui machines aur start date. (plan, error) wapas deta hai.
     Product ka routing na ho to (None, None): order bina plan ke ban jaata hai. Server khud hisaab lagata hai (JS ke dikhaye par bharosa nahi).
     line = order ki Production Line (ho to sirf usi line ki machines chun sakte hain).
@@ -74,11 +74,12 @@ def read_plan(product, batch_kg, order_date, routing=None, line=None, auto=False
         routing = _routing_for(product)
     if not routing:
         return None, None
-    start_raw = (request.form.get("start_date") or "").strip()
-    try:
-        start_date = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else order_date
-    except ValueError:
-        return None, "Enter a valid start date."
+    if start_date is None:                 # Sales Finalize seedha date deta hai (form nahi); production page ka form start_date bhejta hai
+        start_raw = (request.form.get("start_date") or "").strip()
+        try:
+            start_date = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else order_date
+        except ValueError:
+            return None, "Enter a valid start date."
     chosen = []
     for stage in routing:
         if auto:
@@ -406,6 +407,87 @@ def production_orders_list():
     )
 
 
+def default_allowances(product):
+    # Product Master me jo Spare % set hai wahi har RM ka default allowance (form se na aaye to yahi)
+    defaults = {r.raw_material_id: r.spare_percent or 0 for r in product.recipe_items}
+    defaults.update({k.raw_material_id: k.spare_percent or 0 for k in product.packing_items})
+    return {rm_id: round(value, 2) for rm_id, value in defaults.items()}
+
+
+def unit_weight_for(product):
+    # 1 unit ka weight KG me: KG product = 1; baaki unit me Product Master ka unit_weight. Na ho to None (order nahi ban sakta)
+    unit_code = (product.base_unit.code if product.base_unit else "KG").upper()
+    if unit_code in ("KG", "KGS"):
+        return 1.0
+    return product.unit_weight or None
+
+
+def build_order(product, planned_qty, unit_weight, order_date, needed_by, remarks, line, plan, planning_later, bundle_no, extra_percent, allowances, balance_for=None):
+    """Production order + uski recipe / packing lines banata hai (session me add + flush, commit caller karta hai).
+    Production page ka form aur Sales Finalize (Quotation se order) dono yahi use karte hain, taaki recipe / packing / queue ka logic ek hi jagah rahe.
+    Extra RM, balance-order ka note, schedule aur commit caller ke zimme."""
+    batch_kg = planned_qty * unit_weight
+    extra_factor = 1 + extra_percent / 100
+    year = order_date.year
+    count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
+    prod_no = f"PROD-{year}-{count + 1:03d}"
+    order = ProductionOrder(
+        prod_no=prod_no,
+        product_id=product.id,
+        order_date=order_date,
+        planned_qty=planned_qty,
+        unit_weight=unit_weight,
+        status="Draft",
+        remarks=remarks,
+        is_deleted=False,
+        line_id=line.id if line else None,        # planner me chuni line; Start par yahi line chalti hai
+        needed_by_date=needed_by,
+        earliest_start_date=plan["earliest_start"] if plan else order_date,
+        queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
+        plan_confirmed=not (planning_later and plan),      # andaze ka plan ho to planning baaki; plan hi nahi (stages nahi) to planning ka kuch nahi
+        bundle_no=bundle_no,
+        extra_percent=extra_percent,
+        balance_for_id=balance_for.id if balance_for else None,
+    )
+    db.session.add(order)
+    db.session.flush()
+
+    # Plan ke stages aur machines ki copy (master badle to purana order na badle)
+    if plan:
+        _save_plan(order, plan)
+
+    # Master recipe ki id save nahi karte. Ratio aur qty is order pe copy.
+    for r in product.recipe_items:
+        db.session.add(ProductionOrderLine(
+            production_order_id=order.id,
+            raw_material_id=r.raw_material_id,
+            ratio_percent=r.ratio_percent,
+            required_qty=batch_kg * (r.ratio_percent or 0) / 100 * extra_factor,      # C18: extra % sirf metal / flux par; spool-box ordered qty ke hisaab se
+            is_flux=bool(r.is_flux),
+            is_extra=False,
+            work_stage_id=r.work_stage_id,
+            allowance_percent=allowances.get(r.raw_material_id, 0),
+        ))
+
+    # Packing Material (spool / sleeve / box): har kg_per_pack KG par 1 pack, upar round (500 KG / 20 = 25 box). Master badle to purana order na badle.
+    for k in product.packing_items:
+        if not k.raw_material or k.raw_material.is_deleted or not k.kg_per_pack:
+            continue
+        db.session.add(ProductionOrderLine(
+            production_order_id=order.id,
+            raw_material_id=k.raw_material_id,
+            ratio_percent=0,
+            required_qty=math.ceil(round(batch_kg / k.kg_per_pack, 6)),
+            is_flux=False,
+            is_extra=False,
+            is_packing=True,
+            work_stage_id=k.work_stage_id,
+            kg_per_pack=k.kg_per_pack,
+            allowance_percent=allowances.get(k.raw_material_id, 0),
+        ))
+    return order
+
+
 @production_orders_bp.route("/production_orders/add", methods=["POST"])
 def production_orders_add():
     product_id = int(request.form.get("product_id")) if (request.form.get("product_id") or "").strip() else None
@@ -486,9 +568,6 @@ def production_orders_add():
         flash(allowance_error, "error")
         return redirect(url_for("production_orders.production_orders_list"))
     year = order_date.year
-    count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
-    prod_no = f"PROD-{year}-{count + 1:03d}"
-
     # Bundle (client meeting 2, #5): form se bundle_no aaye to us bundle me judta hai (wo pehle se hona chahiye);
     # 'Save & add another item' dabaya aur bundle nahi tha to naya BND-... banta hai. Dono nahi to single order (bundle khaali).
     add_another = request.form.get("add_another") == "1"
@@ -509,60 +588,11 @@ def production_orders_add():
         if not info or not info["short"] or balance_for.short_action or balance_for.product_id != product.id:
             flash("That order does not need a balance order (it is not short, is already settled, or the product is different).", "error")
             return redirect(url_for("production_orders.production_orders_list", tab="completed"))
-    order = ProductionOrder(
-        prod_no=prod_no,
-        product_id=product.id,
-        order_date=order_date,
-        planned_qty=planned_qty,
-        unit_weight=unit_weight,
-        status="Draft",
-        remarks=remarks,
-        is_deleted=False,
-        line_id=line.id if line else None,        # planner me chuni line; Start par yahi line chalti hai
-        needed_by_date=needed_by,
-        earliest_start_date=plan["earliest_start"] if plan else order_date,
-        queue_position=(db.session.query(db.func.max(ProductionOrder.queue_position)).scalar() or 0) + 1,   # queue ke aakhir me
-        plan_confirmed=not (planning_later and plan),      # andaze ka plan ho to planning baaki; plan hi nahi (stages nahi) to planning ka kuch nahi
-        bundle_no=bundle_no,
-        extra_percent=extra_percent,
-        balance_for_id=balance_for.id if balance_for else None,
-    )
-    db.session.add(order)
-    db.session.flush()
-
-    # Plan ke stages aur machines ki copy (master badle to purana order na badle)
-    if plan:
-        _save_plan(order, plan)
-
-    # Master recipe ki id save nahi karte. Ratio aur qty is order pe copy.
-    for r in product.recipe_items:
-        db.session.add(ProductionOrderLine(
-            production_order_id=order.id,
-            raw_material_id=r.raw_material_id,
-            ratio_percent=r.ratio_percent,
-            required_qty=batch_kg * (r.ratio_percent or 0) / 100 * extra_factor,      # C18: extra % sirf metal / flux par; spool-box ordered qty ke hisaab se
-            is_flux=bool(r.is_flux),
-            is_extra=False,
-            work_stage_id=r.work_stage_id,
-            allowance_percent=allowances.get(r.raw_material_id, 0),
-        ))
-
-    # Packing Material (spool / sleeve / box): har kg_per_pack KG par 1 pack, upar round (500 KG / 20 = 25 box). Master badle to purana order na badle.
-    for k in product.packing_items:
-        if not k.raw_material or k.raw_material.is_deleted or not k.kg_per_pack:
-            continue
-        db.session.add(ProductionOrderLine(
-            production_order_id=order.id,
-            raw_material_id=k.raw_material_id,
-            ratio_percent=0,
-            required_qty=math.ceil(round(batch_kg / k.kg_per_pack, 6)),
-            is_flux=False,
-            is_extra=False,
-            is_packing=True,
-            work_stage_id=k.work_stage_id,
-            kg_per_pack=k.kg_per_pack,
-            allowance_percent=allowances.get(k.raw_material_id, 0),
-        ))
+    order = build_order(
+        product, planned_qty, unit_weight, order_date, needed_by, remarks=remarks, line=line, plan=plan,
+        planning_later=planning_later, bundle_no=bundle_no, extra_percent=extra_percent, allowances=allowances,
+        balance_for=balance_for)
+    prod_no = order.prod_no
 
     # Packaging / extra RM recipe ka percent nahi. User jo qty type kare wahi save.
     extra_ids = request.form.getlist("extra_rm_id[]")

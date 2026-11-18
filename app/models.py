@@ -2148,8 +2148,14 @@ class Quotation(CreatedAtMixin, db.Model):
     terms = db.Column(db.String(500), nullable=True)                          # baaki shartein (packing, TC, quality)
     notes = db.Column(db.String(255), nullable=True)                          # andar ke liye note (customer ko print me nahi)
 
-    # Draft -> Sent -> Approved / Rejected ; Draft -> Cancelled. (Approved ke baad Finalize = agla step)
+    # Draft -> Sent -> Approved / Rejected ; Draft -> Cancelled. Approved -> Finalize -> Ordered (production orders ban jaate hain).
     status = db.Column(db.String(20), default="Draft", nullable=False)
+    # Finalize (S2): customer ka PO number / date / copy, kab finalize hua, aur kai products ho to production orders ka bundle number
+    customer_po_no = db.Column(db.String(50), nullable=True)
+    customer_po_date = db.Column(db.Date, nullable=True)
+    po_file = db.Column(db.String(255), nullable=True)                        # uploads ke andar relative path, hamesha "/" se joda hua
+    finalized_at = db.Column(db.DateTime, nullable=True)
+    bundle_no = db.Column(db.String(20), nullable=True)
     revision_no = db.Column(db.Integer, default=0, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -2201,6 +2207,9 @@ class QuotationLine(CreatedAtMixin, db.Model):
     tax_rate_id = db.Column(db.Integer, db.ForeignKey("tax_rates.id"), nullable=True)
     tax_rate = db.relationship("TaxRate", foreign_keys=[tax_rate_id])
     remarks = db.Column(db.String(150), nullable=True)
+    # Finalize par is line ka Production order (har product ka apna order). Plant ko party ka naam nahi dikhta, isliye link sirf is taraf se.
+    production_order_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=True)
+    production_order = db.relationship("ProductionOrder", foreign_keys=[production_order_id])
 
     @property
     def gross_value(self):
