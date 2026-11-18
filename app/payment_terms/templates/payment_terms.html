@@ -84,8 +84,9 @@
             <colgroup>
               <col style="width:6%" />
               <col style="width:18%" />
-              <col style="width:40%" />
-              <col style="width:16%" />
+              <col style="width:28%" />
+              <col style="width:14%" />
+              <col style="width:14%" />
               <col style="width:20%" />
             </colgroup>
             <thead>
@@ -93,6 +94,7 @@
                 <th>#</th>
                 <th>Code</th>
                 <th>Payment term name</th>
+                <th>Credit days</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -115,6 +117,9 @@
                     {{ t.name }}
                   </span>
                 </td>
+                <td class="text-center tabular-nums text-[13.5px] {% if t.is_active %}text-ink{% else %}text-ink-faint{% endif %}">
+                  {% if t.days is not none %}{{ t.days }} {{ 'day' if t.days == 1 else 'days' }}{% else %}<span class="text-ink-faint">Not set</span>{% endif %}
+                </td>
                 <td class="text-center">
                   {% if t.is_active %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
@@ -132,7 +137,8 @@
                       class="btn-edit-pt px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
                       data-id="{{ t.id }}"
                       data-code="{{ t.code }}"
-                      data-name="{{ t.name }}">
+                      data-name="{{ t.name }}"
+                      data-days="{{ t.days if t.days is not none else '' }}">
                       Edit
                     </button>
                     {# Soft-delete — Flask route name se match #}
@@ -201,6 +207,12 @@
         <label for="pt-name" class="block text-[12.5px] font-semibold text-ink mb-1">Payment term name *</label>
         <input type="text" id="pt-name" name="name" required placeholder="Net 30" autocomplete="off"
           class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+      </div>
+      <div>
+        <label for="pt-days" class="block text-[12.5px] font-semibold text-ink mb-1">Credit days</label>
+        <input type="number" id="pt-days" name="days" min="0" max="365" step="1" placeholder="30" autocomplete="off"
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Invoice due date = invoice date + these days (0 = due on the invoice date). Used by Receivables aging. Leave empty if not decided.</p>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
@@ -294,6 +306,7 @@
     modalTitle.textContent = 'Edit payment term';
     codeInput.value = btn.getAttribute('data-code') || '';
     document.getElementById('pt-name').value = btn.getAttribute('data-name') || '';
+    document.getElementById('pt-days').value = btn.getAttribute('data-days') || '';
     openModal();
     document.getElementById('pt-name').focus();
   }

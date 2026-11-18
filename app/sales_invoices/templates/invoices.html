@@ -100,7 +100,7 @@
                 </td>
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(i.total_amount) }}
                   {% if tab == 'done' %}<div class="mt-1"><span class="q-chip {{ 'Part' if i.payment_state == 'Part paid' else i.payment_state }}">{{ i.payment_state }}</span></div>
-                  {% if i.outstanding > 0 %}<div class="text-[12px] text-ink-faint font-normal mt-1">₹ {{ '{:,.2f}'.format(i.outstanding) }} due</div>{% endif %}{% endif %}
+                  {% if i.outstanding > 0 %}<div class="text-[12px] text-ink-faint font-normal mt-1">₹ {{ '{:,.2f}'.format(i.outstanding) }} due by {{ i.due_on.strftime('%d %b %Y') }}{% if i.days_overdue(today_date) > 0 %} · <span class="text-stop font-semibold">{{ i.days_overdue(today_date) }} days late</span>{% endif %}</div>{% endif %}{% endif %}
                   {% if tab == 'waiting' %}<div class="mt-1"><span class="q-chip Waiting">Loss ₹{{ '{:,.2f}'.format(i.loss_amount) }}</span></div>{% endif %}</td>
                 <td>
                   {% if tab == 'waiting' %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Receivables aging{% endblock %}
+
+{# Sales S6: Receivables aging. Customer-wise: kitna lena hai aur kitne din late. Row par click = us customer ke invoices dikhte hain. #}
+{% block page_css %}
+<style>
+  .d-table { width: 100%; min-width: 900px; border-collapse: collapse; table-layout: fixed; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 11px 8px; text-align: left; border-bottom: 1px solid #D1D9D8; }
+  .d-table tbody td { padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .d-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .d-table tfoot td { padding: 11px 8px; font-size: 14px; font-weight: 700; background: #EEF2F1; border-top: 2px solid #D1D9D8; }
+  .cust-row { cursor: pointer; }
+  .cust-row:hover { background: #F4F7F6; }
+  .zero { color: #A3B2B1; }
+  .late1 { color: #92400E; font-weight: 600; }
+  .late2 { color: #B45309; font-weight: 700; }
+  .late3 { color: #B91C1C; font-weight: 700; }
+  .detail-row td { background: #FAFBFB; padding: 4px 8px 12px 28px !important; }
+  .inv-table { width: 100%; border-collapse: collapse; }
+  .inv-table th { font-size: 11.5px; text-transform: uppercase; color: #6B7F82; font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid #E2E8E7; }
+  .inv-table td { font-size: 13px; padding: 6px 8px; border-bottom: 1px solid #EEF2F1; }
+  .inv-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .q-chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid; }
+  .q-chip.ok { background: #E7F4EC; color: #166534; border-color: #BFE0CB; }
+  .q-chip.l1 { background: #FEF3C7; color: #92400E; border-color: #F5D98B; }
+  .q-chip.l2 { background: #FFEDD5; color: #B45309; border-color: #F8C896; }
+  .q-chip.l3 { background: #FEE2E2; color: #B91C1C; border-color: #F5B5B5; }
+</style>
+{% endblock %}
+
+{% macro money(v) %}{% if v and v|abs > 0.004 %}{{ '{:,.2f}'.format(v) }}{% else %}<span class="zero">—</span>{% endif %}{% endmacro %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Sales / Receivables</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Receivables aging</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">Who owes us how much, and for how many days past the due date</p>
+        </div>
+        <form method="get" class="flex items-center gap-2">
+          <label for="as-on" class="text-[13px] text-ink-muted">Aging as on</label>
+          <input type="date" id="as-on" name="as_on" value="{{ as_on.isoformat() }}" class="px-2 py-1.5 text-[14px] border border-slate-300 rounded" />
+          <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Show</button>
+          {% if as_on != today %}<a href="{{ url_for('aging.receivables_aging') }}" class="text-[13px] text-copper-text underline">Today</a>{% endif %}
+        </form>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0" id="summary">
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Total receivable</div><div class="text-[20px] font-bold text-ink tabular-nums" id="sum-net">₹ {{ '{:,.2f}'.format(totals.net) }}</div>{% if totals.other %}<div class="text-[11.5px] text-ink-faint" id="sum-other-note">incl. ₹ {{ '{:,.2f}'.format(totals.other) }} not from invoices (opening balance)</div>{% endif %}</div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Not yet due</div><div class="text-[20px] font-bold text-success tabular-nums" id="sum-current">₹ {{ '{:,.2f}'.format(totals.current) }}</div></div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Overdue</div><div class="text-[20px] font-bold text-stop tabular-nums" id="sum-overdue">₹ {{ '{:,.2f}'.format(overdue) }}</div></div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Advance held (on account)</div><div class="text-[20px] font-bold text-ink tabular-nums" id="sum-advance">₹ {{ '{:,.2f}'.format(totals.advance) }}</div></div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="d-table" id="aging-table">
+            <colgroup><col style="width:19%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:11%"><col style="width:12%"><col style="width:12%"></colgroup>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th class="num">Not yet due</th><th class="num">1-30 days</th><th class="num">31-60 days</th><th class="num">61-90 days</th><th class="num">Over 90</th>
+                <th class="num">Unpaid invoices</th><th class="num">Advance (−)</th><th class="num">Other*</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+              <tr class="cust-row" data-c="{{ r.id }}" title="Click to see invoices">
+                <td class="font-semibold text-ink">{{ r.name }}
+                  <div class="text-[12px] font-normal text-ink-faint">Net ₹ {{ '{:,.2f}'.format(r.net) }}{% if r.oldest is not none and r.oldest > 0 %} · oldest {{ r.oldest }} days late{% endif %}</div>
+                </td>
+                <td class="num">{{ money(r.current) }}</td>
+                <td class="num late1">{{ money(r.b1) }}</td>
+                <td class="num late2">{{ money(r.b2) }}</td>
+                <td class="num late3">{{ money(r.b3) }}</td>
+                <td class="num late3">{{ money(r.b4) }}</td>
+                <td class="num font-semibold">{{ money(r.invoices) }}</td>
+                <td class="num">{{ money(r.advance) }}</td>
+                <td class="num">{{ money(r.other) }}</td>
+              </tr>
+              <tr class="detail-row hidden" data-for="{{ r.id }}">
+                <td colspan="9">
+                  {% if r.lines %}
+                  <table class="inv-table">
+                    <thead><tr><th>Invoice</th><th>Invoice date</th><th>Due date</th><th class="num">Total (₹)</th><th class="num">Paid (₹)</th><th class="num">Balance (₹)</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {% for ln in r.lines %}
+                      <tr>
+                        <td class="font-mono font-bold">{{ ln.no }}</td>
+                        <td>{{ ln.date.strftime('%d %b %Y') }}</td>
+                        <td>{{ ln.due.strftime('%d %b %Y') }}</td>
+                        <td class="num">{{ '{:,.2f}'.format(ln.total) }}</td>
+                        <td class="num">{{ '{:,.2f}'.format(ln.paid) }}</td>
+                        <td class="num font-semibold">{{ '{:,.2f}'.format(ln.outstanding) }}</td>
+                        <td>{% if ln.late <= 0 %}<span class="q-chip ok">{% if ln.late == 0 %}Due today{% else %}Due in {{ -ln.late }} days{% endif %}</span>
+                          {% else %}<span class="q-chip {{ 'l1' if ln.late <= 30 else ('l2' if ln.late <= 60 else 'l3') }}">{{ ln.late }} days late</span>{% endif %}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                  {% else %}
+                  <div class="text-[13px] text-ink-faint py-1">No unpaid invoices.</div>
+                  {% endif %}
+                  {% if r.advance %}<div class="text-[12.5px] text-ink-muted mt-2">Advance of ₹ {{ '{:,.2f}'.format(r.advance) }} is held on account — apply it to an invoice from Receipts.</div>{% endif %}
+                  {% if r.other %}<div class="text-[12.5px] text-ink-muted mt-1">* ₹ {{ '{:,.2f}'.format(r.other) }} is in the customer ledger but not from any invoice (for example an opening balance), so it has no due date here.</div>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            {% if rows %}
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td class="num">{{ '{:,.2f}'.format(totals.current) }}</td><td class="num">{{ '{:,.2f}'.format(totals.b1) }}</td><td class="num">{{ '{:,.2f}'.format(totals.b2) }}</td>
+                <td class="num">{{ '{:,.2f}'.format(totals.b3) }}</td><td class="num">{{ '{:,.2f}'.format(totals.b4) }}</td>
+                <td class="num">{{ '{:,.2f}'.format(totals.invoices) }}</td><td class="num">{{ '{:,.2f}'.format(totals.advance) }}</td><td class="num">{{ '{:,.2f}'.format(totals.other) }}</td>
+              </tr>
+            </tfoot>
+            {% endif %}
+          </table>
+          {% if not rows %}
+          <div class="p-12 text-center">
+            <p class="font-semibold text-ink text-[15px]">Nothing to collect</p>
+            <p class="text-[13px] text-ink-faint mt-1">When invoices are posted and not fully paid, they show up here by how late they are.</p>
+          </div>
+          {% endif %}
+        </div>
+        <div class="px-3.5 py-2 border-t border-slate-200 text-[12px] text-ink-faint shrink-0">
+          Net receivable = Unpaid invoices − Advance + Other = the customer's ledger balance. *Other = ledger amount not from an invoice (e.g. opening balance).
+          Due date = invoice date + the payment term's credit days.
+        </div>
+      </div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  // Customer row par click = uske invoices ki detail row khulti / band hoti hai
+  document.querySelectorAll('.cust-row').forEach(function (row) {
+    row.addEventListener('click', function () {
+      var detail = document.querySelector('.detail-row[data-for="' + row.getAttribute('data-c') + '"]');
+      if (detail) detail.classList.toggle('hidden');
+    });
+  });
+</script>
+{% endblock %}

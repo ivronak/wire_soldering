@@ -62,7 +62,7 @@ def invoices_list():
         by_status[key] = SalesInvoice.query.filter_by(status=status, is_deleted=False).order_by(SalesInvoice.id.desc()).all()
     counts = {"todo": len(todo), "waiting": len(by_status["waiting"]), "done": len(by_status["done"]), "cancelled": len(by_status["cancelled"])}
     return render_template("invoices.html", active_nav="invoices", tab=tab, counts=counts, todo=todo, invoices=by_status.get(tab, []),
-                           drawer=drawer_data(todo), today=today_ist().isoformat(), open_q=request.args.get("q", type=int))
+                           drawer=drawer_data(todo), today=today_ist().isoformat(), today_date=today_ist(), open_q=request.args.get("q", type=int))
 
 
 @sales_invoices_bp.route("/invoices/add/<int:quotation_id>", methods=["POST"])

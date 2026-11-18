@@ -7,6 +7,16 @@ from app.extensions import db
 payment_terms_bp = Blueprint("payment_terms", __name__, template_folder="templates")
 
 
+def read_days():
+    # Credit days: khaali = None (due date invoice date par hi). Sirf 0-365 ke poore number allowed
+    raw = (request.form.get('days') or "").strip()
+    if not raw:
+        return None, None
+    if not raw.isdigit() or int(raw) > 365:
+        return None, "Credit days must be a whole number between 0 and 365."
+    return int(raw), None
+
+
 def generate_next_payment_term_code():
     # Auto serial code: last row ka id + 1 => PT-0001, PT-0002 ...
     last_row = PaymentTerm.query.order_by(PaymentTerm.id.desc()).first()
@@ -39,6 +49,10 @@ def payment_terms_add():
 
     if not code or not name:
         return redirect(url_for('payment_terms.payment_terms_list'))
+    days, err = read_days()
+    if err:
+        flash(err, "error")
+        return redirect(url_for('payment_terms.payment_terms_list'))
 
     existing = PaymentTerm.query.filter_by(code=code).first()
     if existing:
@@ -47,6 +61,7 @@ def payment_terms_add():
             existing.is_deleted = False
             existing.code = code
             existing.name = name
+            existing.days = days
             existing.is_active = True
             db.session.commit()
             flash("A Payment term restored with this code.", "success")
@@ -54,7 +69,7 @@ def payment_terms_add():
         flash("A Payment term with this code already exists.", "error")
         return redirect(url_for('payment_terms.payment_terms_list'))
 
-    term = PaymentTerm(code=code, name=name, is_active=True, is_deleted=False)
+    term = PaymentTerm(code=code, name=name, days=days, is_active=True, is_deleted=False)
     db.session.add(term)
     db.session.commit()
     flash("Payment term saved.", "success")
@@ -86,7 +101,13 @@ def payment_terms_edit(pt_id):
     name = (request.form.get('name') or "").strip()
     if not name:
         return redirect(url_for('payment_terms.payment_terms_list'))
+    days, err = read_days()
+    if err:
+        flash(err, "error")
+        return redirect(url_for('payment_terms.payment_terms_list'))
     term.name = name
+    # Naye days sirf aage ke invoices par lagenge; bane hue invoices ki due date freeze rehti hai
+    term.days = days
     db.session.commit()
     flash("Payment term Updated.", "success")
     return redirect(url_for('payment_terms.payment_terms_list'))

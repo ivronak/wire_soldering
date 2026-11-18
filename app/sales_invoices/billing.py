@@ -8,7 +8,7 @@
 #   * Loss gate: kisi line ka (discount ke baad) rate us line ki asli cost se zara bhi kam ho to invoice "Waiting approval" me rukta hai.
 #     Owner approve kare tab hi Posted hota hai (customer ledger me Dr). Abhi login / roles nahi hain, isliye approve ka button sabko dikhta hai.
 #   * Ledger sign rule (project): Cr = plus, Dr = minus. Customer se paisa LENA hai => Dr => current_balance ghatta hai.
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.costing.full_cost import batch_full_cost
 from app.extensions import db
@@ -54,6 +54,13 @@ def next_invoice_no(invoice_date):
     return f"{prefix}{last + 1:03d}"
 
 
+def due_date_for(quotation, invoice_date):
+    # Due date = invoice date + payment terms ke credit days (quotation ke terms, na ho to customer ke). Days set nahi to invoice date par hi due
+    terms = quotation.payment_terms or (quotation.customer.payment_terms if quotation.customer else None)
+    days = terms.days if terms is not None and terms.days is not None else 0
+    return invoice_date + timedelta(days=days)
+
+
 def _post(invoice):
     # Customer ledger me Dr: lena baaki badha => current_balance minus ki taraf
     ledger = invoice.quotation.customer.ledger
@@ -75,7 +82,7 @@ def create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=
     if not totals:
         raise BillingError("The chosen challans have no goods.")
 
-    invoice = SalesInvoice(invoice_no=next_invoice_no(invoice_date), quotation_id=quotation.id, invoice_date=invoice_date,
+    invoice = SalesInvoice(invoice_no=next_invoice_no(invoice_date), quotation_id=quotation.id, invoice_date=invoice_date, due_date=due_date_for(quotation, invoice_date),
                            tax_type="inter" if quotation.is_inter_state else "intra", status="Posted", remarks=remarks)
     db.session.add(invoice)
     db.session.flush()

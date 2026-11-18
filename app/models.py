@@ -922,6 +922,8 @@ class PaymentTerm(CreatedAtMixin, db.Model):
     # Auto serial (Charges / State / Vendor Type jaisa) — route generate karta hai, form se nahi aata
     code = db.Column(db.String(20), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
+    # Credit days (Net 30 = 30). Invoice ki due date = invoice date + days. Khaali = credit nahi diya (invoice date par hi due)
+    days = db.Column(db.Integer, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -2303,6 +2305,8 @@ class SalesInvoice(CreatedAtMixin, db.Model):
     quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=False)
     quotation = db.relationship("Quotation", foreign_keys=[quotation_id], backref=db.backref("invoices", order_by="SalesInvoice.id"))
     invoice_date = db.Column(db.Date, nullable=False)
+    # Paisa kab tak aana chahiye (invoice date + payment terms ke credit days). Bill banate waqt freeze; purane invoices me khaali = invoice date
+    due_date = db.Column(db.Date, nullable=True)
     tax_type = db.Column(db.String(10), nullable=False)                        # "intra" = CGST + SGST, "inter" = IGST (bill ke din ki copy)
     status = db.Column(db.String(20), default="Posted", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
@@ -2327,6 +2331,14 @@ class SalesInvoice(CreatedAtMixin, db.Model):
     @property
     def is_inter_state(self):
         return self.tax_type == "inter"
+
+    @property
+    def due_on(self):
+        return self.due_date or self.invoice_date
+
+    def days_overdue(self, as_on):
+        # as_on tak kitne din late (0 ya kam = abhi due nahi)
+        return (as_on - self.due_on).days
 
     @property
     def paid(self):
