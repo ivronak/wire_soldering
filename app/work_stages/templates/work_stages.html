@@ -121,7 +121,7 @@
                   {% if s.is_batch %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
                   {% if s.is_billet_stage %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="Billets are counted; scrap is worked out">Billets{% if s.billet_weight %} · {{ '%g'|format(s.billet_weight) }} KG{% endif %}</span>{% endif %}
                   {% if s.no_scrap %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="No scrap is recorded at this stage">No scrap</span>{% endif %}
-                  {% if s.counts_pcs %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Counted in pieces (PCS) from this stage; later stages also run in PCS">PCS from here</span>{% endif %}
+                  {% if s.counts_pcs %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Unit conversion: wire comes in as KG, pieces come out. From this stage on everything is counted in PCS; KG is only a reference">Converts KG → PCS</span>{% endif %}
                   {% if s.max_wait_minutes %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="The next stage must start within this time after this stage is done">Next within {{ s.max_wait_minutes }} min</span>{% endif %}
                 </td>
                 <td class="text-[13px] {% if s.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %} tabular-nums">
@@ -277,8 +277,8 @@
       <div>
         <label class="flex items-start gap-2 cursor-pointer">
           <input type="checkbox" id="stage-pcs" name="counts_pcs" value="on" class="mt-1" />
-          <span><span class="block text-[13px] font-semibold text-ink">Counted in pieces (PCS) from this stage</span>
-            <span class="block text-[12px] text-ink-faint">Use it on Spooling: after it the product is spools (pieces), not kilograms. This stage shows the spool count, and the later stages (Testing, Packing) show and take quantities in PCS, with KG only as a reference. Only for products made in PCS.</span></span>
+          <span><span class="block text-[13px] font-semibold text-ink">Unit conversion stage (KG → PCS)</span>
+            <span class="block text-[12px] text-ink-faint">Tick it for a stage where the unit changes: material comes in as KG and pieces come out (Spooling: wire KG in, spools out). This stage shows the piece count, and every later stage (Testing, Packing) counts and takes quantity in PCS only; KG stays just as a reference. Applies only to products made in PCS. Spooling must have this on.</span></span>
         </label>
       </div>
       <div>

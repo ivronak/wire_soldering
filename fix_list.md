@@ -8,7 +8,7 @@ Fix karne se pehle user se confirm karna (CLAUDE.md rule: pehle poocho, guess ma
 1. **Chhote order ke liye poora box lag raha hai.**
    - Kahan: 7 pcs ke balance order me Material issue ne 1 Corrugated Box Medium (25 KG / 50 pcs wala box) issue kiya. Box ka poora cost 7 pcs par chadh gaya.
    - Kya hona chahiye: box ki cost pcs ke hisaab se bante (7/50 box), ya bacha hua box store me wapas jaye. Decision chahiye ki kaunsa tarika.
-2. **Spooling ke baad quantity PCS me honi chahiye, KG me nahi — YEH CODE ME PEHLE SE BANA HAI (C15, 16 Nov), bas master data me tick nahi laga.**
+2. **[FIXED 20 Nov 2026 (user: "tick on-off ka sawal hi nahi, unit conversion stage hona chahiye"), local only, live par deploy baaki; auto-test 63/63 (real forms Spooling -> Testing -> Packing in PCS)] Spooling ke baad quantity PCS me honi chahiye, KG me nahi — YEH CODE ME PEHLE SE BANA HAI (C15, 16 Nov), bas master data me tick nahi laga.**
    - Kahan: Testing & QC aur Packing ke "Complete stage" form me "Came into this stage" aur "Good output" KG me dikhte hain.
    - Asli wajah: Work stages master me Spooling par "Counted in pieces (PCS) from this stage" ka tick (`work_stage.counts_pcs`) 0 hai. Real local `instance/erp.db` aur demo DB dono me 0 mila. Tick lagate hi Spooling form "Spools made (PCS)" maangega aur Testing/Packing PCS me chalenge (demo_changes_2026_11_16.md C15, DEPLOY_READINESS_2026_11_17.md).
    - Kya karna hai: Spooling par tick lagana (aur live deploy ke baad bhi, deploy note me likha hai). Ho sake to migration/seed me default tick bhi daalna, taaki bhoolne par KG wala purana behaviour na chale.
