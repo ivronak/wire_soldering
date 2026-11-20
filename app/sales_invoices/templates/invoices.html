@@ -128,7 +128,7 @@
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
-          <span>Invoice is made on the goods actually dispatched (extra goods are billed too) · charges of a quotation go on its first invoice</span>
+          <span>Invoice is made on the goods actually dispatched (extra goods are billed too) · charges of a quotation are filled in on its first invoice (you can change them)</span>
           <span class="text-ink-muted">Live data</span>
         </div>
       </div>
@@ -158,6 +158,17 @@
           <tbody id="i-lines"></tbody>
         </table>
         <p class="ql-hint">Rate, discount and GST come from the quotation. You can change the rate or discount here.</p>
+      </div>
+      <div>
+        <p class="form-section-title mb-2">Charges <span class="normal-case font-normal text-ink-faint">· after discount, before GST · from the Charges master</span></p>
+        <input type="hidden" name="charge_count" id="charge-count" value="0">
+        <table class="ql-table">
+          <colgroup><col style="width:44%"><col style="width:22%"><col style="width:24%"><col style="width:10%"></colgroup>
+          <thead><tr><th>Charge</th><th class="num">Amount (₹)</th><th>Effect</th><th></th></tr></thead>
+          <tbody id="i-charges"></tbody>
+        </table>
+        <button type="button" id="i-add-charge" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-brand-teal border border-brand-border rounded bg-brand-soft hover:bg-white">+ Add charge</button>
+        <p class="ql-hint">The quotation's charges are filled in on its first invoice. You can change or remove them, or add a new charge.</p>
       </div>
       <div id="i-loss" class="loss-box hidden"></div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -215,11 +226,40 @@
 {% block page_js %}
 <script>
   var DRAWER = {{ drawer|tojson }};
+  var CHARGES = {{ charge_master|tojson }};
+  var chargeCount = 0;
   var OPEN_Q = {{ open_q|tojson }};
   var iModal = document.getElementById('i-modal'), aModal = document.getElementById('a-modal'), xModal = document.getElementById('x-modal');
   var cur = null;
   function fmt(n) { return Math.round(n * 10000) / 10000; }
   function money(n) { return '₹ ' + (Math.round(n * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  // Charges table ki ek row (quotation drawer jaisi): Charges Master se dropdown, amount, Add / Minus, hatane ka button
+  function addChargeRow(ch) {
+    var i = chargeCount++;
+    var tr = document.createElement('tr');
+    var opts = '<option value="">Select charge…</option>' + CHARGES.map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
+    tr.innerHTML =
+      '<td><select class="ql-input c-sel" name="charge_id_' + i + '">' + opts + '</select></td>' +
+      '<td><input class="ql-input num c-amt" type="number" step="any" min="0" name="charge_amount_' + i + '"></td>' +
+      '<td><select class="ql-input c-eff" name="charge_effect_' + i + '"><option value="add">Add (+)</option><option value="minus">Minus (−)</option></select></td>' +
+      '<td class="text-center"><button type="button" class="rm text-stop text-[18px] leading-none px-1" title="Remove this charge">&times;</button></td>';
+    document.getElementById('i-charges').appendChild(tr);
+    document.getElementById('charge-count').value = chargeCount;
+    if (ch) { tr.querySelector('.c-sel').value = ch.charge_id; tr.querySelector('.c-amt').value = ch.amount; tr.querySelector('.c-eff').value = ch.effect; }
+    tr.querySelectorAll('input,select').forEach(function (el) { el.addEventListener('input', recalc); el.addEventListener('change', recalc); });
+    tr.querySelector('.rm').addEventListener('click', function () { tr.remove(); recalc(); });
+  }
+  // Abhi screen par jo charges hain unki list (naam, amount, effect) — totals / GST ke liye
+  function chargeRows() {
+    var out = [];
+    document.querySelectorAll('#i-charges tr').forEach(function (tr) {
+      var sel = tr.querySelector('.c-sel'), amt = parseFloat(tr.querySelector('.c-amt').value) || 0;
+      if (!sel.value || amt <= 0) return;
+      out.push({ name: sel.options[sel.selectedIndex].text, amount: amt, effect: tr.querySelector('.c-eff').value });
+    });
+    return out;
+  }
 
   // Chune hue challans se har line ki qty, phir amount / GST / total / loss
   function recalc() {
@@ -239,11 +279,15 @@
       document.getElementById('row_' + l.line_id).style.opacity = q ? 1 : 0.4;
       if (q) { rows.push({ net: net, gst: l.gst }); itemsNet += net; gross += g; if (l.cost > 0 && Math.round(l.cost * 100) / 100 > Math.round(rate * (1 - disc / 100) * 100) / 100) lossRows.push(l.product); }
     });
+    var charges = chargeRows(), chargesNet = 0;
+    charges.forEach(function (c) { chargesNet += (c.effect === 'minus' ? -c.amount : c.amount); });
+    chargesNet = Math.round(chargesNet * 100) / 100;
     var tax = 0;
-    rows.forEach(function (r) { var share = itemsNet ? cur.charges_net * r.net / itemsNet : 0; tax += (r.net + share) * r.gst / 100; });
-    var total = itemsNet + cur.charges_net + tax;
+    // Charge items ke value-anupaat me lines me baanta hai, phir har line ke rate se GST (purana rule, F9)
+    rows.forEach(function (r) { var share = itemsNet ? chargesNet * r.net / itemsNet : 0; tax += (r.net + share) * r.gst / 100; });
+    var total = itemsNet + chargesNet + tax;
     var html = '<div class="flex justify-between"><span>Items (after discount)</span><b>' + money(itemsNet) + '</b></div>';
-    cur.charges.forEach(function (c) { html += '<div class="flex justify-between"><span>' + c.name + '</span><b>' + (c.effect === 'minus' ? '− ' : '+ ') + money(c.amount) + '</b></div>'; });
+    charges.forEach(function (c) { html += '<div class="flex justify-between"><span>' + c.name + '</span><b>' + (c.effect === 'minus' ? '− ' : '+ ') + money(c.amount) + '</b></div>'; });
     html += '<div class="flex justify-between"><span>' + (cur.inter ? 'IGST' : 'CGST + SGST') + '</span><b>' + money(tax) + '</b></div>' +
       '<div class="flex justify-between text-[15px] pt-1 border-t border-slate-200"><span class="font-semibold">Total</span><b>' + money(total) + '</b></div>';
     document.getElementById('i-totals').innerHTML = html;
@@ -275,10 +319,14 @@
       tr.querySelectorAll('input').forEach(function (inp) { inp.addEventListener('input', recalc); });
       body.appendChild(tr);
     });
+    // Charges: pehle table khaali, phir quotation ke charges (agar pehla invoice hai) bharo
+    document.getElementById('i-charges').innerHTML = ''; chargeCount = 0; document.getElementById('charge-count').value = 0;
+    cur.charges.forEach(function (c) { addChargeRow(c); });
     recalc();
     iModal.classList.remove('hidden'); iModal.setAttribute('aria-hidden', 'false');
   }
   function closeAll() { iModal.classList.add('hidden'); aModal.classList.add('hidden'); xModal.classList.add('hidden'); }
+  document.getElementById('i-add-charge').addEventListener('click', function () { addChargeRow(null); });
   document.querySelectorAll('.btn-invoice').forEach(function (b) { b.addEventListener('click', function () { openInvoice(b.getAttribute('data-q')); }); });
   ['i-close', 'i-cancel', 'i-backdrop', 'a-close', 'a-backdrop', 'x-close', 'x-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeAll); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });

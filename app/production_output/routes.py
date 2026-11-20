@@ -5,11 +5,12 @@ from datetime import date, datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
-from app.costing.fixed import apply_fixed_cost
+from app.costing.fixed import apply_fixed_cost, restate_day
 from app.extensions import db
 from app.inventory.posting import InventoryError
 from app.models import FGBatch, Product, ProductCategories, ProductionOrder, ProductionOutput, Rack
 from app.production_orders.scheduler import persist_schedule, renumber_queue
+from app.production_orders.source import customer_qty_of
 from app.production_orders.yield_info import short_info
 from app.production_output.posting import cancel_output, fg_warehouse_for, leftover_message, leftover_rows, material_table, packed_lines, post_output, wip_lines
 from app.routing.pcs import kg_per_piece, pcs_start_stage
@@ -69,7 +70,7 @@ def output_plan(order):
     return {
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": unit, "packed": packed, "counted_from_packing": counted is not None, "unit_weight": weight,
-        "planned": order.planned_qty, "extra_percent": order.extra_percent or 0, "good": good, "scrap": scrap, "scrap_kg": scrap_kg, "loss": loss, "rework": 0,
+        "planned": order.planned_qty, "customer_qty": customer_qty_of(order), "extra_percent": order.extra_percent or 0, "good": good, "scrap": scrap, "scrap_kg": scrap_kg, "loss": loss, "rework": 0,
         "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
@@ -129,8 +130,8 @@ def _read_form():
         return None, "Enter the good quantity (it must be more than zero)."
     if rework < 0 or scrap < 0 or loss < 0:
         return None, "Rework, scrap and process loss cannot be negative."
-    # C18: "Make extra for scrap" wale order me material (aur isliye total output) ordered se extra % zyada ho sakta hai; us par 10% ki chhoot
-    allowed = order.planned_qty * (1 + (order.extra_percent or 0) / 100) * OVER_TOLERANCE
+    # planned_qty me extra pieces pehle se judi hain (Extra %), isliye yahan dobara % nahi jodte; sirf 10% ki chhoot
+    allowed = order.planned_qty * OVER_TOLERANCE
     if good + rework + scrap + loss > allowed + 0.00005:
         return None, f"Good + rework + scrap + loss ({good + rework + scrap + loss:g}) is more than 10% above the quantity planned ({allowed / OVER_TOLERANCE:g}). Check the numbers."
     if not wip_lines(order):
@@ -204,6 +205,8 @@ def production_output_cancel(output_id):
         flash(str(stock_error), "error")
         return redirect(_list_url("recorded"))
     output.status = "Cancelled"
+    db.session.flush()
+    restate_day(output.output_date)          # us din ke bache hue Approx output ab din ka poora kharcha baantenge (cancel hue output ka hissa unhe milta hai)
     order = output.production_order
     order.status = "In production"
     order.queue_position = None

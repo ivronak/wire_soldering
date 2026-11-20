@@ -11,6 +11,7 @@ from app.production_orders.planning import WEEKLY_OFF
 
 from app.production_lines.status import line_board
 from app.production_orders.routes import bundle_counts, progress_info, resched_data
+from app.production_orders.source import source_map
 from app.production_orders.scheduler import live_schedule, persist_schedule, today_ist
 from app.production_planning.day_plan import machine_rows, plan_day
 from app.production_orders.stage_material import later_stage_gaps
@@ -19,9 +20,10 @@ production_planning_bp = Blueprint("production_planning", __name__, template_fol
 
 
 def draft_split(queue):
-    # Queue ke Draft orders: (planning baaki, plan pakka — release ke liye tayyar)
+    # Queue ke Draft orders: (review / planning baaki, plan pakka — release ke liye tayyar). Review baaki wala order bhi pehle tab me (reviewed ke bina plan_confirmed nahi ho sakta)
     drafts = [o for o in queue if o.status == "Draft"]
-    return [o for o in drafts if not o.plan_confirmed], [o for o in drafts if o.plan_confirmed]
+    needs = [o for o in drafts if not o.reviewed or not o.plan_confirmed]
+    return needs, [o for o in drafts if o not in needs]
 
 
 @production_planning_bp.route("/production_planning")
@@ -58,6 +60,8 @@ def production_planning_page():
         issue_gaps={o.id: later_stage_gaps(o) for o in shown if o.status in ("Released", "In production")},
         # Plan / Reschedule drawer ka data aur Start ke liye lines ki live status
         resched=resched_data(shown), line_board=line_board(today),
+        # fix_list #12: har order kis quotation ke liye hai ya in-house stock ke liye (+ extra qty jo stock me jayegi)
+        sources=source_map(shown),
     )
 
 

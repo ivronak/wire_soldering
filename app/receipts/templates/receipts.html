@@ -95,6 +95,7 @@
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.amount) }}</td>
                 <td>
                   {% if tab == 'done' %}
+                  <a href="{{ url_for('receipts.receipts_print', receipt_id=r.id) }}" target="_blank" class="inline-block mb-1 px-3 py-1.5 text-[13px] font-semibold text-copper-text bg-white border border-copper-border rounded hover:bg-copper-soft">Print</a>
                   {% if r.on_account > 0.004 and alloc_data.get(r.id) and alloc_data[r.id].invoices %}<button type="button" class="btn-apply px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-id="{{ r.id }}">Apply to invoices</button>{% endif %}
                   <button type="button" class="btn-cancel-r mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ r.id }}" data-no="{{ r.receipt_no }}">Cancel</button>
                   {% endif %}

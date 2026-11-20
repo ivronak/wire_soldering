@@ -16,7 +16,7 @@
     <div class="supplier">
       <span class="lbl">Product</span>
       <strong>{{ order.product.name if order.product else '—' }}</strong>
-      <p>{{ order.product.code if order.product else '' }} · {{ '%g'|format(order.planned_qty) }} {{ unit }} ordered</p>
+      <p>{{ order.product.code if order.product else '' }} · {{ '%g'|format(order.planned_qty) }} {{ unit }} planned</p>
       {% if order.product and order.product.attributes %}
       <div class="chips" style="margin-top:6px">{% for k, v in order.product.attributes.items() %}<span><b>{{ k }}</b><i>{{ v }}</i></span>{% endfor %}</div>
       {% endif %}

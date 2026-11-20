@@ -17,7 +17,7 @@
     <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="f-title" class="text-[16px] font-bold text-ink">Finalize {{ q.quote_no }}</h2>
-        <p class="text-[12.5px] text-ink-faint">Customer has confirmed the order (PO number is optional). Saving creates the production {{ 'orders' if q.lines|length > 1 else 'order' }} (Draft, needs planning).</p>
+        <p class="text-[12.5px] text-ink-faint">Customer has confirmed the order (PO number is optional). Saving creates a production {{ 'order' if q.lines|length == 1 else 'order for each product you choose to make' }} (Draft, the planner decides the quantity). A product already in stock can be sent from stock instead.</p>
       </div>
       <button type="button" id="f-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -46,14 +46,21 @@
       <div>
         <p class="form-section-title mb-2">Final rate and quantity <span class="normal-case font-normal text-ink-faint">· as per the customer's PO</span></p>
         <table class="ql-table">
-          <colgroup><col style="width:38%"><col style="width:18%"><col style="width:18%"><col style="width:26%"></colgroup>
-          <thead><tr><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th class="num">Amount (₹)</th></tr></thead>
+          <colgroup><col style="width:28%"><col style="width:14%"><col style="width:14%"><col style="width:20%"><col style="width:24%"></colgroup>
+          <thead><tr><th>Product</th><th class="num">Quantity</th><th class="num">Rate (₹)</th><th>Goods come from</th><th class="num">Amount (₹)</th></tr></thead>
           <tbody>
             {% for line in q.lines %}
-            <tr class="f-row" data-disc="{{ line.discount_percent }}" data-cost="{{ line_costs.get(line.id, 0) }}" data-name="{{ line.product.name }}">
+            <tr class="f-row" data-disc="{{ line.discount_percent }}" data-cost="{{ line_costs.get(line.id, 0) }}" data-name="{{ line.product.name }}" data-stock="{{ free_stock.get(line.id, 0) }}">
               <td><b>{{ line.product.name }}</b><div class="ql-hint">{{ line.product.code }} · quoted {{ '{:,.2f}'.format(line.rate) }}{% if line.discount_percent %} less {{ '%g'|format(line.discount_percent) }}%{% endif %}</div></td>
               <td><input class="ql-input num f-qty" type="number" step="any" min="0" name="qty_{{ line.id }}" value="{{ line.qty }}" required><div class="ql-hint">in {{ line.product.base_unit.code if line.product.base_unit else '' }}</div></td>
               <td><input class="ql-input num f-rate" type="number" step="any" min="0" name="rate_{{ line.id }}" value="{{ line.rate }}" required><div class="ql-hint f-warn" style="color:#B42318;font-weight:600"></div></td>
+              <td>
+                <select class="ql-input f-source" name="source_{{ line.id }}">
+                  <option value="make">Make (production order)</option>
+                  <option value="stock" {% if free_stock.get(line.id, 0) <= 0 %}disabled{% endif %}>In-house stock · {{ '%g'|format(free_stock.get(line.id, 0)) }} available</option>
+                </select>
+                <div class="ql-hint f-src-warn" style="color:#B42318;font-weight:600"></div>
+              </td>
               <td class="num pt-3 tabular-nums f-amt">0.00</td>
             </tr>
             {% endfor %}
@@ -89,7 +96,7 @@
 
     <div class="px-4 py-3 border-t border-slate-200 bg-mist flex items-center justify-end gap-2 shrink-0">
       <button type="button" id="f-cancel" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Cancel</button>
-      <button type="submit" form="f-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Finalize and create production {{ 'orders' if q.lines|length > 1 else 'order' }}</button>
+      <button type="submit" form="f-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Finalize order</button>
     </div>
   </div>
 </div>
@@ -106,6 +113,9 @@
         var q = parseFloat(tr.querySelector('.f-qty').value) || 0, r = parseFloat(tr.querySelector('.f-rate').value) || 0, d = parseFloat(tr.getAttribute('data-disc')) || 0;
         var g = r2(q * r), net = r2(g - r2(g * d / 100));
         tr.querySelector('.f-amt').textContent = money(net); total += net;
+        // "In-house stock" chuna ho to quantity stock se zyada na ho
+        var src = tr.querySelector('.f-source'), sw = tr.querySelector('.f-src-warn'), stock = parseFloat(tr.getAttribute('data-stock')) || 0;
+        sw.textContent = (src.value === 'stock' && q > stock + 0.00005) ? ('Only ' + stock + ' in stock') : '';
         // Rate (discount ke baad) product ki sabse nayi poori cost se kam ho to chetavni
         var cost = parseFloat(tr.getAttribute('data-cost')) || 0, unit = r2(r * (1 - d / 100)), w = tr.querySelector('.f-warn');
         if (cost > 0 && r > 0 && cost > unit) { w.textContent = 'Below cost ₹ ' + cost; loss.push(tr.getAttribute('data-name')); } else { w.textContent = ''; }
@@ -116,6 +126,7 @@
       document.getElementById('f-items').textContent = money(r2(total));
     }
     document.querySelectorAll('.f-qty, .f-rate').forEach(function (el) { el.addEventListener('input', recalcF); });
+    document.querySelectorAll('.f-source').forEach(function (el) { el.addEventListener('change', recalcF); });
     var open = document.getElementById('btn-finalize'); if (open) open.addEventListener('click', openF);
     ['f-close', 'f-cancel', 'f-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeF); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeF(); });

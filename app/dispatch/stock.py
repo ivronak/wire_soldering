@@ -5,6 +5,8 @@
 #   * Har batch kisi production order ka hota hai. Wo order kisi Ordered quotation line se juda ho to us line ke "pending" tak ka maal us line ke liye RESERVED hai
 #     (usi party ka). Bacha hua maal FREE (Own stock) hai — kisi bhi line ko extra diya ja sakta hai.
 #   * Dispatch par pehle line ke apne order ka maal (purana batch pehle), phir free stock (purana batch pehle).
+#   * (fix_list #13) User batch bhi chun sakta hai: apna order ka maal, in-house / extra (free) stock, ya KISI DOOSRI quotation ke order ka reserved maal
+#     (sirf reason likhne par — "borrowed"). Donor quotation ka reserved ghat jata hai, wahan "maal kam" apne aap dikhta hai (reserved = min(pending, balance)).
 #   * Cancel = ulti rows; kabhi UPDATE / DELETE nahi.
 from sqlalchemy import func
 
@@ -105,25 +107,86 @@ def next_challan_no(challan_date):
     return f"{prefix}{last + 1:03d}"
 
 
-def create_challan(quotation, challan_date, wanted, transporter=None, vehicle_no=None, notes=None):
-    """wanted = {quotation_line: qty}. Challan + lines + FG stock ki DISPATCH rows. Kuch kam ho to DispatchError (caller rollback karta hai)."""
+def split_pick(line, row, qty):
+    """Ek batch se qty maal is line ko dene par kis bucket se kitna: [(kind, qty, donor_quotation_id)].
+    Pehle line ke apne order ka reserved (own), phir free / extra, phir (agar batch kisi doosri quotation ke order ka hai) uska reserved (borrowed)."""
+    owner = row["owner"]
+    mine = owner is not None and (owner.id == line.id or owner.quotation_id == line.quotation_id)
+    parts = []
+    rest = q4(qty)
+    if mine and row["reserved"] > 0.00005:
+        take = min(rest, row["reserved"])
+        parts.append(("own", q4(take), None))
+        rest = q4(rest - take)
+    if rest > 0.00005 and row["free"] > 0.00005:
+        take = min(rest, row["free"])
+        parts.append(("free", q4(take), None))
+        rest = q4(rest - take)
+    if rest > 0.00005:
+        if owner is not None and not mine and rest <= row["reserved"] + 0.00005:
+            parts.append(("borrowed", rest, owner.quotation_id))
+        else:
+            raise DispatchError(f"Batch {row['batch'].batch_no}: only {row['balance']:g} is in stock.")
+    return parts
+
+
+def create_challan(quotation, challan_date, wanted, transporter=None, vehicle_no=None, notes=None, picks=None, borrow_reason=None):
+    """wanted = {quotation_line: qty} (auto: apna order pehle, phir free stock). picks = {quotation_line: [(batch_id, qty)]} (user ne batch chune).
+    Doosri quotation ka maal lena ho to borrow_reason zaroori. Challan + lines + FG stock ki DISPATCH rows. Kuch kam ho to DispatchError (caller rollback karta hai)."""
+    picks = picks or {}
+    reason = (borrow_reason or "").strip()[:255]
     challan = DeliveryChallan(challan_no=next_challan_no(challan_date), quotation_id=quotation.id, challan_date=challan_date,
                               transporter=transporter, vehicle_no=vehicle_no, notes=notes, status="Dispatched")
     db.session.add(challan)
     db.session.flush()
     for line, qty in wanted.items():
-        view = batch_view(line.product_id)                 # har line se pehle taaza (pichhli line ne stock nikala ho sakta hai)
-        for batch, take, from_own in allocate(line, qty, view):
-            balance, value = batch.balance
-            cost_value = value_for_out(balance, value, take)
-            warehouse = batch_warehouse(batch)
-            db.session.add(FGMovement(batch_id=batch.id, warehouse_id=warehouse.id, movement_date=challan_date, movement_type="DISPATCH", qty=-take,
-                                      value=-cost_value, ref_type="DC", ref_id=challan.id, ref_no=challan.challan_no,
-                                      note=f"Dispatched to {quotation.customer.name}"[:255]))
-            db.session.add(DeliveryChallanLine(challan_id=challan.id, quotation_line_id=line.id, batch_id=batch.id, qty=take,
-                                               unit_cost=round(cost_value / take, 4) if take else 0, from_own_order=from_own))
-            db.session.flush()
+        for batch, take, from_own in allocate(line, qty, batch_view(line.product_id)):      # har line se pehle taaza view
+            _post(challan, quotation, challan_date, (line, batch, take, "own" if from_own else "free", None), reason)
+    for line, picked in picks.items():
+        pend0 = pending_qty(line)                          # is challan se pehle ka pending (neeche lines flush hone par ghat jayega)
+        own_free = borrowed = 0.0
+        for batch_id, qty in picked:
+            row = next((r for r in batch_view(line.product_id) if r["batch"].id == batch_id), None)
+            if row is None:
+                raise DispatchError(f"{line.product.name}: the chosen batch has no stock left.")
+            for kind, part_qty, donor in split_pick(line, row, qty):
+                if kind == "borrowed":
+                    borrowed += part_qty
+                else:
+                    own_free += part_qty
+                _post(challan, quotation, challan_date, (line, row["batch"], part_qty, kind, donor), reason)
+        if borrowed > 0.00005:
+            if len(reason) < 3:
+                raise DispatchError("Write the reason for using another quotation's goods.")
+            if borrowed > max(pend0 - own_free, 0) + 0.00005:
+                raise DispatchError(f"{line.product.name}: goods of another quotation can cover only what is still pending ({max(pend0 - own_free, 0):g}).")
     return challan
+
+
+def _post(challan, quotation, challan_date, item, reason):
+    # Ek (line, batch, qty, kind) ki FG DISPATCH movement + challan line
+    line, batch, take, kind, donor = item
+    balance, value = batch.balance
+    if take > balance + 0.00005:
+        raise DispatchError(f"Batch {batch.batch_no}: only {balance:g} is in stock.")
+    cost_value = value_for_out(balance, value, take)
+    warehouse = batch_warehouse(batch)
+    db.session.add(FGMovement(batch_id=batch.id, warehouse_id=warehouse.id, movement_date=challan_date, movement_type="DISPATCH", qty=-take,
+                              value=-cost_value, ref_type="DC", ref_id=challan.id, ref_no=challan.challan_no,
+                              note=f"Dispatched to {quotation.customer.name}"[:255]))
+    db.session.add(DeliveryChallanLine(challan_id=challan.id, quotation_line_id=line.id, batch_id=batch.id, qty=take,
+                                       unit_cost=round(cost_value / take, 4) if take else 0, from_own_order=(kind == "own"), source_kind=kind,
+                                       borrowed_from_quotation_id=donor, borrow_reason=reason if kind == "borrowed" else None))
+    db.session.flush()
+
+
+def lent_out(quotation):
+    """Is quotation ke order ka jo maal doosri quotations ko diya gaya (challan Dispatched): [{borrower, product, qty, reason, challan_no}]"""
+    rows = (DeliveryChallanLine.query.join(DeliveryChallan, DeliveryChallan.id == DeliveryChallanLine.challan_id)
+            .filter(DeliveryChallanLine.borrowed_from_quotation_id == quotation.id, DeliveryChallan.status == "Dispatched", DeliveryChallan.is_deleted == False)
+            .order_by(DeliveryChallanLine.id).all())
+    return [{"borrower": r.challan.quotation.quote_no, "product": r.quotation_line.product.name, "qty": r.qty, "reason": r.borrow_reason, "challan_no": r.challan.challan_no}
+            for r in rows]
 
 
 def cancel_challan(challan, reason):

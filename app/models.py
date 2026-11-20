@@ -213,6 +213,11 @@ class Product(CreatedAtMixin, db.Model):
     # Order form me ye box nahi aata: qty x unit_weight = KG seedha is se banta hai. Khaali = KG wala product.
     unit_weight = db.Column(db.Float, nullable=True)
 
+    # "Extra % (extra pieces)": is product ka order banta hai to customer qty se itna % zyada PIECES bante hain (planned_qty = customer qty x (1 + extra%)).
+    # Scrap / wastage ka cushion ye nahi hai — wo material-wise Spare % se aata hai. Product me ek baar set hota hai (default); Production order form,
+    # Finalize aur review me yahi value bhari aati hai, order banate waqt badal sakte hain. 0 = extra nahi. (Column ka naam purana hai: scrap_extra_percent.)
+    scrap_extra_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)
+
     # In-house semi-finished product (jaise Flux): iska output FG me nahi, is Raw Material ke stock me jaata hai, taaki dusre product ki recipe me
     # wo material ban ke issue ho (client meeting 2, #9). Khaali = normal product (output FG me).
     output_rm_id = db.Column(db.Integer, db.ForeignKey("raw_materials.id"), nullable=True)
@@ -807,9 +812,13 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
 
-    # C18: "Make extra for scrap?" — Yes ho to metal (recipe lines) ordered qty se extra_percent % zyada issue hota hai taaki scrap ke baad bhi ordered qty bane.
-    # 0 = No. Order ki planned_qty badalti nahi (customer ne jitna manga wahi); sirf material zyada lagta hai.
+    # Extra pieces %: planned_qty (jo banana hai) = customer qty x (1 + extra_percent/100), upar round. Recipe / packing is planned_qty se nikalti hai,
+    # isliye extra pieces ka metal apne aap judta hai. Scrap ka cushion alag hai (material-wise Spare %). 0 = extra nahi.
+    # (Purane orders me ye C18 "metal for scrap" tha — wo purane orders jaise hain, migration unhe badalta nahi.)
     extra_percent = db.Column(db.Float, default=0, server_default="0", nullable=False)
+    # Review: Sales Finalize se bana Draft order "Needs review" (False) hota hai — Production order form me kis ke liye / extra pieces / spare % / dates
+    # dekh ke "Confirm order" dabane par True. False tak Plan aur Release band. Form se bane aur purane orders True.
+    reviewed = db.Column(db.Boolean, default=True, server_default="1", nullable=False)
     # C18: order complete hone par good qty ordered se kam ho to user ka faisla: "Cover from stock" / "Balance order" / "Closed as is" (+ note).
     short_action = db.Column(db.String(20), nullable=True)
     short_note = db.Column(db.String(255), nullable=True)
@@ -2293,6 +2302,12 @@ class DeliveryChallanLine(CreatedAtMixin, db.Model):
     qty = db.Column(db.Float, nullable=False)
     unit_cost = db.Column(db.Float, default=0, nullable=False)
     from_own_order = db.Column(db.Boolean, default=True, nullable=False)       # False = free (Own) stock se nikala gaya extra
+    # fix_list #13: maal kahan se aaya — "own" (is quotation ke order ka), "free" (in-house / extra stock), "borrowed" (kisi doosri quotation ke order ka maal,
+    # reason ke saath). Borrowed me donor quotation yaad rehta hai taaki us quotation par "maal kam / udhaar diya" dikha sakein.
+    source_kind = db.Column(db.String(10), default="own", nullable=False)
+    borrowed_from_quotation_id = db.Column(db.Integer, db.ForeignKey("quotations.id"), nullable=True)
+    borrowed_from_quotation = db.relationship("Quotation", foreign_keys=[borrowed_from_quotation_id])
+    borrow_reason = db.Column(db.String(255), nullable=True)
 
 
 class SalesInvoice(CreatedAtMixin, db.Model):

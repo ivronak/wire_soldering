@@ -143,9 +143,9 @@
       </div>
 
       <div style="min-width:0">
-        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}{% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="po-chip bnd" title="Show only the orders of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.reviewed %}<span class="po-chip warn"><i></i>Needs review</span>{% elif o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}{% set src = sources.get(o.id) %}{% if src and src.kind == 'quotation' %}<span class="po-chip bnd" title="This order is made for this quotation"><i></i>For {{ src.quote_no }}</span>{% else %}<span class="po-chip bnd" title="Made for stock, not for a customer order"><i></i>In-house stock</span>{% endif %}{% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="po-chip bnd" title="Show only the orders of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
         <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
-        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}{% if o.extra_percent %} · +{{ '%g'|format(o.extra_percent) }}% metal for scrap{% endif %}{% if o.balance_for %} · balance of {{ o.balance_for.prod_no }}{% endif %}</div>
+        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if src and src.extra %} · customer needs {{ '%g'|format(src.customer_qty) }}, extra {{ '%g'|format(src.extra) }} goes to stock{% endif %} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}{% if o.balance_for %} · balance of {{ o.balance_for.prod_no }}{% endif %}</div>
       </div>
 
       <div class="po-scol">
@@ -194,7 +194,9 @@
         {# C1: Plan, Release, Make first, Reschedule, Start, Material issue sab Production planning page par. Yahan: Print, planning par jaane ka link aur Draft ka Cancel. #}
         {% if o.status != 'Cancelled' %}
         <a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank" class="po-btn ghost sm">Print order</a>
-        {% if o.status in ('Draft', 'Released') %}
+        {% if o.status == 'Draft' and not o.reviewed %}
+        <a href="{{ url_for('production_orders.production_orders_list', review=o.id) }}" class="po-btn primary sm" title="Check the order (quantity, extra pieces, spare %) and confirm it">Review order</a>
+        {% elif o.status in ('Draft', 'Released') %}
         <a href="{{ url_for('production_planning.production_planning_page', tab=('queue' if o.status == 'Released' else ('ready' if o.plan_confirmed else 'needs'))) }}" class="po-btn ghost sm" title="Plan, release, start and reorder orders on the Production planning page">Planning &rarr;</a>
         {% endif %}
         {% if o.status in ('Draft', 'In production') %}
@@ -367,13 +369,14 @@
     <div class="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
       <div>
         <h2 id="mo-title" class="text-[17px] font-bold text-ink">New production order</h2>
-        <p class="text-[12.5px] text-ink-faint">Pick the product and set the quantity. The order joins the end of the queue.</p>
+        <p id="mo-sub" class="text-[12.5px] text-ink-faint">Pick the product and set the quantity. The order joins the end of the queue.</p>
       </div>
       <button type="button" id="btn-close-mo" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
     <form id="mo-form" method="post" action="{{ url_for('production_orders.production_orders_add') }}" class="flex-1 overflow-y-auto">
       {# Bundle (client meeting 2, #5): ek party ke order me kai products — har product ka apna order, sab ek bundle number se jude. #}
       <input type="hidden" id="mo-bundle" name="bundle_no" value="" />
+      <input type="hidden" id="mo-next" name="next" value="" />
       <div id="mo-bundle-banner" class="hidden mx-4 mt-4 rounded-lg px-3 py-2 text-[13px] text-ink" style="background:#E8F1F1;border:1px solid #BCD6D7"></div>
       <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div class="space-y-4 min-w-0">
@@ -403,7 +406,20 @@
           </section>
 
           <section class="po-step">
-            <div class="po-step-h"><span class="po-step-n">2</span><div><h3>Quantity and dates</h3><p>How much to make, and the dates the queue should respect.</p></div></div>
+            <div class="po-step-h"><span class="po-step-n">2</span><div><h3>Made for, quantity and dates</h3><p>Who this order is for, how much to make, and the dates the queue should respect.</p></div></div>
+            {# Made for: Against quotation (customer ki qty us quotation se, extra pieces ho sakte hain) ya Stock order (bina quotation, apne stock ke liye). #}
+            <div id="mo-madefor" class="rounded-lg border border-slate-200 px-3 py-2.5 mb-3">
+              <span class="po-label">Made for *</span>
+              <div id="mo-mf-radios" class="flex flex-wrap gap-x-6 gap-y-1 mt-1 text-[13.5px]">
+                <label class="inline-flex items-center gap-1.5"><input type="radio" name="made_for" value="quotation" id="mo-mf-qt" /> Against quotation</label>
+                <label class="inline-flex items-center gap-1.5"><input type="radio" name="made_for" value="stock" id="mo-mf-stock" checked /> Stock order (no quotation)</label>
+              </div>
+              <div id="mo-qt-box" class="hidden mt-2">
+                <label for="mo-qt-line" class="po-label">Quotation *</label>
+                <select id="mo-qt-line" name="quotation_line_id" class="po-input bg-white max-w-sm" disabled></select>
+              </div>
+              <p id="mo-mf-note" class="text-[12px] text-ink-faint mt-1.5">Stock order: the whole quantity goes to finished goods stock for any customer.</p>
+            </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label id="mo-qty-label" for="mo-qty" class="po-label">Quantity to make *</label>
@@ -431,14 +447,14 @@
               {# Total KG = PCS x kg per PCS — qty ya weight badalte hi live badalta hai (refreshPlan) #}
               <p id="mo-weight-total" class="text-[13px] font-semibold text-ink mt-2"></p>
             </div>
-            {# C18: scrap ke baad bhi ordered qty bane, isliye metal extra. No = sirf ordered qty ka material. #}
-            <div id="mo-extra-wrap" class="rounded-lg border border-slate-200 px-3 py-2.5 mt-3">
-              <span class="po-label">Make extra for scrap?</span>
+            {# Extra pieces (sirf quotation order me): customer qty se Extra % zyada pieces bante hain, extra FG stock me jaate hain. Scrap ka cushion = Spare % (neeche material table). #}
+            <div id="mo-extra-wrap" class="hidden rounded-lg border border-slate-200 px-3 py-2.5 mt-3">
+              <span class="po-label">Make extra pieces?</span>
               <div class="flex gap-5 mt-1 text-[13.5px]">
                 <label class="inline-flex items-center gap-1.5"><input type="radio" name="make_extra" value="0" id="mo-extra-no" checked /> No</label>
                 <label class="inline-flex items-center gap-1.5"><input type="radio" name="make_extra" value="1" id="mo-extra-yes" /> Yes</label>
               </div>
-              <p class="text-[11.5px] text-ink-faint mt-1">Some metal is always lost as scrap. Yes = melt a little more, so the good quantity still reaches what was ordered.</p>
+              <p class="text-[11.5px] text-ink-faint mt-1">Yes = make more pieces than the customer asked for. The extra pieces go to finished goods stock. For scrap and wastage use the Spare % of each material below, not this.</p>
               <div id="mo-extra-box" class="hidden mt-2">
                 <label for="mo-extra-pct" class="po-label">Extra % *</label>
                 <input type="number" id="mo-extra-pct" name="extra_percent" min="0.1" max="50" step="0.1" placeholder="e.g. 5" class="po-input max-w-xs" disabled />
@@ -501,7 +517,7 @@
     </form>
     <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel-mo" class="po-btn ghost">Cancel</button>
-      <button type="submit" form="mo-form" name="add_another" value="1" class="po-btn ghost" style="padding:8px 16px" title="Save this item and open the form again for the next product of the same party order">Save &amp; add another item</button>
+      <button type="submit" form="mo-form" id="mo-add-another" name="add_another" value="1" class="po-btn ghost" style="padding:8px 16px" title="Save this item and open the form again for the next product of the same party order">Save &amp; add another item</button>
       <button type="submit" form="mo-form" id="mo-save" class="po-btn primary" style="padding:8px 20px">Save to queue</button>
     </div>
   </div>
@@ -727,11 +743,12 @@
     clearTimeout(expectedTimer);
     el.className = 'text-[13px] text-ink-faint';
     el.textContent = 'Working it out…';
+    if (REVIEW) { el.textContent = 'Final dates come from the queue after planning.'; return; }      // review me ye order khud queue me hai, preview do baar ginta
     expectedTimer = setTimeout(function () {
       var seq = ++expectedSeq;
       var body = new URLSearchParams();
       body.set('product_id', product.id);
-      body.set('planned_qty', qtyInput.value || '0');
+      body.set('planned_qty', plannedQty(parseFloat(qtyInput.value) || 0, product));      // extra pieces samet
       body.set('unit_weight', weightInput.value || '');
       body.set('start_date', startInput.value || '');
       fetch('{{ url_for("production_orders.production_orders_expected") }}', { method: 'POST', body: body, headers: { 'Accept': 'application/json' } })
@@ -757,7 +774,8 @@
     refreshExpected(product);
     document.getElementById('sum-product').textContent = product.name;
     document.getElementById('sum-code').textContent = product.code;
-    document.getElementById('sum-qty').textContent = (parseFloat(qtyInput.value) || 0) + ' ' + (product.unit || 'KG') + (product.unit && product.unit.toUpperCase() !== 'KG' ? ' (' + batchKg.toFixed(2) + ' KG)' : '');
+    var baseQ = parseFloat(qtyInput.value) || 0, plannedQ = plannedQty(baseQ, product);
+    document.getElementById('sum-qty').textContent = plannedQ + ' ' + (product.unit || 'KG') + (plannedQ !== baseQ ? ' (customer ' + baseQ + ' + extra ' + Math.round((plannedQ - baseQ) * 100) / 100 + ')' : '') + (product.unit && product.unit.toUpperCase() !== 'KG' ? ' · ' + batchKg.toFixed(2) + ' KG' : '');
     var plan = mainPlan.plan;
     var ready = plan && plan.stages.length && plan.stages.every(function (r) { return r.perHour > 0; });
     document.getElementById('sum-time').innerHTML = ready
@@ -766,7 +784,7 @@
     document.getElementById('sum-perday').innerHTML = ready ? '<strong>' + plan.dailyCapacity + ' KG</strong> per day' : '—';
     document.getElementById('sum-slow').textContent = ready ? plan.bottleneck : '—';
     var lines = product.recipe || [];
-    var short = lines.filter(function (l) { return batchKg * (l.ratio || 0) / 100 * extraFactor() - (STORE[String(l.rm_id)] || 0) > 0.0001; });
+    var short = lines.filter(function (l) { return batchKg * (l.ratio || 0) / 100 - (STORE[String(l.rm_id)] || 0) > 0.0001; });
     document.getElementById('sum-material').innerHTML = !lines.length
       ? '<span class="text-ink-faint">No recipe</span>'
       : (short.length
@@ -791,12 +809,14 @@
     var bnBanner = document.getElementById('mo-bundle-banner');
     bnBanner.classList.toggle('hidden', !bundle);
     if (bundle) bnBanner.innerHTML = 'Bundle <b class="font-mono">' + bundle.bundle_no + '</b> — this is item ' + bundle.next_item + ' of the same party order. Date, needed-by and remarks are copied from item 1.';
+    setReviewMode(null);
     document.getElementById('mo-save').textContent = bundle ? 'Save item & finish' : 'Save to queue';
     if (lineSel) lineSel.value = '';
     mainPlan.reset('Select a product to see its stages.');
     categorySel.value = '';
     fillProducts();
     clearExtraLines();
+    setMadeFor('stock');
     setExtraMode(false);
     document.getElementById('mo-balance').value = '';
     document.getElementById('mo-balance-banner').classList.add('hidden');
@@ -816,20 +836,55 @@
     });
   });
 
-  // ---------- C18: "Make extra for scrap?" ----------
+  // ---------- Made for (Against quotation / Stock order) + Make extra pieces? ----------
+  var REVIEW = null;                      // review mode me order ka data (Finalize se bana "Needs review" order), warna null
+  var mfQt = document.getElementById('mo-mf-qt'), mfStock = document.getElementById('mo-mf-stock');
+  var qtBox = document.getElementById('mo-qt-box'), qtSel = document.getElementById('mo-qt-line'), mfNote = document.getElementById('mo-mf-note');
+  var extraWrap = document.getElementById('mo-extra-wrap');
   var extraYes = document.getElementById('mo-extra-yes');
   var extraNo = document.getElementById('mo-extra-no');
   var extraPctInput = document.getElementById('mo-extra-pct');
-  function extraPct() { return extraYes.checked ? (parseFloat(extraPctInput.value) || 0) : 0; }
-  function extraFactor() { return 1 + extraPct() / 100; }
-  function syncExtra(product, qty, unitName) {
-    // Hint: is product ke pichhle 3 completed orders ka average loss. Note: "200 PCS order, material for 210 PCS"
-    var hint = document.getElementById('mo-extra-hint'), note = document.getElementById('mo-extra-note');
-    hint.textContent = product && product.loss_hint
-      ? 'Last ' + product.loss_hint.orders + ' order' + (product.loss_hint.orders === 1 ? '' : 's') + ' of this product: avg ' + product.loss_hint.pct + '% lost.'
-      : (product ? 'No finished order of this product yet, so enter your own estimate (for example 5).' : '');
+  function isQuotation() { return mfQt.checked; }
+  function extraPct() { return isQuotation() && extraYes.checked ? (parseFloat(extraPctInput.value) || 0) : 0; }
+  // Banane wali qty = base x (1 + extra%): pieces me upar round, KG me 2 decimal (server me bhi yahi hisaab: extra.py)
+  function plannedQty(base, product) {
     var pct = extraPct();
-    note.textContent = pct > 0 && qty > 0 ? qty + ' ' + unitName + ' ordered, material for ' + (Math.round(qty * (1 + pct / 100) * 100) / 100) + ' ' + unitName : '';
+    if (!pct) return base;
+    var raw = base * (1 + pct / 100);
+    return product && product.is_kg ? Math.round(parseFloat((raw * 100).toFixed(6))) / 100 : Math.ceil(Math.round(raw * 1e6) / 1e6);      // half-up, server (extra.py) jaisa
+  }
+  function fillQtLines() {
+    // Chune hue product ki Ordered quotation lines jinka abhi koi production order nahi (sirf QT number dikhta hai, party ka naam nahi)
+    var product = byId[productSel.value], lines = product ? (product.qt_lines || []) : [];
+    qtSel.innerHTML = '<option value="">' + (lines.length ? 'Select quotation' : 'No quotation is waiting for this product') + '</option>' +
+      lines.map(function (l) { return '<option value="' + l.line_id + '">' + esc(l.quote_no) + ' · ' + l.qty + ' ' + esc(product.unit || '') + '</option>'; }).join('');
+    if (lines.length === 1) qtSel.value = String(lines[0].line_id);
+  }
+  function syncQtQty() {
+    // Quotation chuni to qty = customer ki qty (badal nahi sakte); extra pieces sirf Extra % se
+    var product = byId[productSel.value], line = null;
+    if (product) (product.qt_lines || []).forEach(function (l) { if (String(l.line_id) === qtSel.value) line = l; });
+    if (REVIEW && REVIEW.kind === 'quotation') { qtyInput.value = REVIEW.base_qty; qtyInput.readOnly = true; return; }
+    if (isQuotation() && line) { qtyInput.value = line.qty; qtyInput.readOnly = true; }
+    else if (!REVIEW) { qtyInput.readOnly = false; }
+  }
+  function setMadeFor(kind) {
+    mfQt.checked = kind === 'quotation'; mfStock.checked = kind !== 'quotation';
+    qtBox.classList.toggle('hidden', kind !== 'quotation' || !!REVIEW);
+    qtSel.disabled = kind !== 'quotation' || !!REVIEW;
+    extraWrap.classList.toggle('hidden', kind !== 'quotation');
+    mfNote.textContent = kind === 'quotation'
+      ? 'Against quotation: the customer quantity comes from the quotation. You can make some extra pieces, which go to stock.'
+      : 'Stock order: the whole quantity goes to finished goods stock for any customer.';
+    if (kind === 'quotation') { fillQtLines(); }
+    else { qtyInput.readOnly = !!REVIEW && REVIEW.kind === 'quotation'; setExtraMode(false); }
+    syncQtQty();
+  }
+  function syncExtra(product, base, unitName) {
+    var hint = document.getElementById('mo-extra-hint'), note = document.getElementById('mo-extra-note');
+    hint.textContent = product ? 'Product master default: ' + (product.master_extra || 0) + '%. You can change it for this order.' : '';
+    var pct = extraPct();
+    note.textContent = pct > 0 && base > 0 ? base + ' ' + unitName + ' for the customer + ' + Math.round((plannedQty(base, product) - base) * 100) / 100 + ' extra = ' + plannedQty(base, product) + ' ' + unitName + ' to make' : '';
   }
   function setExtraMode(on, prefill) {
     extraYes.checked = on; extraNo.checked = !on;
@@ -837,16 +892,72 @@
     extraPctInput.disabled = !on;            // No ho to form ke saath jaata hi nahi
     if (on && !extraPctInput.value) {
       var product = byId[productSel.value];
-      extraPctInput.value = prefill || (product && product.loss_hint && product.loss_hint.pct > 0 ? product.loss_hint.pct : '');
+      extraPctInput.value = prefill || (product && product.master_extra > 0 ? product.master_extra : '');
     }
     if (!on) extraPctInput.value = '';
   }
+  mfQt.addEventListener('change', function () { setMadeFor('quotation'); var p = byId[productSel.value]; if (p && p.master_extra > 0 && qtSel.value) setExtraMode(true); refreshPlan(); });
+  mfStock.addEventListener('change', function () { setMadeFor('stock'); refreshPlan(); });
+  qtSel.addEventListener('change', function () { syncQtQty(); var p = byId[productSel.value]; if (p && p.master_extra > 0 && qtSel.value && !extraYes.checked) setExtraMode(true); refreshPlan(); });
+  productSel.addEventListener('change', function () { if (!REVIEW) { fillQtLines(); syncQtQty(); } });
   extraYes.addEventListener('change', function () { setExtraMode(true); refreshPlan(); });
   extraNo.addEventListener('change', function () { setExtraMode(false); refreshPlan(); });
   extraPctInput.addEventListener('input', refreshPlan);
 
+  // Review mode: Finalize se bana order isi form me khulta hai. Product / kis ke liye / order date yahan nahi badalte; baaki sab dekh ke "Confirm order".
+  function setReviewMode(ctx) {
+    REVIEW = ctx;
+    var form = document.getElementById('mo-form');
+    form.action = ctx ? '/production_orders/review/' + ctx.order_id : '{{ url_for("production_orders.production_orders_add") }}';
+    document.getElementById('mo-next').value = ctx ? (ctx.next || '') : '';
+    document.getElementById('mo-title').textContent = ctx ? 'Review production order ' + ctx.prod_no : 'New production order';
+    document.getElementById('mo-sub').textContent = ctx ? 'This order came from Sales Finalize. Check the quantity, extra pieces, spare % and dates, then confirm it. After that it can be planned.' : 'Pick the product and set the quantity. The order joins the end of the queue.';
+    document.getElementById('mo-add-another').classList.toggle('hidden', !!ctx);
+    document.getElementById('mo-mf-radios').classList.toggle('hidden', !!ctx);
+    categorySel.disabled = !!ctx; document.getElementById('mo-date').disabled = !!ctx;
+    productSel.style.pointerEvents = ctx ? 'none' : '';
+    if (ctx) document.getElementById('mo-save').textContent = 'Confirm order';
+  }
+  function openReview(ctx) {
+    openModal(null);
+    setReviewMode(ctx);
+    categorySel.value = String(ctx.category_id);
+    fillProducts();
+    var p = byId[String(ctx.product_id)];
+    if (!p) { showToast('The product of this order is not available (inactive). Turn it on in the Product master first.', 'error'); closeModal(); return; }
+    setProductChoices([p], 'Select product');          // attribute cascade chhod kar wahi product
+    productSel.disabled = false; productSel.value = String(p.id);
+    document.getElementById('mo-cascade-wrap').classList.add('hidden');
+    document.getElementById('mo-date').value = ctx.order_date;
+    startInput.value = ctx.start; document.getElementById('mo-needed').value = ctx.needed_by;
+    document.getElementById('mo-remarks').value = ctx.remarks;
+    document.getElementById('mo-bundle').value = '';
+    ALLOW = {}; Object.keys(ctx.spare).forEach(function (k) { ALLOW[k] = ctx.spare[k]; });
+    var isQt = ctx.kind === 'quotation';
+    setMadeFor(isQt ? 'quotation' : 'stock');
+    document.getElementById('mo-mf-radios').classList.add('hidden');
+    mfNote.textContent = isQt ? 'Made for quotation ' + ctx.quote_no + '. The customer quantity is fixed by the quotation.' : 'Stock order: the whole quantity goes to finished goods stock.';
+    qtyInput.value = ctx.base_qty; qtyInput.readOnly = isQt;
+    if (isQt && ctx.extra_percent > 0) { setExtraMode(true, ctx.extra_percent); extraPctInput.value = ctx.extra_percent; }
+    clearExtraLines();
+    ctx.others.forEach(function (o) {
+      addExtraLine();
+      var row = extraBody.querySelector('tr.extra-row:last-child');
+      row.querySelector('.extra-rm').value = String(o.rm_id);
+      row.querySelector('.extra-rm').dispatchEvent(new Event('change'));
+      row.querySelector('input[name="extra_qty[]"]').value = o.qty;
+    });
+    refreshPlan();
+  }
+
+  var lastProductId = '';
   function refreshPlan() {
     var product = byId[productSel.value];
+    // Product kisi bhi tarah badle (cascade / category / programmatic — 'change' event nahi aata), to is product ki quotation list aur spare % naye sire se
+    if (productSel.value !== lastProductId) {
+      lastProductId = productSel.value;
+      if (!REVIEW) { ALLOW = {}; fillQtLines(); syncQtQty(); }
+    }
     renderAttrs(product);
     if (!product) {
       mainPlan.reset('Select a product to see its stages.');
@@ -873,17 +984,17 @@
       weightNote.textContent = 'This product is in ' + unitName + ', not kilograms. The recipe is calculated in KG, so enter how many kilograms are in one ' + unitName + ' (or set it once in the Product master).';
       weightLabel.textContent = 'Kilograms in one ' + unitName + ' *';
     }
-    var qty = parseFloat(qtyInput.value) || 0;
+    var baseQty = parseFloat(qtyInput.value) || 0;
+    var qty = plannedQty(baseQty, product);          // banane wali qty (extra pieces samet) — material isi se
     var weight = isKg ? 1 : (parseFloat(weightInput.value) || 0);
     var batchKg = qty * weight;
     if (!isKg) weightTotal.textContent = qty + ' ' + unitName + ' × ' + weight + ' KG = ' + batchKg.toFixed(2) + ' KG in total';
     mainPlan.sync(product.id, product.routing || [], null, batchKg, null, lineSel ? lineSel.value : undefined);
-    syncExtra(product, qty, unitName);
-    var xf = extraFactor();
+    syncExtra(product, baseQty, unitName);
     summary.textContent = isKg
       ? 'Making ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.'
       : (qty + ' ' + unitName + ' × ' + weight + ' KG each = ' + batchKg.toFixed(2) + ' KG. Materials below are for this weight.');
-    if (xf > 1) summary.textContent += ' Metal and flux include ' + extraPct() + '% extra for scrap.';
+    if (qty !== baseQty) summary.textContent += ' Includes ' + Math.round((qty - baseQty) * 100) / 100 + ' extra pieces (' + extraPct() + '%).';
     if (!product.recipe.length) {
       linesBody.innerHTML = '<tr><td colspan="5" class="text-ink-faint">This product has no recipe.</td></tr>';
       renderSide(product, batchKg);
@@ -891,7 +1002,7 @@
     }
     linesBody.innerHTML = product.recipe.map(function (line) {
       if (ALLOW[line.rm_id] === undefined) ALLOW[line.rm_id] = line.spare || 0;          // Product Master ka Spare % pehle se bhara
-      var need = batchKg * (line.ratio || 0) / 100 * xf;      // C18: extra % sirf metal / flux par
+      var need = batchKg * (line.ratio || 0) / 100;
       var have = STORE[String(line.rm_id)] || 0;
       var short = need - have;
       var status = short <= 0.0001
@@ -986,10 +1097,23 @@
   })();
   {% endif %}
 
+  // Finalize se bane order ka review (?review=<order id>): form review mode me khulta hai, "Confirm order" par save
+  {% if review_ctx %}openReview({{ review_ctx | tojson }});{% endif %}
+
   document.getElementById('mo-form').addEventListener('submit', function (event) {
     if (!productSel.value) {
       event.preventDefault();
       showToast('Choose the product first: pick the category and then every attribute.', 'error');
+      return;
+    }
+    if (!REVIEW && isQuotation() && !qtSel.value) {
+      event.preventDefault();
+      showToast('Choose the quotation this order is made for, or switch to Stock order.', 'error');
+      return;
+    }
+    if (extraYes.checked && isQuotation() && !(parseFloat(extraPctInput.value) > 0)) {
+      event.preventDefault();
+      showToast('Enter the Extra % or choose No for extra pieces.', 'error');
       return;
     }
 

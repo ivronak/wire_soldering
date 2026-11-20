@@ -4,6 +4,8 @@
 # - Mahina shuru: Estimated amount (FixedCostPeriod, effective_from tareekh se). Output record hote waqt wahi rate batch par FREEZE (Approx).
 # - Mahine ke end me Final amount: final per KG = final amount / mahine ka total good KG; us mahine ke batch ek baar Approx -> Final.
 # - Purane batch ki cost kisi aur wajah se kabhi nahi badalti (naya period sirf aage ki tareekhon par lagta hai).
+# - Same din ke kai output (fix_list #9): din ka kharcha ek hi baar baantna hai. Naya output aane (ya cancel hone) par us din ke saare 'Approx' output ek hi
+#   common per-KG rate par restate hote hain (restate_day) — 'Final' wale kabhi nahi chhue jaate.
 from datetime import date
 
 from app.extensions import db
@@ -68,6 +70,28 @@ def apply_fixed_cost(output):
     output.fixed_cost_per_kg = round(per_kg, 4)
     output.fixed_cost_total = round(per_kg * kg, 2)
     output.fixed_cost_basis = basis
+    if basis == "Approx":
+        restate_day(day)          # us din ke pehle wale Approx output bhi ab din ke total KG ke hisaab se (din ka kharcha do baar nahi lagta)
+
+
+def restate_day(day):
+    """Is din ke saare 'Approx' output ko ek hi common per-KG rate par lao: din ka kharcha / din ka total good KG (fix_list #9, 20 Nov 2026).
+    Pehle sirf naya output hissa leta tha aur purana pura din ka kharcha rakhta tha -> din ka total kharcha se zyada. Ab output record ya cancel hone par
+    us din ke Approx output dobara baante jaate hain. Final (mahina finalise) aur jo output us waqt bina fixed cost ke bane (basis khaali) — unhe nahi badalte."""
+    if FixedCostMonth.query.filter_by(month_start=month_start(day)).first():
+        return
+    period = period_for(day)
+    if not period or not period.working_days:
+        return
+    outputs = [o for o in posted_outputs(day, date.fromordinal(day.toordinal() + 1)) if costed_kg(o) > 0]
+    day_kg = sum(costed_kg(o) for o in outputs)
+    if day_kg <= 0:
+        return
+    per_kg = (period.monthly_amount / period.working_days) / day_kg
+    for o in outputs:
+        if o.fixed_cost_basis == "Approx":
+            o.fixed_cost_per_kg = round(per_kg, 4)
+            o.fixed_cost_total = round(per_kg * costed_kg(o), 2)
 
 
 def finalize_month(start, final_amount):

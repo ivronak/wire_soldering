@@ -4,7 +4,8 @@
 # Rules (memory.md S4 decision):
 #   * Invoice challan(on) ke dispatched maal par banta hai — order ki qty par nahi (extra bheja to extra ka bhi bill).
 #   * Rate / discount / GST quotation line se aate hain; invoice par rate / discount badal sakte hain.
-#   * Charges (Shipping...) sirf us quotation ke PEHLE invoice par aate hain, baad ke invoices par nahi.
+#   * Charges (Shipping...) quotation se bhare hue sirf us quotation ke PEHLE invoice par aate hain, baad ke invoices par khaali.
+#     Dono jagah user drawer me charge badal / hata sakta hai aur naya (Charges Master se) jod sakta hai — quotation / purchase invoice jaisa.
 #   * Loss gate: kisi line ka (discount ke baad) rate us line ki asli cost se zara bhi kam ho to invoice "Waiting approval" me rukta hai.
 #     Owner approve kare tab hi Posted hota hai (customer ledger me Dr). Abhi login / roles nahi hain, isliye approve ka button sabko dikhta hai.
 #   * Ledger sign rule (project): Cr = plus, Dr = minus. Customer se paisa LENA hai => Dr => current_balance ghatta hai.
@@ -68,8 +69,10 @@ def _post(invoice):
     invoice.status = "Posted"
 
 
-def create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=None):
+def create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=None, charges=None):
     """challans = chune hue (bill nahi bane) challan. rates / discounts = {quotation_line_id: float} (na ho to quotation wali).
+    charges = [{"charge_id", "amount", "effect"}] jo user ne invoice drawer me rakhe (badle / hataye / naye). None = user ne kuch nahi bheja,
+    to purana default: quotation ke charges sirf pehle invoice par. Khaali list [] = user ne saare charges hata diye.
     Invoice + lines + charges banata hai, totals aur loss nikalta hai. Loss ho to 'Waiting approval', warna seedha Posted. Galti par BillingError."""
     if not challans:
         raise BillingError("Choose at least one challan to bill.")
@@ -99,10 +102,14 @@ def create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=
         db.session.add(SalesInvoiceLine(invoice_id=invoice.id, quotation_line_id=qline.id, qty=round(totals[qline]["qty"], 4), rate=rate,
                                         discount_percent=discount, tax_rate_id=qline.tax_rate_id, unit_cost=totals[qline]["cost"]))
 
-    # Charges: quotation ke charges sirf pehle (abhi tak koi active invoice nahi) invoice par
-    if not active_invoices_before(quotation, invoice):
-        for row in quotation.charge_lines:
-            db.session.add(SalesInvoiceCharge(invoice_id=invoice.id, charge_id=row.charge_id, amount=row.amount, effect=row.effect))
+    # Charges: user ne drawer se jo bheja wahi lagta hai (quotation se bhare hue ko badal / hata / naya jod sakta hai).
+    # Kuch nahi bheja (charges=None) to purana rule: quotation ke charges sirf pehle (abhi tak koi active invoice nahi) invoice par
+    if charges is None:
+        charges = []
+        if not active_invoices_before(quotation, invoice):
+            charges = [{"charge_id": row.charge_id, "amount": row.amount, "effect": row.effect} for row in quotation.charge_lines]
+    for spec in charges:
+        db.session.add(SalesInvoiceCharge(invoice_id=invoice.id, charge_id=spec["charge_id"], amount=spec["amount"], effect=spec["effect"]))
     db.session.flush()
     db.session.refresh(invoice)
 

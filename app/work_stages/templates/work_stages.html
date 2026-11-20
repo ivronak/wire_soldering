@@ -269,9 +269,9 @@
       </div>
       <div>
         <label class="flex items-start gap-2 cursor-pointer">
-          <input type="checkbox" id="stage-noscrap" name="no_scrap" value="on" class="mt-1" />
-          <span><span class="block text-[13px] font-semibold text-ink">No scrap at this stage</span>
-            <span class="block text-[12px] text-ink-faint">Use it on Extrusion and Wire Drawing: once the billet is made there is no scrap, only the hours. The scrap box is not shown when the stage is completed.</span></span>
+          <input type="checkbox" id="stage-scrapok" name="scrap_ok" value="on" class="mt-1" checked />
+          <span><span class="block text-[13px] font-semibold text-ink">Scrap can be recorded at this stage</span>
+            <span class="block text-[12px] text-ink-faint">On for every stage by default. Untick it only for a stage where nothing is ever wasted (then the scrap box is not shown when the stage is completed). A stage that counts billets always works out its own scrap.</span></span>
         </label>
       </div>
       <div>
@@ -360,16 +360,15 @@
   var addAction = "{{ url_for('work_stages.work_stages_add') }}";
   var modalTitle = document.getElementById('modal-title');
 
-  // "Count billets" tick ho tabhi billet weight ka box dikhta hai (aur tab "No scrap" nahi lagta)
+  // "Count billets" tick ho tabhi billet weight ka box dikhta hai; billet stage ka scrap apne aap nikalta hai, isliye "Scrap can be recorded" tab fixed on rehta hai
   function syncBilletBox() {
     var on = document.getElementById('stage-billet').checked;
     document.getElementById('stage-billet-weight-box').classList.toggle('hidden', !on);
-    if (on) document.getElementById('stage-noscrap').checked = false;
+    var scrapOk = document.getElementById('stage-scrapok');
+    if (on) scrapOk.checked = true;
+    scrapOk.disabled = on;
   }
   document.getElementById('stage-billet').addEventListener('change', syncBilletBox);
-  document.getElementById('stage-noscrap').addEventListener('change', function () {
-    if (this.checked) { document.getElementById('stage-billet').checked = false; syncBilletBox(); }
-  });
 
   function openModal() {
     modal.classList.remove('hidden');
@@ -407,7 +406,7 @@
     document.getElementById('stage-scraplater').checked = btn.getAttribute('data-scraplater') === '1';
     document.getElementById('stage-billet').checked = btn.getAttribute('data-billet') === '1';
     document.getElementById('stage-billet-weight').value = btn.getAttribute('data-billetweight') || '';
-    document.getElementById('stage-noscrap').checked = btn.getAttribute('data-noscrap') === '1';
+    document.getElementById('stage-scrapok').checked = btn.getAttribute('data-noscrap') !== '1';
     document.getElementById('stage-pcs').checked = btn.getAttribute('data-pcs') === '1';
     document.getElementById('stage-maxwait').value = btn.getAttribute('data-maxwait') || '';
     syncBilletBox();

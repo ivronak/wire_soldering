@@ -99,7 +99,7 @@
                 <td class="num">{{ '%g'|format(line.discount_percent) }}</td>
                 <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
                 <td class="num font-semibold">{{ '{:,.2f}'.format(line.net_value) }}</td>
-                {% if q.status == 'Ordered' %}<td class="num">{{ '%g'|format(sent_qty[line.id]) }}</td><td>{% if line.production_order %}<a class="font-mono text-[13px] font-bold text-copper-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a> <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}—{% endif %}</td>{% endif %}
+                {% if q.status == 'Ordered' %}<td class="num">{{ '%g'|format(sent_qty[line.id]) }}</td><td>{% if line.production_order %}<a class="font-mono text-[13px] font-bold text-copper-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a> <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if line.production_order.status == 'Draft' and not line.production_order.reviewed %} · needs review{% elif not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}<span class="text-[12px] font-semibold text-copper-text">From stock</span>{% endif %}</td>{% endif %}
               </tr>
               {% endfor %}
             </tbody>

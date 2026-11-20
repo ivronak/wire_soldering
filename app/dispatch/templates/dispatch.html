@@ -23,6 +23,14 @@
   .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
   .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
   .ql-hint { font-size: 11.5px; color: #6B7F82; margin-top: 2px; }
+  .pick-box { background: #F8FAF9; border: 1px solid #D1D9D8; border-radius: 6px; padding: 8px 10px; margin: 2px 0 8px; }
+  .pick-box table { width: 100%; border-collapse: collapse; }
+  .pick-box th { font-size: 11.5px; font-weight: 600; text-transform: uppercase; color: #3D5A5D; text-align: left; padding: 4px 4px; }
+  .pick-box td { padding: 4px 4px; font-size: 13px; border-top: 1px solid #E2E8E7; vertical-align: middle; }
+  .src-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid; }
+  .src-chip.own { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
+  .src-chip.free { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .src-chip.kept { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
 </style>
 {% endblock %}
 
@@ -68,6 +76,7 @@
                     {% if l.prod_no %}<div class="text-[12px] text-ink-faint">Production {{ l.prod_no }} · {{ l.prod_status }}</div>{% endif %}
                   </div>
                   {% endfor %}
+                  {% for x in r.lent %}<div class="text-[12px] text-stop mt-1">{{ '%g'|format(x.qty) }} {{ x.product }} of this order's goods went to {{ x.borrower }} ({{ x.challan_no }}{% if x.reason %} · {{ x.reason }}{% endif %}) — shows as short here.</div>{% endfor %}
                 </td>
                 <td>
                   {% if r.any_ready %}
@@ -102,7 +111,7 @@
                 <td>
                   {% for l in c.lines %}
                   <div class="text-[13.5px]"><b>{{ l.quotation_line.product.name }}</b> — {{ '%g'|format(l.qty) }} {{ l.batch.unit_code }}
-                    <span class="text-ink-faint text-[12px]">{{ l.batch.batch_no }}{% if not l.from_own_order %} · <span class="font-semibold text-copper-text">Extra stock</span>{% endif %}</span></div>
+                    <span class="text-ink-faint text-[12px]">{{ l.batch.batch_no }}{% if l.source_kind == 'borrowed' %} · <span class="font-semibold text-stop">Goods of {{ l.borrowed_from_quotation.quote_no }}</span>{% if l.borrow_reason %} <span class="text-ink-faint">({{ l.borrow_reason }})</span>{% endif %}{% elif not l.from_own_order %} · <span class="font-semibold text-copper-text">Extra stock</span>{% endif %}</span></div>
                   {% endfor %}
                 </td>
                 <td class="text-[13px] text-ink-muted">{% if tab == 'done' %}{{ c.vehicle_no or '—' }}{% if c.transporter %}<div class="text-[12px] text-ink-faint">{{ c.transporter }}</div>{% endif %}{% else %}{{ c.cancel_reason }}{% endif %}</td>
@@ -124,7 +133,7 @@
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
-          <span>Goods are taken from this order's own stock first, then from extra stock (stock not kept for any order)</span>
+          <span>By default goods come from this order's own stock first, then extra stock. Choose batches to send from another batch or another quotation's stock</span>
           <span class="text-ink-muted">Live data</span>
         </div>
       </div>
@@ -149,7 +158,7 @@
           <thead><tr><th>Product</th><th class="num">Ordered</th><th class="num">Sent</th><th class="num">Ready</th><th class="num">Send now</th></tr></thead>
           <tbody id="d-lines"></tbody>
         </table>
-        <p class="ql-hint">Default is the pending balance. Send less for a partial dispatch. More than pending is possible only from extra stock (stock not kept for any order). Extra goods are billed on the invoice like the rest.</p>
+        <p class="ql-hint">Default is the pending balance. Send less for a partial dispatch. More than pending is possible only from extra stock (stock not kept for any order). Extra goods are billed on the invoice like the rest. Use "Choose batches" to pick the batch yourself, even goods kept for another quotation (a reason is needed).</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
@@ -164,8 +173,13 @@
           <label for="vehicle_no" class="block text-[12.5px] font-semibold text-ink mb-1">Vehicle number</label>
           <input class="ql-input" type="text" name="vehicle_no" id="vehicle_no" maxlength="20" placeholder="GJ 02 AB 1234">
         </div>
+        <div class="md:col-span-3 hidden" id="borrow-wrap">
+          <label for="borrow_reason" class="block text-[12.5px] font-semibold text-stop mb-1">Why are goods of another quotation used? *</label>
+          <input class="ql-input" type="text" name="borrow_reason" id="borrow_reason" maxlength="255" minlength="3">
+          <p class="ql-hint">That quotation will show short by this quantity until more goods are made.</p>
+        </div>
         <div class="md:col-span-3">
-          <label for="notes" class="block text-[12.5px] font-semibold text-ink mb-1">Note</label>
+          <label for="notes"class="block text-[12.5px] font-semibold text-ink mb-1">Note</label>
           <input class="ql-input" type="text" name="notes" id="notes" maxlength="255">
         </div>
       </div>
@@ -213,10 +227,52 @@
       tr.innerHTML = '<td><b>' + l.product + '</b><div class="ql-hint">' + l.code + (l.prod_no ? ' · ' + l.prod_no + ' ' + l.prod_status : '') + '</div></td>' +
         '<td class="num pt-3">' + fmt(l.ordered) + ' ' + l.unit + '</td><td class="num pt-3">' + fmt(l.dispatched) + '</td>' +
         '<td class="num pt-3">' + fmt(l.available) + '<div class="ql-hint">' + fmt(l.own) + ' order + ' + fmt(l.free) + ' extra</div></td>' +
-        '<td><input class="ql-input num" type="number" step="any" min="0" max="' + fmt(l.available) + '" name="qty_' + l.line_id + '" value="' + (def > 0 ? fmt(def) : '') + '" ' + (l.available > 0 ? '' : 'disabled') + '></td>';
+        '<td><input class="ql-input num" type="number" step="any" min="0" max="' + fmt(l.available) + '" name="qty_' + l.line_id + '" value="' + (def > 0 ? fmt(def) : '') + '" ' + (l.available > 0 ? '' : 'disabled') + '>' +
+        (l.batches.length ? '<a href="#" class="pick-toggle text-[12px] text-copper-text font-semibold hover:underline">Choose batches</a>' : '') +
+        '<input type="hidden" name="mode_' + l.line_id + '" value="auto"></td>';
       body.appendChild(tr);
+      if (!l.batches.length) return;
+      var box = document.createElement('tr'); box.className = 'hidden';
+      var rows = l.batches.map(function (b) {
+        var chip = b.kept_for ? '<span class="src-chip kept">Kept for ' + b.kept_for + '</span>' : (b.mine ? '<span class="src-chip own">' + b.label + '</span>' : '<span class="src-chip free">' + b.label + '</span>');
+        var note = b.borrow_max > 0 ? '<div class="ql-hint">' + fmt(b.free_ok) + ' free · ' + fmt(b.borrow_max) + ' kept (reason needed)</div>' : '';
+        return '<tr><td><span class="font-mono text-[12px]">' + b.batch_no + '</span>' + (b.prod_no ? '<div class="ql-hint">' + b.prod_no + '</div>' : '') + '</td><td>' + chip + note + '</td>' +
+          '<td class="num">' + fmt(b.balance) + '</td><td><input class="ql-input num pick-in" type="number" step="any" min="0" max="' + fmt(b.balance) + '" name="pick_' + l.line_id + '_' + b.batch_id +
+          '" data-borrow-from="' + (b.borrow_max > 0 ? b.free_ok : '') + '"></td></tr>';
+      }).join('');
+      box.innerHTML = '<td colspan="5"><div class="pick-box"><table><thead><tr><th style="width:24%">Batch</th><th style="width:38%">Made for</th><th class="num" style="width:16%">In stock</th><th style="width:22%">Send from this</th></tr></thead><tbody>' + rows + '</tbody></table></div></td>';
+      body.appendChild(box);
+      var qtyIn = tr.querySelector('input[name="qty_' + l.line_id + '"]'), mode = tr.querySelector('input[name="mode_' + l.line_id + '"]');
+      tr.querySelector('.pick-toggle').addEventListener('click', function (e) {
+        e.preventDefault();
+        var open = box.classList.toggle('hidden') === false;
+        if (!open) {
+          mode.value = 'auto'; qtyIn.disabled = !(l.available > 0); qtyIn.value = def > 0 ? fmt(def) : '';
+          box.querySelectorAll('.pick-in').forEach(function (i) { i.value = ''; });
+          syncBorrow();
+        }
+      });
+      box.querySelectorAll('.pick-in').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+          mode.value = 'pick'; qtyIn.disabled = true;        // total sirf dikhane ke liye (batch qty ka jod); server pick_ values se kaam karta hai
+          var t = 0; box.querySelectorAll('.pick-in').forEach(function (i) { t += Number(i.value) || 0; });
+          qtyIn.value = t ? fmt(t) : '';
+          syncBorrow();
+        });
+      });
     });
+    syncBorrow();
     dModal.classList.remove('hidden'); dModal.setAttribute('aria-hidden', 'false');
+  }
+  // Reason ka box tabhi dikhao jab kisi batch se "free" se zyada (yani doosri quotation ka kept maal) liya ja raha ho
+  function syncBorrow() {
+    var need = false;
+    document.querySelectorAll('.pick-in').forEach(function (i) {
+      var freeOk = i.getAttribute('data-borrow-from');
+      if (freeOk !== '' && (Number(i.value) || 0) > Number(freeOk) + 0.00005) need = true;
+    });
+    document.getElementById('borrow-wrap').classList.toggle('hidden', !need);
+    document.getElementById('borrow_reason').required = need;
   }
   function closeAll() { dModal.classList.add('hidden'); cModal.classList.add('hidden'); }
   document.querySelectorAll('.btn-dispatch').forEach(function (b) { b.addEventListener('click', function () { openDispatch(b.getAttribute('data-q')); }); });

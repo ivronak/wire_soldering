@@ -4,6 +4,7 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from app.amount_words import rupees_in_words
 from app.extensions import db
 from app.models import Customer, PaymentMode, SalesInvoice, SalesReceipt
 from app.production_orders.scheduler import today_ist
@@ -112,6 +113,16 @@ def receipts_allocate(receipt_id):
     db.session.commit()
     flash(f"Receipt {receipt.receipt_no}: money on account applied to the invoices. ₹{receipt.on_account:,.2f} is still on account.", "success")
     return back
+
+
+@receipts_bp.route("/receipts/<int:receipt_id>/print")
+def receipts_print(receipt_id):
+    # Sirf Posted receipt ki rasid (cancelled receipt customer ko nahi deni)
+    receipt = SalesReceipt.query.filter_by(id=receipt_id, is_deleted=False).first_or_404()
+    if receipt.status != "Posted":
+        flash("Only a posted receipt can be printed.", "error")
+        return redirect(url_for("receipts.receipts_list", tab="cancelled"))
+    return render_template("receipt_print.html", r=receipt, words=rupees_in_words(receipt.amount))
 
 
 @receipts_bp.route("/receipts/<int:receipt_id>/cancel", methods=["POST"])

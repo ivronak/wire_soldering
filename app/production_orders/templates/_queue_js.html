@@ -13,9 +13,11 @@
     // Chuni hui line ki machines tick. Line wahi hai jo order ki thi to purani chuni machines, badli to us line ki sab machines
     var rsLineSel = document.getElementById('rs-line');
     var same = !rsLineSel || String(rsCurrent.data.line_id || '') === rsLineSel.value;
-    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, same ? rsCurrent.data.chosen : null, rsCurrent.data.batch_kg, rsCurrent.data.prod_no,
+    rsPlan.sync(rsCurrent.id, rsCurrent.data.routing, same ? rsCurrent.data.chosen : null, rsBatchKg(), rsCurrent.data.prod_no,
       rsLineSel ? rsLineSel.value : undefined);
   }
+  // Plan ka andaza order ki banane wali qty (extra pieces samet) se
+  function rsBatchKg() { return rsCurrent.data.batch_kg; }
   function rsClose() { rsModal.style.display = 'none'; rsModal.setAttribute('aria-hidden', 'true'); rsCurrent = null; }
   document.querySelectorAll('.btn-resched').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -28,6 +30,12 @@
       rsStart.value = data.start;
       if (document.getElementById('rs-line')) document.getElementById('rs-line').value = data.line_id || '';
       document.getElementById('rs-needed').value = data.needed_by || '';
+      // Kis ke liye bana + kitni qty banegi
+      document.getElementById('rs-for').textContent = data.kind === 'quotation' ? 'For quotation ' + (data.for || '') : 'In-house stock (not for any customer order)';
+      var rsU = ' ' + (data.unit || '');
+      document.getElementById('rs-qty').textContent = data.kind === 'quotation' && data.customer_qty !== null && data.planned_qty - data.customer_qty > 0.00005
+        ? 'Customer needs ' + data.customer_qty + rsU + '; ' + data.planned_qty + rsU + ' will be made (' + Math.round((data.planned_qty - data.customer_qty) * 10000) / 10000 + ' extra goes to stock).'
+        : data.planned_qty + rsU + ' will be made.';
       rsPlan.reset('');
       rsModal.style.display = 'flex'; rsModal.setAttribute('aria-hidden', 'false');
       rsRefresh();

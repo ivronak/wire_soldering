@@ -48,6 +48,22 @@ def read_unit_weight(base_unit_id):
     return round(weight, 4), None
 
 
+def read_scrap_extra():
+    """Product master ka "Extra % (extra pieces)" (khaali = 0, 0 se 50). Return (percent, error)."""
+    raw = (request.form.get("scrap_extra_percent") or "").strip()
+    if not raw:
+        return 0.0, None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None, "Extra % must be a number."
+    if value != value or value in (float("inf"), float("-inf")):      # nan / inf
+        return None, "Extra % must be a number."
+    if value < 0 or value > 50:
+        return None, "Extra % must be between 0 and 50."
+    return round(value, 2), None
+
+
 def read_output_rm(product_id=None):
     """Form ka "Output goes to Raw Material stock" (khaali = normal FG product). Return (rm_id, error). Ek RM ka ek hi in-house product ho sakta hai,
     aur wo RM us product ki apni recipe me nahi hona chahiye (khud se khud nahi banta)."""
@@ -157,6 +173,10 @@ def products_add():
     if weight_error:
         flash(weight_error, "error")
         return redirect(url_for('products.products_list'))
+    scrap_extra, scrap_error = read_scrap_extra()
+    if scrap_error:
+        flash(scrap_error, "error")
+        return redirect(url_for('products.products_list'))
     output_rm_id, output_error = read_output_rm()
     if output_error:
         flash(output_error, "error")
@@ -202,6 +222,7 @@ def products_add():
             existing.min_stock = min_stock
             existing.max_stock = max_stock
             existing.unit_weight = unit_weight
+            existing.scrap_extra_percent = scrap_extra
             existing.output_rm_id = output_rm_id
             existing.is_active = True
             db.session.commit()
@@ -223,6 +244,7 @@ def products_add():
         min_stock=min_stock,
         max_stock=max_stock,
         unit_weight=unit_weight,
+        scrap_extra_percent=scrap_extra,
         output_rm_id=output_rm_id,
         is_active=True,
         is_deleted=False,
@@ -331,6 +353,10 @@ def products_edit(p_id):
     if weight_error:
         flash(weight_error, "error")
         return redirect(url_for('products.products_list'))
+    scrap_extra, scrap_error = read_scrap_extra()
+    if scrap_error:
+        flash(scrap_error, "error")
+        return redirect(url_for('products.products_list'))
     cat = ProductCategories.query.get(category_id) if category_id else None
     attr_keys = request.form.getlist('attr_key_0[]')
     attr_values = request.form.getlist('attr_value_0[]')
@@ -371,6 +397,7 @@ def products_edit(p_id):
     p.min_stock = min_stock
     p.max_stock = max_stock
     p.unit_weight = unit_weight
+    p.scrap_extra_percent = scrap_extra
     p.output_rm_id = output_rm_id
     p.is_deleted = False
 

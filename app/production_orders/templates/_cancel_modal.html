@@ -4,7 +4,7 @@
   <div id="co-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl">
     <div class="px-5 py-4 border-b border-slate-200"><h2 class="text-[17px] font-bold text-ink">Cancel <span id="co-no" class="font-mono"></span>?</h2>
-      <p class="text-[12.5px] text-ink-faint mt-1">The order moves to the Cancelled tab and its place in the queue and its machines become free. If material was already issued, cancel those issues first.</p></div>
+      <p class="text-[12.5px] text-ink-faint mt-1">The order moves to the Cancelled tab and its place in the queue and its machines become free. If material was already issued, return it to the store first. A running order can be cancelled only when it has no output and no stage is running.</p></div>
     <form id="co-form" method="post" class="px-5 py-4 space-y-3">
       {% if cancel_next %}<input type="hidden" name="next" value="{{ cancel_next }}" /><input type="hidden" name="tab" value="{{ tab }}" />{% endif %}
       <div>

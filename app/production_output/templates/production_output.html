@@ -90,7 +90,7 @@
       <div>
         <div class="flex items-center gap-2 flex-wrap"><span class="ou-no">{{ o.prod_no }}</span><span class="ou-chip ok"><i></i>All {{ sm.total }} stages done</span></div>
         <div class="ou-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
-        <div class="ou-meta">{{ '%g'|format(o.planned_qty) }} {{ plan.unit }} ordered</div>
+        <div class="ou-meta">{% if plan.customer_qty is not none and plan.customer_qty != o.planned_qty %}{{ '%g'|format(plan.customer_qty) }} {{ plan.unit }} ordered · {{ '%g'|format(o.planned_qty) }} planned (extra goes to stock){% else %}{{ '%g'|format(o.planned_qty) }} {{ plan.unit }} ordered{% endif %}</div>
       </div>
       <div>
         <div class="text-[13px]">Routing says about <b>{{ '%g'|format(plan.good) }} {{ plan.unit }}</b> came out{% if plan.scrap %} and <b>{{ '%g'|format(plan.scrap) }}</b> was scrap{% if plan.scrap_kg and plan.unit.upper() not in ('KG', 'KGS') %} (<b>{{ '%g'|format(plan.scrap_kg) }} KG</b> of metal){% endif %}{% endif %}.</div>
@@ -264,13 +264,15 @@
     document.getElementById('ou-s-cost').textContent = good > 0 ? inr(totalValue / good) : '—';
     var check = document.getElementById('ou-check');
     // C18: ordered ke saath GOOD qty compare hoti hai (scrap nahi ginte): "180 of 200 PCS ordered. Short by 20."
-    var limit = current.planned * (1 + (current.extra_percent || 0) / 100) * 1.1;
-    var diff = Math.round((current.planned - good) * 10000) / 10000;
+    var limit = current.planned * 1.1;      // planned me extra pieces pehle se judi hain
+    // Short / Extra customer ki qty se (quotation order me planned = customer + extra pieces); stock order me planned hi target
+    var target = current.customer_qty !== null && current.customer_qty !== undefined ? current.customer_qty : current.planned;
+    var diff = Math.round((target - good) * 10000) / 10000;
     if (good <= 0) { check.style.color = '#B42318'; check.textContent = 'Enter the good quantity.'; }
     else if (total > limit) { check.style.color = '#B42318'; check.textContent = 'Total (' + fmt(total) + ') is more than 10% above the quantity planned (' + fmt(limit / 1.1) + ' ' + current.unit + '). Please check.'; }
-    else if (diff > 0) { check.style.color = '#8A4A1C'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered. Short by ' + fmt(diff) + '. After saving, choose on the order card: cover from stock, make a balance order, or close it as is.'; }
-    else if (diff < 0) { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered. Extra ' + fmt(-diff) + ' goes to finished goods stock.'; }
-    else { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(current.planned) + ' ' + current.unit + ' ordered.'; }
+    else if (diff > 0) { check.style.color = '#8A4A1C'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered. Short by ' + fmt(diff) + '. After saving, choose on the order card: cover from stock, make a balance order, or close it as is.'; }
+    else if (diff < 0) { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered. Extra ' + fmt(-diff) + ' goes to finished goods stock.'; }
+    else { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered.'; }
   }
 
   function openOutput(btn) {

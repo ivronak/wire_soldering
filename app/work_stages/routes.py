@@ -30,9 +30,10 @@ def work_stages_list():
     )
 
 def read_billet_fields():
-    # (is_billet_stage, billet_weight, no_scrap). Billet stage me scrap auto nikalta hai, isliye "no scrap" tab nahi lagta.
+    # (is_billet_stage, billet_weight, no_scrap). Form ka tick ab seedha hai: "Scrap can be recorded at this stage" (fix_list #5, default on);
+    # DB column purana hi (no_scrap = tick band). Billet stage me scrap auto nikalta hai, isliye "no scrap" tab nahi lagta.
     is_billet = request.form.get('is_billet_stage') == 'on'
-    no_scrap = request.form.get('no_scrap') == 'on' and not is_billet
+    no_scrap = request.form.get('scrap_ok') != 'on' and not is_billet
     weight = None
     raw = (request.form.get('billet_weight') or '').strip()
     if raw:

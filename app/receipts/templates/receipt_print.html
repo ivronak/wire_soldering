@@ -1,0 +1,59 @@
+{% extends "print_base.html" %}
+{# Sales S9: Payment receipt (A4 letterhead) — customer ko paisa milne ki rasid. Bank / cost kuch nahi. #}
+{% set doc_title = 'Receipt ' ~ r.receipt_no %}
+{% set back_url = url_for('receipts.receipts_list', tab='done') %}
+{% set eyebrow = 'Payment receipt' %}
+{% set docno = r.receipt_no %}
+{% set status = r.status %}
+
+{% block sheet_body %}
+    <section class="meta">
+      <div><span class="lbl">Receipt date</span><span class="val">{{ r.receipt_date.strftime('%d %b %Y') }}</span></div>
+      <div><span class="lbl">Payment mode</span><span class="val">{{ r.payment_mode.name }}</span></div>
+      <div><span class="lbl">Reference</span><span class="val">{{ r.reference or '—' }}</span></div>
+      <div><span class="lbl">Amount</span><span class="val">₹ {{ '{:,.2f}'.format(r.amount) }}</span></div>
+    </section>
+
+    <section class="supplier">
+      <span class="lbl">Received from</span>
+      <strong>{{ r.customer.name }}</strong>
+      {% if r.customer.address %}<p>{{ r.customer.address }}</p>{% endif %}
+      <p>{{ r.customer.state.name if r.customer.state else '' }}{% if r.customer.gstin %} &nbsp;·&nbsp; GSTIN {{ r.customer.gstin }}{% endif %}</p>
+      <p>Amount in words: <b>{{ words }}</b></p>
+    </section>
+
+    <div class="sec">Applied against</div>
+    <table class="lines">
+      <thead>
+        <tr><th>#</th><th>Invoice</th><th>Invoice date</th><th class="num">Invoice total (₹)</th><th class="num">Received now (₹)</th></tr>
+      </thead>
+      <tbody>
+        {% for a in r.allocations %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><span class="mat-name">{{ a.invoice.invoice_no }}</span></td>
+          <td>{{ a.invoice.invoice_date.strftime('%d %b %Y') }}</td>
+          <td class="num">{{ '{:,.2f}'.format(a.invoice.total_amount) }}</td>
+          <td class="num amt">{{ '{:,.2f}'.format(a.amount) }}</td>
+        </tr>
+        {% endfor %}
+        {% if r.on_account > 0.004 %}
+        <tr><td>{{ r.allocations|length + 1 }}</td><td colspan="3"><span class="mat-name">On account (advance, not yet applied to an invoice)</span></td><td class="num amt">{{ '{:,.2f}'.format(r.on_account) }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <div class="close">
+      <div class="side">
+        {% if r.notes %}<div class="remarks"><span class="lbl">Note</span><p>{{ r.notes }}</p></div>{% endif %}
+        <div class="remarks"><span class="lbl">Note</span><p>This receipt is subject to realisation of the cheque / transfer.</p></div>
+        <div class="sign-head">For Nrupex Solder LLP</div>
+        <div class="signs"><div class="sign"><div class="name"></div><div class="line">Authorised signatory</div></div></div>
+      </div>
+      <div class="totals">
+        <div class="row"><span>Applied to invoices</span><span class="num">{{ '{:,.2f}'.format(r.allocated) }}</span></div>
+        <div class="row"><span>On account</span><span class="num">{{ '{:,.2f}'.format(r.on_account) }}</span></div>
+        <div class="grand"><span>Amount received</span><span class="num">₹ {{ '{:,.2f}'.format(r.amount) }}</span></div>
+      </div>
+    </div>
+{% endblock %}

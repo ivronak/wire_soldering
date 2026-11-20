@@ -13,7 +13,9 @@ from app.tax import line_value
 from app.dispatch.stock import dispatch_state, dispatched_qty
 from app.sales_invoices.billing import billing_state
 from app.costing.full_cost import last_costs
+from app.dispatch.stock import availability
 from app.production_orders.routes import _new_bundle_no, build_order, default_allowances, read_plan, unit_weight_for
+from app.production_orders.extra import planned_with_extra
 from app.production_orders.scheduler import persist_schedule, today_ist
 
 quotations_bp = Blueprint("quotations", __name__, template_folder="templates")
@@ -79,9 +81,13 @@ def form_context():
     }
 
 
-def finalize_context():
-    # Finalize drawer ke liye: payment terms ki list aur aaj ki date
-    return {"payment_terms": PaymentTerm.query.filter_by(is_deleted=False, is_active=True).order_by(PaymentTerm.name).all(), "today": date.today().isoformat()}
+def finalize_context(quotation=None):
+    # Finalize drawer ke liye: payment terms ki list, aaj ki date, aur har line ka in-house (free) stock — "serve from stock" option ke liye
+    stock = {}
+    if quotation is not None:
+        stock = {line.id: availability(line)["free"] for line in quotation.lines}
+    return {"payment_terms": PaymentTerm.query.filter_by(is_deleted=False, is_active=True).order_by(PaymentTerm.name).all(), "today": date.today().isoformat(),
+            "free_stock": stock}
 
 
 def line_cost_map(quotation):
@@ -383,7 +389,7 @@ def quotations_detail(quotation_id):
                            below_cost=below_cost_lines(quotation) if quotation.status in ("Draft", "Sent", "Approved") else {},
                            line_costs=line_cost_map(quotation) if quotation.status == "Approved" else {},
                            sent_qty={line.id: dispatched_qty(line) for line in quotation.lines} if quotation.status == "Ordered" else {},
-                           **(form_context() if editable else {}), **(finalize_context() if quotation.status == "Approved" else {}))
+                           **(form_context() if editable else {}), **(finalize_context(quotation) if quotation.status == "Approved" else {}))
 
 
 @quotations_bp.route("/quotations/<int:quotation_id>/print")
@@ -485,10 +491,19 @@ def quotations_finalize(quotation_id):
                                          old_total=before["grand_total"], new_total=after["grand_total"]))
 
     # Har product ka production order: Draft, "Needs planning" (andaze ka plan; asli line + machines Production planning page par). Plant ko party ka naam nahi.
+    # fix_list #12/#13: koi line "serve from stock" ho sakti hai — uska PO nahi banta, maal in-house (free) stock se Dispatch hota hai.
     order_date = today_ist()
-    bundle_no = _new_bundle_no(order_date.year) if len(quotation.lines) > 1 else None
+    from_stock = [l for l in quotation.lines if request.form.get(f"source_{l.id}") == "stock"]
+    for line in from_stock:
+        free = availability(line)["free"]
+        if line.qty > free + 0.00005:
+            db.session.rollback()
+            flash(f"{line.product.name}: only {free:g} is in stock, but {line.qty:g} is needed. Make a production order for it, or lower the quantity. Nothing was saved.", "error")
+            return back
+    to_make = [l for l in quotation.lines if l not in from_stock]
+    bundle_no = _new_bundle_no(order_date.year) if len(to_make) > 1 else None
     created = []
-    for line in quotation.lines:
+    for line in to_make:
         product = line.product
         if not product.recipe_items:
             db.session.rollback()
@@ -499,13 +514,17 @@ def quotations_finalize(quotation_id):
             db.session.rollback()
             flash(f"{product.name}: set the weight per unit in the Product master first. Nothing was saved.", "error")
             return back
-        plan, plan_error = read_plan(product, line.qty * unit_weight, order_date, auto=True, start_date=order_date)
+        # Product master ka Extra % (extra pieces): customer qty se itne % zyada pieces banenge; scrap ka cushion Spare % me hai.
+        extra_percent = product.scrap_extra_percent or 0.0
+        planned_qty = planned_with_extra(line.qty, extra_percent, product)
+        plan, plan_error = read_plan(product, planned_qty * unit_weight, order_date, auto=True, start_date=order_date)
         if plan_error:
             db.session.rollback()
             flash(f"{product.name}: {plan_error} Nothing was saved.", "error")
             return back
-        order = build_order(product, line.qty, unit_weight, order_date, needed_by, remarks=None, line=None, plan=plan, planning_later=True,
-                            bundle_no=bundle_no, extra_percent=0.0, allowances=default_allowances(product))
+        # reviewed=False: order "Needs review" me aata hai — Production order form me dekh ke Confirm karne tak Plan / Release band
+        order = build_order(product, planned_qty, unit_weight, order_date, needed_by, remarks=None, line=None, plan=plan, planning_later=True,
+                            bundle_no=bundle_no, extra_percent=extra_percent, allowances=default_allowances(product), reviewed=False)
         line.production_order_id = order.id
         created.append(order.prod_no)
     quotation.bundle_no = bundle_no
@@ -522,7 +541,12 @@ def quotations_finalize(quotation_id):
     quotation.finalized_at = datetime.utcnow()
     persist_schedule()
     db.session.commit()
-    flash(f"{quotation.quote_no} finalized. Production {'orders' if len(created) > 1 else 'order'} {', '.join(created)} created and waiting in Production planning.", "success")
+    message = f"{quotation.quote_no} finalized."
+    if created:
+        message += f" Production {'orders' if len(created) > 1 else 'order'} {', '.join(created)} created. {'They need' if len(created) > 1 else 'It needs'} a review in Production planning before planning."
+    if from_stock:
+        message += f" {', '.join(l.product.name for l in from_stock)} will be sent from stock (no production order)."
+    flash(message, "success")
     return done
 
 

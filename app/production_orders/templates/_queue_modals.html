@@ -17,11 +17,16 @@
   <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
     <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
       <div><h2 class="text-[17px] font-bold text-ink">Reschedule <span id="rs-no" class="font-mono"></span></h2>
-        <p class="text-[12.5px] text-ink-faint">Change the earliest start, the needed-by date or the machines. Quantity and materials stay the same. To change priority use the arrows in the queue.</p></div>
+        <p class="text-[12.5px] text-ink-faint">Choose the production line and machines, the earliest start and the needed-by date. To change priority use the arrows in the queue.</p></div>
       <button type="button" id="rs-close" class="w-9 h-9 text-ink-faint hover:bg-mist rounded-lg text-xl" aria-label="Close">&times;</button>
     </div>
     <form id="rs-form" method="post" class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-mist">
       <input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" />
+      {# Kis ke liye bana (quotation ya in-house stock) + banane wali qty. Qty / extra pieces / spare % ka review Production order form me hota hai. #}
+      <div class="po-step">
+        <div id="rs-for" class="text-[13px] font-semibold text-ink"></div>
+        <div id="rs-qty" class="text-[12.5px] text-ink-muted mt-0.5"></div>
+      </div>
       <div class="po-step grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label for="rs-start" class="po-label">Earliest start date</label><input type="date" id="rs-start" name="start_date" class="po-input" /></div>
         <div><label for="rs-needed" class="po-label">Needed by (optional)</label><input type="date" id="rs-needed" name="needed_by" class="po-input" /></div>

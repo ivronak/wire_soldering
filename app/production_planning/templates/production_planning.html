@@ -78,10 +78,14 @@
         {% if o.status == 'In production' %}<span class="pp-chip run"><i></i>In production{% if o.line %} · {{ o.line.name }}{% endif %}</span>
         {% elif o.status == 'Released' %}<span class="pp-chip rel"><i></i>Released{% if o.line %} · {{ o.line.name }}{% endif %}</span>
         {% elif o.plan_confirmed %}<span class="pp-chip ok"><i></i>Planned{% if o.line %} · {{ o.line.name }}{% endif %}</span>
+        {% elif not o.reviewed %}<span class="pp-chip warn"><i></i>Needs review</span>
         {% else %}<span class="pp-chip warn"><i></i>Needs planning</span>{% endif %}
+        {% set src = sources.get(o.id) %}
+        {% if src and src.kind == 'quotation' %}<span class="pp-chip bnd" title="This order is made for this quotation"><i></i>For {{ src.quote_no }}</span>
+        {% else %}<span class="pp-chip bnd" title="Made for stock, not for a customer order"><i></i>In-house stock</span>{% endif %}
         {% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="pp-chip bnd" title="Same party order: see all items of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
       <div class="pp-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
-      <div class="pp-meta">{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.unit_weight and o.unit_weight != 1 %} ({{ '%g'|format(o.planned_qty * o.unit_weight) }} KG){% endif %} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · material {{ o.issue_status|lower }}{% endif %}</div>
+      <div class="pp-meta">{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.unit_weight and o.unit_weight != 1 %} ({{ '%g'|format(o.planned_qty * o.unit_weight) }} KG){% endif %}{% if src and src.extra %} · customer needs {{ '%g'|format(src.customer_qty) }}, extra {{ '%g'|format(src.extra) }} goes to stock{% endif %} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · material {{ o.issue_status|lower }}{% endif %}</div>
     </div>
     <div>
       {% if sc %}
@@ -113,7 +117,10 @@
       {% if sc and sc.waits_for_material %}<div><span class="pp-chip warn"><i></i>Waits for material till {{ dshort(sc.waits_for_material) }}</span></div>{% endif %}
     </div>
     <div class="flex gap-2 justify-end flex-wrap" style="max-width:300px">
-      {% if o.status == 'Draft' %}
+      {% if o.status == 'Draft' and not o.reviewed %}
+      {# Finalize se bana order: pehle Production order form me dekho (kis ke liye, extra pieces, spare %, dates) aur Confirm karo; tab tak Plan / Release band #}
+      <a href="{{ url_for('production_orders.production_orders_list', review=o.id, next='planning') }}" class="pp-btn primary" title="Open the order in the Production order form, check it and press Confirm order">Review order</a>
+      {% elif o.status == 'Draft' %}
       <button type="button" class="pp-btn {{ 'ghost' if o.plan_confirmed else 'primary' }} btn-resched" data-id="{{ o.id }}">{{ 'Change plan' if o.plan_confirmed else 'Plan' }}</button>
       {% if o.plan_confirmed %}
       <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
@@ -141,6 +148,8 @@
       <button type="button" class="pp-btn danger sm btn-cancel-order" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>
       {% elif o.status == 'In production' %}
       <a href="{{ url_for('routing.routing_list') }}" class="pp-btn ghost sm">Routing / stages</a>
+      {# fix_list #7: server ka gate: koi output nahi, koi stage chalta nahi, material issue nahi hua ya poora wapas aa gaya — warna message batata hai kya karna hai #}
+      <button type="button" class="pp-btn danger sm btn-cancel-order" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" title="Possible only when there is no output, no stage is running and all issued material is back in the store">Cancel order</button>
       {% endif %}
     </div>
   </article>
@@ -153,7 +162,7 @@
 </div>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
-  <div class="pp-kpi {{ 'warn' if needs_count else '' }}"><span class="k">Needs planning</span><span class="v">{{ needs_count }}</span><span class="h">line and machines not chosen yet</span></div>
+  <div class="pp-kpi {{ 'warn' if needs_count else '' }}"><span class="k">Needs planning</span><span class="v">{{ needs_count }}</span><span class="h">to review, or line and machines not chosen</span></div>
   <div class="pp-kpi {{ 'good' if ready_count else '' }}"><span class="k">Ready to release</span><span class="v">{{ ready_count }}</span><span class="h">planned, waiting for release</span></div>
   <div class="pp-kpi {{ 'warn' if material_count else '' }}"><span class="k">Need material</span><span class="v">{{ material_count }}</span><span class="h">to buy, coming or to be made</span></div>
   <div class="pp-kpi {{ 'bad' if late_count else '' }}"><span class="k">Will be late</span><span class="v">{{ late_count }}</span><span class="h">finish after the needed-by date</span></div>
@@ -220,7 +229,7 @@
   {% endif %}
   {% if not orders and tab != 'tomorrow' %}
   <div class="pp-empty">
-    {% if tab == 'needs' %}<h3>Nothing waiting to be planned</h3><p>New orders from the Production order page show up here.</p>
+    {% if tab == 'needs' %}<h3>Nothing waiting to be planned</h3><p>New orders from Sales Finalize or the Production order page show up here. Orders from Finalize need a review first.</p>
     {% elif tab == 'ready' %}<h3>No planned order is waiting for release</h3><p>Plan an order first, then release it from here.</p>
     {% else %}<h3>No released or running order</h3><p>Release a planned order and it will show up here, ready to start.</p>{% endif %}
   </div>

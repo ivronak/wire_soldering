@@ -391,6 +391,8 @@ def routing_list():
             "held_at": cur.held_at.strftime("%d %b %H:%M") if cur.held_at else "",
             "defer_self": bool(cur.work_stage and cur.work_stage.scrap_after_next),
             "defer_prev": None,
+            # fix_list #4: pichhle stage ke lab test me jo extra metal dala wo is stage ke input me juda hai — "includes 0.5 KG correction"
+            "corr_in": (correction_in(o, cur) or {}).get("text") if side is None else None,
             # Ingot Casting jaisa stage: lattha ginti (weight stage master se); Extrusion jaisa stage: scrap box nahi
             "billet": {"weight": cur.work_stage.billet_weight} if cur.work_stage and cur.work_stage.is_billet_stage and not side else None,
             "no_scrap": bool(cur.work_stage and cur.work_stage.no_scrap),
@@ -462,6 +464,36 @@ def _stage_for_action(stage_id):
 
 def _previous_stages(order, stage):
     return [s for s in order.stages if s.sort_order < stage.sort_order]
+
+
+def next_main_stage(order, stage):
+    # Metal chain me is stage ke baad ka agla (side nahi) stage; koi nahi to None
+    for later in order.stages:
+        if later.sort_order > stage.sort_order and side_stage_info(order, later) is None:
+            return later
+    return None
+
+
+def correction_in(order, stage):
+    """fix_list #4: pichhle metal stage ke lab test me jo extra metal (KG) dala gaya, wo is stage ke "Came into this stage" me already juda hai —
+    sirf dikhane ke liye {"qty", "stage", "text"} (ya None)."""
+    previous = None
+    for earlier in order.stages:
+        if earlier.sort_order < stage.sort_order and side_stage_info(order, earlier) is None:
+            previous = earlier
+    if previous is None:
+        return None
+    total, names = 0.0, []
+    for qc in previous.lab_qcs:
+        for item in (qc.corrections or []):
+            # purani entries me "in_input" key nahi hoti (default: judta hai); nayi me False ho to (flux wali) dikhana nahi
+            if str(item.get("unit", "")).upper() in ("KG", "KGS") and item.get("in_input", True):
+                total += float(item.get("qty") or 0)
+                if item.get("material") and item["material"] not in names:
+                    names.append(item["material"])
+    if total <= EPS:
+        return None
+    return {"qty": round(total, 4), "stage": previous.stage_name, "text": f"includes {total:g} KG correction ({', '.join(names)}) added at {previous.stage_name}"}
 
 
 def deferred_scrap_stage(order, stage):
@@ -1126,6 +1158,15 @@ def routing_lab_qc(stage_id):
             flash("The test certificate file is too large (maximum 5 MB).", "error")
             return _back()
     corrections = []
+    # fix_list #4: Done stage (Melting) ke lab test me extra metal dala to wo us stage ke input / output me aur agle stage ke input me judna chahiye.
+    # Agla metal stage pehle hi chal / ho chuka ho to uska input badal nahi sakte — tab correction yahan band (pehle usse pehle ka kaam khol ke karo).
+    side_here = side_stage_info(order, stage)
+    kg_extra = round(sum(q for lid, q in wanted_extra.items() if counts_to_input(allowed_lines[lid], side_here)), 4) if side_here is None else 0.0
+    if wanted_extra and stage.status == "Done" and kg_extra > 0:
+        later = next_main_stage(order, stage)
+        if later is not None and later.status != "Pending":
+            flash(f"{later.stage_name} has already started, so extra metal cannot be added to {stage.stage_name} now. Add the correction before {later.stage_name} starts.", "error")
+            return _back()
     if wanted_extra:
         from app.inventory.posting import InventoryError
         from app.material_issues.routes import auto_issue_extra
@@ -1140,11 +1181,18 @@ def routing_lab_qc(stage_id):
             # C19: stage pehle hi Complete ho chuka ho (used likha ja chuka) to correction ka maal seedha melt me gaya hai — use me jod do.
             # Warna wo "unaccounted" dikhta aur operator ko jhootha return / write-off karna padta. Stage chalu ho to Complete form ka default
             # (_auto_extra_qty) ye khud sambhal leta hai, isliye wahan kuch nahi karna.
+            was_used = line.used_qty
             if stage.status == "Done" and line.used_qty is not None:
                 line.used_qty = round(line.used_qty + extra_qty, 4)
+                # Metal ka input badha to output bhi (Melting ka scrap baad me likha jaata hai, isliye abhi 0) — agla stage inhi se input leta hai
+                if side_here is None and counts_to_input(line, side_here):
+                    stage.qty_in = round((stage.qty_in or 0) + extra_qty, 4)
+                    stage.qty_out = round((stage.qty_out or 0) + extra_qty, 4)
             rm = line.raw_material
+            # "in_input": ye correction agle stage ke input me judta hai ya nahi (flux / side stage / used likha hi nahi — to nahi); correction_in() sirf yahi dikhata hai
+            joins_input = side_here is None and counts_to_input(line, side_here) and not (stage.status == "Done" and was_used is None)
             corrections.append({"material": rm.name if rm else "", "qty": extra_qty, "unit": rm.base_unit.code if rm and rm.base_unit else "",
-                                "added_by": added_by, "reason": extra_reason, "issue_no": issue.issue_no})
+                                "added_by": added_by, "reason": extra_reason, "issue_no": issue.issue_no, "in_input": bool(joins_input)})
     row = StageLabQC(stage_id=stage.id, tested_at=tested_at, tested_by=tested_by, result=result, remarks=remarks, corrections=corrections or None)
     db.session.add(row)
     db.session.flush()                      # id chahiye: file ka folder QC id se banta hai

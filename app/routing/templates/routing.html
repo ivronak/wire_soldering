@@ -439,7 +439,7 @@
           <p class="text-[11.5px] text-ink-faint mt-2">Enter the total used in this stage, even if it ran more than once. You cannot use more than was issued. Whatever was issued but not used must be returned to the store before the output is recorded.</p>
         </div>
         <div class="rt-box grid grid-cols-2 gap-3">
-          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> <span class="rt-unit">KG</span> <span id="rt-qty-ref" class="text-ink-faint"></span></div>
+          <div class="col-span-2 text-[12.5px] text-ink-muted">Came into this stage: <b id="rt-qty-in">0</b> <span class="rt-unit">KG</span> <span id="rt-qty-ref" class="text-ink-faint"></span> <span id="rt-qty-corr" class="text-ink-faint"></span></div>
           {# Sirf scrap likhna hai; good output = aaya hua - scrap, system khud nikaalta hai (client change 8) #}
           <div id="rt-scrap-wrap"><label class="rt-label">Scrap (<span class="rt-unit">KG</span>)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
           <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none"></div>
@@ -557,6 +557,7 @@
       document.getElementById('rt-qty-in').textContent = PCS_WA ? Math.round(a.qty_in / PCS_WA * 100) / 100 : a.qty_in;
       QTY_IN = a.qty_in;
       DEFER_PREV = a.defer_prev;
+      document.getElementById('rt-qty-corr').textContent = a.corr_in ? '(' + a.corr_in + ')' : '';      // fix_list #4
       DEFER_SELF = !!a.defer_self;
       BILLET = a.billet || null;
       NO_SCRAP = !!a.no_scrap;

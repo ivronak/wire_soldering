@@ -5,7 +5,7 @@ from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
-from app.models import Quotation, SalesInvoice
+from app.models import Charge, Quotation, SalesInvoice
 from app.production_orders.scheduler import today_ist
 from app.sales_invoices.billing import BillingError, active_invoices, approve_loss, cancel_invoice, challan_totals, create_invoice, unbilled_challans
 
@@ -44,11 +44,38 @@ def drawer_data(rows):
                           "unit": line.product.base_unit.code if line.product.base_unit else "",
                           "rate": line.rate, "discount": line.discount_percent or 0, "gst": line.tax_rate.rate_percent if line.tax_rate else 0,
                           "cost": info["cost"] if info else 0})
-        charges = [{"name": c.charge.name if c.charge else "Charge", "amount": c.amount, "effect": c.effect} for c in q.charge_lines] if r["first"] else []
-        net = sum((-c["amount"] if c["effect"] == "minus" else c["amount"]) for c in charges)
+        # Drawer me pehle se bhare charges: quotation ke, sirf pehle invoice par. User inhe badal / hata sakta hai aur naya jod sakta hai
+        charges = [{"charge_id": c.charge_id, "amount": c.amount, "effect": c.effect} for c in q.charge_lines] if r["first"] else []
         data.append({"id": q.id, "no": q.quote_no, "customer": q.customer.name, "po": q.customer_po_no or "", "inter": q.is_inter_state,
-                     "charges": charges, "charges_net": round(net, 2), "challans": challans, "lines": lines})
+                     "charges": charges, "challans": challans, "lines": lines})
     return data
+
+
+def parse_charges():
+    """Drawer ke charge_id_N / charge_amount_N / charge_effect_N padhta hai (quotation jaisa). (charges, error) lautata hai.
+    Form me charge_count hi nahi aaya (purana form / seedha post) to charges=None => billing.py ka default (quotation ke charges pehle invoice par)."""
+    if request.form.get("charge_count") is None:
+        return None, None
+    charges = []
+    for index in range(request.form.get("charge_count", type=int) or 0):
+        charge_id = request.form.get(f"charge_id_{index}", type=int)
+        amount_raw = (request.form.get(f"charge_amount_{index}") or "").strip()
+        if not charge_id and not amount_raw:
+            continue                                                       # khaali row ignore
+        charge = db.session.get(Charge, charge_id) if charge_id else None
+        if charge is None or charge.is_deleted or not charge.is_active:
+            return None, "Choose a charge from the list."
+        try:
+            amount = float(amount_raw)
+        except ValueError:
+            amount = 0
+        if amount <= 0:
+            return None, f"{charge.name}: enter an amount more than zero."
+        effect = (request.form.get(f"charge_effect_{index}") or "").strip()
+        if effect not in ("add", "minus"):
+            return None, f"{charge.name}: choose Add or Minus."
+        charges.append({"charge_id": charge.id, "amount": round(amount, 2), "effect": effect})
+    return charges, None
 
 
 @sales_invoices_bp.route("/invoices")
@@ -61,8 +88,9 @@ def invoices_list():
     for status, key in (("Waiting approval", "waiting"), ("Posted", "done"), ("Cancelled", "cancelled")):
         by_status[key] = SalesInvoice.query.filter_by(status=status, is_deleted=False).order_by(SalesInvoice.id.desc()).all()
     counts = {"todo": len(todo), "waiting": len(by_status["waiting"]), "done": len(by_status["done"]), "cancelled": len(by_status["cancelled"])}
+    charge_master = Charge.query.filter_by(is_deleted=False, is_active=True).order_by(Charge.name).all()
     return render_template("invoices.html", active_nav="invoices", tab=tab, counts=counts, todo=todo, invoices=by_status.get(tab, []),
-                           drawer=drawer_data(todo), today=today_ist().isoformat(), today_date=today_ist(), open_q=request.args.get("q", type=int))
+                           drawer=drawer_data(todo), charge_master=[{"id": c.id, "name": c.name} for c in charge_master], today=today_ist().isoformat(), today_date=today_ist(), open_q=request.args.get("q", type=int))
 
 
 @sales_invoices_bp.route("/invoices/add/<int:quotation_id>", methods=["POST"])
@@ -93,8 +121,12 @@ def invoices_add(quotation_id):
             except ValueError:
                 flash(f"{line.product.name}: enter a valid {label}.", "error")
                 return back
+    charges, charge_error = parse_charges()
+    if charge_error:
+        flash(charge_error, "error")
+        return back
     try:
-        invoice = create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=(request.form.get("remarks") or "").strip()[:255] or None)
+        invoice = create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=(request.form.get("remarks") or "").strip()[:255] or None, charges=charges)
     except BillingError as error:
         db.session.rollback()
         flash(str(error), "error")

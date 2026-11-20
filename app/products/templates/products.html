@@ -441,6 +441,7 @@
                       data-min-stock="{{ p.min_stock if p.min_stock is not none else '' }}"
                       data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}"
                       data-unit-weight="{{ p.unit_weight if p.unit_weight is not none else '' }}"
+                      data-scrap-extra="{{ '%g'|format(p.scrap_extra_percent or 0) }}"
                       data-output-rm-id="{{ p.output_rm_id or '' }}"
                       data-attributes='{{ (p.attributes or {}) | tojson }}'
                       data-recipe='[{% for r in p.recipe_items %}{"id":{{ r.raw_material_id }},"ratio":{{ r.ratio_percent }},"stage":{{ r.work_stage_id or 'null' }},"spare":{{ r.spare_percent or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]'
@@ -591,6 +592,13 @@
         <input type="number" id="product-unit-weight" name="unit_weight" min="0.001" step="0.001" placeholder="e.g. 1, 0.5 or 0.25"
           class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
         <p class="text-[11.5px] text-ink-faint mt-1">Fixed for this product (a 1 KG spool is 1, a 500 g spool is 0.5). Orders are placed in pieces and the KG is worked out from this.</p>
+      </div>
+      {# Extra % (extra pieces): order me customer qty se itne % zyada pieces bante hain (form, Finalize aur review me default); scrap ka cushion Spare % hai #}
+      <div>
+        <label for="product-scrap-extra" class="block text-[12.5px] font-semibold text-ink mb-1">Extra % (extra pieces)</label>
+        <input type="number" id="product-scrap-extra" name="scrap_extra_percent" min="0" max="50" step="0.1" placeholder="0"
+          class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Default for orders of this product: make this much % more pieces than the customer asked for (100 ordered with 5% = 105 made). The extra pieces go to finished goods stock. Scrap and wastage are covered by the Spare % of each material, not by this. It can be changed when the order is made or reviewed. Leave empty for none.</p>
       </div>
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
@@ -1068,6 +1076,7 @@
     document.getElementById('product-min-stock').value = btn.getAttribute('data-min-stock') || '';
     document.getElementById('product-max-stock').value = btn.getAttribute('data-max-stock') || '';
     document.getElementById('product-unit-weight').value = btn.getAttribute('data-unit-weight') || '';
+    document.getElementById('product-scrap-extra').value = btn.getAttribute('data-scrap-extra') || '';
     document.getElementById('product-output-rm').value = btn.getAttribute('data-output-rm-id') || '';
     var attrs = {};
     var recipe = [];

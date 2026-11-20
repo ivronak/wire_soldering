@@ -1,6 +1,7 @@
 # C18: ordered vs good qty ka hisaab. (1) Order complete hone par "Short by X / Extra X" (2) naya order banate waqt product ka
 # pichhle 3 completed orders ka average loss (hint). Naya DB table nahi: ProductionOutput.good_qty aur ProductionOrder.planned_qty se nikalte hain.
 from app.models import ProductionOrder
+from app.production_orders.source import customer_qty_of
 
 EPS = 0.00005
 
@@ -16,7 +17,11 @@ def short_info(order):
     out = posted_output(order)
     if not out:
         return None
-    ordered = order.planned_qty or 0
+    # Quotation se bana order: "ordered" = customer ne jitna manga (planner ne extra banane ko planned_qty badhaya ho to bhi kami tabhi jab customer ki qty poori na ho).
+    # In-house / balance order: planned_qty hi.
+    ordered = customer_qty_of(order)
+    if ordered is None:
+        ordered = order.planned_qty or 0
     diff = round(ordered - out.good_qty, 4)
     return {"ordered": ordered, "good": out.good_qty, "short": diff if diff > EPS else 0, "extra": -diff if diff < -EPS else 0,
             "unit": order.product.base_unit.code if order.product and order.product.base_unit else ""}

@@ -7,10 +7,12 @@ from datetime import datetime
 from flask import abort, Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionLine, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
-                        ProductionOrderStageMachine, RawMaterial)
+                        ProductionOrderStageMachine, QuotationLine, RawMaterial)
 from app.production_orders.planning import plan_stages
 from app.production_orders.stage_material import gap_text, stage_material_gap
-from app.production_orders.yield_info import learned_loss, short_info
+from app.production_orders.yield_info import short_info
+from app.production_orders.source import line_needs_order, open_quotation_lines, source_map
+from app.production_orders.extra import planned_with_extra, read_extra_percent
 from app.production_lines.status import line_board
 from app.inventory.alerts import store_stock_by_material
 from app.production_orders.timeline import build_timeline
@@ -139,6 +141,22 @@ def _read_needed_by():
         return None, "Enter a valid 'needed by' date."
 
 
+def _read_made_for(product):
+    """Form ka "Made for": made_for = quotation / stock (na aaye to stock). (quotation_line ya None, error ya None).
+    Quotation ke liye line chunni zaroori: wahi product, Ordered quotation, koi chalta order juda nahi (line_needs_order)."""
+    if (request.form.get("made_for") or "stock") != "quotation":
+        return None, None
+    line_id = request.form.get("quotation_line_id", type=int)
+    line = db.session.get(QuotationLine, line_id) if line_id else None
+    if line is None:
+        return None, "Choose the quotation this order is made for."
+    if line.product_id != product.id:
+        return None, "That quotation line is for a different product."
+    if not line_needs_order(line):
+        return None, "That quotation line already has a production order (or is not an ordered quotation any more)."
+    return line, None
+
+
 def _read_allowances(product):
     # Har RM ka apna allowance %: form field allowance_rm_<rm_id> (recipe + packing materials). 0 se 100; khaali = 0.
     # ({rm_id: percent}, None) ya (None, "error")
@@ -153,6 +171,7 @@ def _read_allowances(product):
             continue
         raw = (request.form.get(f"allowance_rm_{rm_id}") or "").strip()
         if not raw:
+            result[rm_id] = 0.0          # box khaali chhoda = spare nahi (0); product master wala default purana order me wapas nahi aata
             continue
         try:
             value = float(raw)
@@ -200,6 +219,7 @@ def _planner_products():
         .all()
     )
     planner = []
+    open_lines = open_quotation_lines()          # {product_id: [{line_id, quote_no, qty}]} — "Against quotation" picker
     for p in products:
         lines = []
         for r in p.recipe_items:
@@ -235,7 +255,9 @@ def _planner_products():
             "routing": _routing_for(p),
             "recipe": lines,
             "packing": packing,
-            "loss_hint": learned_loss(p.id),          # C18: {"pct", "orders"} ya None (pehla order)
+            "master_extra": p.scrap_extra_percent or 0,          # Product master ka Extra % (extra pieces) — form me default
+            "is_kg": (p.base_unit.code if p.base_unit else "KG").upper() in ("KG", "KGS"),
+            "qt_lines": open_lines.get(p.id, []),
         })
     return products, planner
 
@@ -280,10 +302,17 @@ def progress_info(queue, schedule, today):
     return progress, stage_now
 
 
+def material_untouched(order):
+    # Is order ka koi RM (Draft ya Posted issue) abhi tak production ko nahi diya gaya — tabhi qty badal sakte hain
+    return not any(line.issued_qty > 0.00005 for line in order.lines)
+
+
 def resched_data(orders):
     # Plan / Reschedule drawer ke liye har open (Draft / Released) order ka data: kaun se stages, kaun si machines chuni hain, batch KG.
     # C1 ke baad ye drawer Production planning page par hai; helper yahin rehta hai kyunki plan ke baaki helpers (_machine_row, _routing_for) yahin hain.
+    # Drawer me sirf line, machines, earliest start, needed by. Qty / extra pieces / spare % ka review Production order form me hota hai (review route).
     resched = {}
+    sources = source_map([o for o in orders if o.status in ACTIVE_STATUSES])
     for o in orders:
         if o.status not in ACTIVE_STATUSES:
             continue
@@ -298,9 +327,13 @@ def resched_data(orders):
             routing = _routing_for(o.product) if o.product else []
             chosen = {}
         earliest = o.earliest_start_date or o.planned_start_date or o.order_date
+        src = sources.get(o.id) or {"kind": "inhouse", "quote_no": None, "customer_qty": None}
         resched[str(o.id)] = {"prod_no": o.prod_no, "batch_kg": o.planned_qty * o.unit_weight, "routing": routing, "chosen": chosen,
                               "line_id": o.line_id, "line": o.line.name if o.line else "",
-                              "start": earliest.isoformat(), "needed_by": o.needed_by_date.isoformat() if o.needed_by_date else ""}
+                              "start": earliest.isoformat(), "needed_by": o.needed_by_date.isoformat() if o.needed_by_date else "",
+                              "unit_weight": o.unit_weight or 1, "planned_qty": o.planned_qty,
+                              "unit": o.product.base_unit.code if o.product and o.product.base_unit else "",
+                              "for": src["quote_no"] or "", "kind": src["kind"], "customer_qty": src["customer_qty"]}
     return resched
 
 
@@ -348,6 +381,18 @@ def production_orders_list():
                            "qty": info["short"], "unit": info["unit"]}
         else:
             flash("That order does not need a balance order.", "error")
+    # Review (?review=<order id>): Finalize se bana "Needs review" Draft order isi form me khulta hai, "Confirm order" par save (production_orders_review)
+    review_ctx = None
+    review_raw = (request.args.get("review") or "").strip()
+    if review_raw.isdigit():
+        target = ProductionOrder.query.filter_by(id=int(review_raw), is_deleted=False).first()
+        if target and target.status == "Draft" and not target.reviewed and target.product and target.product.is_active and not target.product.is_deleted:
+            review_ctx = review_payload(target)
+            review_ctx["next"] = "planning" if request.args.get("next") == "planning" else ""
+        elif target and target.product and not target.product.is_active:
+            flash("The product of this order is inactive. Turn it on in the Product master, then review the order.", "error")
+        else:
+            flash("That order does not need a review.", "error")
     # Completed tab: har order ka "Short by / Extra" (C18)
     shorts = {o.id: short_info(o) for o in orders if o.status == "Completed"}
     today = today_ist()
@@ -393,10 +438,12 @@ def production_orders_list():
         timeline=timeline,
         by=by,
         store_stock={str(k): v for k, v in store_stock_by_material().items()},
+        sources=source_map(orders),               # fix_list #12: "For QT-..." / "In-house stock" chip
         bundles=bundles,
         bundle_filter=bundle_filter,
         bundle_ctx=bundle_ctx,
         balance_ctx=balance_ctx,
+        review_ctx=review_ctx,
         shorts=shorts,
         products=products,
         categories=categories,
@@ -422,12 +469,13 @@ def unit_weight_for(product):
     return product.unit_weight or None
 
 
-def build_order(product, planned_qty, unit_weight, order_date, needed_by, remarks, line, plan, planning_later, bundle_no, extra_percent, allowances, balance_for=None):
+def build_order(product, planned_qty, unit_weight, order_date, needed_by, remarks, line, plan, planning_later, bundle_no, extra_percent, allowances, balance_for=None, reviewed=True):
     """Production order + uski recipe / packing lines banata hai (session me add + flush, commit caller karta hai).
     Production page ka form aur Sales Finalize (Quotation se order) dono yahi use karte hain, taaki recipe / packing / queue ka logic ek hi jagah rahe.
+    planned_qty = jo banana hai (extra pieces jod ke — caller planned_with_extra se nikalta hai); extra_percent sirf record / dikhane ke liye.
+    reviewed=False: Finalize se bana order, Production order form me "Confirm order" tak Plan / Release band.
     Extra RM, balance-order ka note, schedule aur commit caller ke zimme."""
     batch_kg = planned_qty * unit_weight
-    extra_factor = 1 + extra_percent / 100
     year = order_date.year
     count = ProductionOrder.query.filter(ProductionOrder.prod_no.like(f"PROD-{year}-%")).count()
     prod_no = f"PROD-{year}-{count + 1:03d}"
@@ -447,6 +495,7 @@ def build_order(product, planned_qty, unit_weight, order_date, needed_by, remark
         plan_confirmed=not (planning_later and plan),      # andaze ka plan ho to planning baaki; plan hi nahi (stages nahi) to planning ka kuch nahi
         bundle_no=bundle_no,
         extra_percent=extra_percent,
+        reviewed=reviewed,
         balance_for_id=balance_for.id if balance_for else None,
     )
     db.session.add(order)
@@ -462,7 +511,7 @@ def build_order(product, planned_qty, unit_weight, order_date, needed_by, remark
             production_order_id=order.id,
             raw_material_id=r.raw_material_id,
             ratio_percent=r.ratio_percent,
-            required_qty=batch_kg * (r.ratio_percent or 0) / 100 * extra_factor,      # C18: extra % sirf metal / flux par; spool-box ordered qty ke hisaab se
+            required_qty=batch_kg * (r.ratio_percent or 0) / 100,      # batch_kg planned_qty (extra pieces samet) se; scrap ka cushion = Spare %
             is_flux=bool(r.is_flux),
             is_extra=False,
             work_stage_id=r.work_stage_id,
@@ -486,6 +535,47 @@ def build_order(product, planned_qty, unit_weight, order_date, needed_by, remark
             allowance_percent=allowances.get(k.raw_material_id, 0),
         ))
     return order
+
+
+def _add_other_materials(order, product):
+    """Form ke "Other materials" (recipe ke bahar ka RM: packaging etc.) order me extra lines (is_extra) bana ke jodta hai.
+    Error ho to message wapas (caller rollback karke dikhata hai), warna None. Production order add aur review dono yahi use karte hain."""
+    extra_ids = request.form.getlist("extra_rm_id[]")
+    extra_qtys = request.form.getlist("extra_qty[]")
+    seen_extra = set()
+    # Jo material recipe me pehle se hai wo extra me dobara nahi aa sakta — warna aage "total material required" me double ginega
+    recipe_rm_ids = {r.raw_material_id for r in product.recipe_items} | {k.raw_material_id for k in product.packing_items}
+    for rm_raw, qty_raw in zip(extra_ids, extra_qtys):
+        rm_raw = (rm_raw or "").strip()
+        qty_raw = (qty_raw or "").strip()
+        if not rm_raw and not qty_raw:
+            continue
+        if not rm_raw or not qty_raw:
+            return "Each added material needs a raw material and a quantity."
+        try:
+            rm_id = int(rm_raw)
+            extra_qty = float(qty_raw)
+        except ValueError:
+            return "An added material line is not valid."
+        if extra_qty <= 0:
+            return "Added material quantity must be greater than zero."
+        if rm_id in seen_extra:
+            return "The same extra material is added twice. Keep one line and change its quantity."
+        rm = RawMaterial.query.get(rm_id)
+        if not rm or rm.is_deleted or not rm.is_active:
+            return "Choose an active raw material for the added line."
+        if rm_id in recipe_rm_ids:
+            return f"{rm.name} is already part of this product's recipe. Its quantity is worked out from the recipe, so do not add it again as extra material."
+        seen_extra.add(rm_id)
+        db.session.add(ProductionOrderLine(
+            production_order_id=order.id,
+            raw_material_id=rm.id,
+            ratio_percent=0,
+            required_qty=extra_qty,
+            is_flux=False,
+            is_extra=True,
+        ))
+    return None
 
 
 @production_orders_bp.route("/production_orders/add", methods=["POST"])
@@ -534,18 +624,23 @@ def production_orders_add():
             flash("Enter the weight per unit in KG (or set it once in the Product master).", "error")
             return redirect(url_for("production_orders.production_orders_list"))
 
-    batch_kg = planned_qty * unit_weight
-    # C18: "Make extra for scrap?" Yes -> recipe (metal) lines ordered se extra_percent % zyada; No -> sirf ordered ke hisaab se
+    # "Made for": Against quotation (us quotation line ki customer qty) ya Stock order (bina quotation, in-house stock ke liye).
+    # Quotation order me base qty = customer qty (form ki qty ignore); extra pieces sirf Extra % se (Production order form me "Make extra pieces?").
+    qline, made_for_error = _read_made_for(product)
+    if made_for_error:
+        flash(made_for_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
+    if qline is not None:
+        planned_qty = qline.qty
     extra_percent = 0.0
-    if request.form.get("make_extra") == "1":
-        try:
-            extra_percent = float((request.form.get("extra_percent") or "").strip())
-        except ValueError:
-            extra_percent = -1
-        if extra_percent <= 0 or extra_percent > 50:
-            flash("Extra % for scrap must be more than 0 and not more than 50.", "error")
+    if request.form.get("make_extra") == "1" and qline is not None:
+        extra_percent, extra_error = read_extra_percent(request.form.get("extra_percent"))
+        if extra_error or extra_percent <= 0:
+            flash(extra_error or "Enter the Extra % (more than 0) or choose No extra pieces.", "error")
             return redirect(url_for("production_orders.production_orders_list"))
-    extra_factor = 1 + extra_percent / 100
+    # Stock order me "extra" ka matlab nahi (qty khud hi stock ke liye hai); extra sirf quotation ke order me
+    planned_qty = planned_with_extra(planned_qty, extra_percent, product)
+    batch_kg = planned_qty * unit_weight
     # Naya form (client meeting 2, #6) line / machine nahi bhejta: planning_later=1 -> andaze ka plan, asli plan Production planning page par
     planning_later = request.form.get("planning_later") == "1"
     if planning_later:
@@ -591,57 +686,17 @@ def production_orders_add():
     order = build_order(
         product, planned_qty, unit_weight, order_date, needed_by, remarks=remarks, line=line, plan=plan,
         planning_later=planning_later, bundle_no=bundle_no, extra_percent=extra_percent, allowances=allowances,
-        balance_for=balance_for)
+        balance_for=balance_for, reviewed=True)           # form se bana order = banane wale ne dekh liya, review nahi chahiye
+    if qline is not None:
+        qline.production_order_id = order.id              # quotation line <-> order ka ek hi link (dispatch / reserved isi se chalta hai)
     prod_no = order.prod_no
 
     # Packaging / extra RM recipe ka percent nahi. User jo qty type kare wahi save.
-    extra_ids = request.form.getlist("extra_rm_id[]")
-    extra_qtys = request.form.getlist("extra_qty[]")
-    seen_extra = set()
-    # Jo material recipe me pehle se hai wo extra me dobara nahi aa sakta — warna aage "total material required" me double ginega
-    recipe_rm_ids = {r.raw_material_id for r in product.recipe_items} | {k.raw_material_id for k in product.packing_items}
-    for rm_raw, qty_raw in zip(extra_ids, extra_qtys):
-        rm_raw = (rm_raw or "").strip()
-        qty_raw = (qty_raw or "").strip()
-        if not rm_raw and not qty_raw:
-            continue
-        if not rm_raw or not qty_raw:
-            db.session.rollback()
-            flash("Each added material needs a raw material and a quantity.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
-        try:
-            rm_id = int(rm_raw)
-            extra_qty = float(qty_raw)
-        except ValueError:
-            db.session.rollback()
-            flash("An added material line is not valid.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
-        if extra_qty <= 0:
-            db.session.rollback()
-            flash("Added material quantity must be greater than zero.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
-        if rm_id in seen_extra:
-            db.session.rollback()
-            flash("The same extra material is added twice. Keep one line and change its quantity.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
-        rm = RawMaterial.query.get(rm_id)
-        if not rm or rm.is_deleted or not rm.is_active:
-            db.session.rollback()
-            flash("Choose an active raw material for the added line.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
-        if rm_id in recipe_rm_ids:
-            db.session.rollback()
-            flash(f"{rm.name} is already part of this product's recipe. Its quantity is worked out from the recipe, so do not add it again as extra material.", "error")
-            return redirect(url_for("production_orders.production_orders_list"))
-        seen_extra.add(rm_id)
-        db.session.add(ProductionOrderLine(
-            production_order_id=order.id,
-            raw_material_id=rm.id,
-            ratio_percent=0,
-            required_qty=extra_qty,
-            is_flux=False,
-            is_extra=True,
-        ))
+    other_error = _add_other_materials(order, product)
+    if other_error:
+        db.session.rollback()
+        flash(other_error, "error")
+        return redirect(url_for("production_orders.production_orders_list"))
 
     if balance_for:
         balance_for.short_action = "Balance order"
@@ -659,6 +714,103 @@ def production_orders_add():
         return redirect(url_for("production_orders.production_orders_list", bundle=bundle_no))
     flash(f"Production order {order.prod_no} saved and added to the end of the queue.", "success")
     return redirect(url_for("production_orders.production_orders_list"))
+
+
+def review_payload(order):
+    """Production order form ko "review" mode me kholne ka data (Finalize se bana Draft order): product, kis ke liye, base qty, extra %, dates,
+    remarks, har material ka spare %, aur user ke jode other materials. JSON-friendly dict."""
+    src = source_map([order]).get(order.id) or {"kind": "inhouse", "quote_no": None, "customer_qty": None}
+    quotation_order = src["kind"] == "quotation" and src["customer_qty"] is not None
+    base = src["customer_qty"] if quotation_order else order.planned_qty
+    spare = {str(l.raw_material_id): l.allowance_percent or 0 for l in order.lines if not l.is_extra}
+    others = [{"rm_id": l.raw_material_id, "qty": l.required_qty} for l in order.lines if l.is_extra]
+    return {"order_id": order.id, "prod_no": order.prod_no, "product_id": order.product_id,
+            "category_id": order.product.category_id if order.product else None,
+            "kind": "quotation" if quotation_order else "stock", "quote_no": src["quote_no"], "base_qty": base,
+            "extra_percent": order.extra_percent or 0, "order_date": order.order_date.isoformat(),
+            "start": (order.earliest_start_date or order.order_date).isoformat(),
+            "needed_by": order.needed_by_date.isoformat() if order.needed_by_date else "", "remarks": order.remarks or "",
+            "spare": spare, "others": others, "bundle_no": order.bundle_no or ""}
+
+
+@production_orders_bp.route("/production_orders/review/<int:order_id>", methods=["POST"])
+def production_orders_review(order_id):
+    """Finalize se bana "Needs review" Draft order ko Production order form me dekh ke "Confirm order" karo: extra pieces %, spare %, other materials,
+    dates, remarks yahan tay hote hain. Confirm ke baad hi Plan / Release khulta hai. Product aur "kis ke liye" yahan nahi badalte."""
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    back = redirect(url_for("production_planning.production_planning_page", tab="needs") if request.form.get("next") == "planning"
+                    else url_for("production_orders.production_orders_list"))
+    if order.status != "Draft" or order.reviewed:
+        flash("Only a draft order that needs review can be reviewed.", "error")
+        return back
+    product = order.product
+    if not material_untouched(order):
+        flash(f"{order.prod_no} already has material issued, so it cannot be changed now.", "error")
+        return back
+    src = source_map([order]).get(order.id)
+    quotation_order = bool(src and src["kind"] == "quotation" and src["customer_qty"] is not None)
+    if quotation_order:
+        base_qty = src["customer_qty"]            # customer ne jitna manga wahi; extra pieces sirf Extra % se
+    else:
+        base_qty = request.form.get("planned_qty", type=float) or 0
+        if base_qty <= 0:
+            flash("Quantity must be greater than zero.", "error")
+            return back
+    extra_percent = 0.0
+    if request.form.get("make_extra") == "1" and quotation_order:
+        extra_percent, extra_error = read_extra_percent(request.form.get("extra_percent"))
+        if extra_error or extra_percent <= 0:
+            flash(extra_error or "Enter the Extra % (more than 0) or choose No extra pieces.", "error")
+            return back
+    planned_qty = planned_with_extra(base_qty, extra_percent, product)
+    batch_kg = planned_qty * order.unit_weight
+    needed_by, needed_error = _read_needed_by()
+    allowances, allowance_error = _read_allowances(product)
+    start_raw = (request.form.get("start_date") or "").strip()
+    try:
+        start_date = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else (order.earliest_start_date or order.order_date)
+    except ValueError:
+        start_date, start_error = None, "Enter a valid start date."
+    else:
+        start_error = None
+    for error in (needed_error, allowance_error, start_error):
+        if error:
+            flash(error, "error")
+            return back
+    plan, plan_error = read_plan(product, batch_kg, order.order_date, auto=True, start_date=start_date)
+    if plan_error:
+        flash(plan_error, "error")
+        return back
+
+    # Recipe / packing lines naye planned_qty aur spare % se dobara; purane "other materials" hata ke form ke naye jode jaate hain
+    # (ye Draft document ki lines hain, business record nahi — order Confirm hone se pehle ka kaam).
+    for row in list(order.lines):
+        if row.is_extra:
+            db.session.delete(row)
+        elif row.is_packing:
+            row.required_qty = math.ceil(round(batch_kg / row.kg_per_pack, 6)) if row.kg_per_pack else row.required_qty
+            row.allowance_percent = allowances.get(row.raw_material_id, row.allowance_percent or 0)
+        else:
+            row.required_qty = batch_kg * (row.ratio_percent or 0) / 100
+            row.allowance_percent = allowances.get(row.raw_material_id, row.allowance_percent or 0)
+    db.session.flush()
+    other_error = _add_other_materials(order, product)
+    if other_error:
+        db.session.rollback()
+        flash(other_error, "error")
+        return back
+    order.planned_qty = planned_qty
+    order.extra_percent = extra_percent
+    order.needed_by_date = needed_by
+    order.remarks = (request.form.get("remarks") or "").strip()[:255] or None
+    if plan:
+        _save_plan(order, plan)
+    order.reviewed = True
+    persist_schedule()
+    db.session.commit()
+    extra_note = f" {planned_qty:g} will be made ({base_qty:g} for the customer + {planned_qty - base_qty:g} extra)." if planned_qty - base_qty > 0.00005 else ""
+    flash(f"{order.prod_no} confirmed.{extra_note} Now choose its line and machines on the Production planning page.", "success")
+    return back
 
 
 
@@ -707,6 +859,7 @@ def production_orders_expected():
     unit_weight = 1.0 if unit_code in ("KG", "KGS") else (product.unit_weight or request.form.get("unit_weight", type=float) or 0)
     if unit_weight <= 0:
         return jsonify({"ok": False, "text": "Enter the weight per unit."})
+    # qty = form ki (extra pieces samet) banane wali qty — JS Extra % jod ke bhejta hai
     batch_kg = qty * unit_weight
     today = today_ist()
     plan, error = read_plan(product, batch_kg, today, auto=True)
@@ -761,6 +914,9 @@ def production_orders_release(order_id):
     if not order.lines:
         flash("This production order has no materials, so it cannot be released.", "error")
         return redirect(_back_url())
+    if not order.reviewed:
+        flash(f"Review {order.prod_no} first: open it in the Production order form and press Confirm order, then plan and release it.", "error")
+        return redirect(_back_url())
     if not order.plan_confirmed:
         flash(f"Plan {order.prod_no} first: choose its production line and machines on the Production planning page, then release it.", "error")
         return redirect(_back_url())
@@ -775,13 +931,29 @@ def production_orders_cancel(order_id):
     # Order delete nahi hota, status "Cancelled" + wajah (audit). Material issue ho chuka (ya draft issue pada) ho to cancel nahi:
     # pehle wo issues cancel karo taaki stock wapas store me aaye — warna WIP me phansa maal bhool jaayega.
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
-    if order.status not in ACTIVE_STATUSES:
-        flash("Only a draft or released production order can be cancelled.", "error")
+    # fix_list #7: chalta hua (In production) order bhi cancel ho sakta hai, par sirf safe gate ke andar: koi output nahi, koi stage chal / ruka nahi,
+    # aur material ya to issue hi nahi hua ya poora store me wapas aa gaya (neeche wala check).
+    if order.status not in ACTIVE_STATUSES and order.status != "In production":
+        flash("Only a draft, released or running production order can be cancelled.", "error")
         return redirect(_back_url())
     reason = (request.form.get("reason") or "").strip()
     if not reason:
         flash("Enter the reason for cancelling.", "error")
         return redirect(_back_url())
+    if order.status == "In production":
+        from app.models import ProductionOutput
+        if ProductionOutput.query.filter_by(production_order_id=order.id, status="Posted", is_deleted=False).first() is not None:
+            flash(f"{order.prod_no} has a recorded output. Cancel the output first (Production output, Recorded tab), then cancel the order.", "error")
+            return redirect(_back_url())
+        running = [st.stage_name for st in order.stages if st.status in ("In progress", "On hold")]
+        if running:
+            flash(f"{', '.join(running)} of {order.prod_no} is running. Stop it first (Routing: Cancel start), then cancel the order.", "error")
+            return redirect(_back_url())
+        # Jis line ka maal use (melt / kaam) ho chuka hai wo store me wapas nahi aa sakta — issue cancel karke "wapas" dikhane se stock galat hota; isliye roko
+        consumed = [l.raw_material.name if l.raw_material else "material" for l in order.lines if (l.used_qty or 0) > 0.00005]
+        if consumed:
+            flash(f"{order.prod_no} has already used material ({', '.join(consumed)}), so it cannot be cancelled now. Complete the order or close it instead.", "error")
+            return redirect(_back_url())
     # Draft issue pada ho, ya production me abhi maal (issue - return) bacha ho to cancel nahi: pehle wo store me wapas karo
     drafts = [i.issue_no for i in order.issues if not i.is_deleted and i.status == "Draft"]
     in_wip = [l for l in order.lines if l.issued_qty > 0.00005]
@@ -789,6 +961,9 @@ def production_orders_cancel(order_id):
         flash(f"{order.prod_no} still has material issued to production" + (f" ({', '.join(drafts)} draft)" if drafts else "") +
               ". Return the unused material to the store (Material issue, Return) or cancel the issues first, then cancel the order.", "error")
         return redirect(_back_url())
+    for stage in order.stages:
+        if stage.melt_group_id:
+            stage.melt_group_id = None          # cancel hua order kisi melt (heat) ka member nahi rehta; stage rows history ke liye rehti hain
     order.status = "Cancelled"
     order.cancel_reason = reason[:255]
     order.cancelled_at = datetime.utcnow()
@@ -802,11 +977,17 @@ def production_orders_cancel(order_id):
 
 @production_orders_bp.route("/production_orders/reschedule/<int:order_id>", methods=["POST"])
 def production_orders_reschedule(order_id):
-    # Draft / Released order ki start date aur machines badlo; plan naye sire se hisaab hota hai. Qty / recipe yahan nahi badalte.
+    # Draft / Released order ki start date aur machines badlo; plan naye sire se hisaab hota hai.
+    # Ye drawer sirf line, machines, earliest start, needed by badalta hai. Qty / extra pieces / spare % ka review "Production order" form me
+    # hota hai (review route) — Finalize se bana order wahan "Confirm order" hone tak yahan Plan nahi ho sakta.
     order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
     if order.status not in ACTIVE_STATUSES:
         flash("Only a draft or released production order can be rescheduled.", "error")
         return redirect(_back_url())
+    if not order.reviewed:
+        flash(f"Review {order.prod_no} first: open it in the Production order form and press Confirm order, then plan it.", "error")
+        return redirect(_back_url())
+    new_qty = order.planned_qty
     routing = ([{"stage_id": st.work_stage_id, "name": st.stage_name} for st in order.stages]
                if order.stages else _routing_for(order.product))
     if not routing:
@@ -818,7 +999,7 @@ def production_orders_reschedule(order_id):
         flash(line_error, "error")
         return redirect(_back_url())
     line = line or order.line
-    plan, plan_error = read_plan(order.product, order.planned_qty * order.unit_weight, order.order_date, routing, line=line)
+    plan, plan_error = read_plan(order.product, new_qty * order.unit_weight, order.order_date, routing, line=line)
     if plan_error:
         flash(plan_error, "error")
         return redirect(_back_url())
