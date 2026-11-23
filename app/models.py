@@ -1928,6 +1928,27 @@ class ProductionOrderStageMachine(CreatedAtMixin, db.Model):
     used = db.Column(db.Boolean, default=False, server_default="0", nullable=False)
 
 
+class ProductionOrderStageMachineChange(CreatedAtMixin, db.Model):
+    # Stage Start par machine badli (dusri line ki free machine / kharab machine ki jagah) to purani plan-row yahan likhi jaati hai —
+    # taaki history rahe aur "Cancel run" par plan wali machine wapas aa sake. Plan wali row delete hoti hai, par yahan uski copy bachti hai.
+    # kind: "assign" = Dashboard se free machine par, "swap" = Routing page ka "Use this machine instead", "left_out" = kharab machine bina badli ke hata di.
+    __tablename__ = "production_order_stage_machine_changes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    stage_id = db.Column(db.Integer, db.ForeignKey("production_order_stages.id"), nullable=False)
+    stage = db.relationship("ProductionOrderStage", foreign_keys=[stage_id], backref="machine_changes")
+    from_machine_id = db.Column(db.Integer, db.ForeignKey("machines.id"), nullable=True)
+    from_machine_name = db.Column(db.String(100), nullable=True)
+    from_capacity_per_hour = db.Column(db.Float, nullable=True)
+    from_hours_per_day = db.Column(db.Float, nullable=True)
+    to_machine_id = db.Column(db.Integer, db.ForeignKey("machines.id"), nullable=True)
+    to_machine_name = db.Column(db.String(100), nullable=True)
+    kind = db.Column(db.String(12), nullable=False)
+    reason = db.Column(db.String(150), nullable=True)
+    changed_at = db.Column(db.DateTime, nullable=False)           # IST (naive), baaki stage times ki tarah
+    reverted_at = db.Column(db.DateTime, nullable=True)           # Cancel run par plan wali machine wapas aayi to kab
+
+
 
 # ======================= Production output + Finished goods (FG) =======================
 class ProductionOutput(CreatedAtMixin, db.Model):

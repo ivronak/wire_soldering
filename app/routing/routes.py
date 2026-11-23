@@ -15,6 +15,7 @@ from app.production_orders.stage_material import gap_text, stage_material_gap
 from app.routing.pcs import pcs_mode, spools_made, to_pcs
 from app.production_orders.scheduler import now_ist, today_ist
 from app.routing.batch import combine_error, ensure_melt_group, melt_kg, melt_members, melt_plan, stage_kg
+from app.routing.assign import assign_machine, drop_rows, eligible_machines, restore_planned, settle, target_error
 from app.routing.busy import busy_machines
 from app.routing.handoff import casting_ahead, metal_wait, stage_clash
 
@@ -288,13 +289,10 @@ def stage_machine_problem(stage):
             reasons.append(f"{machine.name} ({busy[row.machine_id]['text']})")
     if not down:
         return None
-    planned_ids = {row.machine_id for row in rows}
-    others = Machines.query.filter(Machines.work_stage_id == stage.work_stage_id, Machines.is_deleted == False,
-                                   Machines.status == "active").order_by(Machines.code).all()
     return {"names": ", ".join(reasons),
             "all_down": len(down) == len(rows),
-            # Badli machine: usi work stage ki Active machine jo plan me nahi aur abhi khali (busy nahi) hai
-            "swaps": [{"id": m.id, "name": m.name} for m in others if m.id not in planned_ids and m.id not in busy],
+            # Badli machine: usi work stage ki Active machine jo plan me nahi, abhi khali (busy nahi) hai aur jiski line chal rahi hai (D6)
+            "swaps": [{"id": m.id, "name": m.name, "line": m.line.name if m.line else ""} for m in eligible_machines(stage.production_order, stage, busy)],
             "rows": down}
 
 
@@ -438,9 +436,11 @@ def routing_list():
     )
 
 
-def _read_when(field):
+def _read_when(field, form=None):
     # <input type="datetime-local"> ki value -> naive IST datetime; khaali ho to abhi. (value, error)
-    raw = (request.form.get(field) or "").strip()
+    # form=None to request.form; Dashboard ka Assign & Start apna form de sakta hai (start_stage ke saath wahi function chalta hai)
+    form = request.form if form is None else form
+    raw = (form.get(field) or "").strip()
     if not raw:
         return now_ist().replace(second=0, microsecond=0), None
     try:
@@ -504,60 +504,69 @@ def deferred_scrap_stage(order, stage):
     return None
 
 
-@routing_bp.route("/routing/start/<int:stage_id>", methods=["POST"])
-def routing_start(stage_id):
-    stage, order, error = _stage_for_action(stage_id)
-    if error:
-        flash(error, "error")
-        return _back()
+def start_stage(stage, order, form, target_machine_id=None, kind="swap", assigned_note=""):
+    """Stage ka Start — saare gates ek jagah (Routing page aur Dashboard "Assign & Start" dono yahi chalate hain, koi gate bypass nahi hota).
+    Wapas (True, "success text") ya (False, "error text"). COMMIT NAHI karta aur flash nahi karta: caller commit kare; fail ho to caller db.session.rollback()
+    kare (kyunki machine badalne jaise changes fail hone se pehle session me ho chuke ho sakte hain).
+    target_machine_id: is machine par chalao (plan wali machine ki jagah) — Dashboard ka "Assign & Start". Khaali ho to purana tareeka: plan wali machine,
+    aur sab ki sab kharab / busy ho to form ka swap_machine_id. kind: log me "assign" (Dashboard) ya "swap" (Routing page).
+    assigned_note: caller ne machine pehle hi badal di ho (Released order: schedule naye machine ke hisaab se bane) to stage notes me jaane wala text."""
     if stage.status != "Pending":
-        flash(f"{stage.stage_name} has already been started.", "error")
-        return _back()
+        return False, f"{stage.stage_name} has already been started."
     previous = _previous_stages(order, stage)
     not_done = [s.stage_name for s in previous if s.status != "Done"]
     if not_done:
-        flash(f"Finish {not_done[0]} first. Stages run one after another.", "error")
-        return _back()
+        return False, f"Finish {not_done[0]} first. Stages run one after another."
     # C7: is stage ka maal (recipe me jo isi stage ke saamne hai) poora issue hona chahiye
     material_gaps = stage_material_gap(order, stage.work_stage_id)
     if material_gaps:
-        flash(f"{stage.stage_name} cannot start yet: its material is not fully issued ({gap_text(material_gaps)}). Issue the rest from the Material issue page.", "error")
-        return _back()
+        return False, f"{stage.stage_name} cannot start yet: its material is not fully issued ({gap_text(material_gaps)}). Issue the rest from the Material issue page."
     blocker = lab_qc_blocker(order, stage)
     if blocker is not None:
-        flash(f"{stage.stage_name} cannot start yet: {blocker.stage_name} needs a passed lab test with the test certificate (TC) uploaded first.", "error")
-        return _back()
+        return False, f"{stage.stage_name} cannot start yet: {blocker.stage_name} needs a passed lab test with the test certificate (TC) uploaded first."
     # G27: stage ki machine kharab / maintenance me ho to start nahi hone dete. Sab ki sab kharab ho to doosri Active machine chunni padti hai
     # (form ka "Use this machine instead"); kuch hi kharab ho to unhe hata ke baaki Active se chalta hai.
     problem = stage_machine_problem(stage)
     swap_machine = None
-    if problem is not None and problem["all_down"]:
-        swap_id = request.form.get("swap_machine_id", type=int)
+    plan_ids = {row.machine_id for row in stage.machines}
+    if target_machine_id:
+        # Dashboard: manager ne khud machine chuni. Wo pehle se plan me hai to kuch badalna nahi (neeche wahi purani jaanch chalti hai).
+        if target_machine_id not in plan_ids:
+            swap_machine = db.session.get(Machines, target_machine_id)
+            error = target_error(order, stage, swap_machine)
+            if error:
+                return False, f"{stage.stage_name} cannot start: {error}"
+    elif problem is not None and problem["all_down"]:
+        swap_id = form.get("swap_machine_id", type=int)
         if not any(option["id"] == swap_id for option in problem["swaps"]):
             if problem["swaps"]:
-                flash(f"{stage.stage_name} cannot start: {problem['names']}. Choose another machine in the Start form (Use this machine instead).", "error")
-            else:
-                flash(f"{stage.stage_name} cannot start: {problem['names']}. No other free machine is available for this stage, so wait until it is free.", "error")
-            return _back()
+                return False, f"{stage.stage_name} cannot start: {problem['names']}. Choose another machine in the Start form (Use this machine instead)."
+            return False, f"{stage.stage_name} cannot start: {problem['names']}. No other free machine is available for this stage, so wait until it is free."
         swap_machine = db.session.get(Machines, swap_id)
-    operator = (request.form.get("operator") or "").strip()[:60]
+    machine_note = assigned_note
+    if swap_machine is not None:
+        # Machine pehle badal do: clash / waste / casting ke saare checks (aur stage ke ghante) chuni hui machine ke hisaab se chahiye (D1, D5).
+        # Aage koi check fail ho to caller rollback karta hai, to ye badlav bhi wapas.
+        old_names = problem["names"] if problem is not None else ", ".join(row.machine_name for row in stage.machines)
+        assign_reason = (form.get("assign_reason") or "").strip()[:150]
+        assign_machine(stage, swap_machine, kind=kind, reason=assign_reason)
+        machine_note = f"Machine changed at start: {old_names} -> {swap_machine.name}" + (f", reason: {assign_reason}" if assign_reason else "")
+        problem = None
+    operator = (form.get("operator") or "").strip()[:60]
     if not operator:
-        flash("Enter the operator's name.", "error")
-        return _back()
+        return False, "Enter the operator's name."
     # Timing clash lock: agle stage ki machine par doosre order ka garam maal aane wala ho aur ye kaam us gap me poora na ho to roko.
     # Wajah (kam se kam 3 akshar) likh kar "start anyway" ho sakta hai; wajah stage ke notes me jaati hai.
     clash = stage_clash(order, stage, in_production_orders())
-    clash_reason = (request.form.get("clash_reason") or "").strip()[:150]
+    clash_reason = (form.get("clash_reason") or "").strip()[:150]
     if clash is not None and len(clash_reason) < 3:
-        flash(f"{stage.stage_name} cannot start now. " + clash["message"], "error")
-        return _back()
+        return False, f"{stage.stage_name} cannot start now. " + clash["message"]
     # C12: garam maal limit se zyada ruka ho to Start tabhi hoga jab wajah (kam se kam 3 akshar) likhi ho; wajah stage notes me jaati hai
     wait = metal_wait(order, stage)
-    rewait_reason = (request.form.get("rewait_reason") or "").strip()[:100]
+    rewait_reason = (form.get("rewait_reason") or "").strip()[:100]
     if wait is not None and wait["over"] and len(rewait_reason) < 3:
-        flash(f"{stage.stage_name} cannot start yet: the metal from {wait['prev_name']} has waited {round(wait['minutes'])} min (limit {wait['limit']} min). "
-              f"Write what was done (for example re-heated) in the Start form.", "error")
-        return _back()
+        return False, (f"{stage.stage_name} cannot start yet: the metal from {wait['prev_name']} has waited {round(wait['minutes'])} min (limit {wait['limit']} min). "
+                       f"Write what was done (for example re-heated) in the Start form.")
     # C8a: furnace (batch machine) poori nahi bhar rahi to Start tabhi hoga jab wajah (kam se kam 3 akshar) likhi ho; wajah stage notes me jaati hai
     is_melt = side_stage_info(order, stage) is None and bool(stage.work_stage and stage.work_stage.is_batch)
     waste = waste_payload(melt_plan(order, stage, melt_kg(stage))) if side_stage_info(order, stage) is None else None
@@ -568,44 +577,32 @@ def routing_start(stage_id):
             continue
         member_problem = _member_start_problem(member)
         if member_problem:
-            flash(f"The combined melt cannot start: {member.production_order.prod_no} {member_problem} Fix it, or remove it from the melt.", "error")
-            return _back()
-    waste_reason = (request.form.get("waste_reason") or "").strip()[:100]
+            return False, f"The combined melt cannot start: {member.production_order.prod_no} {member_problem} Fix it, or remove it from the melt."
+    waste_reason = (form.get("waste_reason") or "").strip()[:100]
     if waste is not None and len(waste_reason) < 3:
-        flash(f"{stage.stage_name} cannot start yet: the furnace holds {waste['cap']:g} KG per melt but this melt fills {waste['melts'] * waste['cap'] - waste['unused']:g} KG "
-              f"({waste['unused']:g} KG unused). Write the reason in the Start form (for example no other order of the same alloy is ready).", "error")
-        return _back()
-    started_at, error = _read_when("started_at")
+        return False, (f"{stage.stage_name} cannot start yet: the furnace holds {waste['cap']:g} KG per melt but this melt fills {waste['melts'] * waste['cap'] - waste['unused']:g} KG "
+                       f"({waste['unused']:g} KG unused). Write the reason in the Start form (for example no other order of the same alloy is ready).")
+    started_at, error = _read_when("started_at", form)
     if error:
-        flash(error, "error")
-        return _back()
+        return False, error
     # G14-4: melt taiyar hone par Casting machine free nahi hogi (aur garam maal limit se zyada rukega) to wajah likhni padti hai; wajah stage notes me
     cast = casting_ahead(order, stage, started_at) if is_melt else None
-    cast_reason = (request.form.get("cast_reason") or "").strip()[:100]
+    cast_reason = (form.get("cast_reason") or "").strip()[:100]
     if cast is not None and cast["needs_reason"] and len(cast_reason) < 3:
-        flash(f"{stage.stage_name} cannot start yet. {cast['message']} Write why you start now (for example the casting machine will be freed early) in the Start form.", "error")
-        return _back()
+        return False, f"{stage.stage_name} cannot start yet. {cast['message']} Write why you start now (for example the casting machine will be freed early) in the Start form."
     if previous and previous[-1].completed_at and started_at < previous[-1].completed_at:
-        flash(f"{stage.stage_name} cannot start before {previous[-1].stage_name} finished ({previous[-1].completed_at.strftime('%d %b %H:%M')}).", "error")
-        return _back()
-    machine_note = ""
+        return False, f"{stage.stage_name} cannot start before {previous[-1].stage_name} finished ({previous[-1].completed_at.strftime('%d %b %H:%M')})."
     if problem is not None:
         # Kharab machine ki plan-row hata dete hain (warna dashboard par us machine par order chalta dikhta). Wajah stage notes me jaati hai.
-        for row, _machine in problem["rows"]:
-            db.session.delete(row)
-        if swap_machine is not None:
-            db.session.add(ProductionOrderStageMachine(stage_id=stage.id, machine_id=swap_machine.id, machine_name=swap_machine.name,
-                                                       capacity_per_hour=swap_machine.capacity_per_hour or 0, hours_per_day=swap_machine.hours_per_day or 8,
-                                                       is_planned=True, used=False))
-            machine_note = f"Machine changed at start: {problem['names']} -> {swap_machine.name}"
-        else:
-            machine_note = f"Not available, left out: {problem['names']}"
+        drop_rows(stage, [row for row, _machine in problem["rows"]], "left_out", problem["names"])
+        settle(stage)
+        machine_note = f"Not available, left out: {problem['names']}"
     stage.status = "In progress"
     stage.started_at = started_at
     stage.operator = operator
     side = side_stage_info(order, stage)
     stage.qty_in = side["qty"] if side else main_input(order, stage)       # flux stage: flux ki apni qty; baaki: metal chain
-    notes = (request.form.get("notes") or "").strip()
+    notes = (form.get("notes") or "").strip()
     if clash is not None:
         notes = (notes + " | " if notes else "") + f"Timing clash overridden ({clash['machine_name']} due for {clash['other_order']}): {clash_reason}"
     if waste is not None:
@@ -633,8 +630,23 @@ def routing_start(stage_id):
         if len(members) > 1:
             heat_text += " Started together with " + ", ".join(m.production_order.prod_no for m in members if m.id != stage.id) + "."
     stage.notes = notes[:255] or None
+    return True, f"{stage.stage_name} started for {order.prod_no}." + (f" {machine_note}." if machine_note else "") + heat_text
+
+
+@routing_bp.route("/routing/start/<int:stage_id>", methods=["POST"])
+def routing_start(stage_id):
+    # Routing page ka Start: sara kaam start_stage() karta hai (Dashboard bhi wahi use karta hai); yahan sirf commit / rollback aur message
+    stage, order, error = _stage_for_action(stage_id)
+    if error:
+        flash(error, "error")
+        return _back()
+    ok, message = start_stage(stage, order, request.form, kind="swap")
+    if not ok:
+        db.session.rollback()
+        flash(message, "error")
+        return _back()
     db.session.commit()
-    flash(f"{stage.stage_name} started for {order.prod_no}." + (f" {machine_note}." if machine_note else "") + heat_text, "success")
+    flash(message, "success")
     return _back()
 
 
@@ -780,6 +792,10 @@ def routing_cancel_start(stage_id):
         member.held_at = None
         member.hold_reason = None
         member.hold_minutes = 0
+        # Start par machine badli thi (Dashboard Assign / Use this machine instead) to plan wali machine wapas: nahi to order us machine par
+        # atka rehta jahan kaam hua hi nahi
+        if restore_planned(member):
+            _add_note(member, "Planned machine restored")
     db.session.commit()
     flash(f"{stage.stage_name} of {order.prod_no} is back to waiting to start. Start it again when the machine really starts."
           + (" The other orders of this melt went back too." if len(members) > 1 else ""), "success")

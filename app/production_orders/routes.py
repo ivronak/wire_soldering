@@ -210,6 +210,9 @@ def _save_plan(order, plan):
                 stage_id=stage_row.id, machine_id=machine["id"], machine_name=machine["name"],
                 capacity_per_hour=machine["per_hour"], hours_per_day=machine["hours_per_day"]))
     db.session.flush()
+    # Upar purane stage rows delete + naye foreign-key se add hue, par order.stages ki memory wali list purani hi rehti hai.
+    # Expire na karein to persist_schedule() purani (delete hui) list par dates likhta hai aur naye stage rows purani dates par rah jaate hain.
+    db.session.expire(order, ["stages"])
 
 
 def _planner_products():
@@ -1044,29 +1047,43 @@ def production_orders_move(order_id, direction):
     return redirect(_back_url())
 
 
-@production_orders_bp.route("/production_orders/start/<int:order_id>", methods=["POST"])
-def production_orders_start(order_id):
-    # Released order ko "In production" karo. Uski dates aaj se shuru hoke us waqt freeze ho jaati hain; baaki queue un ke aas-paas chalti hai.
-    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+def order_line_gap(order, line_id, today):
+    """Order Start par production line ki jaanch. Wapas (line_row, gap_kg, error): line_row None = lines nahi / in-house order (line ka koi gate nahi).
+    gap_kg > 0 = line ki daily capacity ka itna hissa khali rahega, to Start par wajah likhna zaroori. error = English text ya None."""
+    # In-house product (Flux) ka order line ki capacity / "line chuno" se bandha nahi: wo alag se store ke liye banta hai (client meeting 2, #9)
+    in_house = bool(order.product and order.product.output_rm_id)
+    board = [] if in_house else line_board(today)
+    if not board:
+        return None, 0.0, None
+    # Order banate waqt line chuni thi (machines usi ki) to wahi; warna Start ke form se (purane orders)
+    line_id = order.line_id or line_id
+    if line_id not in {row["id"] for row in board}:
+        return None, 0.0, ("The production line of this order is not active any more. Turn it on in Production Lines first." if order.line_id
+                           else "Choose the production line for this order.")
+    # Line ki daily capacity se kam kaam (is order + us line par baaki chalte orders) ho to wajah likhna zaroori
+    chosen = next(row for row in board if row["id"] == line_id)
+    batch_kg = (order.planned_qty or 0) * (order.unit_weight or 1)
+    return chosen, round(chosen["capacity"] - (chosen["left_kg"] + batch_kg), 2), None
+
+
+def start_order(order, line_id=None, under_reason=""):
+    """Released order ko "In production" karo (dates aaj se freeze). Wapas (True, "success text") ya (False, "error text").
+    COMMIT / flash NAHI karta: caller commit kare, fail par db.session.rollback() kare (Dashboard "Assign & Start" isi ke saath stage Start ek hi transaction me karta hai).
+    line_id / under_reason: purane orders (jinki line order banate waqt nahi chuni thi) ke liye Start form se."""
     if order.status != "Released":
-        flash("Only a released production order can be started.", "error")
-        return redirect(_back_url())
+        return False, "Only a released production order can be started."
     if order.issue_status == "Not issued":
-        flash(f"Issue material for {order.prod_no} first (Material issue page), then start production.", "error")
-        return redirect(_back_url())
+        return False, f"Issue material for {order.prod_no} first (Material issue page), then start production."
     if posted_issued_qty(order) <= 0.00005:
         # Draft issue stock nahi hilata — production ke paas maal tab hi hai jab issue Post ho chuka ho
-        flash(f"{order.prod_no} only has a draft material issue. Post it (Material issue page) so the material reaches production, then start.", "error")
-        return redirect(_back_url())
+        return False, f"{order.prod_no} only has a draft material issue. Post it (Material issue page) so the material reaches production, then start."
     if not order.stages:
-        flash("This order has no production plan (stages and machines). Add one with Reschedule first.", "error")
-        return redirect(_back_url())
+        return False, "This order has no production plan (stages and machines). Add one with Reschedule first."
     # C7: order tab start hota hai jab pehle stage (Melting: Tin / Lead) ka maal poora issue ho — kam metal = chhota output. Baad ke stage ka maal partial chalega.
     first_gaps = stage_material_gap(order, order.stages[0].work_stage_id)
     if first_gaps:
-        flash(f"{order.prod_no} cannot start yet: {order.stages[0].stage_name} needs all its material first ({gap_text(first_gaps)}). "
-              f"Issue the rest from the Material issue page.", "error")
-        return redirect(_back_url())
+        return False, (f"{order.prod_no} cannot start yet: {order.stages[0].stage_name} needs all its material first ({gap_text(first_gaps)}). "
+                       f"Issue the rest from the Material issue page.")
     today = today_ist()
     # Is order ko frozen waalon ke turant baad rakh ke aaj se schedule karo, uski dates save karo
     queue = queue_orders()
@@ -1075,33 +1092,23 @@ def production_orders_start(order_id):
     ordered, _materials, schedule = live_schedule(today, frozen + [order] + rest, {order.id: today})
     info = schedule.get(order.id)
     if not info:
-        flash("This order's plan is incomplete (a stage has no machine capacity).", "error")
-        return redirect(_back_url())
+        return False, "This order's plan is incomplete (a stage has no machine capacity)."
     for stage, (start, end) in zip(order.stages, info["windows"]):
         stage.start_date = start
         stage.end_date = end
     # Production line: lines bani hon to chunna zaroori (client change #1); koi line nahi to pehle jaisa chalta hai
     # In-house product (Flux) ka order line ki capacity / "line chuno" se bandha nahi: wo alag se store ke liye banta hai (client meeting 2, #9)
-    in_house = bool(order.product and order.product.output_rm_id)
-    board = [] if in_house else line_board(today)
-    if board:
-        # Order banate waqt line chuni thi (machines usi ki) to wahi; warna Start ke form se (purane orders)
-        line_id = order.line_id or request.form.get("line_id", type=int)
-        if line_id not in {row["id"] for row in board}:
-            flash("The production line of this order is not active any more. Turn it on in Production Lines first." if order.line_id
-                  else "Choose the production line for this order.", "error")
-            return redirect(_back_url())
-        order.line_id = line_id
-        # Line ki daily capacity se kam kaam (is order + us line par baaki chalte orders) ho to wajah likhna zaroori
-        chosen = next(row for row in board if row["id"] == line_id)
-        batch_kg = (order.planned_qty or 0) * (order.unit_weight or 1)
-        gap = round(chosen["capacity"] - (chosen["left_kg"] + batch_kg), 2)
-        reason = (request.form.get("under_reason") or "").strip()[:255]
+    chosen, gap, line_error = order_line_gap(order, line_id, today)
+    if line_error:
+        return False, line_error
+    if chosen is not None:
+        order.line_id = chosen["id"]
+        reason = (under_reason or "").strip()[:255]
         if gap > 0.0001:
             if len(reason) < 3:
-                flash(f"{chosen['name']} can make {chosen['capacity']:g} KG a day but only {chosen['left_kg'] + batch_kg:g} KG is planned. "
-                      f"Write why {gap:g} KG of its capacity is unused (or add another order first).", "error")
-                return redirect(_back_url())
+                batch_kg = (order.planned_qty or 0) * (order.unit_weight or 1)
+                return False, (f"{chosen['name']} can make {chosen['capacity']:g} KG a day but only {chosen['left_kg'] + batch_kg:g} KG is planned. "
+                               f"Write why {gap:g} KG of its capacity is unused (or add another order first).")
             order.under_capacity_kg = gap
             order.under_capacity_reason = reason
         else:
@@ -1114,9 +1121,21 @@ def production_orders_start(order_id):
     order.status = "In production"
     renumber_queue()
     persist_schedule(today)
-    db.session.commit()
     line_text = f" on {order.line.name}" if order.line else ""
-    flash(f"{order.prod_no} is now in production{line_text}. Planned finish: {info['end'].strftime('%d %b %Y')}.", "success")
+    return True, f"{order.prod_no} is now in production{line_text}. Planned finish: {info['end'].strftime('%d %b %Y')}."
+
+
+@production_orders_bp.route("/production_orders/start/<int:order_id>", methods=["POST"])
+def production_orders_start(order_id):
+    # Released order ko "In production" karo. Uski dates aaj se shuru hoke us waqt freeze ho jaati hain; baaki queue un ke aas-paas chalti hai.
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    ok, message = start_order(order, request.form.get("line_id", type=int), request.form.get("under_reason") or "")
+    if not ok:
+        db.session.rollback()
+        flash(message, "error")
+        return redirect(_back_url())
+    db.session.commit()
+    flash(message, "success")
     return redirect(_back_url())
 
 

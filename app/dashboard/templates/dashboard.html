@@ -93,6 +93,19 @@
   .dm-table tr.here td { background: #FFF4E5; font-weight: 600; }
   .dm-table .r { text-align: right; font-variant-numeric: tabular-nums; }
   .dm-card { border: 1px solid #D1D9D8; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+  /* Free machine par intezaar karta order (kisi bhi line ka) aur udhaar (borrowed) machine ka label */
+  .db-wait { font-size: 12.5px; color: #7A4A00; background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 8px; padding: 6px 9px; line-height: 1.35; }
+  .db-wait b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #0F2F32; }
+  .db-wait .go { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: #fff; background: #C26A2E; border-radius: 6px; padding: 2px 9px; }
+  .db-lent { font-size: 11.5px; font-weight: 600; color: #1D4F91; background: #EAF2FD; border: 1px solid #C2D8F5; border-radius: 6px; padding: 3px 8px; }
+  .dm-go { border: 1px solid #C26A2E; background: #C26A2E; color: #fff; border-radius: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+  .dm-go:hover { background: #A85A25; }
+  .dm-go[disabled] { opacity: .4; cursor: default; }
+  .dm-form { border: 1px solid #F5D9B5; background: #FFFAF3; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .dm-form label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #6B7F82; margin: 8px 0 3px; }
+  .dm-form input, .dm-form textarea, .dm-form select { width: 100%; border: 1px solid #C9D3D2; border-radius: 6px; padding: 6px 8px; font-size: 13px; background: #fff; }
+  .dm-form .why { font-size: 12px; color: #7A271A; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 5px 8px; margin-top: 4px; }
+  .dm-form .info { font-size: 12px; color: #3D5A5D; background: #F1F5F4; border-radius: 6px; padding: 5px 8px; margin-top: 4px; }
   .db-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
 </style>
 {% endblock %}
@@ -158,6 +171,7 @@
               </div>
               {% if r.held %}<div class="db-holdline">On hold since {{ r.held_at }}: {{ r.hold_reason }}</div>{% endif %}
               {% if r.over_text %}<div><span class="db-chip over"><i></i>{{ r.over_text }} over plan</span></div>{% endif %}
+              {% if r.lent %}<div class="db-lent" title="This order belongs to {{ r.home_line }} but runs on a {{ r.machine_line }} machine, because that machine was free.">{{ r.home_line }} order on a {{ r.machine_line }} machine</div>{% endif %}
               <div class="db-then">Then &rarr; <b>{{ r.next_stage }}</b></div>
             </div>
             {% endfor %}
@@ -165,7 +179,11 @@
           {% elif t.state == 'inactive' %}
             <div class="db-idle">{% if t.mstatus == 'breakdown' %}Under breakdown. No new order can start here.{% elif t.mstatus == 'maintenance' %}Under maintenance. No new order can start here.{% else %}Switched off in Machine master.{% endif %}</div>
           {% else %}
+            {% if t.idle_for %}
+            <div class="db-wait">Idle &mdash; <b>{{ t.idle_for.prod_no }}</b> ({{ t.idle_for.line or 'no line' }}) {% if t.idle_for.same_line %}is waiting for this machine{% else %}is waiting for a free machine{% endif %}{% if t.idle_for.count > 1 %} &middot; +{{ t.idle_for.count - 1 }} more{% endif %}<br><span class="go">Start here</span></div>
+            {% else %}
             <div class="db-idle">Idle, ready for work.</div>
+            {% endif %}
           {% endif %}
           {% if t.incoming %}
           <div class="db-hot" title="Another order's hot metal goes to this machine. A long job started here now would block it.">{% if t.incoming.waiting %}<span style="{{ 'color:#B42318' if t.incoming.over else '' }}">Hot metal {{ t.incoming.text }}{% if t.incoming.over %} &middot; limit crossed{% endif %}</span>{% else %}Hot metal due {{ t.incoming.text }}{% endif %}: <b>{{ t.incoming.prod_no }}</b> &middot; {{ t.incoming.prev_stage }} &rarr; {{ t.incoming.stage }}</div>
@@ -247,6 +265,62 @@
         '<div class="dm-sec">Stages (' + o.done + ' of ' + o.total + ' done)</div><div class="overflow-x-auto"><table class="dm-table"><thead><tr><th>Stage</th><th>Status</th><th>Machines</th><th>Plan dates</th><th class="r">Planned</th><th class="r">Actual</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="dm-sec">Material</div><table class="dm-table"><thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th></tr></thead><tbody>' + mats + '</tbody></table></div>';
     }
+    // ---------- Free machine: kisi bhi line ke intezaar karte order ko yahin se start karo ("Assign & Start") ----------
+    function assignSection(a) {
+      var rows = a.orders;
+      var html = '<div class="dm-sec">Start an order on this machine</div>';
+      if (!rows.length) return html + '<p class="text-ink-muted">No order is waiting for a machine of this kind right now.</p>';
+      html += '<table class="dm-table"><thead><tr><th>Order</th><th>Home line</th><th>Waiting for</th><th class="r">Batch</th><th></th></tr></thead><tbody>' + rows.map(function (r) {
+        var why = r.ready ? (r.plan_note ? 'Its planned machine: ' + esc(r.plan_note) : 'Planned machine is free too') : '<span style="color:#B42318">' + esc(r.blockers.join('; ')) + '</span>';
+        var btn = r.ready ? '<button type="button" class="dm-go" data-order="' + r.order_id + '">' + (r.in_plan ? 'Start here' : 'Assign &amp; Start') + '</button>' : '<button type="button" class="dm-go" disabled>Blocked</button>';
+        return '<tr><td class="font-mono font-semibold">' + esc(r.prod_no) + '<div class="db-meta">' + esc(r.stage_name) + (r.status === 'Released' ? ' &middot; not started yet' : '') + '</div></td><td>' + esc(r.home_line || '—') + (r.same_line ? '' : ' <span class="db-meta">(other line)</span>') + '</td><td>' + why + '</td><td class="r">' + r.batch_kg + ' KG</td><td class="r">' + btn + '</td></tr>';
+      }).join('') + '</tbody></table><div id="dm-assign-form"></div>';
+      return html + '<p class="db-meta mt-1">The order keeps its own line; only this stage runs here. Every normal Start check still applies (material, lab certificate, busy machine, hot metal).</p>';
+    }
+    // Released order ko is machine ki queue me daalo (start nahi) — machine busy ho tab bhi
+    function queueSection(rows) {
+      var html = '<div class="dm-sec">Plan a released order on this machine</div><table class="dm-table"><thead><tr><th>Order</th><th>Home line</th><th>Planned on now</th><th class="r">Batch</th><th></th></tr></thead><tbody>' + rows.map(function (r) {
+        var btn = r.blockers.length ? '<span class="db-meta" style="color:#B42318">' + esc(r.blockers.join('; ')) + '</span>' : '<button type="button" class="dm-go dm-q" data-order="' + r.order_id + '">Plan here</button>';
+        return '<tr><td class="font-mono font-semibold">' + esc(r.prod_no) + '<div class="db-meta">' + esc(r.stage_name) + '</div></td><td>' + esc(r.home_line || '—') + '</td><td>' + esc(r.plan_text) + '</td><td class="r">' + r.batch_kg + ' KG</td><td class="r">' + btn + '</td></tr>';
+      }).join('') + '</tbody></table><p class="db-meta mt-1">This only changes the plan: the order is not started, and its dates are worked out again. Start it later from this pop-up or from Routing.</p>';
+      return html;
+    }
+    function openAssign(machine, orderId) {
+      var box = document.getElementById('dm-assign-form');
+      box.innerHTML = '<p class="db-meta mt-2">Checking…</p>';
+      fetch('/dashboard/machine/' + machine.id + '/assign/' + orderId + '/check').then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (res) {
+        if (!res.ok) { box.innerHTML = '<p class="mt-2" style="color:#B42318">' + esc(res.j.error || 'Could not check this order.') + '</p>'; return; }
+        var q = res.j.requirements, c = res.j.candidate || {}, f = '';
+        f += '<div class="dm-form"><div class="font-semibold">' + esc(c.prod_no) + ' &rarr; ' + esc(machine.name) + ' <span class="db-meta">(' + esc(machine.line) + ')</span></div>';
+        if (!q.in_plan) f += '<div class="info">Planned machine: ' + esc(c.plan_text) + '. It will be replaced by <b>' + esc(machine.name) + '</b> for this stage' + (q.heat ? ' (and for the other orders in the same melt)' : '') + '. If you cancel the run, the planned machine comes back.</div>';
+        f += '<label>Operator</label><input name="operator" list="dm-ops" maxlength="60" autocomplete="off"><datalist id="dm-ops">' + (res.j.operators || []).map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
+        if (q.lines && q.lines.length) f += '<label>Production line for this order</label><select name="line_id">' + q.lines.map(function (l) { return '<option value="' + l.id + '">' + esc(l.name) + '</option>'; }).join('') + '</select>';
+        if (q.under) f += '<div class="why">' + esc(q.under) + '</div><label>Reason (unused line capacity)</label><input name="under_reason" maxlength="255">';
+        if (q.clash) f += '<div class="why">' + esc(q.clash) + '</div><label>Reason to start anyway (hot metal clash)</label><input name="clash_reason" maxlength="150">';
+        if (q.wait) f += '<div class="why">Hot metal from ' + esc(q.wait.prev) + ' has waited ' + q.wait.minutes + ' min (limit ' + q.wait.limit + ' min).</div><label>What was done (for example re-heated)</label><input name="rewait_reason" maxlength="100">';
+        if (q.waste) f += '<div class="why">' + esc(q.waste.machine) + ' holds ' + q.waste.cap + ' KG per melt, but ' + q.waste.unused + ' KG of it stays unused.</div><label>Reason (furnace not full)</label><input name="waste_reason" maxlength="100">';
+        if (q.cast) f += '<div class="why">' + esc(q.cast.text) + '</div><label>Why start now</label><input name="cast_reason" maxlength="100">';
+        var own = c.own_line_waiting || [];
+        if (own.length) f += '<div class="why">The own order of ' + esc(machine.line) + ' (' + esc(own.join(', ')) + ') is also ready for this kind of machine.</div><label>Why ' + esc(c.prod_no) + ' goes first</label><input name="assign_reason" maxlength="150">';
+        else if (!q.in_plan) f += '<label>Why this machine (optional)</label><input name="assign_reason" maxlength="150" placeholder="For example: Line 1 furnace is busy">';
+        f += '<label>Notes (optional)</label><input name="notes" maxlength="120">';
+        f += '<div class="mt-3 flex gap-2 justify-end"><button type="button" class="px-3 py-1.5 text-[13px] border border-slate-300 bg-white rounded hover:bg-mist" id="dm-assign-cancel">Cancel</button><button type="button" class="dm-go" id="dm-assign-submit" style="padding:6px 14px;font-size:13px">' + (q.in_plan ? 'Start' : 'Assign &amp; Start') + '</button></div>';
+        f += '<div id="dm-assign-err" class="mt-2" style="color:#B42318;font-size:12.5px"></div></div>';
+        box.innerHTML = f;
+        document.getElementById('dm-assign-cancel').addEventListener('click', function () { box.innerHTML = ''; });
+        document.getElementById('dm-assign-submit').addEventListener('click', function () {
+          var btn = this, fd = new FormData();
+          box.querySelectorAll('input[name], select[name]').forEach(function (el) { fd.append(el.name, el.value); });
+          btn.disabled = true;
+          fetch('/dashboard/machine/' + machine.id + '/assign/' + orderId, { method: 'POST', body: fd })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (resp) {
+              if (resp.ok) { window.location.reload(); return; }
+              btn.disabled = false; document.getElementById('dm-assign-err').textContent = resp.j.error || 'Could not start this order.';
+            }).catch(function () { btn.disabled = false; document.getElementById('dm-assign-err').textContent = 'Could not start this order.'; });
+        });
+      }).catch(function () { box.innerHTML = '<p class="mt-2" style="color:#B42318">Could not check this order.</p>'; });
+    }
     function show(data, movedId) {
       var m = data.machine;
       document.getElementById('db-title').textContent = m.name;
@@ -259,6 +333,9 @@
           return '<tr><td class="font-mono font-semibold">' + esc(q.prod_no) + '</td><td>' + esc(q.prev_stage) + ' &rarr; ' + esc(q.stage) + '</td><td>' + esc(q.text) + '</td></tr>';
         }).join('') + '</tbody></table><p class="db-meta mt-1">A long job started on this machine now would block it. The routing page refuses such a start unless a reason is written.</p>';
       }
+      if (data.message) html += '<div class="info mt-1" style="background:#E6F5EC;color:#1F7A4D;border-radius:6px;padding:6px 9px;font-size:12.5px">' + esc(data.message) + '</div>';
+      if (data.assign && data.assign.can) html += assignSection(data.assign);
+      if (data.assign && data.assign.queueable && data.assign.queueable.length) html += queueSection(data.assign.queueable);
       html += '<div class="dm-sec">Queue for this machine</div>';
       if (data.queue.length) {
         html += '<table class="dm-table"><thead><tr><th>#</th><th>Order</th><th>Product</th><th>Stage</th><th class="r">Batch</th><th>From</th><th></th></tr></thead><tbody>' + data.queue.map(function (q, i) {
@@ -276,6 +353,18 @@
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
             .then(function (res) { if (res.ok) show(res.j, b.getAttribute('data-order')); else document.getElementById('dm-err').textContent = res.j.error || 'Could not move the order.'; })
             .catch(function () { document.getElementById('dm-err').textContent = 'Could not move the order.'; });
+        });
+      });
+      body.querySelectorAll('.dm-go[data-order]:not(.dm-q)').forEach(function (b) {
+        b.addEventListener('click', function () { openAssign(m, b.getAttribute('data-order')); });
+      });
+      body.querySelectorAll('.dm-q').forEach(function (b) {
+        b.addEventListener('click', function () {
+          b.disabled = true;
+          fetch('/dashboard/machine/' + m.id + '/queue/' + b.getAttribute('data-order'), { method: 'POST' })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) { if (res.ok) show(res.j, b.getAttribute('data-order')); else { b.disabled = false; document.getElementById('dm-err').textContent = res.j.error || 'Could not change the plan.'; } })
+            .catch(function () { b.disabled = false; document.getElementById('dm-err').textContent = 'Could not change the plan.'; });
         });
       });
       modal.classList.remove('hidden');

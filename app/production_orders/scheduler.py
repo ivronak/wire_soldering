@@ -119,6 +119,22 @@ def _stage_specs(order):
     return specs or None
 
 
+def _held_until(origin, stage):
+    """Frozen order ka ye stage uski machines ko kab tak roke rakhta hai (position, kaam ke din). Pehle har stage plan ki end_date tak rokta tha, isliye
+    jo stage jaldi khatam ho gaya uski machine bhi khali hone ke baad "busy" dikhti thi (nakli idle). Ab:
+      Done        -> aaj ya pehle khatam hua to machine abhi se free (plan ki end_date baaki ho tab bhi), warna plan ki end_date;
+      In progress / On hold -> plan ki end_date tak, par aaj ka din to busy hi hai (der se chal raha ho tab bhi);
+      Pending     -> plan ki end_date tak (pehle jaisa)."""
+    planned = 0.0 if stage.end_date < origin else working_index(origin, stage.end_date) + 1.0
+    if stage.status == "Done" and stage.completed_at:
+        done_day = stage.completed_at.date()
+        done_pos = 0.0 if done_day <= origin else working_index(origin, done_day) + 1.0       # aaj ya pehle khatam = machine abhi se free
+        return min(planned, done_pos)
+    if stage.status in ("In progress", "On hold"):
+        return max(planned, 1.0)
+    return planned
+
+
 def live_schedule(today=None, ordered=None, earliest_override=None):
     """Poori queue ka live hisaab. Wapas (ordered, materials, schedule):
     schedule[order_id] = {"start", "end", "windows": [(d1, d2)], "frozen", "waits_for_material": date|None, "working_days"}.
@@ -137,7 +153,7 @@ def live_schedule(today=None, ordered=None, earliest_override=None):
         if frozen:
             # Frozen order: save hui dates hi sach; machines un dates tak busy
             for stage in order.stages:
-                end_pos = 0.0 if stage.end_date < origin else working_index(origin, stage.end_date) + 1.0
+                end_pos = _held_until(origin, stage)
                 for machine in stage.machines:
                     machine_free[machine.machine_id] = max(machine_free.get(machine.machine_id, 0.0), end_pos)
             schedule[order.id] = {"start": order.stages[0].start_date, "end": order.stages[-1].end_date, "windows": stored,

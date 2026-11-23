@@ -1,11 +1,13 @@
 # Live machine dashboard (client meeting 2, change 10): har production line aur uski har machine ka abhi ka haal.
 # Dekhne ke saath ek hi cheez badalta hai: machine ki queue me order ko upar / neeche karna (client meeting 2, #11). Data: Machines (line), ProductionOrderStage (In progress = machine chal rahi hai),
 # aur live_schedule (agla kaun si machine par aane wala hai).
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, flash, jsonify, render_template, request
 
 from app.extensions import db
 
 from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, WorkStage
+from app.dashboard.assign import (assign_and_start, eligible_orders_for_machine, queue_assign, queueable_orders_for_machine, start_requirements,
+                                  tile_waiting, waiting_stages)
 from app.production_orders.scheduler import live_schedule, now_ist, persist_schedule, queue_orders, today_ist
 from app.routing.handoff import hot_handoffs, hours_text as handoff_text
 
@@ -51,8 +53,12 @@ def running_by_machine(now):
                 "held": stage.status == "On hold", "hold_reason": stage.hold_reason or "",
                 "held_at": stage.held_at.strftime("%d %b %H:%M") if stage.held_at else ""}
         info["over_text"] = hours_text(info["over_min"]) if info["over_min"] else ""
+        info["home_line"] = order.line.name if order.line else ""
         for row in stage.machines:
-            out.setdefault(row.machine_id, []).append(info)
+            # Order ki "home" line aur machine ki line alag ho to machine udhaar (borrowed) hai — tile par chhota label (client: dusri line ki free machine)
+            machine = row.machine
+            lent = bool(order.line_id and machine is not None and machine.line_id and machine.line_id != order.line_id)
+            out.setdefault(row.machine_id, []).append(dict(info, lent=lent, machine_line=machine.line.name if lent and machine.line else ""))
     return out
 
 
@@ -110,6 +116,7 @@ def machine_board(today=None, now=None):
     stage_no = {stage_id: n + 1 for n, stage_id in enumerate(ranked)}          # 1, 2, 3 ... poore process me stage ka number
     machines = Machines.query.filter_by(is_deleted=False).order_by(Machines.code).all()
     machines.sort(key=lambda m: (stage_rank.get(m.work_stage_id, (10 ** 9, 0)), m.code))
+    waiting_all = waiting_stages()          # ek baar: kaun se order shuru hone ka intezaar kar rahe hain (free tile par "Idle — PROD-002 waiting")
 
     def tile(machine):
         runs = running.get(machine.id, [])
@@ -123,7 +130,9 @@ def machine_board(today=None, now=None):
                 # G27: kharab / maintenance / retired — tile par alag rang aur naam se dikhta hai (pehle sab "Inactive" tha)
                 "mstatus": machine.status, "down_text": {"breakdown": "Breakdown", "maintenance": "Maintenance", "retired": "Retired"}.get(machine.status, ""),
                 "down_phrase": {"breakdown": "under breakdown", "maintenance": "under maintenance", "retired": "retired"}.get(machine.status, ""),
-                "incoming": (incoming.get(machine.id) or [None])[0]}
+                "incoming": (incoming.get(machine.id) or [None])[0],
+                # Free machine par intezaar karta ready order (kisi bhi line ka): tile par "Idle — PROD-002 (Line 1) waiting" + Start here
+                "idle_for": tile_waiting(machine, waiting_all) if state == "free" and not (incoming.get(machine.id) or []) else None}
 
     groups = []
     for line in ProductionLine.query.filter_by(is_deleted=False).order_by(ProductionLine.code).all():
@@ -173,7 +182,9 @@ def order_detail(order, running_stage):
         else:
             actual = stage.actual_hours
         stages.append({"name": stage.stage_name, "status": stage.status, "is_this": stage.id == running_stage.id,
-                       "machines": [row.machine_name for row in stage.machines], "start": day_text(stage.start_date), "end": day_text(stage.end_date),
+                       "machines": [row.machine_name + (f" ({row.machine.line.name})" if order.line_id and row.machine is not None and row.machine.line_id
+                                                        and row.machine.line_id != order.line_id and row.machine.line else "") for row in stage.machines],
+                       "start": day_text(stage.start_date), "end": day_text(stage.end_date),
                        "planned_h": round(stage.planned_hours, 2) if stage.planned_hours else None, "actual_h": actual,
                        "operator": stage.operator or "", "qty_in": round(stage.qty_in, 2) if stage.qty_in is not None else None,
                        "qty_out": round(stage.qty_out, 2) if stage.qty_out is not None else None})
@@ -254,7 +265,12 @@ def machine_payload(machine):
                       "can_down": movable and index < len(rows) - 1})
     incoming = incoming_by_machine(now_ist()).get(machine.id, [])
     learned = learned_speed(machine)
-    return {"incoming": incoming, "machine": {"id": machine.id, "name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
+    # Free (Active, kuch chal nahi raha) machine: kaun se orders (kisi bhi line ke) is par abhi chal sakte hain — pop-up me "Start here"
+    can_assign = machine.status == "active" and not orders
+    assign = {"can": can_assign, "orders": eligible_orders_for_machine(machine) if can_assign else [],
+              # Released orders ko is machine ki queue me daalna (start nahi) — machine busy ho tab bhi
+              "queueable": queueable_orders_for_machine(machine) if machine.status == "active" else []}
+    return {"incoming": incoming, "assign": assign, "machine": {"id": machine.id, "name": machine.name, "code": machine.code, "stage": machine.work_stage.name if machine.work_stage else "",
                                 "line": machine.line.name if machine.line else "No line", "capacity": machine.capacity_text,
                                 "status": machine.status, "learned": learned_text(learned),
                                 "learned_kg_per_hour": learned["kg_per_hour"] if learned["ok"] else None},
@@ -307,6 +323,67 @@ def machine_queue_move(machine_id, order_id, direction):
     persist_schedule()
     db.session.commit()
     return jsonify(machine_payload(machine))
+
+
+def _assign_target(machine_id, order_id):
+    # Assign & Start ke dono routes ke liye: machine, order aur uska pehla na-hua stage (nahi to 404 / 400)
+    machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    stage = next((st for st in order.stages if st.status != "Done"), None)
+    return machine, order, stage
+
+
+@dashboard_bp.route("/dashboard/machine/<int:machine_id>/assign/<int:order_id>/check")
+def machine_assign_check(machine_id, order_id):
+    """Start form kholne se pehle: is order ko is machine par chalane me kya poochna padega (wajah wale boxes) — kuch save nahi hota."""
+    machine, order, stage = _assign_target(machine_id, order_id)
+    if stage is None or stage.status != "Pending":
+        return jsonify({"error": f"{order.prod_no} has no stage waiting to start."}), 400
+    try:
+        requirements = start_requirements(machine, order, stage)
+    finally:
+        db.session.rollback()          # machine tentative badli thi, wapas
+    row = next((r for r in eligible_orders_for_machine(machine) if r["order_id"] == order_id), None)
+    return jsonify({"requirements": requirements, "candidate": row,
+                    "operators": [r[0] for r in db.session.query(ProductionOrderStage.operator).filter(ProductionOrderStage.operator.isnot(None))
+                                  .distinct().order_by(ProductionOrderStage.operator).all()]})
+
+
+@dashboard_bp.route("/dashboard/machine/<int:machine_id>/assign/<int:order_id>", methods=["POST"])
+def machine_assign(machine_id, order_id):
+    """Free machine par order ka stage chalao (Released ho to order bhi saath me start). Wahi gates jo Routing page ke Start par — ek hi transaction:
+    kuch bhi atka to poora wapas (order bhi Released rehta hai, machine bhi plan wali)."""
+    machine, order, _stage = _assign_target(machine_id, order_id)
+    try:
+        ok, message = assign_and_start(machine, order, request.form)
+    except Exception:
+        db.session.rollback()
+        raise
+    if not ok:
+        db.session.rollback()
+        return jsonify({"error": message}), 400
+    db.session.commit()
+    flash(message, "success")
+    return jsonify({"ok": True, "message": message})
+
+
+@dashboard_bp.route("/dashboard/machine/<int:machine_id>/queue/<int:order_id>", methods=["POST"])
+def machine_queue_assign(machine_id, order_id):
+    """Released order ka stage is machine par plan karo (start nahi). Wapas naya pop-up data + message; dates dobara bante hain."""
+    machine = Machines.query.filter_by(id=machine_id, is_deleted=False).first_or_404()
+    order = ProductionOrder.query.filter_by(id=order_id, is_deleted=False).first_or_404()
+    try:
+        ok, message = queue_assign(machine, order, request.form.get("assign_reason") or "")
+    except Exception:
+        db.session.rollback()
+        raise
+    if not ok:
+        db.session.rollback()
+        return jsonify({"error": message}), 400
+    db.session.commit()
+    payload = machine_payload(machine)
+    payload["message"] = message
+    return jsonify(payload)
 
 
 @dashboard_bp.route("/dashboard")
