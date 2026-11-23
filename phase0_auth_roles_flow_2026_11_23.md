@@ -1,6 +1,6 @@
 # Phase 0 — Login + simple Roles / Permissions (Developer > Admin > Staff) — FLOW (2026-11-23)
 
-**Status: FLOW PROPOSED — user ke OK ke bina kuch build nahi hoga.** Yeh file `tracker.md` Current Focus aur `memory.md` se linked hai.
+**Status: FLOW FINAL — user ne 11 sawal clear kiye (section 11, 23 Nov); build abhi shuru nahi, user ke "shuru karo" par P0-1.** Yeh file `tracker.md` Current Focus aur `memory.md` se linked hai.
 Research ka source: 3 read-only researchers (code inventory, saari md files, secure-design research) — 23 Nov 2026. Sab numbers neeche asli code se hain (`app.url_map` dump).
 
 ---
@@ -188,3 +188,39 @@ Sirf account par hard-lock = attacker Admin / Developer ko hamesha lock rakh sak
 9. **Admin account kaun banaye?** Recommended: **sirf Developer** (Admin kisi aur Admin ko nahi bana sakta).
 10. **Tour / demo** live par bilkul band (env flag) — recommended; sirf aap (Developer) local / beta par chalayen.
 11. **Approve** (stock adjustment) shuru me Developer / Admin only — theek?
+
+---
+
+## 11. USER KE FAISLE (23 Nov 2026) — 11 sawal ek-ek karke clear hue. **Ye section baaki doc se upar maana jaayega.**
+| # | Sawal | User ka jawab | Asar (flow me kya badla) |
+|---|---|---|---|
+| 1 | Levels | **View + Edit** | 3-way chip `No access / View / View + Edit`, jaisa likha tha. |
+| 2 | Admin ceiling | **Developer tay kare** | "Admin access" page sirf Developer ko; Admin sirf wahi pages de sakta hai jo uske ceiling me hain. |
+| 3 | Users / Roles pages Staff role ko mil sakte hain? | **Haan, role me bhi de sakein** *(recommendation se ulta)* | Neeche 11.1 ke niyam. `admin_access` aur `audit_log` ab bhi sirf Developer. |
+| 4 | Starter roles | **Haan, 6** | Store keeper, Purchase, Sales, Production supervisor, Accounts, Read-only — editable DB rows. |
+| 5 | Idle logout | **Zaroori nahi** *(recommendation se alag)* | Koi idle timeout nahi. Session = normal browser-session cookie: **Logout dabao ya browser band karo tab tak login**. Dashboard / TV screen ka masla khatam. Admin user ko deactivate / reset kare to uska session phir bhi agli request par band (session_version). Cookie Secure + HttpOnly rahegi. |
+| 6 | Login ID | **Sirf mobile number** *(username hata diya)* | Neeche 11.2. |
+| 7 | Audit log | **Sirf Developer** | Admin ko baad me option. |
+| 8 | Demo tour live par | **Abhi development hai; production me jaane par hata denge** | **ERP_DEMO env flag nahi.** Tour abhi jaisa hai chalta rahega (guard me Developer-only; uska andar wala `test_client().post` seedha order-function ban jaayega taaki guard / CSRF ke saath bhi chale). **Real go-live checklist me item: tour hatana** (`app/tour`, `static/js/tour.js`, `/demo`, `/tour/*`). |
+| 9 | Admin kaun banaye | **Sirf Developer** | Users page me "Admin" type ka option sirf Developer ko dikhta hai. |
+| 10 | Stock adjustment Approve | **Sirf Admin / Developer** | Alag permission `stock_adjustments.approve`; starter roles me kisi ko nahi. Baad me kisi role ko de sakte hain. |
+| 11 | Code kaun likhe | **AI likhe, har step samjhaye, user review kare** | CLAUDE.md §0A ka "user type kare" default is Phase ke liye **override** (user ka faisla 23 Nov). |
+
+### 11.1 Faisla 3 ke niyam (Staff role ko Users / Roles page dena)
+Jis Staff ke role me `users` / `roles` page par **Edit** hai wo "manager-staff" hai. Uske liye wahi `can_manage(actor, target)` + `clamp_permissions` helper (10.1) lagega:
+1. Wo sirf **Staff** users ko dekh / bana / badal / reset / unlock kar sakta hai — **Admin ya Developer ko kabhi nahi** (dikhte bhi nahi). Naya Staff user banane par **Admin type nahi** chun sakta.
+2. Wo kisi ko / kisi role me **sirf wahi pages aur levels** de sakta hai jo **uske apne role me** hain (apne se zyada nahi, apna role badalna bhi nahi).
+3. Admin ka ceiling Admin par, Admin ke bhi upar Developer. Chain: Developer ⊇ Admin ceiling ⊇ manager-staff ke pages ⊇ unke banaye roles.
+4. Role editor me jo page uske paas nahi wo grey: "Not available for your account".
+5. Role ko `users` / `roles` page dene ka kaam sirf Admin / Developer kar sakte hain (manager-staff khud kisi role ko Users page nahi de sakta — isse power-chain lambi nahi hoti).
+*(Agar baad me ye jyada ho jaye to ek line me hata sakte hain; shuru me yahi sabse safe form hai.)*
+
+### 11.2 Faisla 6 ke niyam (sirf mobile number se login)
+- `users.mobile` = **login ID**, unique (inactive users ke bhi), **10 digit Indian number** (`+91` / space / `-` hata ke normalize). `users.full_name` sirf dikhane ke liye. Username column **nahi**.
+- Developer ka bhi mobile se hi login (`flask create-developer --mobile 9XXXXXXXXX`, password hidden prompt).
+- Lockout counter `(mobile, IP)` par; message hamesha "Invalid mobile number or password".
+- Mobile number personal data hai: audit / logs me sirf last 4 digit ya user id, poora number nahi. Do user ka mobile same nahi ho sakta (parivar / shared phone ke liye dikkat ho to bataiye).
+- Password reset flow wahi (Admin / manager-staff temp password dete hain; OTP / SMS **nahi**, wo baad ka kaam).
+
+### 11.3 Ab ye doc ka final build plan hai
+Section 8 ke P0-1 … P0-8 + section 10 ke fix + upar ke faisle. Pehla step: **P0-1 (tables + migration + 6 starter roles seed + registry ka skeleton)**, DB copy par auto-test, local DB par migration backup ke saath, live par kuch nahi jab tak user "deploy" na bole.

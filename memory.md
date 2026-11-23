@@ -520,7 +520,9 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ne kaha audio saath me ho, kuch karna na pade, ek click me poora demo.
 **How to apply:** Naya step jodo to narration + mp3 dono banao (`tour_narration.py` + `build_tour_audio.py`). Selectors / ids badlo to `tour_test.py` fail karega — tour dono (manual + auto) usi step data se chalte hain.
 
-### Requirement (flow approval pending): Phase 0 Login + Roles/Permissions, Developer > Admin > Staff (2026-11-23)
+### Decision (flow FINAL, build pending 'shuru karo'): Phase 0 Login + Roles/Permissions, Developer > Admin > Staff (2026-11-23)
+**User ke 11 jawab (doc section 11):** View+Edit; Developer tay kare Admin ceiling; Users/Roles pages Staff role ko bhi de sakte (manager-staff rules 11.1); 6 starter roles; koi idle logout nahi; **login sirf mobile number**; audit sirf Developer; demo tour abhi rahega + production me hatana (go-live checklist); Admin sirf Developer banaye; stock adjustment approve alag permission Admin/Developer only; AI likhe + samjhaye (CLAUDE.md 0A override).
+
 **Kya:** User ne kaha: Admin account users/roles/permissions manage kare; permission module-wise page par (sirf permitted page dikhe); ekdum simple role + UI; Admin ke upar hidden Developer (owner) jo Admin ko permission de; baaki baad me. Pehle (19 Oct) decide tha 'login Sales ke baad' — Sales live hai (20 Nov), ab trigger aa gaya.
 **Flow:** `phase0_auth_roles_flow_2026_11_23.md` (research + 2 critics). Mukhya faisle (proposed): 47 page keys, deny-by-default guard, levels No access/View/View+Edit, Admin ceiling (Admin apne se zyada nahi de sakta), Developer sirf server CLI se, Admin sirf Developer banata hai, tour/demo env-flag, fail-closed secret key.
 **How to apply:** Build se pehle user flow approve kare (11 open sawal doc ke section 9 + 10.10). Dashboard/routing/scheduler jaisa step-by-step, har step auto-test.
