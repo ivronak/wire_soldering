@@ -520,15 +520,15 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ne kaha audio saath me ho, kuch karna na pade, ek click me poora demo.
 **How to apply:** Naya step jodo to narration + mp3 dono banao (`tour_narration.py` + `build_tour_audio.py`). Selectors / ids badlo to `tour_test.py` fail karega — tour dono (manual + auto) usi step data se chalte hain.
 
-### Decision (BUILT, review pending): Dashboard cross-line Assign & Start — B0–B6 (2026-11-23)
+### Decision (BUILT + LIVE 23 Nov, commit fba789c): Dashboard cross-line Assign & Start — B0–B6 (2026-11-23)
 **Kya:** Flow approve hone par B0–B6 local build + auto-test. Faisle jo doc se alag / naye: (1) combined melt me assign poora group ek saath target furnace par le jaata hai (pehle 'refuse in first cut' likha tha) — double-booking se bachne ke liye; (2) queue-only 'Plan here' sirf Released order par (frozen In-production order ki dates nahi badalti, un par sirf Start-time swap); (3) scheduler me Done stage ki machine aaj se free (`_held_until`), In progress / On hold aaj tak pakad ke; (4) har machine badlav `production_order_stage_machine_changes` me log (kinds assign / swap / left_out / queue), Cancel run plan wapas karta hai, 'queue' kind wapas nahi hota; (5) swap / eligible list: Active + capacity>0 + line chal rahi + busy nahi; (6) machine badalte hi stage capacity / planned hours / order totals dobara nikalte hain.
 **Kyun:** Client rule — machine ek minute khali na baithe; line sirf order ka home label hai.
-**How to apply:** Dashboard / routing start / scheduler chhedte waqt `dashboard_machine_assign_flow_2026_11_23.md` + `app/routing/assign.py` + `app/dashboard/assign.py` dekho. Migration c3d9a5e7f1b4 live par deploy baaki.
+**How to apply:** Dashboard / routing start / scheduler chhedte waqt `dashboard_machine_assign_flow_2026_11_23.md` + `app/routing/assign.py` + `app/dashboard/assign.py` dekho. Migration c3d9a5e7f1b4 live par lag chuki (23 Nov).
 
-### Requirement (flow approval pending): Dashboard se cross-line machine assign + start (2026-11-23)
+### Requirement (ab BUILT + LIVE, upar Decision dekho): Dashboard se cross-line machine assign + start (2026-11-23)
 **Kya:** Line 1 ka order apni busy machine ki jagah Line 2 ki **free same-stage machine** par dashboard se assign + start ho sake; agla stage apni planned machine (busy/clash ho to kisi bhi line ki free machine). Line = order ka home label, machine = asli resource. Client principle: machine/aadmi idle nahi (meeting 2, transcript line 133).
 **Kyun yahan likha:** Ye pehle sirf C11 "proposed" tha (demo_changes line 109), 16 Nov ke agreed list (C8+C11+G14) me sirf stage-Start ka "Use this machine instead" aaya; dashboard wala hissa chhoot gaya aur dobara uthaya nahi gaya — user ne 23 Nov ko pakda.
-**How to apply:** Build se pehle `dashboard_machine_assign_flow_2026_11_23.md` (flow, 21 scenarios, bugs D1-D7, build order B0-B6, open questions) user se approve karao. Dashboard / routing / scheduler chhedte waqt isko dekho.
+**How to apply:** Ye ab build ho chuka hai; flow, 21 scenarios, bugs D1-D7 `dashboard_machine_assign_flow_2026_11_23.md` me hain. Dashboard / routing / scheduler chhedte waqt isko dekho.
 
 ---
 

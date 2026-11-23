@@ -1,6 +1,6 @@
 # Dashboard se machine assign + start (cross-line) — FLOW (2026-11-23)
 
-**Status: APPROVED 23 Nov + B0–B6 BUILT locally (uncommitted, review pending). Doc se alag: combined melt = poora group target furnace par jaata hai (refuse nahi); queue-only assign sirf Released orders ke liye.** Yeh file `tracker.md` Current Focus aur `memory.md` se linked hai.
+**Status: APPROVED 23 Nov + B0–B6 BUILT, committed fba789c, LIVE 23 Nov (migration c3d9a5e7f1b4). Doc se alag: combined melt = poora group target furnace par jaata hai (refuse nahi); queue-only assign sirf Released orders ke liye.** Yeh file `tracker.md` Current Focus aur `memory.md` se linked hai.
 
 ## 1. Requirement (user, 23 Nov, "client ne bhi kaha tha")
 Order 1 + Order 2 = Line 1, Order 3 = Line 2. Order 1 Line 1 ke furnace me Melting chala raha hai. Order 3 ki Melting khatam, Line 2 ka furnace FREE. Order 2 (Line 1) ko Line 1 ka furnace busy hone se start nahi mil raha. **Dashboard se hi** Line 2 ka free furnace Order 2 ko assign + start kar sakein (client: "machine ya aadmi ek minute bhi nahi baithna chahiye" — meeting 2, transcript line 133). Phir Order 2 stage 2 par kahan jayega, ye sab scenario ek flow me pehle decide ho.
