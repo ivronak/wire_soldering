@@ -520,6 +520,11 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 **Kyun:** User ne kaha audio saath me ho, kuch karna na pade, ek click me poora demo.
 **How to apply:** Naya step jodo to narration + mp3 dono banao (`tour_narration.py` + `build_tour_audio.py`). Selectors / ids badlo to `tour_test.py` fail karega — tour dono (manual + auto) usi step data se chalte hain.
 
+### Requirement (flow approval pending): Phase 0 Login + Roles/Permissions, Developer > Admin > Staff (2026-11-23)
+**Kya:** User ne kaha: Admin account users/roles/permissions manage kare; permission module-wise page par (sirf permitted page dikhe); ekdum simple role + UI; Admin ke upar hidden Developer (owner) jo Admin ko permission de; baaki baad me. Pehle (19 Oct) decide tha 'login Sales ke baad' — Sales live hai (20 Nov), ab trigger aa gaya.
+**Flow:** `phase0_auth_roles_flow_2026_11_23.md` (research + 2 critics). Mukhya faisle (proposed): 47 page keys, deny-by-default guard, levels No access/View/View+Edit, Admin ceiling (Admin apne se zyada nahi de sakta), Developer sirf server CLI se, Admin sirf Developer banata hai, tour/demo env-flag, fail-closed secret key.
+**How to apply:** Build se pehle user flow approve kare (11 open sawal doc ke section 9 + 10.10). Dashboard/routing/scheduler jaisa step-by-step, har step auto-test.
+
 ### Decision (BUILT + LIVE 23 Nov, commit fba789c): Dashboard cross-line Assign & Start — B0–B6 (2026-11-23)
 **Kya:** Flow approve hone par B0–B6 local build + auto-test. Faisle jo doc se alag / naye: (1) combined melt me assign poora group ek saath target furnace par le jaata hai (pehle 'refuse in first cut' likha tha) — double-booking se bachne ke liye; (2) queue-only 'Plan here' sirf Released order par (frozen In-production order ki dates nahi badalti, un par sirf Start-time swap); (3) scheduler me Done stage ki machine aaj se free (`_held_until`), In progress / On hold aaj tak pakad ke; (4) har machine badlav `production_order_stage_machine_changes` me log (kinds assign / swap / left_out / queue), Cancel run plan wapas karta hai, 'queue' kind wapas nahi hota; (5) swap / eligible list: Active + capacity>0 + line chal rahi + busy nahi; (6) machine badalte hi stage capacity / planned hours / order totals dobara nikalte hain.
 **Kyun:** Client rule — machine ek minute khali na baithe; line sirf order ka home label hai.
