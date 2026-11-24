@@ -56,7 +56,7 @@ def _load_user(user_id):
         return None
     if user is None or not user.is_active:
         return None
-    if session.get("sv") != user.session_version:           # password badla / reset / deactivate / role badla
+    if session.get("sv") != user.session_version:           # password badla / reset / deactivate (role ya role ke rights badalne par nahi — wo live reload hote hain)
         return None
     if time.time() - (session.get("lt") or 0) > MAX_SESSION_SECONDS:
         return None

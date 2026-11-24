@@ -2634,7 +2634,7 @@ class User(UserMixin, CreatedAtMixin, db.Model):   # UserMixin = Flask-Login ke 
     role = db.relationship("Role", foreign_keys=[role_id], backref="users")
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     must_change_password = db.Column(db.Boolean, default=True, nullable=False)   # naya user / Admin reset ke baad pehle login par password badalna zaroori
-    # session_version: Admin user ko deactivate / reset kare ya role badle to +1 — uske purane khule session agli request par band
+    # session_version: Admin user ko deactivate / reset kare to +1 (role badalne par nahi — rights live reload hote hain) — uske purane khule session agli request par band
     session_version = db.Column(db.Integer, default=1, nullable=False)
     last_login_at = db.Column(db.DateTime, nullable=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)

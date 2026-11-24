@@ -137,7 +137,8 @@ def users_edit(user_id):
     if role.id != target.role_id:
         changes["role"] = [target.role.name, role.name]
         target.role_id = role.id
-        target.session_version += 1            # role badla: purane session band, naye rights ke saath dobara login
+        # Yahan session_version +1 NAHI karte: rights har request par DB se aate hain (service.permissions_of), isliye user logout kiye
+        # bina agle page-load / refresh par naye role ke rights mil jaate hain. (Pehle yahan +1 tha — usse user bahar nikal jaata tha.)
     if changes:
         service.audit("user_updated", target_type="user", target_id=target.id, detail=changes)
         db.session.commit()
