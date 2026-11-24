@@ -15,6 +15,12 @@
   </div>
   {% endif %}
 
+  {% if values.copied_from %}
+  <div class="px-3 py-2 rounded border bg-info-bg border-info-border text-info text-[13px]" role="note">
+    This is a copy of <b>{{ values.copied_from }}</b>. Nothing is created until you click <b>Save role</b> — closing this page discards it.
+  </div>
+  {% endif %}
+
   <div class="bg-white border border-slate-300 rounded-lg shadow-sm p-4 grid gap-3 md:grid-cols-2">
     <div>
       <label for="name" class="block text-[12.5px] font-semibold text-ink-muted mb-1">Role name</label>

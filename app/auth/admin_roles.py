@@ -273,9 +273,11 @@ def roles_edit(role_id):
     return redirect(url_for("admin_roles.roles_list"))
 
 
-@admin_roles_bp.route("/<int:role_id>/copy", methods=["POST"])
+@admin_roles_bp.route("/<int:role_id>/copy")
 def roles_copy(role_id):
-    # Copy me sirf wahi rows aati hain jo actor khud de sakta hai (locked / bas ke bahar wali chhod di jaati hain)
+    # Copy ab DB me KUCH nahi banata (pehle yahin role ban jaata tha — form band karne par bhi bina confirm ke role reh jaata tha).
+    # Sirf "Add role" form kholta hai: naam "Copy of X" + source ke pages pehle se bhare. Role tabhi banta hai jab user "Save role" dabaye
+    # (wo POST roles_new par jaata hai, jahan naam / rights ki saari checking hoti hai). Copy me sirf wahi rows aati hain jo actor khud de sakta hai.
     actor = service.current()
     source = _custom_role_or_404(role_id)
     _rank_guard(actor, source)
@@ -284,15 +286,9 @@ def roles_copy(role_id):
     while Role.query.filter(func.lower(Role.name) == name.lower()).first() is not None:
         n += 1
         name = "%s (%d)" % (base, n)
-    final = {key: min(level, max_level(actor, key)) for key, level in role_current(source).items() if max_level(actor, key) > 0}
-    role = Role(name=name, description=source.description)
-    db.session.add(role)
-    db.session.flush()
-    _apply_permissions(role, final)
-    service.audit("role_created", target_type="role", target_id=role.id, detail={"name": name, "copied_from": source.name, "permissions": final})
-    db.session.commit()
-    flash("Role copied. Rename it and adjust the pages.", "success")
-    return redirect(url_for("admin_roles.roles_edit", role_id=role.id))
+    levels = {key: min(level, max_level(actor, key)) for key, level in role_current(source).items() if max_level(actor, key) > 0}
+    values = {"name": name, "description": source.description or "", "levels": levels, "copied_from": source.name}
+    return _render_form(actor, None, values, [])
 
 
 @admin_roles_bp.route("/<int:role_id>/toggle", methods=["POST"])

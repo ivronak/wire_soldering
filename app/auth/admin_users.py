@@ -1,4 +1,6 @@
 # Phase 0 (P0-7): Users screen — Administration. List, naya user, edit (naam / role), password reset, unlock, active / inactive.
+# Add / Edit alag page nahi: list ke upar side drawer me khulta hai (templates/admin/users.html). GET /new aur GET /<id>/edit bhi
+# wahi list dikhate hain, drawer pehle se khula (seedhe link ke liye); galat input par POST wahi drawer error ke saath wapas deta hai.
 # Rank rules (flow doc 10.1 + 11.1) sab service.py ke can_manage_user / can_assign_role se: koi bhi kaam server par dobara check hota hai,
 # UI me button chhupana sirf suvidha hai. Developer role wale users sirf Developer ko dikhte hain (visible_users_query).
 # User ka koi alag "type" nahi — har user ka sirf ek Role (Developer / Admin bhi roles hain).
@@ -38,8 +40,10 @@ def _credentials_page(user, temp_password, heading):
     return render_template("admin/credentials.html", target=user, temp_password=temp_password, heading=heading, active_nav="users")
 
 
-@admin_users_bp.route("/")
-def users_list():
+def _render_list(drawer=None, status_code=200):
+    # Users list + (optional) side drawer. Add / Edit ab alag page nahi — baaki masters ki tarah side me form kholta hai.
+    # drawer = None (band) ya {"mode": "add" / "edit", "target": User ya None, "values": {...}, "error": text ya None}:
+    #   POST me galti ho to wahi drawer bhara hua + error ke saath dobara khulta hai (user ka likha hua gayab nahi hota).
     actor = service.current()
     q = (request.args.get("q") or "").strip()
     status = (request.args.get("status") or "all").lower()
@@ -56,8 +60,17 @@ def users_list():
     users = sorted(query.all(), key=lambda u: (ROLE_ORDER.get(u.role.system_key, 2), (u.full_name or "").lower()))
     locked = _locked_mobile_hashes()
     rows = [{"user": u, "manage": service.can_manage_user(actor, u), "locked": security.mobile_hash(u.mobile) in locked} for u in users]
+    roles = service.assignable_roles(actor)
+    if drawer and drawer.get("target") is not None and drawer["target"].role not in roles:
+        roles.append(drawer["target"].role)     # user ka mojooda role hamesha dropdown me (unchanged save ho sake — peer manager / inactive role par bhi)
     return render_template("admin/users.html", rows=rows, q=q, status=status, total=total, active_count=active_count,
-                           inactive_count=total - active_count, active_nav="users", can_add=service.user_can(actor, "users", 2))
+                           inactive_count=total - active_count, active_nav="users", can_add=service.user_can(actor, "users", 2),
+                           roles=roles, drawer=drawer), status_code
+
+
+@admin_users_bp.route("/")
+def users_list():
+    return _render_list()
 
 
 def _form_values():
@@ -68,9 +81,8 @@ def _form_values():
 @admin_users_bp.route("/new", methods=["GET", "POST"])
 def users_new():
     actor = service.current()
-    roles = service.assignable_roles(actor)
     if request.method == "GET":
-        return render_template("admin/user_form.html", user=None, values={}, roles=roles, error=None, active_nav="users")
+        return _render_list(drawer={"mode": "add", "target": None, "values": {}, "error": None})      # list + khula Add drawer
     values = _form_values()
     error = None
     mobile = security.normalize_mobile(values["mobile"])
@@ -91,7 +103,7 @@ def users_new():
     elif role is None or not service.can_assign_role(actor, role):
         error = "Choose a role from the list."                    # Developer role kisi ko nahi milta; Admin role sirf Developer de sakta hai
     if error:
-        return render_template("admin/user_form.html", user=None, values=values, roles=roles, error=error, active_nav="users"), 400
+        return _render_list(drawer={"mode": "add", "target": None, "values": values, "error": error}, status_code=400)
     temp_password = security.generate_temp_password()
     user = User(full_name=values["full_name"], mobile=mobile, password_hash=security.hash_password(temp_password),
                 role_id=role.id, must_change_password=True, created_by_id=actor.id)
@@ -108,12 +120,9 @@ def users_edit(user_id):
     actor = service.current()
     target = _target_or_404(user_id)
     _manageable_or_403(target)
-    roles = service.assignable_roles(actor)
-    if target.role not in roles:
-        roles.append(target.role)           # user ka mojooda role hamesha dropdown me (unchanged save ho sake — peer manager / inactive role par bhi)
     if request.method == "GET":
-        return render_template("admin/user_form.html", user=target, values={"full_name": target.full_name, "mobile": target.mobile,
-                               "role_id": str(target.role_id)}, roles=roles, error=None, active_nav="users")
+        return _render_list(drawer={"mode": "edit", "target": target, "error": None, "values": {
+            "full_name": target.full_name, "mobile": target.mobile, "role_id": str(target.role_id)}})
     values = _form_values()
     error = None
     role = None
@@ -129,7 +138,7 @@ def users_edit(user_id):
             error = "Choose a role from the list."
     if error:
         values["mobile"] = target.mobile
-        return render_template("admin/user_form.html", user=target, values=values, roles=roles, error=error, active_nav="users"), 400
+        return _render_list(drawer={"mode": "edit", "target": target, "values": values, "error": error}, status_code=400)
     changes = {}
     if target.full_name != values["full_name"]:
         changes["name"] = [target.full_name, values["full_name"]]

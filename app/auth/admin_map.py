@@ -9,7 +9,7 @@ V, E = R.LEVEL_VIEW, R.LEVEL_EDIT
 PAGE_BLUEPRINTS = {"admin_users": "users", "admin_roles": "roles"}
 DEVELOPER_BLUEPRINTS = {"admin_access", "admin_audit"}
 # Form kholna (GET) bhi badalne ka kaam hai (jaise quotations_new) -> Edit; sirf View wale ko khaali form nahi dikhta
-FORM_ENDPOINTS = {"admin_users.users_new", "admin_users.users_edit", "admin_roles.roles_new", "admin_roles.roles_edit"}
+FORM_ENDPOINTS = {"admin_users.users_new", "admin_users.users_edit", "admin_roles.roles_new", "admin_roles.roles_edit", "admin_roles.roles_copy"}
 
 
 def resolve(endpoint, mutating):

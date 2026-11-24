@@ -8,11 +8,12 @@
     <h1 class="text-[20px] font-bold text-ink leading-tight">Users</h1>
   </div>
   {% if can_add %}
-  <a href="{{ url_for('admin_users.users_new') }}"
+  {# Masters ki tarah: button side drawer kholta hai (alag page nahi) #}
+  <button type="button" id="btn-add-user"
      class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
     Add user
-  </a>
+  </button>
   {% endif %}
 </div>
 
@@ -61,7 +62,10 @@
           <td>
             {% if row.manage and can('users', 2) %}
             <div class="flex flex-wrap items-center justify-center gap-1.5">
-              <a href="{{ url_for('admin_users.users_edit', user_id=u.id) }}" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Edit</a>
+              {# Edit = drawer; data-* se form bharta hai (mobile sirf dikhane ke liye, badalta nahi) #}
+              <button type="button" class="btn-edit-user px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist"
+                data-action="{{ url_for('admin_users.users_edit', user_id=u.id) }}" data-name="{{ u.full_name }}" data-mobile="{{ u.mobile }}"
+                data-role-id="{{ u.role_id }}" data-role-name="{{ u.role.name }}">Edit</button>
               <form method="post" action="{{ url_for('admin_users.users_reset', user_id=u.id) }}" data-name="{{ u.full_name }}" onsubmit="return confirm('Reset the password for ' + this.dataset.name + '? A new temporary password will be shown once.');">
                 <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Reset password</button>
               </form>
@@ -84,4 +88,142 @@
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block modals %}
+{% if can_add %}
+{# Add / Edit user — side drawer (masters jaisa). Ek hi form: JS Add ya Edit mode set karta hai. Server har baar dobara check karta hai. #}
+<div id="user-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
+  <div id="user-backdrop" class="absolute inset-0 bg-ink/40"></div>
+  <div role="dialog" aria-labelledby="user-modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
+      <div>
+        <h2 id="user-modal-title" class="text-[16px] font-bold text-ink">Add user</h2>
+        <p id="user-modal-sub" class="text-[12.5px] text-ink-faint">Name, mobile (login ID) and role</p>
+      </div>
+      <button type="button" id="user-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
+    </div>
+    <form id="user-form" method="post" action="{{ url_for('admin_users.users_new') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div id="user-error" class="{% if not (drawer and drawer.error) %}hidden {% endif %}px-3 py-2 rounded border bg-stop-bg border-stop-border text-stop text-[13px]" role="alert">{{ drawer.error if drawer and drawer.error else '' }}</div>
+      <div>
+        <label for="user-full-name" class="block text-[12.5px] font-semibold text-ink mb-1">Full name *</label>
+        <input id="user-full-name" name="full_name" type="text" maxlength="100" required autocomplete="off"
+               class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
+      </div>
+      <div>
+        <label for="user-mobile" class="block text-[12.5px] font-semibold text-ink mb-1">Mobile number (login ID) *</label>
+        <input id="user-mobile" name="mobile" type="tel" inputmode="numeric" maxlength="20" required autocomplete="off" placeholder="10-digit mobile number"
+               class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
+        <p id="user-mobile-note" class="hidden text-[11.5px] text-ink-faint mt-1">The mobile number cannot be changed.</p>
+      </div>
+      <div>
+        <label for="user-role" class="block text-[12.5px] font-semibold text-ink mb-1">Role *</label>
+        <select id="user-role" name="role_id" required class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
+          <option value="">Select a role…</option>
+          {% for role in roles %}<option value="{{ role.id }}">{{ role.name }}</option>{% endfor %}
+        </select>
+        <p class="text-[11.5px] text-ink-faint mt-1">Only roles within your own access are listed. The Admin role uses the pages set under Admin access.</p>
+      </div>
+      <p id="user-temp-note" class="text-[12px] text-ink-muted bg-mist border border-slate-200 rounded px-3 py-2">A temporary password is generated and shown once after saving.</p>
+    </form>
+    <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+      <button type="button" id="user-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
+      <button type="submit" form="user-form" id="user-save" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Create user</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block page_js %}
+{% if can_add %}
+<script>
+  (function () {
+    var modal = document.getElementById('user-modal');
+    var form = document.getElementById('user-form');
+    var title = document.getElementById('user-modal-title');
+    var sub = document.getElementById('user-modal-sub');
+    var nameIn = document.getElementById('user-full-name');
+    var mobileIn = document.getElementById('user-mobile');
+    var roleSel = document.getElementById('user-role');
+    var mobileNote = document.getElementById('user-mobile-note');
+    var tempNote = document.getElementById('user-temp-note');
+    var saveBtn = document.getElementById('user-save');
+    var errBox = document.getElementById('user-error');
+    var addAction = "{{ url_for('admin_users.users_new') }}";
+
+    function openDrawer() {
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+    function closeDrawer() {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    function showError(text) {
+      errBox.textContent = text || '';              // textContent: server / user ka text script ki tarah nahi chalta
+      errBox.classList.toggle('hidden', !text);
+    }
+    // Edit me user ka mojooda role dropdown me hona chahiye (agar list me nahi hai to ek option jod do)
+    function selectRole(id, name) {
+      var found = false;
+      for (var i = 0; i < roleSel.options.length; i++) {
+        if (roleSel.options[i].value === String(id)) { found = true; break; }
+      }
+      if (!found && id) {
+        var opt = document.createElement('option');
+        opt.value = id; opt.textContent = name || ('Role ' + id);
+        roleSel.appendChild(opt);
+      }
+      roleSel.value = id ? String(id) : '';
+    }
+    function setMode(mode, v) {
+      v = v || {};
+      var edit = mode === 'edit';
+      title.textContent = edit ? 'Edit user' : 'Add user';
+      sub.textContent = edit ? 'Change the name or role' : 'Name, mobile (login ID) and role';
+      saveBtn.textContent = edit ? 'Save changes' : 'Create user';
+      form.action = edit ? v.action : addAction;
+      nameIn.value = v.name || '';
+      mobileIn.value = v.mobile || '';
+      mobileIn.readOnly = edit;
+      mobileIn.required = !edit;
+      mobileIn.classList.toggle('bg-mist', edit);
+      mobileIn.classList.toggle('text-ink-muted', edit);
+      mobileNote.classList.toggle('hidden', !edit);
+      tempNote.classList.toggle('hidden', edit);
+      selectRole(v.roleId || '', v.roleName);
+      showError(v.error || '');
+      openDrawer();
+      nameIn.focus();
+    }
+
+    document.getElementById('btn-add-user').addEventListener('click', function () { setMode('add'); });
+    document.querySelectorAll('.btn-edit-user').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setMode('edit', {action: btn.dataset.action, name: btn.dataset.name, mobile: btn.dataset.mobile,
+                         roleId: btn.dataset.roleId, roleName: btn.dataset.roleName});
+      });
+    });
+    document.getElementById('user-close').addEventListener('click', closeDrawer);
+    document.getElementById('user-cancel').addEventListener('click', closeDrawer);
+    document.getElementById('user-backdrop').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeDrawer();
+    });
+
+    {% if drawer %}
+    // Server ne drawer khula bheja hai (galti ke baad ya seedhe /new, /<id>/edit link) — user ka bhara hua data wapas
+    {# drawer['values'] (drawer.values nahi): dict ka apna .values() method pehle mil jaata hai #}
+    {% set dv = drawer['values'] or {} %}
+    setMode({{ drawer.mode|tojson }}, {
+      action: {{ (url_for('admin_users.users_edit', user_id=drawer.target.id) if drawer.target else '')|tojson }},
+      name: {{ (dv.get('full_name') or '')|tojson }}, mobile: {{ (dv.get('mobile') or '')|tojson }},
+      roleId: {{ (dv.get('role_id') or '')|tojson }}, roleName: {{ (drawer.target.role.name if drawer.target else '')|tojson }},
+      error: {{ (drawer.error or '')|tojson }}
+    });
+    {% endif %}
+  })();
+</script>
+{% endif %}
 {% endblock %}

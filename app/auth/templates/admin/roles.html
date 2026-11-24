@@ -60,9 +60,8 @@
             {% elif can_add and not row.own and row.within %}
             <div class="flex flex-wrap items-center justify-center gap-1.5">
               <a href="{{ url_for('admin_roles.roles_edit', role_id=r.id) }}" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Edit</a>
-              <form method="post" action="{{ url_for('admin_roles.roles_copy', role_id=r.id) }}">
-                <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Copy</button>
-              </form>
+              {# Copy = GET link: Add role form kholta hai (bhara hua); role Save dabane par hi banta hai #}
+              <a href="{{ url_for('admin_roles.roles_copy', role_id=r.id) }}" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Copy</a>
               <form method="post" action="{{ url_for('admin_roles.roles_toggle', role_id=r.id) }}">
                 <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border rounded {% if r.is_active %}border-stop-border text-stop bg-white hover:bg-stop-bg{% else %}border-success-border text-success bg-white hover:bg-success-bg{% endif %}">{% if r.is_active %}Deactivate{% else %}Activate{% endif %}</button>
               </form>
