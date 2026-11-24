@@ -23,10 +23,23 @@
       <input type="search" name="q" value="{{ q }}" placeholder="Search name or mobile…" autocomplete="off"
              class="w-full py-2 px-3 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
       <input type="hidden" name="status" value="{{ status }}" />
+      {% if role_filter %}<input type="hidden" name="role" value="{{ role_filter }}" />{% endif %}
+    </form>
+    {# Role filter: alag GET form — q / status saath jaate hain; select badalte hi submit. Ginti = us role ke users (Developer role sirf Developer ko). #}
+    <form method="get" action="{{ url_for('admin_users.users_list') }}" class="flex items-center gap-1.5">
+      <input type="hidden" name="q" value="{{ q }}" />
+      <input type="hidden" name="status" value="{{ status }}" />
+      <label for="role-filter" class="text-[12.5px] font-semibold text-ink-muted">Role</label>
+      <select id="role-filter" name="role" onchange="this.form.submit()"
+              class="py-1.5 pl-2.5 pr-7 text-[12.5px] font-semibold border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent">
+        <option value="">All roles</option>
+        {% for r in role_options %}<option value="{{ r.id }}" {% if role_filter == r.id %}selected{% endif %}>{{ r.name }} ({{ role_counts[r.id] }})</option>{% endfor %}
+      </select>
+      <noscript><button type="submit" class="px-2.5 py-1 text-[12px] border border-slate-300 rounded bg-white">Apply</button></noscript>
     </form>
     <div class="flex items-center gap-1">
       {% for key, label, count in [('all', 'All', total), ('active', 'Active', active_count), ('inactive', 'Inactive', inactive_count)] %}
-      <a href="{{ url_for('admin_users.users_list', q=q or None, status=key) }}"
+      <a href="{{ url_for('admin_users.users_list', q=q or None, role=role_filter, status=key) }}"
          class="px-3 py-1.5 text-[12.5px] rounded border font-semibold {% if status == key %}border-accent bg-accent text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">{{ label }} ({{ count }})</a>
       {% endfor %}
     </div>

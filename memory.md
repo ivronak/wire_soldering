@@ -6,6 +6,11 @@ Yeh file **kyun** wala context store karti hai — jab bhi koi bada decision liy
 
 ---
 
+### DECISION (2026-11-24): "kaun ne kiya" ke liye naya People master NAHI — sab log Users me, Role se pehchaan
+**User ne kaha:** "Naya People master nahi banate, user me hi wo banayenge... floor worker ko login pass de ya na de wo unka problem, par sab user wahin Users me banayenge role dekar."
+**Kya:** ERP ke "operator / inspector / issued_by / received_by / written_off_by..." (abhi free text) aage **Users table** se dropdown banenge (active, Developer nahi). Document par created/approved/cancelled-by = login user se automatic. Floor worker bhi Users me, uska Role (jaise Operator / Lab / Store) pehchaan. **Kyun:** do list (Users + People) ka jhanjhat nahi; ek hi jagah. **Bache sawal** (mobile optional, "Login allowed" switch, picker filter, role filter) aur poora flow: `user_in_erp_flow_2026_11_24.md` section 12. Abhi kuch build nahi.
+**Update (baad me, user):** "Abhi jaisa hai waisa hi rehne de, Admin ko login dena hoga to password dega warna nahi" → **koi "Login allowed" switch nahi, Users screen / login me koi badlav nahi, mobile zaroori jaisa hai.** Picker = saare active users + role label + search; Role filter abhi nahi.
+
 ### Phase 0 build started — P0-1 done (2026-11-23)
 **Kya:** User ke 'haan' par P0-1 bana: `app/auth/registry.py` (47 pages + 4 admin pages + special `stock_adjustments.approve`, ek hi list), models `User/Role/RolePermission/AdminCeiling/AuditLog`, migration `d4e1b7a9c2f5` (5 tables + 6 starter roles; migration self-contained, registry import nahi karti). **Kyun:** flow doc section 11 ke faisle. **Test:** DB copy par up/down/up + 36 checks pass; local DB migrated (backup `instance/erp.db.before-p0-1-20261123`). Abhi uncommitted; live par kuch nahi. Next P0-2. Details: `phase0_auth_roles_flow_2026_11_23.md` + tracker Current Focus.
 

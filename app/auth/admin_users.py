@@ -6,7 +6,7 @@
 # User ka koi alag "type" nahi — har user ka sirf ek Role (Developer / Admin bhi roles hain).
 # Temp password sirf POST ke jawab me ek baar dikhta hai (redirect / flash me nahi — cookie me chala jaata), page no-store hai.
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from app.auth import lockout, security, service
 from app.extensions import db
@@ -48,7 +48,16 @@ def _render_list(drawer=None, status_code=200):
     q = (request.args.get("q") or "").strip()
     status = (request.args.get("status") or "all").lower()
     base = service.visible_users_query(actor)
-    total, active_count = base.count(), base.filter(User.is_active == True).count()  # noqa: E712
+    # Role filter: sirf wahi roles jinke koi user actor ko dikhte hain (Developer role Admin ko nahi dikhta); ajeeb / purani id = filter nahi
+    role_counts = dict(base.with_entities(User.role_id, func.count(User.id)).group_by(User.role_id).all())
+    role_options = sorted((r for r in Role.query.filter(Role.id.in_(list(role_counts))).all()),
+                          key=lambda r: (ROLE_ORDER.get(r.system_key, 2), r.name.lower()))
+    role_filter = service.parse_id(request.args.get("role"))
+    if role_filter not in role_counts:
+        role_filter = None
+    if role_filter:
+        base = base.filter(User.role_id == role_filter)
+    total, active_count = base.count(), base.filter(User.is_active == True).count()  # noqa: E712 (All / Active / Inactive ginti role filter ke andar)
     query = base
     if q:
         like = "%" + q + "%"
@@ -65,7 +74,7 @@ def _render_list(drawer=None, status_code=200):
         roles.append(drawer["target"].role)     # user ka mojooda role hamesha dropdown me (unchanged save ho sake — peer manager / inactive role par bhi)
     return render_template("admin/users.html", rows=rows, q=q, status=status, total=total, active_count=active_count,
                            inactive_count=total - active_count, active_nav="users", can_add=service.user_can(actor, "users", 2),
-                           roles=roles, drawer=drawer), status_code
+                           roles=roles, drawer=drawer, role_options=role_options, role_counts=role_counts, role_filter=role_filter), status_code
 
 
 @admin_users_bp.route("/")
