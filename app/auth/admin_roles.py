@@ -188,9 +188,16 @@ def roles_list():
             ceiling = service.ceiling_map()
             pages, edits = len(ceiling), sum(1 for v in ceiling.values() if v >= R.LEVEL_EDIT)
         own = actor.kind == service.KIND_STAFF and actor.role_id == role.id
+        # Custom role ke liye: "Admin access" ceiling ke baad asli kitna milta hai (blocked pages ka note list me dikhane ke liye)
+        blocked, real_pages, real_edits = [], pages, edits
+        if not role.system_key:
+            real_pages, real_edits, blocked = service.ceiling_gap(role)
         rows.append({"role": role, "pages": pages, "edits": edits, "users": counts.get(role.id, 0), "own": own,
-                     "within": service.role_within_actor(actor, role)})
-    return render_template("admin/roles.html", rows=rows, active_nav="roles", can_add=service.user_can(actor, "roles", R.LEVEL_EDIT))
+                     "within": service.role_within_actor(actor, role), "blocked": blocked, "real_pages": real_pages, "real_edits": real_edits})
+    # Kisi bhi active custom role ke pages ceiling se kat rahe ho to list ke upar ek saaf warning
+    blocked_roles = sum(1 for r in rows if r["blocked"] and r["role"].is_active)
+    return render_template("admin/roles.html", rows=rows, active_nav="roles", can_add=service.user_can(actor, "roles", R.LEVEL_EDIT),
+                           blocked_roles=blocked_roles, is_developer=actor.kind == service.KIND_DEVELOPER)
 
 
 @admin_roles_bp.route("/new", methods=["GET", "POST"])

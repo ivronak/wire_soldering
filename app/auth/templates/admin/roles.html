@@ -16,6 +16,15 @@
   {% endif %}
 </div>
 
+{# Ceiling warning: Developer ne "Admin access" me jo pages allow nahi kiye, unka role-right chalta hi nahi — isliye list me saaf dikhate hain #}
+{% if blocked_roles %}
+<div class="shrink-0 px-3 py-2 rounded border bg-warning-bg border-warning-border text-warning text-[12.5px]" role="note">
+  <b>{{ blocked_roles }} role(s) have pages that are not allowed in Admin access.</b>
+  Users with these roles cannot open those pages until the Developer allows them
+  {% if is_developer %}— <a href="{{ url_for('admin_access.access_page') }}" class="underline font-semibold">open Admin access</a>.{% else %}on the Admin access screen.{% endif %}
+</div>
+{% endif %}
+
 <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
   <div class="flex-1 overflow-auto min-h-0">
     <table class="unit-table">
@@ -28,7 +37,18 @@
           <td>{{ loop.index }}</td>
           <td class="font-semibold text-ink">{{ r.name }}{% if r.system_key %} <span class="text-[11px] font-medium text-ink-faint">(built-in)</span>{% endif %}</td>
           <td class="text-ink-muted text-[12.5px]">{{ r.description or '—' }}</td>
-          <td class="text-[12.5px]">{{ row.pages }} page(s){% if row.edits %}, {{ row.edits }} with edit{% endif %}</td>
+          <td class="text-[12.5px]">
+            {# Custom role: asli (ceiling ke baad) access dikhao; jo kat raha hai uska note #}
+            {% if row.blocked %}
+              {% if row.real_pages %}<div>{{ row.real_pages }} page(s) effective{% if row.real_edits %}, {{ row.real_edits }} with edit{% endif %}</div>
+              {% else %}<div class="font-semibold text-stop">No effective access</div>{% endif %}
+              <div class="mt-0.5 text-[11.5px] text-warning cursor-help" title="Not fully allowed in Admin access: {% for b in row.blocked %}{{ b[0] }} ({{ 'blocked' if b[2] == 0 else 'view only' }}){% if not loop.last %}, {% endif %}{% endfor %}">
+                {{ row.blocked|length }} of {{ row.pages }} page(s) limited by Admin access
+              </div>
+            {% else %}
+              {{ row.pages }} page(s){% if row.edits %}, {{ row.edits }} with edit{% endif %}
+            {% endif %}
+          </td>
           <td>{{ row.users }}</td>
           <td>
             {% if r.is_active %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-success-bg text-success border-success-border">Active</span>

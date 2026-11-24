@@ -252,6 +252,22 @@ def audit(action, target_type=None, target_id=None, detail=None, actor=None, lab
 
 # ---------- helpers for screens / templates ----------
 
+def ceiling_gap(role):
+    # Role me jo pages diye hain par Admin ceiling ("Admin access" screen) unhe poora nahi deti — runtime par staff ko min(role, ceiling) hi milta hai.
+    # Wapas: (effective_pages, effective_edits, blocked) — blocked = [(page label, role level, asli level)]; Roles list ka note isi se banta hai.
+    ceiling = ceiling_map()
+    pages = edits = 0
+    blocked = []
+    for key, level in _role_map(role, ignore_active=True).items():
+        real = min(level, ceiling.get(key, 0))
+        if real:
+            pages += 1
+            edits += 1 if real >= R.LEVEL_EDIT else 0
+        if real < level:
+            blocked.append((R.get(key)["label"], level, real))
+    return pages, edits, blocked
+
+
 def permission_summary(role):
     # Role list me "12 pages (3 edit)" jaisa chhota text
     items = _role_map(role, ignore_active=True)
