@@ -3,7 +3,7 @@
    search / filter se saari rows chhup jaayen to header bhi chhupa deta hai. #}
 {% macro po_group_row(po, cols) %}
 <tr class="po-group">
-  <td colspan="{{ cols }}" style="text-align:left;background:#eef4f7;border-top:2px solid #c9d4de;padding:6px 12px;">
+  <td colspan="{{ cols }}" style="text-align:left;background:var(--surface-3);border-top:2px solid var(--line-strong);padding:6px 12px;">
     {% if po %}
     <span class="font-mono font-bold text-ink">{{ po.po_no }}</span>
     <span class="text-ink-muted"> · {{ po.vendor.name if po.vendor else '—' }}</span>

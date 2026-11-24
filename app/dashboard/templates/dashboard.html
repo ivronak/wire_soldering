@@ -3,110 +3,118 @@
 
 {% block page_css %}
 <style>
-  .db-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .db-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .db-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .db-kpi .h { font-size: 12px; color: #6B7F82; }
-  .db-line { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 14px; }
-  .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8E7; background: #F8FAF9; border-radius: 12px 12px 0 0; }
-  .db-name { font-size: 15px; font-weight: 700; color: #0F2F32; }
-  .db-meta { font-size: 12px; color: #6B7F82; }
+  .db-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .db-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .db-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .db-kpi .h { font-size: 12px; color: #5A6577; }
+  .db-line { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; margin-bottom: 14px; }
+  .db-line-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8F1; background: #F8FAFD; border-radius: 12px 12px 0 0; }
+  .db-name { font-size: 15px; font-weight: 700; color: #0B1220; }
+  .db-meta { font-size: 12px; color: #5A6577; }
   /* Stage blocks hi journey hain: 1 -> 2 -> 3 ... Har row me barabar blocks (JS balance karta hai), same row ke blocks ke beech connector + arrow */
   .db-stages { --cols: 4; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 16px 24px; padding: 16px 20px 18px; align-items: start; }
-  .db-sb { position: relative; background: #F5F8F7; border: 1px solid #E2E8E7; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-  .db-sb.has-next::before { content: ''; position: absolute; top: 22px; right: -24px; width: 24px; height: 3px; background: #D1D9D8; }
-  .db-sb.has-next::after { content: ''; position: absolute; top: 16px; right: -24px; border-left: 9px solid #A6B4B3; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
-  .db-sb.run.has-next::before { background: #E9A96B; }
-  .db-sb.run.has-next::after { border-left-color: #C26A2E; }
+  .db-sb { position: relative; background: #F8FAFD; border: 1px solid #E2E8F1; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .db-sb.has-next::before { content: ''; position: absolute; top: 22px; right: -24px; width: 24px; height: 3px; background: #D4DBE6; }
+  .db-sb.has-next::after { content: ''; position: absolute; top: 16px; right: -24px; border-left: 9px solid #9FABBF; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+  .db-sb.run.has-next::before { background: #BCD2FA; }
+  .db-sb.run.has-next::after { border-left-color: #0B5BEF; }
   .db-sb-head { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
-  .db-sb-no { width: 22px; height: 22px; border-radius: 6px; background: #0F2F32; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .db-sb-name { font-size: 13.5px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .db-sb-no { width: 22px; height: 22px; border-radius: 6px; background: #0B1220; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .db-sb-name { font-size: 13.5px; font-weight: 700; color: #0B1220; line-height: 1.2; }
   .db-sb-count { margin-left: auto; display: flex; gap: 4px; }
   .db-pill { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
-  .db-pill.run { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .db-pill.hold { background: #FEF3F2; color: #B42318; border-color: #FDA29B; }
+  /* Running = accent-blue, Hold = warning amber (hold ek soch-samajh ke roka hua kaam hai, error nahi), Free = green */
+  .db-pill.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .db-pill.hold { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .db-pill.free { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   /* Machine card */
-  .db-tile { background: #fff; border: 1px solid #D9E1E0; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: box-shadow .12s, border-color .12s; box-shadow: 0 1px 2px rgba(15,47,50,.05); }
-  .db-tile:hover { box-shadow: 0 3px 12px rgba(15,47,50,.14); border-color: #B9C6C4; }
-  .db-tile.inactive { background: #F5F7F7; }
+  .db-tile { background: #fff; border: 1px solid #DAE1EC; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: box-shadow .12s, border-color .12s; box-shadow: 0 1px 2px rgba(11,18,32,.05); }
+  .db-tile:hover { box-shadow: 0 3px 12px rgba(11,18,32,.14); border-color: #B4C0D3; }
+  .db-tile:focus-visible, .dm-mv:focus-visible, .dm-go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .db-tile.inactive { background: #F5F7FB; }
   .db-mc-top { display: flex; align-items: center; gap: 8px; }
   .db-dot { width: 9px; height: 9px; border-radius: 50%; background: #1F9D6A; flex-shrink: 0; box-shadow: 0 0 0 3px #E6F5EC; }
-  .db-tile.running .db-dot { background: #C26A2E; box-shadow: 0 0 0 3px #FFF0DF; }
-  .db-tile.inactive .db-dot { background: #A6B4B3; box-shadow: 0 0 0 3px #E8EDEC; }
-  .db-mc-name { font-size: 14px; font-weight: 700; color: #0F2F32; min-width: 0; line-height: 1.25; }
+  .db-tile.running .db-dot { background: #0B5BEF; box-shadow: 0 0 0 3px #EDF3FF; }
+  .db-tile.inactive .db-dot { background: #9FABBF; box-shadow: 0 0 0 3px #E9EEF6; }
+  .db-mc-name { font-size: 14px; font-weight: 700; color: #0B1220; min-width: 0; line-height: 1.25; }
   .db-mc-state { margin-left: auto; font-size: 11.5px; font-weight: 700; color: #1F7A4D; white-space: nowrap; }
-  .db-tile.running .db-mc-state { color: #8A4A1C; }
-  .db-tile.inactive .db-mc-state { color: #6B7F82; }
+  .db-tile.running .db-mc-state { color: #0A3CA6; }
+  .db-tile.inactive .db-mc-state { color: #5A6577; }
   /* G27: breakdown laal, maintenance amber (running machine par bhi) */
-  .db-tile.m-breakdown { border-color: #FDA29B; }
-  .db-tile.m-breakdown .db-dot { background: #D92D20; box-shadow: 0 0 0 3px #FEE4E2; }
+  .db-tile.m-breakdown { border-color: #F0C4C0; }
+  .db-tile.m-breakdown .db-dot { background: #B42318; box-shadow: 0 0 0 3px #FCEBEA; }
   .db-tile.m-breakdown .db-mc-state, .db-tile.m-breakdown .db-mwarn { color: #B42318; }
-  .db-tile.m-maintenance { border-color: #F5D9B5; }
-  .db-tile.m-maintenance .db-dot { background: #B45309; box-shadow: 0 0 0 3px #FEF0C7; }
+  .db-tile.m-maintenance { border-color: #FBD9A5; }
+  .db-tile.m-maintenance .db-dot { background: #B45309; box-shadow: 0 0 0 3px #FEF3E2; }
   .db-tile.m-maintenance .db-mc-state, .db-tile.m-maintenance .db-mwarn { color: #B45309; }
   .db-mwarn { font-size: 12px; font-weight: 700; margin-top: 6px; }
-  .db-tile.held { border-color: #FDA29B; background: #FFFAF9; }
-  .db-tile.held .db-dot { background: #D92D20; box-shadow: 0 0 0 3px #FEE4E2; }
-  .db-tile.held .db-mc-state { color: #B42318; }
-  .dm-mv { border: 1px solid #D9E1E0; background: #fff; color: #0F2F32; border-radius: 6px; width: 26px; height: 24px; font-size: 11px; cursor: pointer; margin-left: 3px; }
-  .dm-mv:hover:not([disabled]) { background: #F4F6F5; border-color: #B9C6C4; }
+  /* Hold = jaan-boojh ke roka hua kaam: warning amber (breakdown jaisa laal nahi) */
+  .db-tile.held { border-color: #FBD9A5; background: #FEF3E2; }
+  .db-tile.held .db-dot { background: #B45309; box-shadow: 0 0 0 3px #FBD9A5; }
+  .db-tile.held .db-mc-state { color: #B45309; }
+  .dm-mv { border: 1px solid #DAE1EC; background: #fff; color: #0B1220; border-radius: 6px; width: 32px; height: 32px; font-size: 11px; cursor: pointer; margin-left: 4px; }
+  .dm-mv:hover:not([disabled]) { background: #F3F6FB; border-color: #B4C0D3; }
   .dm-mv[disabled] { opacity: .3; cursor: default; }
-  .db-holdline { font-size: 12px; font-weight: 600; color: #B42318; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 3px 8px; }
-  .db-mc-sub { font-size: 11.5px; color: #6B7F82; margin-top: -5px; padding-left: 17px; }
-  .db-run { border-top: 1px dashed #E2E8E7; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-  .db-ordno { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; color: #0F2F32; background: #EEF2F1; border: 1px solid #D9E1E0; border-radius: 6px; padding: 1px 7px; }
-  .db-prod { font-size: 12px; color: #3D5A5D; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .db-bar { height: 6px; border-radius: 999px; background: #EEF2F1; overflow: hidden; }
-  .db-bar i { display: block; height: 100%; border-radius: 999px; background: #C26A2E; }
-  .db-bar.over i { background: #D92D20; }
+  .db-holdline { font-size: 12px; font-weight: 600; color: #B45309; background: #FEF3E2; border: 1px solid #FBD9A5; border-radius: 6px; padding: 3px 8px; }
+  .db-mc-sub { font-size: 11.5px; color: #5A6577; margin-top: -5px; padding-left: 17px; }
+  .db-run { border-top: 1px dashed #E2E8F1; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .db-ordno { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; color: #0B1220; background: #E9EEF6; border: 1px solid #DAE1EC; border-radius: 6px; padding: 1px 7px; }
+  .db-prod { font-size: 12px; color: #475266; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-bar { height: 6px; border-radius: 999px; background: #E9EEF6; overflow: hidden; }
+  .db-bar i { display: block; height: 100%; border-radius: 999px; background: #0B5BEF; }
+  .db-bar.over i { background: #B42318; }
   /* Timer: chhote rang-birange pill me (chalta hua hh:mm:ss); plan se zyada chale to laal */
-  .db-bar-l { white-space: nowrap; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #6B7F82; margin-top: 4px; }
-  .db-pill-t { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: #8A4A1C; background: #FFF0DF; border: 1px solid #F5D9B5; border-radius: 999px; padding: 1px 9px; margin-left: 0; white-space: nowrap; }
+  .db-bar-l { white-space: nowrap; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #5A6577; margin-top: 4px; }
+  .db-pill-t { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0A3CA6; background: #EDF3FF; border: 1px solid #BCD2FA; border-radius: 999px; padding: 1px 9px; margin-left: 0; white-space: nowrap; }
   .db-pill-t::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
-  .db-pill-t.over { color: #B42318; background: #FEF3F2; border-color: #FDA29B; }
+  .db-pill-t.over { color: #B42318; background: #FCEBEA; border-color: #F0C4C0; }
   .db-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
-  .db-fact .l { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8A9A9C; }
-  .db-fact .v { font-size: 13px; font-weight: 600; color: #0F2F32; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .db-then { font-size: 11.5px; color: #3D5A5D; background: #F1F5F4; border-radius: 6px; padding: 4px 8px; }
-  .db-then b { color: #0F2F32; }
-  .db-hot { font-size: 11.5px; color: #7A271A; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 5px 8px; }
+  .db-fact .l { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #5A6577; }
+  .db-fact .v { font-size: 13px; font-weight: 600; color: #0B1220; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-then { font-size: 11.5px; color: #475266; background: #EEF2F8; border-radius: 6px; padding: 4px 8px; }
+  .db-then b { color: #0B1220; }
+  /* Garam dhaatu intezaar kar rahi hai = waiting / needs attention -> amber; limit cross ho jaye to sirf wahi line laal */
+  .db-hot { font-size: 11.5px; color: #B45309; background: #FEF3E2; border: 1px solid #FBD9A5; border-radius: 6px; padding: 5px 8px; }
   .db-hot b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .db-idle { font-size: 12.5px; color: #6B7F82; }
-  .db-next { font-size: 12px; color: #3D5A5D; border-top: 1px dashed #E2E8E7; padding-top: 7px; }
-  .db-next b { color: #0F2F32; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .db-hot .over { color: #B42318; font-weight: 700; }
+  .db-idle { font-size: 12.5px; color: #5A6577; }
+  .db-next { font-size: 12px; color: #475266; border-top: 1px dashed #E2E8F1; padding-top: 7px; }
+  .db-next b { color: #0B1220; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .db-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .db-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
-  .db-chip.running { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .db-chip.running { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .db-chip.hold { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .db-chip.free { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .db-chip.inactive { background: #EEF2F1; color: #6B7F82; border-color: #D1D9D8; }
-  .db-chip.over { background: #FDECEA; color: #B42318; border-color: #F3C9C4; }
+  .db-chip.inactive { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .db-chip.over { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
   #db-modal.hidden { display: none; }
   #db-modal { display: flex; }
-  .dm-sec { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; margin: 14px 0 6px; }
+  .dm-sec { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; margin: 14px 0 6px; }
   .dm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   /* G25: arrow se abhi hila order thodi der highlight, taaki naya number turant dikhe */
-  .dm-table tr.dm-moved td { background: #FFF4D6; animation: dm-fade 2.5s ease-out forwards; }
-  @keyframes dm-fade { from { background: #FFE9A8; } to { background: transparent; } }
-  .dm-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 6px 8px; border: 1px solid #D1D9D8; text-align: left; }
-  .dm-table td { padding: 5px 8px; border: 1px solid #E2E8E7; vertical-align: top; }
-  .dm-table tr.here td { background: #FFF4E5; font-weight: 600; }
+  .dm-table tr.dm-moved td { background: #EDF3FF; animation: dm-fade 2.5s ease-out forwards; }
+  @keyframes dm-fade { from { background: #BCD2FA; } to { background: transparent; } }
+  .dm-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 6px 8px; border: 1px solid #D4DBE6; text-align: left; }
+  .dm-table td { padding: 5px 8px; border: 1px solid #E2E8F1; vertical-align: top; }
+  .dm-table tr.here td { background: #EDF3FF; font-weight: 600; }
   .dm-table .r { text-align: right; font-variant-numeric: tabular-nums; }
-  .dm-card { border: 1px solid #D1D9D8; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+  .dm-card { border: 1px solid #D4DBE6; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
   /* Free machine par intezaar karta order (kisi bhi line ka) aur udhaar (borrowed) machine ka label */
-  .db-wait { font-size: 12.5px; color: #7A4A00; background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 8px; padding: 6px 9px; line-height: 1.35; }
-  .db-wait b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #0F2F32; }
-  .db-wait .go { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: #fff; background: #C26A2E; border-radius: 6px; padding: 2px 9px; }
-  .db-lent { font-size: 11.5px; font-weight: 600; color: #1D4F91; background: #EAF2FD; border: 1px solid #C2D8F5; border-radius: 6px; padding: 3px 8px; }
-  .dm-go { border: 1px solid #C26A2E; background: #C26A2E; color: #fff; border-radius: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
-  .dm-go:hover { background: #A85A25; }
+  .db-wait { font-size: 12.5px; color: #B45309; background: #FEF3E2; border: 1px solid #FBD9A5; border-radius: 8px; padding: 6px 9px; line-height: 1.35; }
+  .db-wait b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #0B1220; }
+  .db-wait .go { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: #fff; background: #0B5BEF; border-radius: 6px; padding: 2px 9px; }
+  /* lent = sirf ek tag (state nahi): neutral grey, taaki accent / running blue se na takraye */
+  .db-lent { font-size: 11.5px; font-weight: 600; color: #475569; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 3px 8px; }
+  .dm-go { border: 1px solid #0B5BEF; background: #0B5BEF; color: #fff; border-radius: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+  .dm-go:hover { background: #0843C2; }
   .dm-go[disabled] { opacity: .4; cursor: default; }
-  .dm-form { border: 1px solid #F5D9B5; background: #FFFAF3; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
-  .dm-form label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #6B7F82; margin: 8px 0 3px; }
-  .dm-form input, .dm-form textarea, .dm-form select { width: 100%; border: 1px solid #C9D3D2; border-radius: 6px; padding: 6px 8px; font-size: 13px; background: #fff; }
-  .dm-form .why { font-size: 12px; color: #7A271A; background: #FEF3F2; border: 1px solid #FDA29B; border-radius: 6px; padding: 5px 8px; margin-top: 4px; }
-  .dm-form .info { font-size: 12px; color: #3D5A5D; background: #F1F5F4; border-radius: 6px; padding: 5px 8px; margin-top: 4px; }
-  .db-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .dm-form { border: 1px solid #BCD2FA; background: #EDF3FF; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .dm-form label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #5A6577; margin: 8px 0 3px; }
+  .dm-form input, .dm-form textarea, .dm-form select { width: 100%; border: 1px solid #C7D0DE; border-radius: 6px; padding: 6px 8px; font-size: 13px; background: #fff; }
+  /* .why = submit se pehle ka hint / reason maangne wali warning -> amber (error nahi) */
+  .dm-form .why { font-size: 12px; color: #B45309; background: #FEF3E2; border: 1px solid #FBD9A5; border-radius: 6px; padding: 5px 8px; margin-top: 4px; }
+  .dm-form .info { font-size: 12px; color: #0B7285; background: #E6F6F8; border: 1px solid #B2DDE4; border-radius: 6px; padding: 5px 8px; margin-top: 4px; }
+  .db-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
 </style>
 {% endblock %}
 
@@ -122,9 +130,9 @@
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="db-kpi"><span class="k">Machines</span><span class="v">{{ board.total.machines }}</span><span class="h">on all lines</span></div>
-  <div class="db-kpi"><span class="k">Running</span><span class="v" style="color:#8A4A1C">{{ board.total.running - board.total.held }}</span><span class="h">{% if board.total.held %}{{ board.total.held }} on hold · {% endif %}{{ board.total.orders }} order{{ '' if board.total.orders == 1 else 's' }} in work</span></div>
+  <div class="db-kpi"><span class="k">Running</span><span class="v" style="color:#0A3CA6">{{ board.total.running - board.total.held }}</span><span class="h">{% if board.total.held %}{{ board.total.held }} on hold · {% endif %}{{ board.total.orders }} order{{ '' if board.total.orders == 1 else 's' }} in work</span></div>
   <div class="db-kpi"><span class="k">Free</span><span class="v" style="color:#1F7A4D">{{ board.total.free }}</span><span class="h">ready for the next order</span></div>
-  <div class="db-kpi"><span class="k">Unavailable</span><span class="v"{% if board.total.down %} style="color:#B42318"{% endif %}>{{ board.total.down }}</span><span class="h">breakdown, maintenance or off</span></div>
+  <div class="db-kpi"><span class="k">Unavailable</span><span class="v"{% if board.total.down %} style="color:#B45309"{% endif %}>{{ board.total.down }}</span><span class="h">breakdown, maintenance or off</span></div>
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
@@ -137,7 +145,7 @@
       </div>
       <div class="flex gap-1.5">
         <span class="db-chip running"><i></i>{{ g.running - g.held }} running</span>
-        {% if g.held %}<span class="db-chip over"><i></i>{{ g.held }} on hold</span>{% endif %}
+        {% if g.held %}<span class="db-chip hold"><i></i>{{ g.held }} on hold</span>{% endif %}
         <span class="db-chip free"><i></i>{{ g.free }} free</span>
         {% if g.inactive %}<span class="db-chip inactive"><i></i>{{ g.inactive }} unavailable</span>{% endif %}
       </div>
@@ -180,13 +188,13 @@
             <div class="db-idle">{% if t.mstatus == 'breakdown' %}Under breakdown. No new order can start here.{% elif t.mstatus == 'maintenance' %}Under maintenance. No new order can start here.{% else %}Switched off in Machine master.{% endif %}</div>
           {% else %}
             {% if t.idle_for %}
-            <div class="db-wait">Idle &mdash; <b>{{ t.idle_for.prod_no }}</b> ({{ t.idle_for.line or 'no line' }}) {% if t.idle_for.same_line %}is waiting for this machine{% else %}is waiting for a free machine{% endif %}{% if t.idle_for.count > 1 %} &middot; +{{ t.idle_for.count - 1 }} more{% endif %}<br><span class="go">Start here</span></div>
+            <div class="db-wait">Idle &mdash; <b>{{ t.idle_for.prod_no }}</b> ({{ t.idle_for.line or 'no line' }}) {% if t.idle_for.same_line %}is waiting for this machine{% else %}is waiting for a free machine{% endif %}{% if t.idle_for.count > 1 %} &middot; +{{ t.idle_for.count - 1 }} more{% endif %}{% if can_do('dashboard.machine_assign') %}<br><span class="go">Start here</span>{% endif %}</div>
             {% else %}
             <div class="db-idle">Idle, ready for work.</div>
             {% endif %}
           {% endif %}
           {% if t.incoming %}
-          <div class="db-hot" title="Another order's hot metal goes to this machine. A long job started here now would block it.">{% if t.incoming.waiting %}<span style="{{ 'color:#B42318' if t.incoming.over else '' }}">Hot metal {{ t.incoming.text }}{% if t.incoming.over %} &middot; limit crossed{% endif %}</span>{% else %}Hot metal due {{ t.incoming.text }}{% endif %}: <b>{{ t.incoming.prod_no }}</b> &middot; {{ t.incoming.prev_stage }} &rarr; {{ t.incoming.stage }}</div>
+          <div class="db-hot" title="Another order's hot metal goes to this machine. A long job started here now would block it.">{% if t.incoming.waiting %}<span class="{{ 'over' if t.incoming.over else '' }}">Hot metal {{ t.incoming.text }}{% if t.incoming.over %} &middot; limit crossed{% endif %}</span>{% else %}Hot metal due {{ t.incoming.text }}{% endif %}: <b>{{ t.incoming.prod_no }}</b> &middot; {{ t.incoming.prev_stage }} &rarr; {{ t.incoming.stage }}</div>
           {% endif %}
           {% if t.next %}
           <div class="db-next">Next: <b>{{ t.next.prod_no }}</b> from {{ t.next.start.strftime('%d %b') }}{% if t.queue_count > 1 %} · +{{ t.queue_count - 1 }} more{% endif %}</div>
@@ -211,14 +219,14 @@
 <div id="db-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="db-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="db-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-5 py-4 border-b border-slate-200 bg-copper-soft shrink-0 flex items-start justify-between gap-3">
+    <div class="px-5 py-4 border-b border-slate-200 bg-accent-soft shrink-0 flex items-start justify-between gap-3">
       <div><h2 id="db-title" class="text-[17px] font-bold text-ink">Machine</h2><p id="db-sub" class="text-[12.5px] text-ink-faint mt-0.5"></p></div>
       <button type="button" id="db-close" class="px-2.5 py-1 text-[13px] border border-slate-300 bg-white rounded hover:bg-mist" aria-label="Close">Close</button>
     </div>
     <div id="db-body" class="flex-1 overflow-y-auto px-5 py-4 text-[13.5px] text-ink"></div>
     <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
-      <a href="/routing" class="px-3 py-2 text-[13px] font-medium border border-slate-300 bg-white rounded hover:bg-mist">Open Routing</a>
-      <a href="/production_orders" class="px-3 py-2 text-[13px] font-medium border border-copper bg-copper text-white rounded hover:bg-copper-dark">Open Order queue</a>
+      {% if can_do('routing.routing_list', 'GET') %}<a href="/routing" class="px-3 py-2 text-[13px] font-medium border border-slate-300 bg-white rounded hover:bg-mist">Open Routing</a>{% endif %}
+      {% if can_do('production_orders.production_orders_list', 'GET') %}<a href="/production_orders" class="px-3 py-2 text-[13px] font-medium border border-accent bg-accent text-white rounded hover:bg-accent-dark">Open Order queue</a>{% endif %}
     </div>
   </div>
 </div>
@@ -260,11 +268,13 @@
         return '<tr><td>' + esc(m.name) + '</td><td class="r">' + m.required + ' ' + esc(m.unit) + '</td><td class="r">' + m.issued + ' ' + esc(m.unit) + '</td></tr>';
       }).join('');
       return '<div class="dm-card"><div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-mono font-bold text-[15px]">' + esc(o.prod_no) + '</span> <span class="text-ink-faint">' + esc(o.product) + '</span></div>' +
-        '<span class="db-chip running"><i></i>' + esc(o.running_stage) + (o.held ? ' on hold: ' + esc(o.hold_reason) : ' running') + '</span></div>' +
+        '<span class="db-chip ' + (o.held ? 'hold' : 'running') + '"><i></i>' + esc(o.running_stage) + (o.held ? ' on hold: ' + esc(o.hold_reason) : ' running') + '</span></div>' +
         '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">' + kv('Batch', o.batch_kg + ' KG') + kv('Line', o.line) + kv('Plan', o.planned_start + (o.planned_end ? ' – ' + o.planned_end : '')) + kv('Needed by', o.needed_by) + '</div>' +
         '<div class="dm-sec">Stages (' + o.done + ' of ' + o.total + ' done)</div><div class="overflow-x-auto"><table class="dm-table"><thead><tr><th>Stage</th><th>Status</th><th>Machines</th><th>Plan dates</th><th class="r">Planned</th><th class="r">Actual</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<div class="dm-sec">Material</div><table class="dm-table"><thead><tr><th>Material</th><th class="r">Needed</th><th class="r">Issued</th></tr></thead><tbody>' + mats + '</tbody></table></div>';
     }
+    {# Assign / Plan / arrows (machine_assign, machine_assign_check, machine_queue_assign, machine_queue_move) sab dashboard Edit maangte hain: View user ke liye ye JS bhi nahi banta #}
+    {% if can_edit('dashboard') %}
     // ---------- Free machine: kisi bhi line ke intezaar karte order ko yahin se start karo ("Assign & Start") ----------
     function assignSection(a) {
       var rows = a.orders;
@@ -321,6 +331,7 @@
         });
       }).catch(function () { box.innerHTML = '<p class="mt-2" style="color:#B42318">Could not check this order.</p>'; });
     }
+    {% endif %}
     function show(data, movedId) {
       var m = data.machine;
       document.getElementById('db-title').textContent = m.name;
@@ -334,19 +345,22 @@
         }).join('') + '</tbody></table><p class="db-meta mt-1">A long job started on this machine now would block it. The routing page refuses such a start unless a reason is written.</p>';
       }
       if (data.message) html += '<div class="info mt-1" style="background:#E6F5EC;color:#1F7A4D;border-radius:6px;padding:6px 9px;font-size:12.5px">' + esc(data.message) + '</div>';
+      {% if can_edit('dashboard') %}
       if (data.assign && data.assign.can) html += assignSection(data.assign);
       if (data.assign && data.assign.queueable && data.assign.queueable.length) html += queueSection(data.assign.queueable);
+      {% endif %}
       html += '<div class="dm-sec">Queue for this machine</div>';
       if (data.queue.length) {
-        html += '<table class="dm-table"><thead><tr><th>#</th><th>Order</th><th>Product</th><th>Stage</th><th class="r">Batch</th><th>From</th><th></th></tr></thead><tbody>' + data.queue.map(function (q, i) {
+        html += '<table class="dm-table"><thead><tr><th>#</th><th>Order</th><th>Product</th><th>Stage</th><th class="r">Batch</th><th>From</th>{% if can_edit('dashboard') %}<th></th>{% endif %}</tr></thead><tbody>' + data.queue.map(function (q, i) {
           var btn = function (dir, on, label) {
             return '<button type="button" class="dm-mv" data-order="' + q.order_id + '" data-dir="' + dir + '"' + (on ? '' : ' disabled') + ' title="Move ' + dir + '" aria-label="Move ' + dir + '">' + label + '</button>';
           };
-          return '<tr class="' + (movedId && String(q.order_id) === String(movedId) ? 'dm-moved' : '') + '"><td>' + (i === 0 ? '<b>Next</b>' : (i + 1)) + '</td><td class="font-mono font-semibold">' + esc(q.prod_no) + (q.status === 'In production' ? ' <span class="db-meta">(in production)</span>' : '') + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td class="r">' + q.batch_kg + ' KG</td><td>' + esc(q.start) + '</td><td class="r" style="white-space:nowrap">' + btn('up', q.can_up, '&#9650;') + btn('down', q.can_down, '&#9660;') + '</td></tr>';
-        }).join('') + '</tbody></table><p class="db-meta mt-1">When the running order finishes on this machine, the first order here is next. Use the arrows to change the turn of released orders; the dates of the other orders are worked out again.</p>';
+          return '<tr class="' + (movedId && String(q.order_id) === String(movedId) ? 'dm-moved' : '') + '"><td>' + (i === 0 ? '<b>Next</b>' : (i + 1)) + '</td><td class="font-mono font-semibold">' + esc(q.prod_no) + (q.status === 'In production' ? ' <span class="db-meta">(in production)</span>' : '') + '</td><td>' + esc(q.product) + '</td><td>' + esc(q.stage) + '</td><td class="r">' + q.batch_kg + ' KG</td><td>' + esc(q.start) + '</td>{% if can_edit('dashboard') %}<td class="r" style="white-space:nowrap">' + btn('up', q.can_up, '&#9650;') + btn('down', q.can_down, '&#9660;') + '</td>{% endif %}</tr>';
+        }).join('') + '</tbody></table><p class="db-meta mt-1">When the running order finishes on this machine, the first order here is next.{% if can_edit('dashboard') %} Use the arrows to change the turn of released orders; the dates of the other orders are worked out again.{% endif %}</p>';
       } else html += '<p class="text-ink-muted">No order is waiting for this machine.</p>';
       html += '<div id="dm-err" class="db-meta mt-1" style="color:#B42318"></div>';
       body.innerHTML = html;
+      {% if can_edit('dashboard') %}
       body.querySelectorAll('.dm-mv').forEach(function (b) {
         b.addEventListener('click', function () {
           fetch('/dashboard/machine/' + m.id + '/move/' + b.getAttribute('data-order') + '/' + b.getAttribute('data-dir'), { method: 'POST' })
@@ -367,6 +381,7 @@
             .catch(function () { b.disabled = false; document.getElementById('dm-err').textContent = 'Could not change the plan.'; });
         });
       });
+      {% endif %}
       modal.classList.remove('hidden');
       modal.setAttribute('aria-hidden', 'false');
     }

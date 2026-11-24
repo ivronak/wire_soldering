@@ -1,0 +1,276 @@
+{# Sidebar: module-wise drawers (Masters / Procurement / Sales / Inventory / Manufacturing / Administration).
+   Data app/auth/nav.py se aata hai (nav_modules: registry ke pages, sirf user ke dekhne layak) — naya page registry me jodo, yahan kuch nahi badalna.
+   Har module ek drawer: header par click = khulta / band hota hai; khula-band ka haal browser me yaad rehta hai (localStorage "erp.nav.v1").
+   Jis drawer me abhi ka page hai wo hamesha khula; Masters ke andar ke sub-groups (Common / Production / ...) bhi drawers.
+   "Find a page" box: naam ya module se filter, match wale drawers apne aap khul jaate hain. Tour (tour.js) .nav-link / aside par nirbhar hai — class naam mat badlo. #}
+{% macro chev() -%}<svg class="nav-chev" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>{%- endmacro %}
+
+{% macro nav_link(p, active_nav, alert) -%}
+<a href="{{ p.url }}" class="nav-link{% if p.active == active_nav %} is-active{% endif %}"{% if p.active == active_nav %} aria-current="page"{% endif %} data-nav-text="{{ p.label|lower }}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ p.icon }}"/></svg><span class="nav-link-label">{{ p.label }}</span>{% if p.key == 'stock' and alert %}<span class="nav-pill nav-pill-alert" title="Materials at or below their reorder level">{{ alert }}</span>{% endif %}</a>
+{%- endmacro %}
+
+<aside id="sidebar" class="w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col nav-noanim" aria-label="Sidebar">
+  <style>
+    /* Sidebar ki saari styling yahin (#sidebar ke andar) — baaki pages ke .nav-link / aside par asar nahi */
+    #sidebar .nav-head { display: flex; align-items: center; gap: 10px; width: calc(100% - 16px); margin: 2px 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: transparent; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); text-align: left; cursor: pointer; }
+    #sidebar .nav-head:hover { background: var(--neutral-bg); }
+    #sidebar .nav-head:focus-visible, #sidebar .nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    /* Drawer icons neutral grey — rang sirf ACTIVE page ke icon / bar par (nahi to har drawer 'selected' jaisa dikhta) */
+    #sidebar .nav-head-ico { width: 18px; height: 18px; flex-shrink: 0; color: var(--ink-faint); }
+    #sidebar .nav-head-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #sidebar .nav-pill { flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--surface-3); color: var(--ink-faint); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
+    /* Laal pill SIRF stock alert ke liye (red = alert, aur kahin nahi) */
+    #sidebar .nav-pill-alert { background: var(--stop); color: #fff; font-weight: 700; margin-left: auto; }
+    #sidebar .nav-chev { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2.5; color: var(--ink-faint); transition: transform .16s ease; }
+    #sidebar .nav-group.is-open > .nav-head .nav-chev, #sidebar .nav-group[data-force-open] > .nav-head .nav-chev { transform: rotate(90deg); }
+    /* Jis drawer me abhi ka page hai: heading accent-text me, band ho tab bhi pata chale ki yahin ho (icon grey hi rehta hai) */
+    #sidebar .nav-group.has-active > .nav-head { color: var(--accent-text); }
+    #sidebar .nav-group.has-active:not(.is-open) > .nav-head .nav-pill { background: var(--accent-soft); color: var(--accent-text); }
+
+    /* Drawer ka khulna-band hona: grid row 0fr -> 1fr (height animate, JS me height nahi napte). Band panel me focus bhi nahi jata (visibility + inert) */
+    #sidebar .nav-panel { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows .16s ease, visibility 0s .16s; }
+    #sidebar .nav-group.is-open > .nav-panel, #sidebar .nav-group[data-force-open] > .nav-panel { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows .16s ease, visibility 0s; }
+    #sidebar .nav-panel-inner { min-height: 0; overflow: hidden; margin-left: 26px; padding-left: 3px; border-left: 1px solid var(--line-soft); }
+    #sidebar .nav-panel-inner .nav-link { margin: 1px 6px 1px 3px; padding: 7px 10px; font-size: 13.5px; gap: 9px; }
+    #sidebar .nav-link { position: relative; }
+    #sidebar .nav-link svg { width: 15px; height: 15px; color: var(--ink-faint); }
+    #sidebar .nav-link.is-active svg { color: var(--accent); }
+    /* Active link ki left bar: logo ke X jaisa gradient (azure -> royal blue), upar se neeche */
+    #sidebar .nav-link.is-active::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: linear-gradient(180deg, var(--logo-azure), var(--accent)); }
+    #sidebar .nav-link-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Dashboard: akela link (drawer nahi), drawer header jaisa dikhta hai */
+    #sidebar .nav-solo { margin: 2px 8px; padding: 8px 10px; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); }
+    #sidebar .nav-solo svg { width: 18px; height: 18px; color: var(--ink-faint); }
+    #sidebar .nav-solo.is-active { color: var(--accent-text); }
+    #sidebar .nav-solo.is-active svg { color: var(--accent); }
+
+    /* Masters ke sub-group drawers (Common / Production / ...): chhote uppercase header */
+    #sidebar .nav-panel-inner .nav-sub > .nav-head { width: calc(100% - 8px); margin: 3px 4px 0 3px; padding: 6px 10px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; color: var(--ink-faint); }
+    #sidebar .nav-sub .nav-chev { width: 12px; height: 12px; }
+    #sidebar .nav-sub.has-active > .nav-head { color: var(--accent-text); }
+    #sidebar .nav-sub > .nav-panel > .nav-panel-inner { margin-left: 12px; }
+
+    #sidebar .nav-admin { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line-soft); }
+    #sidebar .nav-hide { display: none !important; }
+    #sidebar nav { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+    #sidebar.nav-noanim *, #sidebar.nav-noanim *::before { transition: none !important; }
+    @media (prefers-reduced-motion: reduce) { #sidebar .nav-panel, #sidebar .nav-chev { transition: none !important; } }
+  </style>
+
+  {# Brand: Nrupex ka logo (wordmark) + chhota caption. Logo file app/static/img/nrupex_logo.png (print documents me bhi yahi) #}
+  <div class="px-4 pt-3.5 pb-3 border-b border-slate-200 leading-tight">
+    <img src="{{ url_for('static', filename='img/nrupex_logo.png') }}" alt="Nrupex" class="block h-16 w-auto max-w-full -ml-3 -my-3" width="171" height="64" />
+    <div class="mt-2 text-[11px] text-ink-faint tracking-wide">Wire Soldering · Factory ERP</div>
+  </div>
+
+  {% if nav_modules %}
+  <div class="px-2.5 pt-2.5 pb-1.5 flex items-center gap-1.5">
+    <div class="relative flex-1 min-w-0">
+      <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input id="nav-search" type="search" autocomplete="off" placeholder="Find a page…" title="Press / to search" aria-label="Find a page"
+             class="w-full pl-8 pr-2 py-1.5 text-[13px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
+    </div>
+    <button type="button" id="nav-expand-all" title="Expand all" aria-label="Expand all sections" class="shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-md border border-slate-300 text-ink-muted hover:bg-mist">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 13l-7 7-7-7m14-8l-7 7-7-7"/></svg>
+    </button>
+    <button type="button" id="nav-collapse-all" title="Collapse all" aria-label="Collapse all sections" class="shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-md border border-slate-300 text-ink-muted hover:bg-mist">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 11l7-7 7 7M5 19l7-7 7 7"/></svg>
+    </button>
+  </div>
+  {% endif %}
+
+  <nav id="sidebar-nav" class="flex-1 overflow-y-auto pb-3" aria-label="Main menu">
+    {% for m in nav_modules %}
+      {% if m.single %}
+        {# Dashboard: ek hi page — seedha link #}
+        {% set p = m.groups[0].pages[0] %}
+        <a href="{{ p.url }}" class="nav-link nav-solo{% if p.active == active_nav %} is-active{% endif %}"{% if p.active == active_nav %} aria-current="page"{% endif %} data-nav-text="{{ p.label|lower }}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ p.icon }}"/></svg><span class="nav-link-label">{{ p.label }}</span></a>
+      {% else %}
+        {% set mod = namespace(active=false) %}
+        {% for g in m.groups %}{% for p in g.pages %}{% if p.active == active_nav %}{% set mod.active = true %}{% endif %}{% endfor %}{% endfor %}
+        <section class="nav-group{% if mod.active %} is-open has-active{% endif %}{% if m.id == 'administration' %} nav-admin{% endif %}" data-nav-group="{{ m.id }}" data-nav-label="{{ m.label|lower }}">
+          <button type="button" class="nav-head" id="navh-{{ m.id }}" aria-expanded="{{ 'true' if mod.active else 'false' }}" aria-controls="navp-{{ m.id }}">
+            <svg class="nav-head-ico" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ m.icon }}"/></svg>
+            <span class="nav-head-label">{{ m.label }}</span>
+            {% if m.id == 'inventory' and stock_alert_count %}<span class="nav-pill nav-pill-alert" title="Materials at or below their reorder level">{{ stock_alert_count }}</span>{% else %}<span class="nav-pill">{{ m.count }}</span>{% endif %}
+            {{ chev() }}
+          </button>
+          <div class="nav-panel" id="navp-{{ m.id }}" role="group" aria-labelledby="navh-{{ m.id }}">
+            <div class="nav-panel-inner">
+              {% for g in m.groups %}
+                {% if g.label %}
+                  {# Sub-group drawer (sirf Masters me) #}
+                  {% set sub = namespace(active=false) %}
+                  {% for p in g.pages %}{% if p.active == active_nav %}{% set sub.active = true %}{% endif %}{% endfor %}
+                  <section class="nav-group nav-sub{% if sub.active %} is-open has-active{% endif %}" data-nav-group="{{ g.id }}" data-nav-label="{{ g.label|lower }}">
+                    <button type="button" class="nav-head" id="navh-{{ g.id|replace('/', '-') }}" aria-expanded="{{ 'true' if sub.active else 'false' }}" aria-controls="navp-{{ g.id|replace('/', '-') }}">
+                      <span class="nav-head-label">{{ g.label }}</span>
+                      {{ chev() }}
+                    </button>
+                    <div class="nav-panel" id="navp-{{ g.id|replace('/', '-') }}" role="group" aria-labelledby="navh-{{ g.id|replace('/', '-') }}">
+                      <div class="nav-panel-inner">
+                        {% for p in g.pages %}{{ nav_link(p, active_nav, stock_alert_count) }}{% endfor %}
+                      </div>
+                    </div>
+                  </section>
+                {% else %}
+                  {% for p in g.pages %}{{ nav_link(p, active_nav, stock_alert_count) }}{% endfor %}
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      {% endif %}
+    {% endfor %}
+    <div id="nav-empty" class="hidden px-4 py-6 text-center text-[12.5px] text-ink-faint">No page matches your search.</div>
+  </nav>
+
+  {# Logged-in user ka naam + Logout (POST + CSRF). #}
+  {% if me %}
+  <div class="border-t border-slate-200 px-3 py-2.5 shrink-0">
+    <div class="flex items-center gap-2 min-w-0">
+      <div class="w-8 h-8 shrink-0 rounded-full bg-accent-soft border border-accent-border text-accent-text text-[13px] font-bold flex items-center justify-center">{{ (me.full_name or '?')[:1]|upper }}</div>
+      <div class="min-w-0 leading-tight">
+        <div class="text-[13px] font-semibold text-ink truncate" title="{{ me.full_name }}">{{ me.full_name }}</div>
+        <div class="text-[11px] text-ink-faint truncate">{{ me.role.name if me.role else '' }}</div>
+      </div>
+    </div>
+    <div class="mt-2 flex items-center gap-2">
+      <a href="{{ url_for('auth.change_password') }}" class="flex-1 min-h-[32px] flex items-center justify-center text-center px-2 py-1.5 text-[12px] font-semibold text-ink-muted border border-slate-300 rounded hover:bg-neutral-bg">Change password</a>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="flex-1">
+        {# Log out routine action hai, destructive nahi — neutral button (laal rang sirf errors / destructive ke liye) #}
+        <button type="submit" class="w-full min-h-[32px] px-2 py-1.5 text-[12px] font-semibold text-ink-muted border border-slate-300 rounded hover:bg-neutral-bg">Log out</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <script>
+    (function () {
+      var aside = document.getElementById('sidebar');
+      var nav = document.getElementById('sidebar-nav');
+      if (!aside || !nav) return;
+      var KEY = 'erp.nav.v1';
+      var groups = [].slice.call(nav.querySelectorAll('.nav-group'));
+      var input = document.getElementById('nav-search');
+      var empty = document.getElementById('nav-empty');
+
+      // Khula-band ka haal browser me (private mode / blocked storage me chupchap chhod do)
+      function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
+      function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } }
+      var state = load();
+
+      function head(g) { return g.querySelector(':scope > .nav-head'); }
+      function panel(g) { return g.querySelector(':scope > .nav-panel'); }
+      function syncPanel(g) {
+        // Band drawer ke andar tab / click / screen-reader nahi jaana chahiye
+        var open = g.classList.contains('is-open') || g.hasAttribute('data-force-open');
+        var p = panel(g);
+        if (open) p.removeAttribute('inert'); else p.setAttribute('inert', '');
+        head(g).setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function setOpen(g, open, persist) {
+        g.classList.toggle('is-open', open);
+        syncPanel(g);
+        if (persist) { state[g.getAttribute('data-nav-group')] = open; save(state); }
+      }
+
+      // Pehli baar: jo yaad hai wahi; jis drawer me abhi ka page hai wo hamesha khula
+      groups.forEach(function (g) {
+        var saved = state[g.getAttribute('data-nav-group')];
+        var open = typeof saved === 'boolean' ? saved : g.classList.contains('is-open');
+        if (g.classList.contains('has-active')) open = true;
+        setOpen(g, open, false);
+      });
+
+      nav.addEventListener('click', function (e) {
+        var btn = e.target.closest('.nav-head');
+        if (!btn || !nav.contains(btn)) return;
+        var g = btn.parentElement;
+        setOpen(g, !g.classList.contains('is-open'), true);
+      });
+      function setAll(open) { groups.forEach(function (g) { setOpen(g, open, true); }); }
+      var ex = document.getElementById('nav-expand-all'), co = document.getElementById('nav-collapse-all');
+      if (ex) ex.addEventListener('click', function () { setAll(true); });
+      if (co) co.addEventListener('click', function () { setAll(false); });
+
+      // Find a page: naam se, ya module / group ke naam se (jaise "sales" likho to Sales ke saare pages)
+      function labelMatches(a, q) {
+        // Module / group ka naam tabhi jab kam se kam 4 akshar likhe ho aur naam usi se shuru ho ("sale" -> Sales; "inv" par poora Inventory nahi aata)
+        if (q.length < 4) return false;
+        var el = a.closest('.nav-group');
+        while (el) {
+          if ((el.getAttribute('data-nav-label') || '').indexOf(q) === 0) return true;
+          el = el.parentElement ? el.parentElement.closest('.nav-group') : null;
+        }
+        return false;
+      }
+      function applySearch() {
+        var q = input.value.trim().toLowerCase();
+        aside.classList.toggle('is-searching', !!q);
+        var anyLink = false;
+        [].forEach.call(nav.querySelectorAll('.nav-link'), function (a) {
+          var show = !q || (a.getAttribute('data-nav-text') || '').indexOf(q) !== -1 || labelMatches(a, q);
+          a.classList.toggle('nav-hide', !show);
+          if (show) anyLink = true;
+        });
+        groups.forEach(function (g) {
+          var has = !q || g.querySelector('.nav-link:not(.nav-hide)') !== null;
+          g.classList.toggle('nav-hide', !has);
+          if (q && has) g.setAttribute('data-force-open', ''); else g.removeAttribute('data-force-open');
+          syncPanel(g);
+        });
+        empty.classList.toggle('hidden', !q || anyLink);
+      }
+      if (input) {
+        input.addEventListener('input', applySearch);
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') { input.value = ''; applySearch(); input.blur(); }
+          else if (e.key === 'Enter') {
+            e.preventDefault();
+            var first = nav.querySelector('.nav-link:not(.nav-hide)');
+            if (input.value.trim() && first) window.location.href = first.href;
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            var f = focusables()[0]; if (f) f.focus();
+          }
+        });
+        // "/" dabane se search box (jab kisi input me type na kar rahe ho)
+        document.addEventListener('keydown', function (e) {
+          if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+          var t = e.target, tag = (t && t.tagName || '').toLowerCase();
+          if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+          e.preventDefault(); input.focus(); input.select();
+        });
+      }
+
+      // Keyboard: Up / Down se headers aur links ke beech
+      function focusables() {
+        return [].filter.call(nav.querySelectorAll('.nav-head, .nav-link'), function (el) {
+          return !el.closest('[inert]') && !el.closest('.nav-hide');
+        });
+      }
+      nav.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        var list = focusables(), i = list.indexOf(document.activeElement);
+        if (i === -1) return;
+        e.preventDefault();
+        if (e.key === 'ArrowUp' && i === 0 && input) { input.focus(); return; }
+        var next = list[i + (e.key === 'ArrowDown' ? 1 : -1)];
+        if (next) next.focus();
+      });
+
+      // Demo tour (tour.js) ko kisi link tak pahunchna ho to uske drawers khol do
+      window.ErpNav = {
+        reveal: function (el) {
+          var g = el && el.closest ? el.closest('.nav-group') : null;
+          while (g) { setOpen(g, true, false); g = g.parentElement ? g.parentElement.closest('.nav-group') : null; }
+        }
+      };
+
+      // Pehli paint ke baad hi animation chalu (warna page load par drawers khulte-band hote dikhte)
+      requestAnimationFrame(function () { requestAnimationFrame(function () { aside.classList.remove('nav-noanim'); }); });
+    })();
+  </script>
+</aside>

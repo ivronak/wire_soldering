@@ -3,58 +3,65 @@
 
 {% block page_css %}
 <style>
-  /* Production output UI — queue / routing jaisa card look (copper-teal theme), simple English */
-  .ou-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .ou-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .ou-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .ou-kpi .h { font-size: 12px; color: #6B7F82; }
-  .ou-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .ou-kpi.warn .v { color: #8A4A1C; }
+  /* Production output UI — queue / routing jaisa card look (blue accent theme), simple English */
+  .ou-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .ou-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .ou-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .ou-kpi .h { font-size: 12px; color: #5A6577; }
+  /* KPI variants: warn = sirf jahan action chahiye (amber); info = sirf jaankari ki ginti (accent-soft, jaise 'Still in stages') */
+  .ou-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .ou-kpi.warn .v { color: #B45309; }
+  .ou-kpi.info { background: #EDF3FF; border-color: #BCD2FA; } .ou-kpi.info .v { color: #0A3CA6; }
   .ou-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .ou-kpi.good .v { color: #1F7A4D; }
-  .ou-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .ou-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .ou-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .ou-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
-  .ou-group { padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; }
-  .ou-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 10px; }
+  .ou-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .ou-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .ou-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .ou-tabs a span { font-weight: 500; color: #5A6577; margin-left: 3px; }
+  .ou-group { padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5A6577; }
+  .ou-card { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; margin-bottom: 10px; }
   .ou-card.ready { border-left: 4px solid #1F7A4D; }
   .ou-row { display: grid; grid-template-columns: minmax(210px, 1.4fr) minmax(220px, 1.5fr) minmax(170px, 1fr) auto; gap: 16px; align-items: center; padding: 14px 16px; }
-  .ou-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .ou-prod { font-size: 13.5px; color: #1C2B2D; }
-  .ou-meta { font-size: 12px; color: #6B7F82; }
+  .ou-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0B1220; }
+  .ou-prod { font-size: 13.5px; color: #121A2B; }
+  .ou-meta { font-size: 12px; color: #5A6577; }
   .ou-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .ou-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .ou-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .ou-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .ou-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .ou-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .ou-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .ou-chip.bad { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .ou-chip.gone { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .ou-nums { display: flex; gap: 18px; }
   .ou-nums div { text-align: left; }
-  .ou-nums b { display: block; font-size: 17px; color: #0F2F32; font-variant-numeric: tabular-nums; }
-  .ou-nums small { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
+  .ou-nums b { display: block; font-size: 17px; color: #0B1220; font-variant-numeric: tabular-nums; }
+  .ou-nums small { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
   .ou-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
-  .ou-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .ou-btn.primary:hover { background: #A35522; }
-  .ou-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .ou-btn.ghost:hover { background: #F4F6F5; }
-  .ou-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .ou-btn.danger:hover { background: #FDECEC; }
-  .ou-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .ou-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .ou-btn.primary { background: #0B5BEF; color: #fff; border-color: #0843C2; } .ou-btn.primary:hover { background: #0843C2; }
+  .ou-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .ou-btn.ghost:hover { background: #F3F6FB; }
+  .ou-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .ou-btn.danger:hover { background: #FCEBEA; }
+  .ou-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .ou-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
   @media (max-width: 1100px) { .ou-row { grid-template-columns: 1fr auto; } .ou-row > :nth-child(2), .ou-row > :nth-child(3) { grid-column: 1 / 3; } }
-  .ou-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
-  .ou-box h3 { font-size: 15px; font-weight: 700; color: #0F2F32; margin-bottom: 2px; }
-  .ou-box .sub { font-size: 12.5px; color: #6B7F82; margin-bottom: 10px; }
-  .ou-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
-  .ou-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .ou-box { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 14px 16px; }
+  .ou-box h3 { font-size: 15px; font-weight: 700; color: #0B1220; margin-bottom: 2px; }
+  .ou-box .sub { font-size: 12.5px; color: #5A6577; margin-bottom: 10px; }
+  .ou-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 8px; background: #fff; }
+  .ou-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.15); }
   .ou-input.big { font-size: 20px; font-weight: 700; padding: 10px 12px; }
-  .ou-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 3px; }
-  .ou-help { font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
+  .ou-label { display: block; font-size: 12.5px; font-weight: 600; color: #0B1220; margin-bottom: 3px; }
+  .ou-help { font-size: 11.5px; color: #5A6577; margin-top: 3px; }
   .ou-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .ou-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D1D9D8; text-align: left; }
-  .ou-table td { padding: 8px; border: 1px solid #E2E8E7; }
-  .ou-side { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 16px; position: sticky; top: 0; align-self: start; }
+  .ou-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D4DBE6; text-align: left; }
+  .ou-table td { padding: 8px; border: 1px solid #E2E8F1; }
+  .ou-table tbody tr:hover td { background: #F1F5F9; }   /* hover = neutral slate */
+  .ou-side { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 16px; position: sticky; top: 0; align-self: start; }
   .ou-side ol { list-style: none; counter-reset: s; padding: 0; margin: 0; }
   .ou-side li { counter-increment: s; position: relative; padding: 8px 0 8px 32px; font-size: 13.5px; border-bottom: 1px dashed #E1E8E7; }
   .ou-side li:last-child { border-bottom: 0; }
-  .ou-side li::before { content: counter(s); position: absolute; left: 0; top: 8px; width: 22px; height: 22px; border-radius: 50%; background: #FBF4EE; color: #8A4A1C; border: 1px solid #E8C9A8; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .ou-side li::before { content: counter(s); position: absolute; left: 0; top: 8px; width: 22px; height: 22px; border-radius: 50%; background: #EDF3FF; color: #0A3CA6; border: 1px solid #BCD2FA; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   #ou-modal.hidden { display: none; } #ou-modal { display: flex; }
+  /* Pre-submit check line ka rang JS se class (data-state) se aata hai — hex JS string me nahi */
+  #ou-check[data-state="bad"] { color: #B42318; } #ou-check[data-state="warn"] { color: #B45309; } #ou-check[data-state="ok"] { color: #1F7A4D; }
+  /* Keyboard focus */
+  .ou-btn:focus-visible, .ou-tabs a:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -67,7 +74,7 @@
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="ou-kpi {{ 'good' if kpi.ready else '' }}"><span class="k">Ready to record</span><span class="v">{{ kpi.ready }}</span><span class="h">all stages are finished</span></div>
-  <div class="ou-kpi {{ 'warn' if kpi.waiting else '' }}"><span class="k">Still in stages</span><span class="v">{{ kpi.waiting }}</span><span class="h">not finished yet</span></div>
+  <div class="ou-kpi {{ 'info' if kpi.waiting else '' }}"><span class="k">Still in stages</span><span class="v">{{ kpi.waiting }}</span><span class="h">not finished yet</span></div>
   <div class="ou-kpi"><span class="k">Outputs recorded</span><span class="v">{{ kpi.recorded }}</span><span class="h">batches made</span></div>
   <div class="ou-kpi"><span class="k">Value recorded</span><span class="v">₹{{ kpi.value|inr }}</span><span class="h">raw material cost</span></div>
 </div>
@@ -77,7 +84,9 @@
     <a href="{{ url_for('production_output.production_output_list', tab='ready') }}" class="{{ 'on' if tab == 'ready' else '' }}">Ready to record<span>{{ kpi.ready }}</span></a>
     <a href="{{ url_for('production_output.production_output_list', tab='recorded') }}" class="{{ 'on' if tab == 'recorded' else '' }}">Recorded<span>{{ outputs|length }}</span></a>
   </div>
+  {% if can_do('production_output.finished_goods_list', 'GET') %}
   <a href="{{ url_for('production_output.finished_goods_list') }}" class="ou-btn ghost">See finished goods stock →</a>
+  {% endif %}
 </div>
 
 <div class="flex-1 overflow-auto min-h-0 pb-6">
@@ -100,10 +109,10 @@
       <div>{% set bad = plan.materials | selectattr('issued', 'le', 0) | list %}
         <div class="ou-meta">Material in production</div>
         <div class="text-[13px] font-semibold">₹{{ (plan.materials | sum(attribute='value'))|inr }}</div>
-        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first (or written off) · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline;font-weight:600">Return it to the store</a></div>
+        {% if plan.leftover_note %}<div class="ou-meta mt-1" style="color:#B42318">Unused material must be returned first (or written off){% if can_do('material_issues.material_issues_list', 'GET') %} · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline;font-weight:600">Return it to the store</a>{% endif %}</div>
         {% for l in plan.leftover %}<div class="ou-meta" style="color:#B42318"><b>{{ '%g'|format(l.qty) }} {{ l.unit }}</b> {{ l.name }} unaccounted for</div>{% endfor %}
-        <button type="button" class="ou-writeoff ou-btn ghost" style="margin-top:6px" data-plan='{{ plan|tojson }}'>Write off as missing</button>{% endif %}</div>
-      <div><button type="button" class="ou-act ou-btn primary" data-plan='{{ plan|tojson }}'>Record output</button></div>
+        {% if can_do('material_issues.material_writeoff_add') %}<button type="button" class="ou-writeoff ou-btn ghost" style="margin-top:6px" data-plan='{{ plan|tojson }}'>Write off as missing</button>{% endif %}{% endif %}</div>
+      <div>{% if can_edit('production_output') %}<button type="button" class="ou-act ou-btn primary" data-plan='{{ plan|tojson }}'>Record output</button>{% endif %}</div>
     </div>
   </article>
   {% endfor %}
@@ -114,7 +123,7 @@
     <div><span class="ou-no">{{ o.prod_no }}</span><div class="ou-prod">{{ o.product.name if o.product else '' }}</div></div>
     <div class="text-[13px]">{{ sm.done }} of {{ sm.total }} stages done{% if sm.current %} · now: <b>{{ sm.current.stage_name }}</b>{% endif %}</div>
     <div></div>
-    <div><a href="{{ url_for('routing.routing_list') }}" class="ou-btn ghost">Open Routing</a></div>
+    <div>{% if can_do('routing.routing_list', 'GET') %}<a href="{{ url_for('routing.routing_list') }}" class="ou-btn ghost">Open Routing</a>{% endif %}</div>
   </div></article>
   {% endfor %}
   {% endif %}
@@ -145,9 +154,11 @@
       <div class="flex gap-2 justify-end">
         {% if x.status == 'Posted' %}
         <a href="{{ url_for('production_output.production_output_print', output_id=x.id) }}" target="_blank" class="ou-btn ghost">Print batch slip</a>
+        {% if can_edit('production_output') %}
         <form method="post" action="{{ url_for('production_output.production_output_cancel', output_id=x.id) }}" class="js-confirm-submit" data-confirm-title="Cancel output" data-confirm-ok="Cancel output"
               data-confirm-message="Cancel {{ x.output_no }}? The finished goods and scrap are removed, the raw material goes back to production, and {{ x.production_order.prod_no }} is open again. This only works if none of the batch has been used or sent out.">
           <button type="submit" class="ou-btn danger">Cancel</button></form>
+        {% endif %}
         {% endif %}
       </div>
     </div>
@@ -161,6 +172,8 @@
 
 {% block modals %}
 {# Bacha hua maal (jaise khali spool) na mile to "missing" likhna: naam + reason zaroori (client meeting 2, #14) #}
+{# Write-off form material_issues ka endpoint hai, isliye uski apni permission se dikhta hai #}
+{% if can_do('material_issues.material_writeoff_add') %}
 <div id="wo-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" aria-hidden="true">
   <div id="wo-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <form method="post" action="{{ url_for('material_issues.material_writeoff_add') }}" class="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-200 p-5 space-y-3">
@@ -173,6 +186,9 @@
     <div class="flex justify-end gap-2"><button type="button" id="wo-cancel" class="ou-btn ghost">Cancel</button><button type="submit" class="ou-btn primary">Write off</button></div>
   </form>
 </div>
+{% endif %}
+{# Record output drawer sirf production_output Edit wale ko #}
+{% if can_edit('production_output') %}
 <div id="ou-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="ou-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-5xl bg-mist border-l border-slate-200 flex flex-col shadow-xl">
@@ -236,6 +252,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
@@ -246,6 +263,7 @@
   var modal = document.getElementById('ou-modal');
   var current = null;
 
+  {% if can_edit('production_output') %}
   function refresh() {
     if (!current) return;
     var good = parseFloat(document.getElementById('ou-good').value) || 0;
@@ -268,11 +286,11 @@
     // Short / Extra customer ki qty se (quotation order me planned = customer + extra pieces); stock order me planned hi target
     var target = current.customer_qty !== null && current.customer_qty !== undefined ? current.customer_qty : current.planned;
     var diff = Math.round((target - good) * 10000) / 10000;
-    if (good <= 0) { check.style.color = '#B42318'; check.textContent = 'Enter the good quantity.'; }
-    else if (total > limit) { check.style.color = '#B42318'; check.textContent = 'Total (' + fmt(total) + ') is more than 10% above the quantity planned (' + fmt(limit / 1.1) + ' ' + current.unit + '). Please check.'; }
-    else if (diff > 0) { check.style.color = '#8A4A1C'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered. Short by ' + fmt(diff) + '. After saving, choose on the order card: cover from stock, make a balance order, or close it as is.'; }
-    else if (diff < 0) { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered. Extra ' + fmt(-diff) + ' goes to finished goods stock.'; }
-    else { check.style.color = '#1F7A4D'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered.'; }
+    if (good <= 0) { check.dataset.state = 'bad'; check.textContent = 'Enter the good quantity.'; }
+    else if (total > limit) { check.dataset.state = 'bad'; check.textContent = 'Total (' + fmt(total) + ') is more than 10% above the quantity planned (' + fmt(limit / 1.1) + ' ' + current.unit + '). Please check.'; }
+    else if (diff > 0) { check.dataset.state = 'warn'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered. Short by ' + fmt(diff) + '. After saving, choose on the order card: cover from stock, make a balance order, or close it as is.'; }
+    else if (diff < 0) { check.dataset.state = 'ok'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered. Extra ' + fmt(-diff) + ' goes to finished goods stock.'; }
+    else { check.dataset.state = 'ok'; check.textContent = 'Good ' + fmt(good) + ' of ' + fmt(target) + ' ' + current.unit + ' ordered.'; }
   }
 
   function openOutput(btn) {
@@ -306,15 +324,17 @@
     document.getElementById('ou-mats').innerHTML = current.materials.map(function (m) {
       var diff = (m.used != null ? m.used : m.issued) - m.planned;
       var tol = Math.max(m.planned * 0.05, 0.0001);
-      var chip = diff > tol ? '<span class="ou-chip warn"><i></i>' + fmt(diff) + ' more than planned</span>'
-               : (diff < -tol ? '<span class="ou-chip warn"><i></i>' + fmt(-diff) + ' less than planned</span>' : '<span class="ou-chip ok"><i></i>As planned</span>');
-      return '<tr><td><b>' + esc(m.name) + '</b><div class="ou-meta">' + esc(m.code) + '</div></td><td style="text-align:right">' + fmt(m.planned) + ' ' + esc(m.unit) + '</td><td style="text-align:right"><b>' + fmt(m.used != null ? m.used : m.issued) + '</b> ' + esc(m.unit) + (m.leftover ? '<div class="ou-meta" style="color:#B42318">' + fmt(m.leftover) + ' still to return</div>' : '') + '</td><td>' + (m.leftover ? '<span class="ou-chip warn"><i></i>Return ' + fmt(m.leftover) + ' to store</span>' : chip) + '</td></tr>';
+      var chip = diff > tol ? '<span class="ou-chip bad"><i></i>' + fmt(diff) + ' more than planned</span>'
+               : (diff < -tol ? '<span class="ou-chip gone"><i></i>' + fmt(-diff) + ' less than planned</span>' : '<span class="ou-chip ok"><i></i>As planned</span>');
+      return '<tr><td><b>' + esc(m.name) + '</b><div class="ou-meta">' + esc(m.code) + '</div></td><td style="text-align:right">' + fmt(m.planned) + ' ' + esc(m.unit) + '</td><td style="text-align:right"><b>' + fmt(m.used != null ? m.used : m.issued) + '</b> ' + esc(m.unit) + (m.leftover ? '<div class="ou-meta" style="color:#B45309">' + fmt(m.leftover) + ' still to return</div>' : '') + '</td><td>' + (m.leftover ? '<span class="ou-chip warn"><i></i>Return ' + fmt(m.leftover) + ' to store</span>' : chip) + '</td></tr>';
     }).join('');
     refresh();
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
   }
   function closeOutput() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
   document.querySelectorAll('.ou-act').forEach(function (b) { b.addEventListener('click', function () { openOutput(b); }); });
+  {% endif %}
+  {% if can_do('material_issues.material_writeoff_add') %}
   // Write off as missing (bacha hua maal jo na use hua na wapas aaya)
   var woModal = document.getElementById('wo-modal');
   document.querySelectorAll('.ou-writeoff').forEach(function (b) {
@@ -330,8 +350,11 @@
     });
   });
   ['wo-cancel', 'wo-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { woModal.classList.add('hidden'); woModal.setAttribute('aria-hidden', 'true'); }); });
+  {% endif %}
+  {% if can_edit('production_output') %}
   ['ou-close', 'ou-cancel', 'ou-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', closeOutput); });
   ['ou-good', 'ou-rework', 'ou-scrap', 'ou-loss'].forEach(function (id) { document.getElementById(id).addEventListener('input', refresh); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeOutput(); });
+  {% endif %}
 </script>
 {% endblock %}

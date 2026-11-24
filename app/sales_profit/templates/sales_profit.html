@@ -5,18 +5,20 @@
 {% block page_css %}
 <style>
   .d-table { width: 100%; min-width: 1000px; border-collapse: collapse; table-layout: fixed; }
-  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 11px 8px; text-align: left; border-bottom: 1px solid #D1D9D8; }
-  .d-table tbody td { padding: 10px 8px; font-size: 13.5px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 11px 8px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .d-table tbody td { padding: 10px 8px; font-size: 13.5px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
   .d-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .d-table tfoot td { padding: 11px 8px; font-weight: 700; background: #EEF2F1; border-top: 2px solid #D1D9D8; }
+  .d-table tfoot td { padding: 11px 8px; font-weight: 700; background: #E9EEF6; border-top: 2px solid #D4DBE6; }
   .inv-row { cursor: pointer; }
-  .inv-row:hover { background: #F4F7F6; }
-  .line-row td { background: #FAFBFB; font-size: 13px; color: #3D5A5D; }
+  .inv-row:hover { background: #F1F5F9; }
+  .inv-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .line-row td { background: #FAFBFD; font-size: 13px; color: #475266; }
   .profit-pos { color: #1F7A4D; font-weight: 700; }
   .profit-neg { color: #B42318; font-weight: 700; }
-  .ql-input { padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
-  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+  .ql-input { padding: 7px 8px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
 </style>
 {% endblock %}
 
@@ -37,7 +39,7 @@
           <input type="date" name="from" id="pf-from" value="{{ date_from.isoformat() }}" class="ql-input">
           <label class="text-[13px] text-ink-muted" for="pf-to">To</label>
           <input type="date" name="to" id="pf-to" value="{{ date_to.isoformat() }}" max="{{ today.isoformat() }}" class="ql-input">
-          <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Show</button>
+          <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
         </form>
       </div>
 
@@ -56,7 +58,7 @@
             <thead><tr><th>Invoice</th><th class="num">Items sold</th><th class="num">Returns (−)</th><th class="num">Charges</th><th class="num">Net sales</th><th class="num">Material</th><th class="num">Fixed</th><th class="num">Total cost</th><th class="num">Profit</th><th class="num">Margin</th></tr></thead>
             <tbody>
               {% for r in rows %}
-              <tr class="inv-row" data-i="{{ r.invoice.id }}" title="Click for product-wise">
+              <tr class="inv-row" data-i="{{ r.invoice.id }}" title="Click for product-wise" tabindex="0" role="button" aria-expanded="false">
                 <td><span class="font-mono font-bold">{{ r.invoice.invoice_no }}</span>
                   <div class="text-[12px] text-ink-faint">{{ r.invoice.quotation.customer.name }} · {{ r.invoice.invoice_date.strftime('%d %b %Y') }}</div></td>
                 <td class="num">{{ n(r.sold_items) }}</td>
@@ -107,8 +109,15 @@
 <script>
   // Invoice row par click = product-wise lines khulti / band hoti hain
   document.querySelectorAll('.inv-row').forEach(function (row) {
-    row.addEventListener('click', function () {
-      document.querySelectorAll('.line-row[data-for="' + row.getAttribute('data-i') + '"]').forEach(function (l) { l.classList.toggle('hidden'); });
+    function toggleRow() {
+      var open = false;
+      document.querySelectorAll('.line-row[data-for="' + row.getAttribute('data-i') + '"]').forEach(function (l) { l.classList.toggle('hidden'); open = !l.classList.contains('hidden'); });
+      row.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    row.addEventListener('click', toggleRow);
+    // Keyboard: Enter / Space se bhi row khule (mouse jaisa hi kaam)
+    row.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRow(); }
     });
   });
 </script>

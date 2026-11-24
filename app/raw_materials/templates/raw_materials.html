@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_row_actions.html" import edit_btn, delete_form, toggle_form, act_sep with context %}
 {% block title %}Raw Material Master{% endblock %}
 
 {% block page_css %}
@@ -12,16 +13,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 10px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .rm-table thead th:first-child,
   .rm-table tbody td:first-child { text-align: left; padding-left: 14px; }
@@ -30,14 +31,16 @@
     padding: 10px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .rm-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .rm-table tbody tr:hover { background: #FBF4EE; }
+  .rm-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .rm-table tbody tr:hover { background: #F1F5F9; }
   .rm-table tbody tr.row-muted { opacity: 0.72; }
+  /* Actions cell ek hi line me rahe (View · QC tests · Edit · Delete | toggle) */
+  .rm-table .row-actions { flex-wrap: nowrap; white-space: nowrap; }
   .search-wrap input { padding-left: 32px; }
   #rm-modal.hidden, #view-modal.hidden, #qc-modal.hidden { display: none; }
   #rm-modal, #view-modal, #qc-modal { display: flex; }
@@ -48,8 +51,10 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #6B7F82;
+    color: #5A6577;
   }
+  /* Keyboard focus: buttons / links / summary par saaf outline */
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -60,11 +65,13 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Raw Materials</h1>
           <p class="text-[12.5px] text-ink-faint mt-0.5">Code is auto-generated · just fill the rest</p>
         </div>
+        {% if can_edit('raw_materials') %}
         <button type="button" id="btn-add-rm"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add material
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -72,14 +79,14 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-rm" placeholder="Search code or name…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
             <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Category from RM Category master · Base unit from Unit master · No price here — rate at purchase time
@@ -90,16 +97,16 @@
         <div class="flex-1 overflow-auto min-h-0">
           <table class="rm-table">
             <colgroup>
-              {# Actions column me ek aur button (QC tests) aaya, isliye Material name aur Valuation se 4% le kar Actions ko diya (total 100) #}
+              {# Actions me ab 5 controls + QC tests ek line me aate hain (icon buttons + toggle), isliye Actions ko 28% diya; baaki columns thoda kam (total 100) #}
               <col style="width:4%" />
-              <col style="width:9%" />
-              <col style="width:14%" />
-              <col style="width:11%" />
-              <col style="width:9%" />
-              <col style="width:11%" />
+              <col style="width:8%" />
+              <col style="width:13%" />
               <col style="width:10%" />
-              <col style="width:11%" />
-              <col style="width:21%" />
+              <col style="width:8%" />
+              <col style="width:10%" />
+              <col style="width:9%" />
+              <col style="width:10%" />
+              <col style="width:28%" />
             </colgroup>
             <thead>
               <tr>
@@ -134,15 +141,16 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
                 <td>
-                  <div class="flex items-center justify-center gap-2 flex-wrap">
-                    <button type="button"
-                      class="btn-view-rm px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                  {# Product master jaisa row-actions: View / QC tests / Edit / Delete | toggle. View drawer isi page ka apna (btn-view-rm) — sirf trigger ka look shared icon wala #}
+                  <div class="row-actions">
+                    <button type="button" title="View details" aria-label="View details"
+                      class="btn-view-rm act-btn"
                       data-code="{{ m.code }}"
                       data-name="{{ m.name }}"
                       data-category="{{ m.category.name if m.category else '' }}"
@@ -158,53 +166,44 @@
                       data-base-metal="{% if m.is_base_metal %}1{% else %}0{% endif %}"
                       data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}"
                       data-packing="{% if m.is_packing %}1{% else %}0{% endif %}">
-                      View
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
-                    <button type="button"
-                      class="btn-edit-rm px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ m.id }}"
-                      data-code="{{ m.code }}"
-                      data-name="{{ m.name }}"
-                      data-category-id="{{ m.category_id or '' }}"
-                      data-description="{{ m.description or '' }}"
-                      data-base-unit-id="{{ m.base_unit_id or '' }}"
-                      data-alt-unit-id="{{ m.alt_unit_id or '' }}"
-                      data-conversion="{{ m.conversion_note or '' }}"
-                      data-reorder="{{ m.reorder_level if m.reorder_level is not none else '' }}"
-                      data-min-stock="{{ m.min_stock if m.min_stock is not none else '' }}"
-                      data-max-stock="{{ m.max_stock if m.max_stock is not none else '' }}"
-                      data-hsn="{{ m.hsn_code or '' }}"
-                      data-tax-rate="{{ m.tax_rate_id or '' }}"
-                      data-valuation="{{ m.valuation_method or 'fifo' }}"
-                      data-base-metal="{% if m.is_base_metal %}1{% else %}0{% endif %}"
-                      data-core-flux="{% if m.is_core_flux %}1{% else %}0{% endif %}"
-                      data-packing="{% if m.is_packing %}1{% else %}0{% endif %}">
-                      Edit
-                    </button>
-                    {# QC tests: inward QC ke test parameters (purity, gauge...) ka panel kholta hai. Count = remove kiye hue parameters ko chhod kar #}
+                    {# QC tests: inward QC ke test parameters (purity, gauge...) ka panel kholta hai. Count = remove kiye hue parameters ko chhod kar. Text + count chahiye isliye icon-box nahi, auto-width act-btn #}
                     {% set qc_count = m.qc_parameters | rejectattr('is_deleted') | list | length %}
                     <button type="button"
-                      class="btn-qc-params px-2.5 py-1 text-[12.5px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                      class="btn-qc-params act-btn text-[12.5px] font-medium whitespace-nowrap"
+                      style="width:auto;padding:0 10px"
                       title="Manage QC test parameters for inward inspection"
+                      aria-label="QC tests ({{ qc_count }})"
                       data-id="{{ m.id }}"
                       data-code="{{ m.code }}"
                       data-name="{{ m.name }}">
                       QC tests ({{ qc_count }})
                     </button>
-                    <form method="post" action="{{ url_for('raw_materials.raw_materials_delete', m_id=m.id) }}" class="inline js-confirm-submit"
-                          data-confirm-title="Remove material"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this material from the master list? It will be kept in the database but hidden.">
-                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">Delete</button>
-                    </form>
-                    <form method="post" action=" {{ url_for('raw_materials.raw_materials_toggle', m_id=m.id) }} " class="inline">
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if m.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                    {% if can_edit('raw_materials') %}
+                    {{ edit_btn("btn-edit-rm", "material", {
+                      "id": m.id,
+                      "code": m.code,
+                      "name": m.name,
+                      "category-id": m.category_id or '',
+                      "description": m.description or '',
+                      "base-unit-id": m.base_unit_id or '',
+                      "alt-unit-id": m.alt_unit_id or '',
+                      "conversion": m.conversion_note or '',
+                      "reorder": m.reorder_level if m.reorder_level is not none else '',
+                      "min-stock": m.min_stock if m.min_stock is not none else '',
+                      "max-stock": m.max_stock if m.max_stock is not none else '',
+                      "hsn": m.hsn_code or '',
+                      "tax-rate": m.tax_rate_id or '',
+                      "valuation": m.valuation_method or 'fifo',
+                      "base-metal": '1' if m.is_base_metal else '0',
+                      "core-flux": '1' if m.is_core_flux else '0',
+                      "packing": '1' if m.is_packing else '0'
+                    }) }}
+                    {{ delete_form(url_for('raw_materials.raw_materials_delete', m_id=m.id), "material") }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('raw_materials.raw_materials_toggle', m_id=m.id), m.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -216,24 +215,26 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No materials found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new raw material.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add material</button>
+            {% if can_edit('raw_materials') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add material</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} materials</span>
           <span>Tip: set Reorder Level so low-stock alerts fire before you run out</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
 {# ——— Add / Edit ——— #}
+{% if can_edit('raw_materials') %}
 <div id="rm-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add raw material</h2>
         <p class="text-[12.5px] text-ink-faint">Basic info, units, stock control &amp; tax</p>
@@ -253,16 +254,18 @@
         <div>
           <label for="rm-name" class="block text-[12.5px] font-semibold text-ink mb-1">Material name *</label>
           <input type="text" id="rm-name" name="name" required placeholder="Copper Wire 3mm" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
           <label for="rm-category" class="text-[12.5px] font-semibold text-ink">Category *</label>
-          <a href="{{ url_for('rm_categories.rm_categories_list') }}" class="text-[12px] font-semibold text-copper-text hover:underline">Manage categories →</a>
+          {% if can_do('rm_categories.rm_categories_list', 'GET') %}
+          <a href="{{ url_for('rm_categories.rm_categories_list') }}" class="text-[12px] font-semibold text-accent-text hover:underline">Manage categories →</a>
+          {% endif %}
         </div>
         <select id="rm-category" name="category_id" required
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select category</option>
           {% for cat in categories %}
           <option value="{{ cat.id }}">{{ cat.code }} — {{ cat.name }}</option>
@@ -272,7 +275,7 @@
       <div>
         <label for="rm-description" class="block text-[12.5px] font-semibold text-ink mb-1">Description</label>
         <textarea id="rm-description" name="description" rows="2" placeholder="Short spec/notes"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent"></textarea>
       </div>
 
       <hr class="border-slate-200 !my-4" />
@@ -281,7 +284,7 @@
         <div>
           <label for="rm-base-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Base unit *</label>
           <select id="rm-base-unit" name="base_unit_id" required
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">Select unit</option>
             {% for u in units %}
             <option value="{{ u.id }}">{{ u.code }} — {{ u.name }}</option>
@@ -291,7 +294,7 @@
         <div>
           <label for="rm-alt-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Alternate unit (optional)</label>
           <select id="rm-alt-unit" name="alt_unit_id"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">None</option>
             {% for u in units %}
             <option value="{{ u.id }}">{{ u.code }} — {{ u.name }}</option>
@@ -302,7 +305,7 @@
       <div>
         <label for="rm-conversion" class="block text-[12.5px] font-semibold text-ink mb-1">Conversion factor</label>
         <input type="text" id="rm-conversion" name="conversion_note" placeholder="e.g. 1 Box = 25 PCS"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="text-[11px] text-ink-faint mt-1">Only if bought in one unit and issued in another.</p>
       </div>
 
@@ -312,17 +315,17 @@
         <div>
           <label for="rm-reorder" class="block text-[12.5px] font-semibold text-ink mb-1">Reorder level</label>
           <input type="number" id="rm-reorder" name="reorder_level" placeholder="0" min="0"
-            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="rm-min-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Min stock</label>
           <input type="number" id="rm-min-stock" name="min_stock" placeholder="0" min="0"
-            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="rm-max-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Max stock</label>
           <input type="number" id="rm-max-stock" name="max_stock" placeholder="0" min="0"
-            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
 
@@ -332,12 +335,12 @@
         <div>
           <label for="rm-hsn" class="block text-[12.5px] font-semibold text-ink mb-1">HSN code</label>
           <input type="text" id="rm-hsn" name="hsn_code" placeholder="7408" maxlength="8"
-            class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="rm-valuation" class="block text-[12.5px] font-semibold text-ink mb-1">Valuation method</label>
           <select id="rm-valuation" name="valuation_method"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="fifo" selected>FIFO</option>
             <option value="weighted_avg">Weighted Average</option>
           </select>
@@ -346,10 +349,12 @@
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
           <label for="rm-tax-rate" class="text-[12.5px] font-semibold text-ink">Tax rate</label>
-          <a href="{{ url_for('tax_rates.tax_rates_list') }}" class="text-[12px] font-semibold text-copper-text hover:underline">Manage tax rates →</a>
+          {% if can_do('tax_rates.tax_rates_list', 'GET') %}
+          <a href="{{ url_for('tax_rates.tax_rates_list') }}" class="text-[12px] font-semibold text-accent-text hover:underline">Manage tax rates →</a>
+          {% endif %}
         </div>
         <select id="rm-tax-rate" name="tax_rate_id"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select tax rate</option>
           {% for t in tax_rates %}
           <option value="{{ t.id }}">{{ t.code }} — {{ t.rate_percent }}%</option>
@@ -360,7 +365,7 @@
       <p class="form-section-title">Recipe role</p>
       <p class="text-[12px] text-ink-faint -mt-1">Pick one. None means this material is not part of a product recipe.</p>
       <div class="grid grid-cols-4 gap-2" role="group" aria-label="Recipe role">
-        <button type="button" data-role="none" class="rm-role-btn text-left px-2.5 py-2 rounded border border-copper bg-copper text-white font-semibold">
+        <button type="button" data-role="none" class="rm-role-btn text-left px-2.5 py-2 rounded border border-accent bg-accent text-white font-semibold">
           <span class="block text-[13px]">None</span>
           <span class="block text-[11px] mt-0.5 opacity-80 font-normal">Not in a recipe</span>
         </button>
@@ -387,16 +392,17 @@
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="rm-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save material</button>
+      <button type="submit" form="rm-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save material</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 {# ——— View (read-only) ——— #}
 <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Raw material details</h2>
         <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -417,7 +423,7 @@
 <div id="qc-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="qc-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="qc-modal-title" class="relative ml-auto h-full w-full max-w-xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="qc-modal-title" class="text-[16px] font-bold text-ink">QC test parameters</h2>
         <p id="qc-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -432,23 +438,24 @@
 
       <div id="qc-list" class="space-y-2"></div>
 
+      {% if can_edit('raw_materials') %}
       <form id="qc-form" class="border border-slate-200 rounded-lg p-3 space-y-3 bg-mist" autocomplete="off">
         <p id="qc-form-title" class="form-section-title">Add a parameter</p>
         <div class="grid grid-cols-3 gap-3">
           <div class="col-span-2">
             <label for="qc-name" class="block text-[12.5px] font-semibold text-ink mb-1">Parameter name *</label>
             <input type="text" id="qc-name" name="name" maxlength="100" placeholder="e.g. Purity, Gauge, Visual finish"
-              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div>
             <label for="qc-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Unit label</label>
             <input type="text" id="qc-unit" name="unit_label" maxlength="20" placeholder="mm, %"
-              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
         </div>
         <div>
           <label for="qc-type" class="block text-[12.5px] font-semibold text-ink mb-1">How is it checked?</label>
-          <select id="qc-type" name="check_type" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <select id="qc-type" name="check_type" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="range">Number range (minimum / maximum)</option>
             <option value="pass_fail">Pass / Fail (visual or yes-no check)</option>
           </select>
@@ -457,25 +464,26 @@
           <div>
             <label for="qc-min" class="block text-[12.5px] font-semibold text-ink mb-1">Minimum</label>
             <input type="number" step="any" id="qc-min" name="min_value" placeholder="optional"
-              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div>
             <label for="qc-max" class="block text-[12.5px] font-semibold text-ink mb-1">Maximum</label>
             <input type="number" step="any" id="qc-max" name="max_value" placeholder="optional"
-              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div>
             <label for="qc-order" class="block text-[12.5px] font-semibold text-ink mb-1">Display order</label>
             <input type="number" step="1" id="qc-order" name="sort_order" placeholder="optional"
-              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white tabular-nums focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
         </div>
         <p id="qc-limits-help" class="text-[12px] text-ink-faint">Enter a minimum, a maximum, or both. A smaller display order is listed first.</p>
         <div class="flex items-center justify-end gap-2">
           <button type="button" id="btn-qc-cancel-edit" class="hidden px-3 py-2 text-[13.5px] text-ink-faint hover:bg-white rounded">Cancel edit</button>
-          <button type="submit" id="btn-qc-save" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Add parameter</button>
+          <button type="submit" id="btn-qc-save" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Add parameter</button>
         </div>
       </form>
+      {% endif %}
     </div>
 
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end shrink-0">
@@ -511,9 +519,9 @@
   function applyFilterButtonStyles(btn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === btn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -646,12 +654,15 @@
     document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {# Add / Edit modal sirf Edit user ko milta hai — View user ke liye uske listeners / form code nahi lagte (modal, form null honge) #}
+  {% if can_edit('raw_materials') %}
   document.getElementById('btn-add-rm').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
   document.getElementById('btn-close-modal').addEventListener('click', closeModal);
   document.getElementById('btn-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  {% endif %}
   document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
   document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
   document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
@@ -661,7 +672,9 @@
     if (document.getElementById('erp-confirm-root')) return;
     if (!qcModal.classList.contains('hidden')) closeQcPanel();
     else if (!viewModal.classList.contains('hidden')) closeViewModal();
+    {% if can_edit('raw_materials') %}
     else if (!modal.classList.contains('hidden')) closeModal();
+    {% endif %}
   });
   document.querySelectorAll('.btn-edit-rm').forEach(function (btn) {
     btn.addEventListener('click', function () { openEditModal(btn); });
@@ -670,6 +683,7 @@
     btn.addEventListener('click', function () { openViewModal(btn); });
   });
 
+  {% if can_edit('raw_materials') %}
   var rmBaseMetal = document.getElementById('rm-base-metal');
   var rmCoreFlux = document.getElementById('rm-core-flux');
   var rmPacking = document.getElementById('rm-packing');
@@ -681,8 +695,8 @@
     else if (rmPacking.checked) role = 'packing';
     document.querySelectorAll('.rm-role-btn').forEach(function (btn) {
       var on = btn.getAttribute('data-role') === role;
-      btn.classList.toggle('border-copper', on);
-      btn.classList.toggle('bg-copper', on);
+      btn.classList.toggle('border-accent', on);
+      btn.classList.toggle('bg-accent', on);
       btn.classList.toggle('text-white', on);
       btn.classList.toggle('font-semibold', on);
       btn.classList.toggle('border-slate-300', !on);
@@ -718,6 +732,7 @@
       if (typeof showToast === 'function') showToast('Wire Flask Add route first (form action).', 'error');
     }
   });
+  {% endif %}
 
   // ================= QC test parameters panel =================
   // Panel kholne par list server se aati hai (fetch), add / edit / remove bhi fetch se hote hain,
@@ -744,7 +759,7 @@
   }
   function renderQcList() {
     if (!qcParams.length) {
-      qcList.innerHTML = '<div class="border border-dashed border-slate-300 rounded-lg p-4 text-center text-[13px] text-ink-faint">No QC parameters yet. Add the first one below.</div>';
+      qcList.innerHTML = '<div class="border border-dashed border-slate-300 rounded-lg p-4 text-center text-[13px] text-ink-faint">No QC parameters yet.{% if can_edit('raw_materials') %} Add the first one below.{% endif %}</div>';
     } else {
       qcList.innerHTML = qcParams.map(function (p) {
         return '<div class="flex items-center justify-between gap-3 border border-slate-200 rounded-lg px-3 py-2 bg-white">' +
@@ -753,8 +768,11 @@
             '<div class="text-[12.5px] text-ink-muted tabular-nums">' + esc(qcStandardText(p)) + '</div>' +
           '</div>' +
           '<div class="flex items-center gap-1.5 shrink-0">' +
-            '<button type="button" class="qc-edit px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white" data-id="' + p.id + '">Edit</button>' +
+            {# QC list ke Edit / Remove buttons sirf Edit user ko #}
+            {% if can_edit('raw_materials') %}
+            '<button type="button" class="qc-edit px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-accent-soft rounded hover:bg-accent hover:text-white" data-id="' + p.id + '">Edit</button>' +
             '<button type="button" class="qc-remove px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90" data-id="' + p.id + '">Remove</button>' +
+            {% endif %}
           '</div>' +
         '</div>';
       }).join('');
@@ -777,6 +795,7 @@
       });
   }
 
+  {% if can_edit('raw_materials') %}
   // Pass/Fail me minimum / maximum ka matlab nahi, isliye un boxes ko band kar do.
   // (Disabled box form ke saath jaata hi nahi; server bhi pass_fail me limits saaf kar deta hai.)
   function syncQcCheckType() {
@@ -812,6 +831,7 @@
     document.getElementById('btn-qc-cancel-edit').classList.remove('hidden');
     document.getElementById('qc-name').focus();
   }
+  {% endif %}
 
   function openQcPanel(btn) {
     qcMaterialId = btn.getAttribute('data-id');
@@ -819,7 +839,9 @@
     document.getElementById('qc-modal-subtitle').textContent =
       (btn.getAttribute('data-code') || '') + ' — ' + (btn.getAttribute('data-name') || '');
     qcParams = [];
+    {% if can_edit('raw_materials') %}
     resetQcForm();
+    {% endif %}
     qcModal.classList.remove('hidden');
     qcModal.setAttribute('aria-hidden', 'false');
     loadQcParams();
@@ -829,6 +851,7 @@
     qcModal.setAttribute('aria-hidden', 'true');
   }
 
+  {% if can_edit('raw_materials') %}
   qcForm.addEventListener('submit', function (e) {
     e.preventDefault();   // normal form submit nahi, fetch se bhejenge
     var url = '/raw_materials/' + qcMaterialId + '/qc_parameters/' + (qcEditingId ? qcEditingId + '/edit' : 'add');
@@ -879,12 +902,15 @@
       });
     }
   });
+  {% endif %}
 
   document.querySelectorAll('.btn-qc-params').forEach(function (btn) {
     btn.addEventListener('click', function () { openQcPanel(btn); });
   });
+  {% if can_edit('raw_materials') %}
   document.getElementById('qc-type').addEventListener('change', syncQcCheckType);
   document.getElementById('btn-qc-cancel-edit').addEventListener('click', resetQcForm);
+  {% endif %}
   document.getElementById('btn-close-qc').addEventListener('click', closeQcPanel);
   document.getElementById('btn-close-qc-2').addEventListener('click', closeQcPanel);
   document.getElementById('qc-modal-backdrop').addEventListener('click', closeQcPanel);

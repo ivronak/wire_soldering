@@ -203,7 +203,11 @@ def purchase_returns_add():
 
     vendor_name = data["invoice"].vendor.name
     flash(f"Return {pr_no} posted. {vendor_name} will credit you ₹{data['total_amount']:,.2f}.", "success")
-    return redirect(url_for("purchase_returns.purchase_return_list"))
+    # Purchase invoice ka Edit wala user (jise Purchase return page ka View nahi) save ke baad 403 page na dekhe -> invoice page par wapas
+    from app.auth import registry as auth_registry, service as auth_service
+    if auth_service.user_can(auth_service.current(), "purchase_returns", auth_registry.LEVEL_VIEW):
+        return redirect(url_for("purchase_returns.purchase_return_list"))
+    return redirect(url_for("purchase_invoices.purchase_invoices_list", tab="completed"))
 
 
 @purchase_returns_bp.route("/purchase_returns/cancel/<int:ret_id>", methods=["POST"])

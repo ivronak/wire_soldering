@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 {% block title %}Payment Modes Master{% endblock %}
 
 {% block page_css %}
@@ -13,16 +14,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 14px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .pt-table thead th:first-child,
   .pt-table tbody td:first-child { text-align: left; padding-left: 18px; }
@@ -31,17 +32,19 @@
     padding: 11px 14px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .pt-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .pt-table tbody tr:hover { background: #FBF4EE; }
+  .pt-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .pt-table tbody tr:hover { background: #F1F5F9; }
   .pt-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
   #pt-modal.hidden { display: none; }
   #pt-modal { display: flex; }
+  /* Keyboard focus: buttons / links / summary par saaf outline */
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -51,11 +54,14 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Payment modes</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Payment modes master</h1>
         </div>
+        {# View-only user ko Add button nahi dikhta (server 403 deta) #}
+        {% if can_edit('payment_modes') %}
         <button type="button" id="btn-add-pt"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add payment mode
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -64,14 +70,14 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-pt" placeholder="Search code or name…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
-            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Stopped (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Source of the "Payment mode" dropdown on the Receipt form (how the customer paid) · Label only, no accounting effect
@@ -84,9 +90,9 @@
             <colgroup>
               <col style="width:6%" />
               <col style="width:18%" />
-              <col style="width:40%" />
-              <col style="width:16%" />
-              <col style="width:20%" />
+              <col style="width:38%" />
+              <col style="width:14%" />
+              <col style="width:22%" />
             </colgroup>
             <thead>
               <tr>
@@ -94,7 +100,7 @@
                 <th>Code</th>
                 <th>Payment mode name</th>
                 <th>Status</th>
-                <th>Actions</th>
+                                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="pt-tbody">
@@ -121,40 +127,26 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
                 <td>
-                  <div class="flex items-center justify-center gap-3 flex-wrap">
-                    <button type="button"
-                      class="btn-edit-pt px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ t.id }}"
-                      data-code="{{ t.code }}"
-                      data-name="{{ t.name }}">
-                      Edit
-                    </button>
-                    {# Soft-delete — Flask route name se match #}
-                    <form method="post"
-                          action="{{ url_for('payment_modes.payment_modes_delete', pm_id=t.id) }}"
-                          class="inline js-confirm-submit"
-                          data-confirm-title="Remove payment mode"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this payment mode from the master list? It will be kept in the database but hidden.">
-                      <button type="submit"
-                              class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">
-                        Delete
-                      </button>
-                    </form>
-                    <form method="post" action="{{ url_for('payment_modes.payment_modes_toggle', pm_id=t.id) }}" class="inline js-pt-toggle">
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if t.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                  {# Product master jaisa icon actions: View sabko, baaki (Edit/Delete/toggle) sirf can_edit walon ko #}
+                  <div class="row-actions">
+                    {{ view_btn("Payment mode details", t.code, [
+                      ["Code", t.code],
+                      ["Payment Mode Name", t.name],
+                      ["Created", t.created_at|ist],
+                      ["Status", "Active" if t.is_active else "Inactive", "success" if t.is_active else "neutral"]
+                    ]) }}
+                    {% if can_edit('payment_modes') %}
+                    {{ edit_btn("btn-edit-pt", "payment mode", {"id": t.id, "code": t.code, "name": t.name}) }}
+                    {{ delete_form(url_for('payment_modes.payment_modes_delete', pm_id=t.id), "payment mode") }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('payment_modes.payment_modes_toggle', pm_id=t.id), t.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -167,23 +159,25 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No payment modes found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new payment mode.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add payment mode</button>
+            {% if can_edit('payment_modes') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add payment mode</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} payment modes</span>
           <span>Used on Vendor, Customer & Purchase orders</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('payment_modes') %}
 <div id="pt-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add payment mode</h2>
         <p class="text-[12.5px] text-ink-faint">Code is auto-generated · just name it</p>
@@ -200,21 +194,25 @@
       <div>
         <label for="pt-name" class="block text-[12.5px] font-semibold text-ink mb-1">Payment mode name *</label>
         <input type="text" id="pt-name" name="name" required placeholder="UPI" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="pt-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save payment mode</button>
+      <button type="submit" form="pt-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save payment mode</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 <script>
+  {# Modal / form sirf Edit user ke liye render hote hain — unka JS bhi same condition me (View user pe null error na aaye) #}
+  {% if can_edit('payment_modes') %}
   var modal = document.getElementById('pt-modal');
   var form = document.getElementById('pt-form');
+  {% endif %}
   var searchInput = document.getElementById('search-pt');
   var rows = Array.from(document.querySelectorAll('.pt-row'));
   var emptyState = document.getElementById('empty-state');
@@ -223,10 +221,12 @@
   var activeFilter = 'all';
   var FILTER_KEY = 'erp.paymentModes.statusFilter';
   var SEARCH_KEY = 'erp.paymentModes.searchQ';
+  {% if can_edit('payment_modes') %}
   var modalTitle = document.getElementById('modal-title');
   var codeInput = document.getElementById('pt-code');
   var nextCode = "{{ next_code }}";
   var addAction = "{{ url_for('payment_modes.payment_modes_add') }}";
+  {% endif %}
 
   function saveActiveFilter() {
     try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (err) {}
@@ -241,9 +241,9 @@
   function applyFilterButtonStyles(selectedBtn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === selectedBtn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -268,6 +268,7 @@
     applyFilters();
   }
 
+  {% if can_edit('payment_modes') %}
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -297,6 +298,7 @@
     openModal();
     document.getElementById('pt-name').focus();
   }
+  {% endif %}
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -325,9 +327,10 @@
     });
     document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
     document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
-    document.querySelector('[data-filter="inactive"]').textContent = 'Stopped (' + counts.inactive + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {% if can_edit('payment_modes') %}
   document.getElementById('btn-add-pt').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
@@ -349,6 +352,7 @@
       return;
     }
   });
+  {% endif %}
 
   document.querySelectorAll('td form').forEach(function (f) {
     f.addEventListener('submit', function () { saveListState(); });

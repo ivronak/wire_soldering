@@ -3,24 +3,29 @@
 
 {% block page_css %}
 <style>
-  .lh-card { border: 1px solid #D1D9D8; border-radius: 10px; padding: 14px 16px; background: #fff; }
-  .lh-card.good { border-color: #B7E0C7; background: #F2FAF5; }
-  .lh-card.wait { border-color: #F5D9B5; background: #FFF9F0; }
-  .lh-card.bad  { border-color: #F8CFCB; background: #FFF6F5; }
-  .lh-card.wip  { border-color: #C9D8F0; background: #F4F8FE; }
-  .lh-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #5c6e80; }
+  .lh-card { border: 1px solid #D4DBE6; border-radius: 10px; padding: 14px 16px; background: #fff; }
+  /* Tone = status ka matlab (view se aata hai): good = green, wait = warning amber, bad = red, wip = accent blue */
+  .lh-card.good { border-color: #B7E0C7; background: #E6F5EC; }
+  .lh-card.wait { border-color: #FBD9A5; background: #FEF3E2; }
+  .lh-card.bad  { border-color: #F0C4C0; background: #FCEBEA; }
+  .lh-card.wip  { border-color: #BCD2FA; background: #EDF3FF; }
+  .lh-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #475266; }
   .tl { list-style: none; margin: 0; padding: 0; }
-  .tl li { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; padding: 14px 4px; border-bottom: 1px solid #E8EEED; align-items: start; }
+  .tl li { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; padding: 14px 4px; border-bottom: 1px solid #E2E8F1; align-items: start; }
   .tl li:last-child { border-bottom: none; }
   .tl .dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
   .dot.in   { background: #E6F5EC; color: #1F7A4D; }
-  .dot.out  { background: #FDECEC; color: #B42318; }
-  .dot.move { background: #EAF1FB; color: #2B5FA8; }
+  .dot.out  { background: #FCEBEA; color: #B42318; }
+  .dot.move { background: #EDF3FF; color: #0A3CA6; }
+  /* value-only event (sirf rate/value badla, qty nahi) — pehle iska koi style nahi tha, dot transparent dikhta tha */
+  .dot.value { background: #F1F5F9; color: #475569; }
   .tl .cancelled { opacity: .6; }
 </style>
 {% endblock %}
 
 {% block content %}
+      {# Value / ₹ amounts sirf Stock valuation View wale ko dikhte hain #}
+      {% set show_val = can_do('inventory.stock_valuation', 'GET') %}
       <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
         <div>
           <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('inventory.stock_list') }}" class="hover:underline">Inventory / Stock</a> / Lot history</div>
@@ -40,7 +45,7 @@
               <div class="lh-tag">{{ w.label }}</div>
               <div class="text-[24px] font-bold text-ink tabular-nums leading-tight mt-1">{{ w.qty|qty }} <span class="text-[14px] font-semibold text-ink-muted">{{ unit }}</span></div>
               <div class="text-[13px] text-ink-muted">in {{ w.warehouse }}</div>
-              <div class="text-[12px] text-ink-faint mt-1">Value ₹{{ w.value|inr }} ({{ 'bill rate' if final_rate else 'estimated at PO rate' }})</div>
+              {% if show_val %}<div class="text-[12px] text-ink-faint mt-1">Value ₹{{ w.value|inr }} ({{ 'bill rate' if final_rate else 'estimated at PO rate' }})</div>{% endif %}
             </div>
             {% endfor %}
           </div>
@@ -60,16 +65,19 @@
               <div class="dot {{ e.kind }}">{{ '+' if e.kind == 'in' else ('−' if e.kind == 'out' else ('₹' if e.kind == 'value' else '⇄')) }}</div>
               <div>
                 <div class="text-[14px] font-semibold text-ink">{{ e.title }} <span class="font-mono text-[12px] font-normal text-ink-faint">· {{ e.ref_no or '' }}</span></div>
-                <div class="text-[13.5px] text-ink-muted">{{ e.sentence }}</div>
+                {# Value-only event ke sentence me ₹ amount / rate hota hai, isliye valuation permission chahiye #}
+                {% if e.kind != 'value' or show_val %}<div class="text-[13.5px] text-ink-muted">{{ e.sentence }}</div>{% endif %}
                 <div class="text-[11.5px] text-ink-faint mt-0.5">{{ e.date.strftime('%d %b %Y') }}{% if e.created_at %} · entered {{ e.created_at|ist }}{% endif %}</div>
               </div>
               <div class="text-right tabular-nums">
                 {% if e.kind == 'value' %}
+                {% if show_val %}
                 <div class="text-[15px] font-bold {{ 'text-success' if e.value >= 0 else 'text-stop' }}">{{ '+' if e.value >= 0 else '−' }}₹{{ e.value|abs|inr }}</div>
                 <div class="text-[12px] text-ink-faint">value only</div>
+                {% endif %}
                 {% else %}
                 <div class="text-[15px] font-bold {{ 'text-success' if e.kind == 'in' else ('text-stop' if e.kind == 'out' else 'text-ink') }}">{{ e.qty|qty }} {{ unit }}</div>
-                <div class="text-[12px] text-ink-faint">₹{{ e.value|inr }}</div>
+                {% if show_val %}<div class="text-[12px] text-ink-faint">₹{{ e.value|inr }}</div>{% endif %}
                 {% endif %}
               </div>
             </li>

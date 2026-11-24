@@ -3,40 +3,44 @@
 
 {% block page_css %}
 <style>
-  .sc-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .sc-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .sc-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .sc-kpi .h { font-size: 12px; color: #6B7F82; }
-  .sc-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .sc-kpi.warn .v { color: #8A4A1C; }
+  .sc-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .sc-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .sc-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .sc-kpi .h { font-size: 12px; color: #5A6577; }
+  /* warn = sirf jahan action chahiye (amber); info = sirf jaankari ki ginti (accent-soft, jaise 'On the floor') */
+  .sc-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .sc-kpi.warn .v { color: #B45309; }
+  .sc-kpi.info { background: #EDF3FF; border-color: #BCD2FA; } .sc-kpi.info .v { color: #0A3CA6; }
   .sc-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .sc-kpi.good .v { color: #1F7A4D; }
-  .sc-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .sc-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .sc-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .sc-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
-  .sc-box h3 { font-size: 14px; font-weight: 700; color: #0F2F32; margin-bottom: 2px; }
-  .sc-box .sub { font-size: 12px; color: #6B7F82; margin-bottom: 10px; }
+  .sc-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .sc-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .sc-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .sc-box { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 14px 16px; }
+  .sc-box h3 { font-size: 14px; font-weight: 700; color: #0B1220; margin-bottom: 2px; }
+  .sc-box .sub { font-size: 12px; color: #5A6577; margin-bottom: 10px; }
   .sc-bar { display: grid; grid-template-columns: 150px 1fr 70px; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; }
-  .sc-bar .track { height: 10px; background: #EEF2F1; border-radius: 999px; overflow: hidden; }
-  .sc-bar .track div { height: 100%; background: #C46B2D; border-radius: 999px; }
+  .sc-bar .track { height: 10px; background: #E9EEF6; border-radius: 999px; overflow: hidden; }
+  .sc-bar .track div { height: 100%; background: #0B5BEF; border-radius: 999px; }
   .sc-bar .q { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .sc-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; }
+  .sc-card { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; margin-bottom: 8px; }
   .sc-row { display: grid; grid-template-columns: minmax(190px, 1.3fr) minmax(150px, 1fr) minmax(190px, 1.2fr) minmax(110px, .6fr) minmax(150px, .9fr); gap: 14px; align-items: center; padding: 12px 16px; }
-  .sc-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .sc-meta { font-size: 12px; color: #6B7F82; }
-  .sc-prod { font-size: 13.5px; color: #1C2B2D; }
-  .sc-qty { font-size: 20px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .sc-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0B1220; }
+  .sc-meta { font-size: 12px; color: #5A6577; }
+  .sc-prod { font-size: 13.5px; color: #121A2B; }
+  .sc-qty { font-size: 20px; font-weight: 700; color: #0B1220; font-variant-numeric: tabular-nums; }
   .sc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .sc-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .sc-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .sc-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .sc-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
-  .sc-chip.type { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
-  .sc-btn { display: inline-flex; align-items: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid #D1D9D8; background: #fff; color: #0F2F32; text-decoration: none; }
-  .sc-btn:hover { background: #F4F6F5; }
-  .sc-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .sc-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
-  .sc-filter a { font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid #D1D9D8; color: #3D5A5D; text-decoration: none; background: #fff; }
-  .sc-filter a.on { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
+  .sc-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .sc-chip.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .sc-chip.gone { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .sc-chip.type { background: #E6F6F8; color: #0B7285; border-color: #B2DDE4; }
+  .sc-btn { display: inline-flex; align-items: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid #D4DBE6; background: #fff; color: #0B1220; text-decoration: none; }
+  .sc-btn:hover { background: #F3F6FB; }
+  .sc-btn:focus-visible, .sc-tabs a:focus-visible, .sc-filter a:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
+  .sc-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .sc-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
+  .sc-filter a { font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid #D4DBE6; color: #475266; text-decoration: none; background: #fff; }
+  .sc-filter a.on { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
   @media (max-width: 1100px) { .sc-row { grid-template-columns: 1fr 1fr; } .sc-bar { grid-template-columns: 110px 1fr 60px; } }
 </style>
 {% endblock %}
@@ -51,7 +55,7 @@
   <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
     {# Barcode scanner keyboard jaisa hai: code type / scan karke Enter -> pack ya batch ka label khulta hai #}
     <form method="get" action="{{ url_for('scrap.scrap_scan') }}" class="flex gap-1.5 w-full sm:w-auto">
-      <input type="text" name="code" placeholder="Scan or type barcode" autocomplete="off" class="px-2.5 py-1.5 text-[13px] border border-slate-300 rounded-lg font-mono w-full min-w-0 sm:w-56 focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+      <input type="text" name="code" placeholder="Scan or type barcode" autocomplete="off" class="px-2.5 py-1.5 text-[13px] border border-slate-300 rounded-lg font-mono w-full min-w-0 sm:w-56 focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
       <button type="submit" class="sc-btn">Find</button>
     </form>
     <a href="{{ url_for('scrap.scrap_types_list') }}" class="sc-btn">Manage scrap types</a>
@@ -60,7 +64,7 @@
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="sc-kpi {{ 'good' if kpi.yard else '' }}"><span class="k">In scrap yard</span><span class="v">{{ '%g'|format(kpi.yard) }} <span class="text-[14px]">KG</span></span><span class="h">stock, can be sold later</span></div>
-  <div class="sc-kpi {{ 'warn' if kpi.floor else '' }}"><span class="k">On the floor</span><span class="v">{{ '%g'|format(kpi.floor) }} <span class="text-[14px]">KG</span></span><span class="h">from orders still running</span></div>
+  <div class="sc-kpi {{ 'info' if kpi.floor else '' }}"><span class="k">On the floor</span><span class="v">{{ '%g'|format(kpi.floor) }} <span class="text-[14px]">KG</span></span><span class="h">from orders still running</span></div>
   <div class="sc-kpi"><span class="k">Process loss</span><span class="v">{{ '%g'|format(kpi.loss) }} <span class="text-[14px]">KG</span></span><span class="h">recorded, not stocked</span></div>
   <div class="sc-kpi"><span class="k">Scrap rate</span><span class="v">{{ kpi.rate }}%</span><span class="h">of the batch weight</span></div>
 </div>
@@ -99,7 +103,7 @@
       {% if e.kind == 'Process loss' %}<span class="sc-chip gone"><i></i>Process loss</span>{% else %}<span class="sc-chip ok"><i></i>Saleable</span>{% endif %}</div>
     <div class="sc-qty">{{ '%g'|format(e.qty) }} <span class="text-[12px] font-semibold text-ink-faint">KG</span></div>
     <div>{% if e.where == 'In scrap yard' %}<span class="sc-chip ok"><i></i>In scrap yard</span>
-      {% elif e.where == 'On the floor' %}<span class="sc-chip warn"><i></i>On the floor</span>
+      {% elif e.where == 'On the floor' %}<span class="sc-chip run"><i></i>On the floor</span>
       {% else %}<span class="sc-chip gone"><i></i>Not stocked</span>{% endif %}</div>
   </div></article>
   {% else %}
@@ -108,7 +112,7 @@
   {% endfor %}
 {% else %}
   {# Din-wise pack: ek din ke saare batch ek bori me, ek barcode #}
-  {% if to_pack %}
+  {% if to_pack and can_edit('scrap') %}
   <div class="sc-box mb-3"><h3>Pack a day's scrap</h3><p class="sub">Put all the scrap of one day (from every order) in one bag with one barcode. Each batch keeps its own stage, type and operator record.</p>
     {% for d in to_pack %}
     <form method="post" action="{{ url_for('scrap.scrap_pack_create') }}" class="flex flex-wrap items-center justify-between gap-2 py-1.5 border-t border-slate-100 first:border-t-0">
@@ -126,8 +130,10 @@
       <div><span class="sc-no">{{ pk.pack_no }}</span> <span class="sc-meta">· {{ pk.pack_date.strftime('%d %b %Y') }} · {{ pk.items|length }} batch{{ '' if pk.items|length == 1 else 'es' }} · {{ '%g'|format(pk.weight) }} KG now</span></div>
       <div class="flex gap-1.5">
         <a href="{{ url_for('scrap.scrap_pack_label', pack_id=pk.id) }}" target="_blank" class="sc-btn" style="padding:4px 10px;font-size:12px">Print label</a>
+        {% if can_edit('scrap') %}
         <form method="post" action="{{ url_for('scrap.scrap_pack_remove', pack_id=pk.id) }}" class="js-confirm-submit" data-confirm-title="Open pack" data-confirm-ok="Open pack" data-confirm-message="Open {{ pk.pack_no }}? Its batches go back to unpacked. Stock does not change.">
           <button type="submit" class="sc-btn" style="padding:4px 10px;font-size:12px">Open pack</button></form>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

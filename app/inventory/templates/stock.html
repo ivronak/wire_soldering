@@ -3,43 +3,66 @@
 
 {% block page_css %}
 <style>
-  .sc-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 10px 14px; }
+  .sc-card { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 10px 14px; }
   .sc-big { font-size: 22px; font-weight: 700; line-height: 1.1; }
   .sc-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
-  .sc-chip.wait { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .sc-chip.bad  { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .sc-chip.wip  { background: #EAF1FB; color: #2B5FA8; border-color: #C9D8F0; }
+  /* Chip rang = status ka matlab: wait = warning amber (QC baaki / low stock), bad = red (rejected / out), wip = accent blue (production / transit),
+     over = neutral grey (max se zyada — ye 'in production' jaisa blue nahi hona chahiye), good = green (ready) */
+  .sc-chip.wait { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .sc-chip.bad  { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .sc-chip.wip  { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .sc-chip.over { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .sc-chip.good { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .sc-chip.zero { background: #F5F7F7; color: #98A5A4; border-color: #E4EAE9; font-weight: 500; }
+  .sc-chip.zero { background: #F1F5F9; color: #5A6577; border-color: #E2E8F0; font-weight: 500; }
+  /* KPI card highlight: sirf jab count > 0 (action chahiye) — pehle inline style me cream/copper hex tha */
+  .sc-card.k-warn { border-color: #FBD9A5; background: #FEF3E2; }
+  .sc-card.k-warn .sc-big { color: #B45309; }
+  .sc-card.k-bad  { border-color: #F0C4C0; background: #FCEBEA; }
   /* Compact material cards: pehle jaisa grid, par chhota; sirf kaam ki cheezein dikhti hain (zero wale chip nahi) */
-  .sm-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 10px 12px; }
+  .sm-card { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 10px 12px; }
   .sm-card { cursor: pointer; }
-  /* Warehouse badge: warehouse type ke rang me (RM store hara, QC Hold orange, WIP neela, Scrap lal, FG teal) */
+  /* Warehouse badge: warehouse type ka categorical rang — warehouses.html / stock_valuation.html / stock_lot.html / finished_goods.html me SAME map:
+     RM = cyan (cat2), WIP = accent blue, FG = indigo (cat1), SCRAP = neutral grey, QC_HOLD = warning amber, TRANSIT = slate (cat6).
+     Status colour (green/red) type ke liye nahi — taaki 'Scrap' error jaisa na dikhe aur 'RM' success jaisa na dikhe. */
   .lot-line { min-height: 26px; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
-  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid #D1D9D8; background: #F5F7F7; color: #3D5A5D; white-space: nowrap; }
-  .wh-badge.wh-RM { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .wh-badge.wh-QC_HOLD { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .wh-badge.wh-WIP { background: #EAF1FB; color: #2B5FA8; border-color: #C9D8F0; }
-  .wh-badge.wh-SCRAP { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .wh-badge.wh-FG { background: #E8F3F4; color: #0F6B73; border-color: #BFDDE0; }
-  .rack-tag { font-size: 12px; font-weight: 600; color: #0F2F32; background: #fff; border: 1px dashed #98A5A4; border-radius: 6px; padding: 0 7px; }
-  .sm-card:focus-visible { outline: 2px solid #C77B1B; outline-offset: 2px; }
-  .sm-card:hover { border-color: #C9B8A6; box-shadow: 0 1px 4px rgba(15, 47, 50, .08); }
-  .sm-card.is-open { border-color: #C77B1B; box-shadow: 0 0 0 2px #F5D9B5; }
+  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid #D4DBE6; background: #F5F7FB; color: #475266; white-space: nowrap; }
+  .wh-badge.wh-RM { background: #E6F6F8; color: #0E7490; border-color: #B2DDE4; }
+  .wh-badge.wh-QC_HOLD { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .wh-badge.wh-WIP { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .wh-badge.wh-SCRAP { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .wh-badge.wh-FG { background: #EEF0FD; color: #4338CA; border-color: #C7CCF5; }
+  .wh-badge.wh-TRANSIT { background: #EEF2F6; color: #475569; border-color: #CBD5E1; }
+  .rack-tag { font-size: 12px; font-weight: 600; color: #0B1220; background: #fff; border: 1px dashed #94A0B4; border-radius: 6px; padding: 0 7px; }
+  .sm-card:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
+  .sm-card:hover { border-color: #B8C4DA; box-shadow: 0 1px 4px rgba(11,18,32, .08); }
+  /* Selected / open card = accent border + 2px ring. Alert stripe (left) alag hue: red = out/critical, amber = low, grey = over —
+     taaki 'selected' aur 'low stock' kabhi ek hi rang na dikhein */
+  .sm-card.is-open { border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
   .sm-card.is-alert { border-left: 4px solid #B42318; }
-  .sm-card.is-alert.warn { border-left: 4px solid #C77B1B; }
+  .sm-card.is-alert.warn { border-left: 4px solid #B45309; }
+  .sm-card.is-alert.over { border-left: 4px solid #475569; }
   /* Needs attention: band + drawer */
-  .at-band { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 1px solid #F8CFCB; background: #FFF1EF; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
-  .at-band:hover { background: #FFE9E6; }
-  .at-dot { width: 10px; height: 10px; border-radius: 999px; background: #B42318; box-shadow: 0 0 0 3px #F8CFCB; flex: none; }
+  /* Band ka rang sabse bure alert se: red = koi out/critical, amber = sirf low, grey = sirf over */
+  .at-band { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 1px solid #F0C4C0; background: #FCEBEA; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
+  .at-band:hover { border-color: #B42318; }
+  .at-band:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
+  .at-dot { width: 10px; height: 10px; border-radius: 999px; background: #B42318; box-shadow: 0 0 0 3px #F0C4C0; flex: none; }
+  .at-band.at-wait { border-color: #FBD9A5; background: #FEF3E2; }
+  .at-band.at-wait:hover { border-color: #B45309; }
+  .at-band.at-wait .at-dot { background: #B45309; box-shadow: 0 0 0 3px #FBD9A5; }
+  .at-band.at-over { border-color: #E2E8F0; background: #F1F5F9; }
+  .at-band.at-over:hover { border-color: #475569; }
+  .at-band.at-over .at-dot { background: #475569; box-shadow: 0 0 0 3px #E2E8F0; }
   .st-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .st-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 11px 10px; text-align: left; border-bottom: 1px solid #D1D9D8; }
-  .st-table tbody td { padding: 11px 10px; font-size: 13.5px; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
-  .st-table tbody tr:hover { background: #FBF4EE; }
+  .st-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 11px 10px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .st-table tbody td { padding: 11px 10px; font-size: 13.5px; border-bottom: 1px solid #E2E8F1; vertical-align: middle; }
+  .st-table tbody tr:hover { background: #F1F5F9; }  /* hover = neutral grey, accent tint sirf selected ke liye */
 </style>
 {% endblock %}
 
 {% block content %}
+      {# Value / amount sirf us user ko jiske paas Stock valuation page ka View hai (cost alag permission) #}
+      {% set show_val = can_do('inventory.stock_valuation', 'GET') %}
       {% set total_value = summary_rows | sum(attribute='value') %}
       {% set rejected_lots = lot_rows | selectattr('rejected', 'gt', 0) | list | length %}
       {% set waiting_lots = lot_rows | selectattr('waiting', 'gt', 0) | list | length %}
@@ -49,7 +72,7 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Stock</h1>
           <p class="text-[12.5px] text-ink-faint">How much material you have, and where it is right now.</p>
         </div>
-        <details class="text-[12.5px] text-copper-text">
+        <details class="text-[12.5px] text-accent-text">
           <summary class="font-semibold cursor-pointer hover:underline">How does stock move? ▾</summary>
           <div class="mt-1.5 max-w-md text-ink-muted leading-snug bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
             <p><strong>Goods received (GRN)</strong> → goes to QC Hold, shown as <em>Waiting for QC</em>.</p>
@@ -64,21 +87,26 @@
       <div class="flex-1 overflow-auto min-h-0 space-y-5">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div class="sc-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Materials in stock</div><div class="sc-big text-ink mt-1">{{ summary_rows|length }}</div></div>
+          {% if show_val %}
           <div class="sc-card"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Stock value</div><div class="sc-big text-ink mt-1">₹{{ total_value|inr }}</div></div>
-          <div class="sc-card" {% if waiting_lots %}style="border-color:#F5D9B5;background:#FFF9F0"{% endif %}><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots waiting for QC</div><div class="sc-big mt-1 text-ink" {% if waiting_lots %}style="color:#8A4A1C"{% endif %}>{{ waiting_lots }}</div></div>
-          <div class="sc-card" {% if rejected_lots %}style="border-color:#F8CFCB;background:#FFF6F5"{% endif %}><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots with rejected goods</div><div class="sc-big mt-1 {{ 'text-stop' if rejected_lots else 'text-ink' }}">{{ rejected_lots }}</div>{% if rejected_lots %}<div class="text-[11.5px] text-ink-muted mt-0.5">Failed Inward QC. Send back with a Purchase Return</div>{% endif %}</div>
+          {% endif %}
+          <div class="sc-card {{ 'k-warn' if waiting_lots else '' }}"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots waiting for QC</div><div class="sc-big mt-1 text-ink">{{ waiting_lots }}</div></div>
+          <div class="sc-card {{ 'k-bad' if rejected_lots else '' }}"><div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Lots with rejected goods</div><div class="sc-big mt-1 {{ 'text-stop' if rejected_lots else 'text-ink' }}">{{ rejected_lots }}</div>{% if rejected_lots %}<div class="text-[11.5px] text-ink-muted mt-0.5">Failed Inward QC. Send back with a Purchase Return</div>{% endif %}</div>
         </div>
 
         {% set alert_by = {} %}
         {% for a in alerts.rows %}{% set _ = alert_by.update({a.material.id: a}) %}{% endfor %}
+        {# Band ka rang sabse bure alert se (red > amber > grey) — pehle hamesha red tha #}
+        {% set at_sev = namespace(cls='at-over') %}
+        {% for a in alerts.rows %}{% if a.status in ('out', 'critical') %}{% set at_sev.cls = '' %}{% elif a.status == 'low' and at_sev.cls != '' %}{% set at_sev.cls = 'at-wait' %}{% endif %}{% endfor %}
         {% if alerts.rows %}
-        <button type="button" id="at-open" class="at-band" aria-haspopup="dialog">
+        <button type="button" id="at-open" class="at-band {{ at_sev.cls }}" aria-haspopup="dialog">
           <span class="at-dot"></span>
           <span class="text-[14px] font-bold text-ink">{{ alerts.rows|length }} material{{ '' if alerts.rows|length == 1 else 's' }} need attention</span>
           <span class="flex flex-wrap gap-1.5">
-            {% for label, group in alerts.rows|groupby('label') %}<span class="sc-chip {{ 'bad' if group[0].status in ('out', 'critical') else ('wait' if group[0].status == 'low' else 'wip') }}">{{ group|length }} {{ label }}</span>{% endfor %}
+            {% for label, group in alerts.rows|groupby('label') %}<span class="sc-chip {{ 'bad' if group[0].status in ('out', 'critical') else ('wait' if group[0].status == 'low' else 'over') }}">{{ group|length }} {{ label }}</span>{% endfor %}
           </span>
-          <span class="ml-auto text-[13px] font-semibold text-copper-text">Review ›</span>
+          <span class="ml-auto text-[13px] font-semibold text-accent-text">Review ›</span>
         </button>
         {% endif %}
         {% if alerts.unset %}<p class="text-[12px] text-ink-faint">{{ alerts.unset }} material{{ '' if alerts.unset == 1 else 's' }} have no reorder / minimum / maximum level set, so they cannot raise alerts. Set them in Raw materials.</p>{% endif %}
@@ -86,7 +114,7 @@
         <section>
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h2 class="text-[15px] font-semibold text-ink">By material</h2>
-            <input type="search" id="stock-search" placeholder="Search material, lot, batch or rack…" class="w-64 max-w-full px-3 py-1.5 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+            <input type="search" id="stock-search" placeholder="Search material, lot, batch or rack…" class="w-64 max-w-full px-3 py-1.5 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           {% if summary_rows %}
           <p class="text-[12px] text-ink-faint mb-2">Each box shows <b>everything you hold</b> of a material, split by state. The big number is only the part that is <b>ready to use</b>; rejected, waiting and in-production quantities are <b>separate</b> (not inside the big number). Rejected goods stay with you until a Purchase Return sends them back to the vendor.</p>
@@ -98,13 +126,13 @@
             {% set live = lots | rejectattr('used_up') | list %}
             {% set ns = namespace(text='') %}
             {% for r in lots %}{% set ns.text = ns.text ~ ' ' ~ r.lot.lot_code ~ ' ' ~ (r.lot.vendor_batch_no or '') ~ ' ' ~ (r.lot.grn_line.grn.grn_no if r.lot.grn_line and r.lot.grn_line.grn else '') ~ ' ' ~ (r.lot.rack.name if r.lot.rack else '') %}{% endfor %}
-            <div class="sm-card stock-card {{ 'is-alert' if al else '' }} {{ 'warn' if al and al.status in ('low', 'over') else '' }}" role="button" tabindex="0" data-mid="{{ item.material.id if item.material else '' }}" data-name="{{ item.material.name if item.material else '' }}" data-code="{{ item.material.code if item.material else '' }}" data-live="{{ live|length }}" data-search="{{ ((item.material.name if item.material else '') ~ ' ' ~ (item.material.code if item.material else '') ~ ns.text)|lower }}">
+            <div class="sm-card stock-card {{ 'is-alert' if al else '' }} {{ 'warn' if al and al.status == 'low' else ('over' if al and al.status == 'over' else '') }}" role="button" tabindex="0" data-mid="{{ item.material.id if item.material else '' }}" data-name="{{ item.material.name if item.material else '' }}" data-code="{{ item.material.code if item.material else '' }}" data-live="{{ live|length }}" data-search="{{ ((item.material.name if item.material else '') ~ ' ' ~ (item.material.code if item.material else '') ~ ns.text)|lower }}">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="text-[14px] font-semibold text-ink leading-tight">{{ item.material.name if item.material else '—' }}</div>
                   <div class="text-[11.5px] text-ink-faint font-mono">{{ item.material.code if item.material else '' }}</div>
                 </div>
-                {% if al %}<span class="sc-chip {{ 'bad' if al.status in ('out', 'critical') else ('wait' if al.status == 'low' else 'wip') }}">{{ al.label }}</span>{% endif %}
+                {% if al %}<span class="sc-chip {{ 'bad' if al.status in ('out', 'critical') else ('wait' if al.status == 'low' else 'over') }}">{{ al.label }}</span>{% endif %}
               </div>
               {% set total = item.available + item.waiting + item.rejected + item.wip + item.transit %}
               <div class="flex items-end justify-between gap-2 mt-1.5">
@@ -112,49 +140,51 @@
                   <div class="text-[10.5px] font-bold uppercase tracking-wide text-ink-faint">Ready to use</div>
                   <div><span class="sc-big text-ink tabular-nums">{{ item.available|qty }}</span> <span class="text-[12.5px] font-semibold text-ink-muted">{{ item.unit }}</span></div>
                 </div>
+                {% if show_val %}
                 <div class="text-[11.5px] text-ink-faint tabular-nums" title="Estimated value of all stock of this material">₹{{ item.value|inr }}</div>
+                {% endif %}
               </div>
               {% if has_extra %}
               <div class="mt-2 pt-2 border-t border-slate-100">
-                {# Rangeen patti: total me kaun kitna hai (hara = ready, orange = QC baaki, lal = rejected, neela = production / transit) #}
+                {# Rangeen patti: total me kaun kitna hai — fill chips/text ke SAME token rang (hara = ready, amber = QC baaki, lal = rejected, accent blue = production / transit) #}
                 {% if total > 0 %}
                 <div class="flex h-2 rounded-full overflow-hidden bg-slate-100" aria-hidden="true">
-                  {% if item.available > 0 %}<div style="width:{{ (item.available / total * 100)|round(1) }}%;background:#2E9E68"></div>{% endif %}
-                  {% if item.waiting > 0 %}<div style="width:{{ (item.waiting / total * 100)|round(1) }}%;background:#E0A04A"></div>{% endif %}
-                  {% if item.rejected > 0 %}<div style="width:{{ (item.rejected / total * 100)|round(1) }}%;background:#D9534F"></div>{% endif %}
-                  {% if item.wip > 0 or item.transit > 0 %}<div style="width:{{ ((item.wip + item.transit) / total * 100)|round(1) }}%;background:#5B8DD6"></div>{% endif %}
+                  {% if item.available > 0 %}<div style="width:{{ (item.available / total * 100)|round(1) }}%;background:#1F7A4D"></div>{% endif %}
+                  {% if item.waiting > 0 %}<div style="width:{{ (item.waiting / total * 100)|round(1) }}%;background:#B45309"></div>{% endif %}
+                  {% if item.rejected > 0 %}<div style="width:{{ (item.rejected / total * 100)|round(1) }}%;background:#B42318"></div>{% endif %}
+                  {% if item.wip > 0 or item.transit > 0 %}<div style="width:{{ ((item.wip + item.transit) / total * 100)|round(1) }}%;background:#0B5BEF"></div>{% endif %}
                 </div>
                 {% endif %}
                 <div class="text-[12px] text-ink-muted mt-1.5 leading-snug">
                   <b class="text-ink">Total {{ total|qty }} {{ item.unit }}</b> =
                   <span style="color:#1F7A4D"><b>{{ item.available|qty }}</b> ready</span>
-                  {% if item.waiting > 0 %} + <span style="color:#8A4A1C" title="Received, QC not done yet"><b>{{ item.waiting|qty }}</b> waiting for QC</span>{% endif %}
+                  {% if item.waiting > 0 %} + <span style="color:#B45309" title="Received, QC not done yet"><b>{{ item.waiting|qty }}</b> waiting for QC</span>{% endif %}
                   {% if item.rejected > 0 %} + <span style="color:#B42318" title="Failed Inward QC. Send it back with a Purchase Return."><b>{{ item.rejected|qty }}</b> rejected</span>{% endif %}
-                  {% if item.wip > 0 %} + <span style="color:#2B5FA8" title="Issued to production"><b>{{ item.wip|qty }}</b> in production</span>{% endif %}
-                  {% if item.transit > 0 %} + <span style="color:#2B5FA8"><b>{{ item.transit|qty }}</b> in transit</span>{% endif %}
+                  {% if item.wip > 0 %} + <span style="color:#0A3CA6" title="Issued to production"><b>{{ item.wip|qty }}</b> in production</span>{% endif %}
+                  {% if item.transit > 0 %} + <span style="color:#0A3CA6"><b>{{ item.transit|qty }}</b> in transit</span>{% endif %}
                 </div>
                 {% if item.scrap > 0 %}<div class="text-[11.5px] text-ink-faint mt-1">Scrap {{ item.scrap|qty }} {{ item.unit }} (not counted above)</div>{% endif %}
               </div>
               {% endif %}
               <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[12px]">
                 <span class="text-ink-faint">{{ live|length }} lot{{ '' if live|length == 1 else 's' }} with stock{% if lots|length > live|length %} · {{ lots|length - live|length }} used up{% endif %}</span>
-                <span class="font-semibold text-copper-text">View lots ▾</span>
+                <span class="font-semibold text-accent-text">View lots ▾</span>
               </div>
             </div>
             {% endfor %}
             {# Lots ka panel: card par click karne par yahin (saare boxes ke neeche, purani By lot ki jagah) khulta hai #}
             <div id="lot-panel" class="hidden" style="grid-column: 1 / -1">
-              <div class="bg-white rounded-lg overflow-hidden" style="border: 1px solid #C77B1B">
-                <div class="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2" style="background:#FFF8EF;border-bottom:1px solid #F5D9B5">
+              <div class="bg-white rounded-lg overflow-hidden" style="border: 1px solid #0B5BEF">
+                <div class="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2" style="background:#EDF3FF;border-bottom:1px solid #BCD2FA">
                   <div><span id="lot-title" class="text-[15px] font-bold text-ink">Lots</span> <span id="lot-sub" class="text-[12px] text-ink-faint"></span></div>
                   <div class="flex flex-wrap items-center gap-3">
-                    <input type="search" id="lot-find" placeholder="Find a lot, batch, GRN or rack…" class="w-60 max-w-full px-3 py-1 text-[13px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+                    <input type="search" id="lot-find" placeholder="Find a lot, batch, GRN or rack…" class="w-60 max-w-full px-3 py-1 text-[13px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
                     <label class="flex items-center gap-2 text-[13px] text-ink-muted cursor-pointer"><input type="checkbox" id="lot-showused" /> <span>Show used-up lots <span id="lot-usedcount" class="text-ink-faint"></span></span></label>
                     <button type="button" id="lot-close" class="px-2.5 py-1 text-[12.5px] font-semibold text-ink-muted border border-slate-300 rounded hover:bg-mist">Close ✕</button>
                   </div>
                 </div>
                 <table class="st-table" style="table-layout:auto">
-                  <thead><tr><th>Lot</th><th>Where it is now</th><th>Warehouse · Rack</th><th>Value</th><th></th></tr></thead>
+                  <thead><tr><th>Lot</th><th>Where it is now</th><th>Warehouse · Rack</th>{% if show_val %}<th>Value</th>{% endif %}<th></th></tr></thead>
                   <tbody id="lot-body"></tbody>
                 </table>
                 <p id="lot-empty" class="hidden text-center text-ink-faint py-5 text-[13.5px]">No lots to show.</p>
@@ -191,12 +221,12 @@
                 {% set w = row.wh[key] %}
                 <div class="lot-line"><span class="wh-badge wh-{{ w.type }}">{{ w.name }}</span>{% if lot.rack and lot.rack.warehouse_id == w.id %}<span class="rack-tag">Rack {{ lot.rack.name }}</span>{% endif %}</div>
                 {% endfor %}
-                {% if row.transit > 0 %}<div class="lot-line"><span class="wh-badge">On the way</span></div>{% endif %}
+                {% if row.transit > 0 %}<div class="lot-line"><span class="wh-badge wh-TRANSIT">On the way</span></div>{% endif %}
                 {% if row.used_up %}<div class="lot-line"><span class="text-ink-faint">—</span></div>{% endif %}
               </div>
             </td>
-            <td class="tabular-nums">₹{{ row.value|inr }}</td>
-            <td class="text-right"><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2.5 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white">History</a></td>
+            {% if show_val %}<td class="tabular-nums">₹{{ row.value|inr }}</td>{% endif %}
+            <td class="text-right"><a href="{{ url_for('inventory.stock_lot', lot_id=lot.id) }}" class="px-2.5 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent">History</a></td>
           </tr>
           {% endfor %}
         </template>
@@ -215,14 +245,14 @@
     </div>
     <div class="flex-1 overflow-y-auto p-4 space-y-2.5">
       {% for a in alerts.rows %}
-      <div class="bg-white border rounded-lg px-3.5 py-3" style="border-color: {{ '#F8CFCB' if a.status in ('out', 'critical') else '#E2E8E7' }}">
+      <div class="bg-white border rounded-lg px-3.5 py-3" style="border-color: {{ '#F0C4C0' if a.status in ('out', 'critical') else '#E2E8F1' }}">
         <div class="flex items-start justify-between gap-2">
           <div><div class="text-[14.5px] font-semibold text-ink">{{ a.material.name }}</div><div class="text-[11.5px] text-ink-faint font-mono">{{ a.material.code }}</div></div>
-          <span class="sc-chip {{ 'bad' if a.status in ('out', 'critical') else ('wait' if a.status == 'low' else 'wip') }}">{{ a.label }}</span>
+          <span class="sc-chip {{ 'bad' if a.status in ('out', 'critical') else ('wait' if a.status == 'low' else 'over') }}">{{ a.label }}</span>
         </div>
         <div class="text-[13px] text-ink-muted mt-1.5"><span class="font-semibold text-ink tabular-nums">{{ a.available|qty }} {{ a.unit }}</span> in store{% if a.reorder %} · reorder at {{ a.reorder }}{% endif %}{% if a.minimum %} · minimum {{ a.minimum }}{% endif %}{% if a.maximum %} · maximum {{ a.maximum }}{% endif %}</div>
         <div class="text-[12.5px] mt-1">
-          {% if a.on_order > 0 %}<span class="text-brand-teal font-medium">{{ a.on_order|qty }} {{ a.unit }} already on order</span>{% elif a.status != 'over' %}<span class="text-stop font-medium">Nothing on order</span>{% endif %}
+          {% if a.on_order > 0 %}<span class="text-info font-medium">{{ a.on_order|qty }} {{ a.unit }} already on order</span>{% elif a.status != 'over' %}<span class="text-stop font-medium">Nothing on order</span>{% endif %}
           {% if a.suggest %}<span class="text-ink-faint"> · suggested order {{ a.suggest|qty }} {{ a.unit }}</span>{% endif %}
         </div>
       </div>

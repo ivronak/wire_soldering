@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Wire Soldering ERP{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <title>{% block title %}Nrupex ERP{% endblock %}</title>
   <!-- Font: IBM Plex Sans (requirements doc Section 20.2 me suggest kiya gaya tha).
        Inter se switch kiya kyunki IBM Plex ka look zyada distinct/engineering-feel wala hai —
        ek manufacturing ERP ke liye zyada fit baithta hai. Internet na ho to system font fallback hoga. -->
@@ -11,25 +13,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            ink: { DEFAULT: '#0F2F32', soft: '#1A3F43', muted: '#3D5A5D', faint: '#6B7F82' },
-            copper: { DEFAULT: '#C46B2D', dark: '#A35522', soft: '#FBF4EE', border: '#E8C9A8', text: '#8A4A1C' },
-            mist: '#F4F6F5',
-            brand: { teal: '#2A6B6E', soft: '#EAF3F3', border: '#C5D9DA' },
-            /* Status tokens — Unit: green/red. Machine: + warning (amber) + neutral (gray). */
-            success: { DEFAULT: '#1F7A4D', bg: '#E6F5EC', border: '#B7E0C7' },
-            stop: { DEFAULT: '#B42318', bg: '#FCEBEA', border: '#F0C4C0' },
-            warning: { DEFAULT: '#B45309', bg: '#FEF3E2', border: '#FBD9A5' },
-            neutral: { DEFAULT: '#475569', bg: '#F1F5F9', border: '#E2E8F0' }
-          }
-        }
-      }
-    };
-  </script>
+  <!-- Colour theme (Nrupex logo se): tokens + CSS variables ek hi file me — app/static/js/theme.js. Tailwind CDN ke BAAD load hona zaroori hai. -->
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <!-- Shared UI rules (focus ring, checkbox/radio colour, selection) — erp-ui.css; theme.js ke variables use karta hai isliye uske BAAD -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/erp-ui.css') }}" />
   <style>
     /* Font-size ek notch bada kiya gaya hai (13px -> 14.5px base) — bade screen/monitor par
        pehle text bahut chota dikh raha tha. Row padding bhi thoda badhaya taaki bade text
@@ -37,17 +24,17 @@
     body {
       font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 14.5px;
-      color: #1C2B2D;
-      background: #F4F6F5;
+      color: var(--ink);
+      background: var(--mist);
       margin: 0;
     }
     .nav-link {
       display: flex; align-items: center; gap: 9px;
       margin: 1px 8px; padding: 9px 11px; border-radius: 6px;
-      font-size: 14px; color: #3D5A5D; text-decoration: none; border: 1px solid transparent;
+      font-size: 14px; color: var(--ink-muted); text-decoration: none; border: 1px solid transparent;
     }
-    .nav-link:hover { background: #F4F6F5; color: #0F2F32; }
-    .nav-link.is-active { background: #FBF4EE; color: #8A4A1C; font-weight: 600; border-color: #E8C9A8; }
+    .nav-link:hover { background: var(--neutral-bg); color: var(--ink); }
+    .nav-link.is-active { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; border-color: var(--accent-border); }
     .nav-link svg { width: 16px; height: 16px; flex-shrink: 0; }
 
     /* Page/main hamesha full width rehta hai (koi max-width cap nahi) — poori screen use hoti hai.
@@ -64,16 +51,16 @@
       position: sticky;
       top: 0;
       z-index: 5;
-      background: #EEF2F1;
-      color: #3D5A5D;
+      background: var(--surface-3);
+      color: var(--ink-muted);
       font-size: 12.5px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.03em;
       padding: 12px 14px;
       text-align: center;
-      border-bottom: 1px solid #D1D9D8;
-      border-right: 1px solid #E4EAE9;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line-soft);
     }
     /* Pehla column (#) chhota/numeric hai — usko left hi rehne do, baaki sab center. */
     .unit-table thead th:first-child,
@@ -83,13 +70,14 @@
       padding: 11px 14px;
       font-size: 14px;
       text-align: center;
-      border-bottom: 1px solid #E2E8E7;
+      border-bottom: 1px solid var(--line-soft);
       vertical-align: middle;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .unit-table tbody tr:nth-child(even) { background: #F8FAF9; }
-    .unit-table tbody tr:hover { background: #FBF4EE; }
+    /* Zebra bahut halka (surface-2); hover thoda gehra neutral grey — accent-soft sirf SELECTED / active row ke liye reserved hai, hover se confuse na ho */
+    .unit-table tbody tr:nth-child(even) { background: var(--surface-2); }
+    .unit-table tbody tr:hover { background: var(--neutral-bg); }
     .unit-table tbody tr.row-muted { opacity: 0.72; }
     .search-wrap input { padding-left: 32px; }
     #unit-modal.hidden { display: none; }
@@ -100,130 +88,17 @@
 
   {% block page_css %}{% endblock %}
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tour.css') }}" />
-  <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
+  {# Demo tour sirf Developer ke liye (guard_map me tour Developer-only) — baaki users ko launcher button bhi nahi #}
+  {% if can_do('tour.demo_player', 'GET') %}<link rel="stylesheet" href="{{ url_for('static', filename='css/tour.css') }}" />{% endif %}
+  {# csrf.js tour.js se PEHLE: har POST form / fetch ke saath CSRF token (Phase 0) #}
+  <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
+  {% if can_do('tour.demo_player', 'GET') %}<script src="{{ url_for('static', filename='js/tour.js') }}"></script>{% endif %}
 </head>
 <body class="antialiased">
   <div class="flex h-screen overflow-hidden">
 
-    <aside class="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
-      <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2.5">
-        <div class="w-11 h-11 shrink-0 rounded-md bg-mist border border-brand-border flex items-center justify-center p-0.5">
-          <img src="{{ url_for('static', filename='img/wire_soldering_logo.png') }}" alt="Wire Soldering" class="w-full h-full object-contain" width="44" height="44" />
-        </div>
-        <div class="min-w-0 leading-tight">
-          <div class="text-[14.5px] font-bold text-ink truncate">Wire Soldering</div>
-          <div class="text-[11px] text-ink-faint">Factory ERP</div>
-        </div>
-      </div>
-      <nav class="flex-1 overflow-y-auto py-2">
-        <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Menu</div>
-        <a href="{{ url_for('dashboard.dashboard_page') }}" class="nav-link{% if active_nav == 'dashboard' %} is-active{% endif %}"{% if active_nav == 'dashboard' %} aria-current="page"{% endif %}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4h4v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
-          Dashboard
-        </a>
-        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Masters</div>
-
-        {# Sub-group: Common — har module me reuse hone wale base masters #}
-        <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Common</div>
-        <a href="{{ url_for('units.units_list') }}" class="nav-link{% if active_nav == 'units' %} is-active{% endif %}"{% if active_nav == 'units' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3zm4 0V4h10v2"/></svg>Units</a>
-        <a href="{{ url_for('tax_rates.tax_rates_list') }}" class="nav-link{% if active_nav == 'tax_rates' %} is-active{% endif %}"{% if active_nav == 'tax_rates' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>Tax rates</a>
-        <a href="{{ url_for('charges.charges_list') }}" class="nav-link{% if active_nav == 'charges' %} is-active{% endif %}"{% if active_nav == 'charges' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Charges</a>
-        <a href="{{ url_for('states.states_list') }}" class="nav-link{% if active_nav == 'states' %} is-active{% endif %}"{% if active_nav == 'states' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>States</a>
-        <a href="{{ url_for('payment_terms.payment_terms_list') }}" class="nav-link{% if active_nav == 'payment_terms' %} is-active{% endif %}"{% if active_nav == 'payment_terms' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Payment terms</a>
-        <a href="{{ url_for('payment_modes.payment_modes_list') }}" class="nav-link{% if active_nav == 'payment_modes' %} is-active{% endif %}"{% if active_nav == 'payment_modes' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4 8h2"/></svg>Payment modes</a>
-
-        {# Sub-group: Production — shop-floor setup #}
-        <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Production</div>
-        <a href="{{ url_for('work_stages.work_stages_list')}}" class="nav-link{% if active_nav == 'work_stages' %} is-active{% endif %}"{% if active_nav == 'work_stages' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h14"/></svg>Work stages</a>
-        <a href="{{ url_for('machines.machines_list') }}" class="nav-link{% if active_nav == 'machines' %} is-active{% endif %}"{% if active_nav == 'machines' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Machines</a>
-        <a href="{{ url_for('production_lines.production_lines_list') }}" class="nav-link{% if active_nav == 'production_lines' %} is-active{% endif %}"{% if active_nav == 'production_lines' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Production lines</a>
-
-        {# Sub-group: Raw material — category + material (category pehle, phir item) #}
-        <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Raw material</div>
-        <a href="{{ url_for('rm_categories.rm_categories_list') }}" class="nav-link{% if active_nav == 'rm_categories' %} is-active{% endif %}"{% if active_nav == 'rm_categories' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>RM categories</a>
-        <a href="{{ url_for('raw_materials.raw_materials_list') }}" class="nav-link{% if active_nav == 'raw_materials' %} is-active{% endif %}"{% if active_nav == 'raw_materials' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Raw materials</a>
-
-        {# Sub-group: Products — category + finished good #}
-        <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Products</div>
-        <a href="{{ url_for('product_categories.product_categories_list') }}" class="nav-link{% if active_nav == 'product_categories' %} is-active{% endif %}"{% if active_nav == 'product_categories' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M3 11V6a1 1 0 011-1h5a1 1 0 01.707.293l9 9a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-9-9A1 1 0 013 11z"/></svg>Product categories</a>
-        <a href="{{ url_for('products.products_list') }}" class="nav-link{% if active_nav == 'products' %} is-active{% endif %}"{% if active_nav == 'products' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Products</a>
-
-        {# Sub-group: Storage — physical/logical stock buckets #}
-        <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Storage</div>
-        <a href="{{ url_for('warehouses.warehouses_list') }}" class="nav-link{% if active_nav == 'warehouses' %} is-active{% endif %}"{% if active_nav == 'warehouses' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>Warehouses</a>
-        <a href="{{ url_for('racks.racks_list') }}" class="nav-link{% if active_nav == 'racks' %} is-active{% endif %}"{% if active_nav == 'racks' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16M4 12h16M4 19h16M7 5v14M17 5v14"/></svg>Racks</a>
-
-        {# Sub-group: Partners — external parties (vendor type vendor ke saath) #}
-        <div class="px-4 pt-1.5 pb-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-ink-faint/70">Partners</div>
-        <a href="{{ url_for('vendors.vendors_list') }}" class="nav-link{% if active_nav == 'vendors' %} is-active{% endif %}"{% if active_nav == 'vendors' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8m-9 0h10l1 12H6L7 7z"/></svg>Vendors</a>
-        <a href="{{ url_for('vendor_types.vendor_types_list') }}" class="nav-link{% if active_nav == 'vendor_types' %} is-active{% endif %}"{% if active_nav == 'vendor_types' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 11V6a2 2 0 012-2z"/></svg>Vendor types</a>
-        <a href="{{ url_for('customers.customers_list') }}" class="nav-link{% if active_nav == 'customers' %} is-active{% endif %}"{% if active_nav == 'customers' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-4a3 3 0 11-6 0 3 3 0 016 0zm6 0a3 3 0 11-6 0"/></svg>Customers</a>
-
-        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Procurement</div>
-        <a href="{{url_for('purchase_orders.purchase_orders_list')}}" class="nav-link{% if active_nav == 'purchase_orders' %} is-active{% endif %}"{% if active_nav == 'purchase_orders' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Purchase orders</a>
-        <a href="{{url_for('grns.grns_list')}}" class="nav-link{% if active_nav == 'grns' %} is-active{% endif %}"{% if active_nav == 'grns' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Gate inward / GRN</a>
-        <a href="{{url_for('inward_qc.inward_qc_list')}}" class="nav-link{% if active_nav == 'inwards_qc' %} is-active{% endif %}"{% if active_nav == 'inwards_qc' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Inward QC</a>
-        <a href="{{url_for('purchase_invoices.purchase_invoices_list')}}" class="nav-link{% if active_nav == 'purchase_invoices' %} is-active{% endif %}"{% if active_nav == 'purchase_invoices' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>Purchase invoice</a>
-        <a href="{{url_for('purchase_returns.purchase_return_list')}}" class="nav-link{% if active_nav == 'purchase_returns' %} is-active{% endif %}"{% if active_nav == 'purchase_returns' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Purchase return</a>
-
-        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Sales</div>
-        <a href="{{ url_for('quotations.quotations_list') }}" class="nav-link{% if active_nav == 'quotations' %} is-active{% endif %}"{% if active_nav == 'quotations' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Quotations</a>
-        <a href="{{ url_for('dispatch.dispatch_list') }}" class="nav-link{% if active_nav == 'dispatch' %} is-active{% endif %}"{% if active_nav == 'dispatch' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 17a2 2 0 11-4 0 2 2 0 014 0zm12 0a2 2 0 11-4 0 2 2 0 014 0zM2 5h11v10H2zm11 4h4l3 3v3h-7z"/></svg>Dispatch</a>
-        <a href="{{ url_for('sales_invoices.invoices_list') }}" class="nav-link{% if active_nav == 'invoices' %} is-active{% endif %}"{% if active_nav == 'invoices' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m-6 4h6m-6 4h3M6 3h12a1 1 0 011 1v16l-3-2-3 2-3-2-3 2V4a1 1 0 011-1z"/></svg>Invoices</a>
-        <a href="{{ url_for('receipts.receipts_list') }}" class="nav-link{% if active_nav == 'receipts' %} is-active{% endif %}"{% if active_nav == 'receipts' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>Receipts</a>
-        <a href="{{ url_for('sales_returns.returns_list') }}" class="nav-link{% if active_nav == 'sales_returns' %} is-active{% endif %}"{% if active_nav == 'sales_returns' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 010 10H9M3 10l4-4M3 10l4 4"/></svg>Sales returns</a>
-        <a href="{{ url_for('aging.receivables_aging') }}" class="nav-link{% if active_nav == 'aging' %} is-active{% endif %}"{% if active_nav == 'aging' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Receivables</a>
-        <a href="{{ url_for('customer_statement.statement_page') }}" class="nav-link{% if active_nav == 'statement' %} is-active{% endif %}"{% if active_nav == 'statement' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>Statement</a>
-        <a href="{{ url_for('sales_profit.profit_page') }}" class="nav-link{% if active_nav == 'sales_profit' %} is-active{% endif %}"{% if active_nav == 'sales_profit' %} aria-current="page"{% endif %}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg>Profit</a>
-
-        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Inventory</div>
-        <a href="{{ url_for('inventory.stock_list') }}" class="nav-link{% if active_nav == 'stock' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Stock ledger{% if stock_alert_count %}<span class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-stop text-white text-[11px] font-bold inline-flex items-center justify-center" title="Materials at or below their reorder level">{{ stock_alert_count }}</span>{% endif %}</a>
-        <a href="{{ url_for('opening_stock.opening_stock_list') }}" class="nav-link{% if active_nav == 'opening_stock' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Opening stock</a>
-        <a href="{{ url_for('stock_transfers.stock_transfers_list') }}" class="nav-link{% if active_nav == 'stock_transfers' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>Stock transfer</a>
-        <a href="{{ url_for('stock_adjustments.stock_adjustments_list') }}" class="nav-link{% if active_nav == 'stock_adjustments' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock adjustment</a>
-        <a href="{{ url_for('inventory.stock_valuation') }}" class="nav-link{% if active_nav == 'valuation' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Stock valuation</a>
-        <a href="{{ url_for('production_output.finished_goods_list') }}" class="nav-link{% if active_nav == 'finished_goods' %} is-active{% endif %}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>Finished goods</a>
-
-        <div class="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Manufacturing</div>
-        <a href="{{ url_for('production_orders.production_orders_list') }}" class="nav-link{% if active_nav == 'production_orders' %} is-active{% endif %}"{% if active_nav == 'production_orders' %} aria-current="page"{% endif %}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-          Production order
-        </a>
-        <a href="{{ url_for('production_planning.production_planning_page') }}" class="nav-link{% if active_nav == 'production_planning' %} is-active{% endif %}"{% if active_nav == 'production_planning' %} aria-current="page"{% endif %}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Production planning
-        </a>
-        <a href="{{ url_for('material_plan.material_plan_page') }}" class="nav-link{% if active_nav == 'material_plan' %} is-active{% endif %}"{% if active_nav == 'material_plan' %} aria-current="page"{% endif %}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>
-          Material plan
-        </a>
-        <a href="{{ url_for('material_issues.material_issues_list') }}" class="nav-link{% if active_nav == 'material_issues' %} is-active{% endif %}">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-          Material issue
-        </a>
-        <a href="{{ url_for('routing.routing_list') }}" class="nav-link{% if active_nav == 'routing' %} is-active{% endif %}">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Routing / stages
-        </a>
-        <a href="{{ url_for('production_output.production_output_list') }}" class="nav-link{% if active_nav == 'production_output' %} is-active{% endif %}">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-          Production output
-        </a>
-        <a href="{{ url_for('scrap.scrap_list') }}" class="nav-link{% if active_nav == 'scrap' %} is-active{% endif %}">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          Scrap / waste
-        </a>
-        <a href="{{ url_for('variance.variance_list') }}" class="nav-link{% if active_nav == 'variance' %} is-active{% endif %}">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-          Consumption variance
-        </a>
-        <a href="{{ url_for('costing.costing_page') }}" class="nav-link{% if active_nav == 'costing' %} is-active{% endif %}"{% if active_nav == 'costing' %} aria-current="page"{% endif %}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 8h6m-6 4h6m-3 4l-3-4m0-8h.01M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>
-          Costing
-        </a>
-      </nav>
-    </aside>
+    {# Sidebar: module-wise drawers — poora markup + JS app/templates/_sidebar.html me, data app/auth/nav.py se #}
+    {% include "_sidebar.html" %}
 
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden p-4 gap-3">
       {% block content %}{% endblock %}
@@ -232,6 +107,8 @@
 
   {% block modals %}{% endblock %}
   <script src="{{ url_for('static', filename='js/erp-toast.js') }}"></script>
+  {# Saare masters ka read-only View-details drawer (eye button) #}
+  <script src="{{ url_for('static', filename='js/erp-view.js') }}"></script>
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     <script>

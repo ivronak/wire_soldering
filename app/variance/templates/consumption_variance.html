@@ -3,45 +3,50 @@
 
 {% block page_css %}
 <style>
-  .cv-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .cv-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .cv-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .cv-kpi .h { font-size: 12px; color: #6B7F82; }
-  .cv-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .cv-kpi.bad .v { color: #B42318; }
+  .cv-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .cv-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .cv-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .cv-kpi .h { font-size: 12px; color: #5A6577; }
+  .cv-kpi.bad { background: #FCEBEA; border-color: #F0C4C0; } .cv-kpi.bad .v { color: #B42318; }
   .cv-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .cv-kpi.good .v { color: #1F7A4D; }
-  .cv-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .cv-kpi.warn .v { color: #8A4A1C; }
-  .cv-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .cv-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .cv-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .cv-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
-  .cv-filter a { font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid #D1D9D8; color: #3D5A5D; text-decoration: none; background: #fff; }
-  .cv-filter a.on { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
-  .cv-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 10px; }
+  .cv-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .cv-kpi.warn .v { color: #B45309; }
+  .cv-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .cv-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .cv-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .cv-tabs a span { font-weight: 500; color: #5A6577; margin-left: 3px; }
+  .cv-filter a { font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px; border: 1px solid #D4DBE6; color: #475266; text-decoration: none; background: #fff; }
+  .cv-filter a.on { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .cv-card { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; margin-bottom: 10px; }
   .cv-row { display: grid; grid-template-columns: minmax(210px, 1.4fr) minmax(190px, 1.2fr) minmax(170px, 1fr) minmax(150px, .9fr) auto; gap: 16px; align-items: center; padding: 14px 16px; }
-  .cv-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .cv-prod { font-size: 13.5px; color: #1C2B2D; }
-  .cv-meta { font-size: 12px; color: #6B7F82; }
+  .cv-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0B1220; }
+  .cv-prod { font-size: 13.5px; color: #121A2B; }
+  .cv-meta { font-size: 12px; color: #5A6577; }
   .cv-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .cv-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .cv-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .cv-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .cv-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .cv-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .cv-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .cv-chip.bad { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .cv-chip.gone { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .cv-chip.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  /* EK scheme (KPI, count, chip, diff cell sab me): Used more = red, On plan = green, Used less = neutral grey (amber / green nahi) */
+  .cv-over { color: #B42318; } .cv-under { color: #475569; } .cv-onplan { color: #1F7A4D; } .cv-zero { color: #5A6577; } .cv-check { color: #B45309; }
+  .cv-btn:focus-visible, .cv-tabs a:focus-visible, .cv-filter a:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
   .cv-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; white-space: nowrap; }
-  .cv-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .cv-btn.primary:hover { background: #A35522; }
-  .cv-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .cv-btn.ghost:hover { background: #F4F6F5; }
-  .cv-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .cv-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .cv-btn.primary { background: #0B5BEF; color: #fff; border-color: #0843C2; } .cv-btn.primary:hover { background: #0843C2; }
+  .cv-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .cv-btn.ghost:hover { background: #F3F6FB; }
+  .cv-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .cv-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
   @media (max-width: 1100px) { .cv-row { grid-template-columns: 1fr 1fr; } }
-  .cv-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
-  .cv-box h3 { font-size: 15px; font-weight: 700; color: #0F2F32; margin-bottom: 2px; }
-  .cv-box .sub { font-size: 12.5px; color: #6B7F82; margin-bottom: 10px; }
+  .cv-box { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 14px 16px; }
+  .cv-box h3 { font-size: 15px; font-weight: 700; color: #0B1220; margin-bottom: 2px; }
+  .cv-box .sub { font-size: 12.5px; color: #5A6577; margin-bottom: 10px; }
   .cv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .cv-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D1D9D8; text-align: left; }
-  .cv-table td { padding: 8px; border: 1px solid #E2E8E7; vertical-align: top; }
+  .cv-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D4DBE6; text-align: left; }
+  .cv-table td { padding: 8px; border: 1px solid #E2E8F1; vertical-align: top; }
+  .cv-table tbody tr:hover td { background: #F1F5F9; }   /* hover = neutral slate */
   .cv-table .r { text-align: right; font-variant-numeric: tabular-nums; }
-  .cv-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
-  .cv-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
+  .cv-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 8px; background: #fff; }
+  .cv-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.15); }
   #cv-modal.hidden { display: none; } #cv-modal { display: flex; }
 </style>
 {% endblock %}
@@ -56,14 +61,14 @@
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="cv-kpi"><span class="k">Orders checked</span><span class="v">{{ kpi.checked }}</span><span class="h">{{ kpi.review }} not reviewed yet</span></div>
   <div class="cv-kpi {{ 'bad' if kpi.over else '' }}"><span class="k">Extra material cost</span><span class="v">₹{{ kpi.over|inr }}</span><span class="h">used more than planned</span></div>
-  <div class="cv-kpi {{ 'good' if kpi.under else '' }}"><span class="k">Material saved</span><span class="v">₹{{ (-kpi.under)|inr }}</span><span class="h">used less than planned</span></div>
+  <div class="cv-kpi"><span class="k">Material saved</span><span class="v">₹{{ (-kpi.under)|inr }}</span><span class="h">used less than planned</span></div>
   <div class="cv-kpi"><span class="k">Average yield</span><span class="v">{{ kpi.yield if kpi.yield is not none else '—' }}{{ '%' if kpi.yield is not none else '' }}</span><span class="h">good output vs ordered</span></div>
 </div>
 
 {% if packing_rows %}
 {# Spool / packing check (client meeting 2, #14): liye vs bane, aur farak kahan gaya #}
-<div class="shrink-0 rounded-lg border bg-white" style="border-color:#F8CFCB">
-  <div class="px-4 py-2.5" style="background:#FFF6F5;border-bottom:1px solid #F8CFCB"><span class="text-[14.5px] font-bold" style="color:#B42318">Spool / packing check</span>
+<div class="shrink-0 rounded-lg border bg-white" style="border-color:#F0C4C0">
+  <div class="px-4 py-2.5" style="background:#FCEBEA;border-bottom:1px solid #F0C4C0"><span class="text-[14.5px] font-bold" style="color:#B42318">Spool / packing check</span>
     <span class="text-[12.5px] text-ink-muted"> — material taken for production that was not used and not returned</span></div>
   <div class="overflow-x-auto"><table class="w-full text-[13.5px]">
     <thead><tr class="text-left text-[11.5px] uppercase tracking-wide text-ink-faint"><th class="px-4 py-2">Order</th><th class="px-2 py-2">Material</th><th class="px-2 py-2 text-right">Taken</th><th class="px-2 py-2 text-right">Made / used</th><th class="px-2 py-2 text-right">Not found</th><th class="px-2 py-2">Issued by</th><th class="px-2 py-2">Taken by</th><th class="px-2 py-2">Status</th></tr></thead>
@@ -107,16 +112,16 @@
     <div class="cv-row">
       <div>
         <div class="flex items-center gap-2 flex-wrap"><span class="cv-no">{{ o.prod_no }}</span>
-          {% if v.final %}<span class="cv-chip ok"><i></i>Completed</span>{% else %}<span class="cv-chip warn"><i></i>So far</span>{% endif %}</div>
+          {% if v.final %}<span class="cv-chip ok"><i></i>Completed</span>{% else %}<span class="cv-chip run"><i></i>So far</span>{% endif %}</div>
         <div class="cv-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
         <div class="cv-meta">{% if out %}batch {{ out.batch_no }} · {{ out.output_date.strftime('%d %b %Y') }}{% else %}{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }} ordered{% endif %}</div>
       </div>
       <div>
-        <div class="text-[13px]">{{ v.lines|length }} materials · <b style="color:{{ '#B42318' if v.over else '#6B7F82' }}">{{ v.over }} used more</b> · <b style="color:{{ '#1F7A4D' if v.under else '#6B7F82' }}">{{ v.under }} used less</b></div>
+        <div class="text-[13px]">{{ v.lines|length }} materials · <b class="{{ 'cv-over' if v.over else 'cv-zero' }}">{{ v.over }} used more</b> · <b class="{{ 'cv-under' if v.under else 'cv-zero' }}">{{ v.under }} used less</b></div>
         <div class="cv-meta mt-1">{{ v.insights[0] }}</div>
       </div>
       <div>
-        {% if v.status == 'over' %}<span class="cv-chip bad"><i></i>Used more</span>{% elif v.status == 'under' %}<span class="cv-chip warn"><i></i>Used less</span>{% else %}<span class="cv-chip ok"><i></i>On plan</span>{% endif %}
+        {% if v.status == 'over' %}<span class="cv-chip bad"><i></i>Used more</span>{% elif v.status == 'under' %}<span class="cv-chip gone"><i></i>Used less</span>{% else %}<span class="cv-chip ok"><i></i>On plan</span>{% endif %}
         <div class="text-[13px] font-semibold mt-1">{{ '+' if v.impact > 0 else ('−' if v.impact < 0 else '') }}₹{{ (v.impact|abs)|inr }}</div>
         <div class="cv-meta">cost difference</div>
       </div>
@@ -158,7 +163,7 @@
   function inr(x) { return '₹' + Math.abs(Number(x)).toLocaleString('en-IN', {maximumFractionDigits: 0}); }
   var modal = document.getElementById('cv-modal');
   function chip(status) {
-    return status === 'over' ? '<span class="cv-chip bad"><i></i>Used more</span>' : (status === 'under' ? '<span class="cv-chip warn"><i></i>Used less</span>' : '<span class="cv-chip ok"><i></i>On plan</span>');
+    return status === 'over' ? '<span class="cv-chip bad"><i></i>Used more</span>' : (status === 'under' ? '<span class="cv-chip gone"><i></i>Used less</span>' : '<span class="cv-chip ok"><i></i>On plan</span>');
   }
   function openDetail(btn) {
     var d = JSON.parse(btn.getAttribute('data-detail'));
@@ -173,7 +178,7 @@
       var lots = (ln.lots || []).map(function (l) { return esc(l.lot) + (l.batch ? ' (' + esc(l.batch) + ')' : '') + ': ' + n(l.qty); }).join(' · ');
       html += '<tr><td><b>' + esc(ln.name) + '</b><div class="cv-meta">' + esc(ln.code) + (lots ? ' · ' + lots : '') + '</div></td>' +
         '<td class="r">' + n(ln.planned) + ' ' + esc(ln.unit) + '</td><td class="r"><b>' + n(ln.actual) + '</b> ' + esc(ln.unit) + '</td>' +
-        '<td class="r" style="color:' + (ln.status === 'over' ? '#B42318' : (ln.status === 'under' ? '#8A4A1C' : '#1F7A4D')) + '">' + (ln.variance > 0 ? '+' : '') + n(ln.variance) + '<div class="cv-meta">' + (ln.pct > 0 ? '+' : '') + ln.pct + '%</div></td>' +
+        '<td class="r ' + (ln.status === 'over' ? 'cv-over' : (ln.status === 'under' ? 'cv-under' : 'cv-onplan')) + '">' + (ln.variance > 0 ? '+' : '') + n(ln.variance) + '<div class="cv-meta">' + (ln.pct > 0 ? '+' : '') + ln.pct + '%</div></td>' +
         '<td class="r">' + (ln.impact > 0 ? '+' : (ln.impact < 0 ? '−' : '')) + inr(ln.impact) + '</td><td>' + chip(ln.status) + '</td></tr>';
     });
     html += '</tbody></table></div></section>';
@@ -184,15 +189,15 @@
         [['Good', o.good], ['Rework', o.rework], ['Scrap', o.scrap], ['Process loss', o.loss], ['Yield', o.yield_pct + '%']].map(function (p) { return '<div class="rounded-lg border border-slate-200 bg-white p-2"><div class="text-[18px] font-bold">' + (typeof p[1] === 'number' ? n(p[1]) : p[1]) + '</div><div class="cv-meta">' + p[0] + '</div></div>'; }).join('') +
         '</div>' +
         '<p class="text-[13px] mt-3">Material in (KG items only): <b>' + n(o.input_kg) + ' KG</b> · output (good + rework + scrap + loss): <b>' + n(o.output_kg) + ' KG</b> · ' +
-        (Math.abs(o.unaccounted_kg) < 0.05 ? '<span style="color:#1F7A4D">everything is accounted for</span>' : (o.unaccounted_kg > 0 ? '<span style="color:#B42318">' + n(o.unaccounted_kg) + ' KG is not accounted for (lost or not recorded)</span>' : '<span style="color:#8A4A1C">output is ' + n(-o.unaccounted_kg) + ' KG more than the material in — check the numbers</span>')) + '</p>' +
+        (Math.abs(o.unaccounted_kg) < 0.05 ? '<span class="cv-onplan">everything is accounted for</span>' : (o.unaccounted_kg > 0 ? '<span class="cv-over">' + n(o.unaccounted_kg) + ' KG is not accounted for (lost or not recorded)</span>' : '<span class="cv-check">output is ' + n(-o.unaccounted_kg) + ' KG more than the material in — check the numbers</span>')) + '</p>' +
         '<p class="text-[13px]">Cost: ₹' + Number(o.total_value).toLocaleString('en-IN') + ' of raw material → <b>₹' + Number(o.unit_cost).toLocaleString('en-IN', {maximumFractionDigits: 2}) + '</b> per ' + esc(o.unit) + ' of good goods.</p></section>';
       if (d.reviewed) {
         html += '<section class="cv-box"><h3>Reviewed</h3><p class="text-[13.5px]">By <b>' + esc(d.reviewed.by) + '</b> on ' + esc(d.reviewed.at) + (d.reviewed.note ? '<br>Note: ' + esc(d.reviewed.note) : '') + '</p></section>';
-      } else {
+      } {# Review form JS se banta hai aur POST karta hai -> sirf variance Edit wale ko #}{% if can_edit('variance') %}else {
         html += '<section class="cv-box"><h3>Mark as reviewed</h3><p class="sub">Once you have looked at this and understood any difference, mark it reviewed.</p>' +
           '<form method="post" action="/consumption_variance/review/' + d.output_id + '" class="space-y-2"><input class="cv-input" name="reviewed_by" maxlength="60" placeholder="Your name" required>' +
           '<input class="cv-input" name="review_note" maxlength="255" placeholder="Note, e.g. extra tin because of a spill (optional)"><button type="submit" class="cv-btn primary">Mark reviewed</button></form></section>';
-      }
+      }{% endif %}
     }
     document.getElementById('cv-body').innerHTML = html;
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 {% block title %}Work Stage Master{% endblock %}
 
 {% block page_css %}
@@ -12,16 +13,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 14px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .stage-table thead th:first-child,
   .stage-table tbody td:first-child { text-align: left; padding-left: 18px; }
@@ -30,13 +31,18 @@
     padding: 11px 14px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .stage-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .stage-table tbody tr:hover { background: #FBF4EE; }
+  .stage-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  /* Hover = halka neutral grey; accent-soft sirf selected ke liye */
+  .stage-table tbody tr:hover { background: #F1F5F9; }
+  .stage-table button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Flag chips (Lab QC, Batch, Billets ...) = sirf pehchaan ke tag, status nahi: sab neutral grey + chhota dot */
+  .flag-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+  .flag-chip::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #475569; flex-shrink: 0; }
   .stage-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
   #stage-modal.hidden { display: none; }
@@ -52,11 +58,14 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Work stages</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Work stages</h1>
         </div>
+        {# View-only user ko Add button nahi dikhta (server 403 deta) #}
+        {% if can_edit('work_stages') %}
         <button type="button" id="btn-add-stage"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add stage
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -65,14 +74,14 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-stages" placeholder="Search code or name…" autocomplete="off"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (4)</button>
-            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">In use (3)</button>
-            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Stopped (1)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Work stage = production step (Cutting, Soldering…) · Machines and Routing will pick from this list · Sort order = pipeline sequence
@@ -84,11 +93,12 @@
           <table class="stage-table">
             <colgroup>
               <col style="width:5%" />
-              <col style="width:12%" />
-              <col style="width:28%" />
-              <col style="width:12%" />
-              <col style="width:18%" />
-              <col style="width:25%" />
+              <col style="width:11%" />
+              <col style="width:36%" />
+              <col style="width:11%" />
+              <col style="width:14%" />
+              {# Actions sabko dikhta hai (View button sabke liye) — 5 icon controls ek line me, isliye fixed px #}
+              <col style="width:210px" />
             </colgroup>
             <thead>
               <tr>
@@ -116,13 +126,13 @@
                   <span class="font-medium {% if s.is_active %}text-ink{% else %}text-ink-faint{% endif %}">
                     {{ s.name }}
                   </span>
-                  {% if s.requires_lab_qc %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border" title="Lab QC and test certificate needed before the next stage">Lab QC</span>{% endif %}
-                  {% if s.scrap_after_next %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="Scrap of this stage is entered when the next stage is completed">Scrap later</span>{% endif %}
-                  {% if s.is_batch %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
-                  {% if s.is_billet_stage %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="Billets are counted; scrap is worked out">Billets{% if s.billet_weight %} · {{ '%g'|format(s.billet_weight) }} KG{% endif %}</span>{% endif %}
-                  {% if s.no_scrap %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="No scrap is recorded at this stage">No scrap</span>{% endif %}
-                  {% if s.counts_pcs %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-copper-soft text-copper-text border border-copper-border" title="Unit conversion: wire comes in as KG, pieces come out. From this stage on everything is counted in PCS; KG is only a reference">Converts KG → PCS</span>{% endif %}
-                  {% if s.max_wait_minutes %}<span class="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200" title="The next stage must start within this time after this stage is done">Next within {{ s.max_wait_minutes }} min</span>{% endif %}
+                  {% if s.requires_lab_qc %}<span class="flag-chip ml-1" title="Lab QC and test certificate needed before the next stage">Lab QC</span>{% endif %}
+                  {% if s.scrap_after_next %}<span class="flag-chip ml-1" title="Scrap of this stage is entered when the next stage is completed">Scrap later</span>{% endif %}
+                  {% if s.is_batch %}<span class="flag-chip ml-1" title="Runs in lots of the machine capacity">Batch</span>{% endif %}
+                  {% if s.is_billet_stage %}<span class="flag-chip ml-1" title="Billets are counted; scrap is worked out">Billets{% if s.billet_weight %} · {{ '%g'|format(s.billet_weight) }} KG{% endif %}</span>{% endif %}
+                  {% if s.no_scrap %}<span class="flag-chip ml-1" title="No scrap is recorded at this stage">No scrap</span>{% endif %}
+                  {% if s.counts_pcs %}<span class="flag-chip ml-1" title="Unit conversion: wire comes in as KG, pieces come out. From this stage on everything is counted in PCS; KG is only a reference">Converts KG → PCS</span>{% endif %}
+                  {% if s.max_wait_minutes %}<span class="flag-chip ml-1" title="The next stage must start within this time after this stage is done">Next within {{ s.max_wait_minutes }} min</span>{% endif %}
                 </td>
                 <td class="text-[13px] {% if s.is_active %}text-ink-muted{% else %}text-ink-faint{% endif %} tabular-nums">
                   {{ s.sort_order }}
@@ -130,55 +140,49 @@
                 <td class="text-center">
                   {% if s.is_active %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> In use
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button"
-                      class="btn-edit-stage px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ s.id }}"
-                      data-code="{{ s.code }}"
-                      data-name="{{ s.name }}"
-                      data-sort="{{ s.sort_order }}"
-                      data-batch="{{ 1 if s.is_batch else 0 }}"
-                      data-labqc="{{ 1 if s.requires_lab_qc else 0 }}"
-                      data-scraplater="{{ 1 if s.scrap_after_next else 0 }}"
-                      data-billet="{{ 1 if s.is_billet_stage else 0 }}"
-                      data-billetweight="{{ s.billet_weight if s.billet_weight is not none else '' }}"
-                      data-noscrap="{{ 1 if s.no_scrap else 0 }}"
-                      data-pcs="{{ 1 if s.counts_pcs else 0 }}"
-                      data-maxwait="{{ s.max_wait_minutes if s.max_wait_minutes else '' }}">
-                      Edit
-                    </button>
-                    {# Soft-delete — confirm popup = js-confirm-submit (erp-toast.js) #}
-                    <form method="post"
-                          action="{{url_for('work_stages.work_stages_delete', stage_id=s.id)}}"
-                          class="inline js-confirm-submit"
-                          data-confirm-title="Remove work stage"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this work stage from the master list? It will be kept in the database but hidden.">
-                      <button type="submit"
-                              class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">
-                        Delete
-                      </button>
-                    </form>
-                    {# Toggle is_active — Unit Master jaisa switch #}
-                    <form method="post"
-                          action="{{ url_for('work_stages.work_stages_toggle', stage_id=s.id) }}"
-                          class="inline">
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle In use / Stopped">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if s.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                <td style="white-space:nowrap">
+                  <div class="row-actions">
+                    {# View sabko; Edit/Delete/toggle sirf edit permission wale ko (backend bhi alag se rokta hai) #}
+                    {{ view_btn("Work stage details", s.code, [
+                      ["Code", s.code],
+                      ["Stage name", s.name],
+                      ["Sort order", s.sort_order],
+                      ["Batch stage (lots of machine capacity)", "Yes" if s.is_batch else "No"],
+                      ["Lab QC + test certificate after stage", "Yes" if s.requires_lab_qc else "No"],
+                      ["Scrap entered after next stage", "Yes" if s.scrap_after_next else "No"],
+                      ["Counts billets", ("Yes · " ~ ('%g'|format(s.billet_weight)) ~ " KG per billet") if (s.is_billet_stage and s.billet_weight) else ("Yes" if s.is_billet_stage else "No")],
+                      ["Scrap recorded at this stage", "No" if s.no_scrap else "Yes"],
+                      ["Converts KG to PCS", "Yes" if s.counts_pcs else "No"],
+                      ["Max wait before next stage", (s.max_wait_minutes ~ " min") if s.max_wait_minutes else "No limit"],
+                      ["Created", s.created_at|ist],
+                      ["Status", "Active" if s.is_active else "Inactive", "success" if s.is_active else "neutral"]
+                    ]) }}
+                    {% if can_edit('work_stages') %}
+                    {# data-* ke naam page JS (openEditModal) se match hone chahiye: sort, batch, labqc, scraplater, billet, billetweight, noscrap, pcs, maxwait #}
+                    {{ edit_btn("btn-edit-stage", "work stage", {
+                      "id": s.id, "code": s.code, "name": s.name, "sort": s.sort_order,
+                      "batch": 1 if s.is_batch else 0,
+                      "labqc": 1 if s.requires_lab_qc else 0,
+                      "scraplater": 1 if s.scrap_after_next else 0,
+                      "billet": 1 if s.is_billet_stage else 0,
+                      "billetweight": s.billet_weight if s.billet_weight is not none else "",
+                      "noscrap": 1 if s.no_scrap else 0,
+                      "pcs": 1 if s.counts_pcs else 0,
+                      "maxwait": s.max_wait_minutes if s.max_wait_minutes else ""
+                    }) }}
+                    {# Soft-delete — hard delete nahi, sirf hidden #}
+                    {{ delete_form(url_for('work_stages.work_stages_delete', stage_id=s.id), "work stage") }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('work_stages.work_stages_toggle', stage_id=s.id), s.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -191,23 +195,24 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No stages found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new work stage.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add stage</button>
+            {% if can_edit('work_stages') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add stage</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{result_count}} of {{total_count}} stages</span>
-          <span>Tip: Machines will use this list as a dropdown (foreign key)</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('work_stages') %}
 <div id="stage-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add work stage</h2>
         <p class="text-[12.5px] text-ink-faint">Code is auto-generated · just name it</p>
@@ -220,17 +225,17 @@
         <label for="stage-code" class="block text-[12.5px] font-semibold text-ink mb-1">Stage code</label>
         <input type="text" id="stage-code" name="code" value="{{ next_code }}" disabled
           class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
-        <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated, read-only — disabled so it is never sent with the form; the route generates the real code itself.</p>
+        <p class="text-[11.5px] text-ink-faint mt-1">Created automatically when you save.</p>
       </div>
       <div>
         <label for="stage-name" class="block text-[12.5px] font-semibold text-ink mb-1">Stage name *</label>
         <input type="text" id="stage-name" name="name" required placeholder="Cutting" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="stage-sort" class="block text-[12.5px] font-semibold text-ink mb-1">Sort order</label>
         <input type="number" id="stage-sort" name="sort_order" placeholder="10" min="0" step="10"
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="mt-1 text-[12px] text-ink-faint">Lower number = earlier in the pipeline</p>
       </div>
       <div>
@@ -263,7 +268,7 @@
         <div id="stage-billet-weight-box" class="mt-2 ml-6 hidden">
           <label for="stage-billet-weight" class="block text-[12.5px] font-semibold text-ink mb-1">Billet weight (KG)</label>
           <input type="number" id="stage-billet-weight" name="billet_weight" min="0.001" step="0.001" placeholder="e.g. 5"
-            class="w-32 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-32 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
           <p class="text-[11.5px] text-ink-faint mt-1">One billet weighs this much. If empty, it is asked the first time a stage is completed. It can be changed any time.</p>
         </div>
       </div>
@@ -284,22 +289,26 @@
       <div>
         <label for="stage-maxwait" class="block text-[13px] font-semibold text-ink mb-1">Max wait before next stage (minutes)</label>
         <input type="number" id="stage-maxwait" name="max_wait_minutes" min="1" step="1" placeholder="e.g. 60"
-          class="w-32 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-32 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="text-[11.5px] text-ink-faint mt-1">Use it on Melting: after it is done, the next stage (Ingot Casting) should start within this time, or the molten metal cools. Past the limit, starting the next stage needs a written reason. Leave empty for no limit.</p>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="stage-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save stage</button>
+      <button type="submit" form="stage-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save stage</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 <script>
+  {# Modal / form sirf Edit user ke liye render hote hain — unka JS bhi same condition me (View user pe null error na aaye) #}
+  {% if can_edit('work_stages') %}
   var modal = document.getElementById('stage-modal');
   var form = document.getElementById('stage-form');
+  {% endif %}
   var searchInput = document.getElementById('search-stages');
   var rows = Array.from(document.querySelectorAll('.stage-row'));
   var emptyState = document.getElementById('empty-state');
@@ -326,9 +335,9 @@
   function applyFilterButtonStyles(selectedBtn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === selectedBtn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -356,6 +365,7 @@
     applyFilters();
   }
 
+  {% if can_edit('work_stages') %}
   // Add URL fix — Edit ke baad close pe wapas Add pe
   var addAction = "{{ url_for('work_stages.work_stages_add') }}";
   var modalTitle = document.getElementById('modal-title');
@@ -412,6 +422,7 @@
     syncBilletBox();
     openModal();
   }
+  {% endif %}
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -439,10 +450,11 @@
       if (counts[status] !== undefined) counts[status] += 1;
     });
     document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
-    document.querySelector('[data-filter="active"]').textContent = 'In use (' + counts.active + ')';
-    document.querySelector('[data-filter="inactive"]').textContent = 'Stopped (' + counts.inactive + ')';
+    document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {% if can_edit('work_stages') %}
   document.getElementById('btn-add-stage').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
@@ -465,6 +477,7 @@
       document.getElementById('stage-name').focus();
     }
   });
+  {% endif %}
 
   // Toggle / Delete form submit se pehle filter + search save
   document.querySelectorAll('td form').forEach(function (f) {

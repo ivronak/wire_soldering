@@ -3,73 +3,87 @@
 
 {% block page_css %}
 <style>
-  /* Routing tracker UI — Production queue / Material issue jaisa card look (copper-teal theme) */
-  .rt-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .rt-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .rt-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .rt-kpi .h { font-size: 12px; color: #6B7F82; }
-  .rt-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .rt-kpi.warn .v { color: #8A4A1C; }
-  .rt-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .rt-kpi.bad .v { color: #B42318; }
-  .rt-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .rt-kpi.good .v { color: #1F7A4D; }
-  .rt-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .rt-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .rt-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .rt-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
-  .rt-card { background: #fff; border: 1px solid #D1D9D8; border-left: 4px solid #C46B2D; border-radius: 12px; margin-bottom: 10px; }
+  /* Routing tracker UI — Production queue / Material issue jaisa card look */
+  .rt-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .rt-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .rt-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .rt-kpi .h { font-size: 12px; color: #5A6577; }
+  .rt-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .rt-kpi.warn .v { color: #B45309; }
+  .rt-kpi.run { background: #EDF3FF; border-color: #BCD2FA; } .rt-kpi.run .v { color: #0A3CA6; }
+  .rt-kpi.bad { background: #FCEBEA; border-color: #F0C4C0; } .rt-kpi.bad .v { color: #B42318; }
+  .rt-kpi.good { background: #E6F5EC; border-color: #B7E0C7; } .rt-kpi.good .v { color: #1F7A4D; }
+  .rt-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .rt-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .rt-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .rt-tabs a span { font-weight: 500; color: #5A6577; margin-left: 3px; }
+  .rt-card { background: #fff; border: 1px solid #D4DBE6; border-left: 4px solid #0B5BEF; border-radius: 12px; margin-bottom: 10px; }
   .rt-card.is-done { border-left-color: #1F7A4D; }
   .rt-head { display: grid; grid-template-columns: minmax(200px, 1.3fr) minmax(190px, 1.2fr) minmax(190px, 1.2fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px 8px; cursor: pointer; }
-  .rt-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .rt-prod { font-size: 13.5px; color: #1C2B2D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rt-meta { font-size: 12px; color: #6B7F82; }
-  .rt-bar { height: 7px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 6px; }
-  .rt-bar div { height: 100%; background: #1F7A4D; border-radius: 999px; }
+  .rt-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0B1220; }
+  .rt-prod { font-size: 13.5px; color: #121A2B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rt-meta { font-size: 12px; color: #5A6577; }
+  .rt-bar { height: 7px; border-radius: 999px; background: #E7ECF4; overflow: hidden; margin-top: 6px; }
+  .rt-bar div { height: 100%; background: #0B5BEF; border-radius: 999px; }
+  .rt-bar.late div { background: #B42318; }
+  .rt-card.is-done .rt-bar div { background: #1F7A4D; }
   .rt-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .rt-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .rt-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .rt-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .rt-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .rt-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
-  .rt-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .rt-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .rt-chip.bad { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .rt-chip.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .rt-chip.gone { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .rt-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
-  .rt-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .rt-btn.primary:hover { background: #A35522; }
-  .rt-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .rt-btn.teal:hover { background: #1F5558; }
-  .rt-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .rt-btn.ghost:hover { background: #F4F6F5; }
-  .rt-chev { border: 0; background: transparent; color: #98A5A4; font-size: 13px; transition: transform .15s; cursor: pointer; }
+  .rt-btn.primary { background: #0B5BEF; color: #fff; border-color: #0843C2; } .rt-btn.primary:hover { background: #0843C2; }
+  .rt-btn.outline { background: #fff; color: #0A3CA6; border-color: #BCD2FA; } .rt-btn.outline:hover { background: #EDF3FF; border-color: #0B5BEF; }
+  .rt-btn:disabled, .rt-btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .rt-btn:focus-visible, .rt-chev:focus-visible, .rt-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .rt-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .rt-btn.ghost:hover { background: #F3F6FB; }
+  .rt-chev { border: 0; background: transparent; color: #5A6577; font-size: 13px; transition: transform .15s; cursor: pointer; }
   .rt-card.is-open .rt-chev { transform: rotate(180deg); }
   .rt-pipe { display: flex; gap: 0; padding: 4px 14px 14px; overflow-x: auto; }
-  .rt-step { flex: 1 0 118px; position: relative; padding: 8px 10px 8px 12px; border: 1px solid #D1D9D8; border-right: 0; background: #F8FAF9; min-width: 118px; }
+  .rt-step { flex: 1 0 118px; position: relative; padding: 8px 10px 8px 12px; border: 1px solid #D4DBE6; border-right: 0; background: #F8FAFD; min-width: 118px; }
   .rt-step:first-child { border-radius: 9px 0 0 9px; }
-  .rt-step:last-child { border-right: 1px solid #D1D9D8; border-radius: 0 9px 9px 0; }
-  .rt-step .n { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: #98A5A4; text-transform: uppercase; }
-  .rt-step .t { font-size: 13px; font-weight: 700; color: #1C2B2D; line-height: 1.2; margin-top: 1px; }
-  .rt-step .s { font-size: 11.5px; color: #6B7F82; margin-top: 3px; }
-  .rt-step.done { background: #EAF7EF; border-color: #B7E0C7; } .rt-step.done .n { color: #1F7A4D; } .rt-step.done + .rt-step { border-left-color: #B7E0C7; }
-  .rt-step.cur { background: #FFF4E5; border-color: #E8B97A; box-shadow: inset 0 -3px 0 #C46B2D; } .rt-step.cur .n { color: #8A4A1C; }
-  .rt-detail { display: none; border-top: 1px solid #E4EAE9; background: #F8FAF9; border-radius: 0 0 12px 12px; padding: 12px 16px 14px; }
+  .rt-step:last-child { border-right: 1px solid #D4DBE6; border-radius: 0 9px 9px 0; }
+  .rt-step .n { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: #5A6577; text-transform: uppercase; }
+  .rt-step .t { font-size: 13px; font-weight: 700; color: #121A2B; line-height: 1.2; margin-top: 1px; }
+  .rt-step .s { font-size: 11.5px; color: #5A6577; margin-top: 3px; }
+  .rt-step.done { background: #E6F5EC; border-color: #B7E0C7; } .rt-step.done .n { color: #1F7A4D; } .rt-step.done + .rt-step { border-left-color: #B7E0C7; }
+  .rt-step.cur { background: #EDF3FF; border-color: #BCD2FA; box-shadow: inset 0 -3px 0 #0B5BEF; } .rt-step.cur .n { color: #0A3CA6; }
+  /* next = agla pending stage: sirf outline (neutral), running jaisa nahi chamakta */
+  .rt-step.next { background: #fff; border-color: #C7D0DE; } .rt-step.next .n { color: #475569; }
+  .rt-detail { display: none; border-top: 1px solid #E5EAF2; background: #F8FAFD; border-radius: 0 0 12px 12px; padding: 12px 16px 14px; }
   .rt-card.is-open .rt-detail { display: block; }
   .rt-dl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .rt-dl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; padding: 4px 8px 6px; }
-  .rt-dl td { padding: 9px 8px; border-top: 1px dashed #DDE5E4; vertical-align: top; }
-  .rt-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .rt-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .rt-dl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; padding: 4px 8px 6px; }
+  .rt-dl td { padding: 9px 8px; border-top: 1px dashed #DEE5EF; vertical-align: top; }
+  .rt-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .rt-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
   @media (max-width: 1100px) { .rt-head { grid-template-columns: 1fr auto 28px; } .rt-head > :nth-child(2), .rt-head > :nth-child(3) { grid-column: 1 / 3; } }
-  .rt-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
-  .rt-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
-  .rt-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
-  .rt-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
+  .rt-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 8px; background: #fff; }
+  .rt-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.15); }
+  .rt-label { display: block; font-size: 12.5px; font-weight: 600; color: #0B1220; margin-bottom: 4px; }
+  .rt-box { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 14px 16px; }
   #rt-modal.hidden { display: none; } #rt-modal { display: flex; }
   #rs-modal.hidden { display: none; } #rs-modal { display: flex; }
-  .rt-chip.hold { background: #FEF3F2; color: #B42318; border-color: #FDA29B; }
-  .rt-step.hold { background: #FEF3F2; border-color: #FDA29B; box-shadow: inset 0 -3px 0 #D92D20; } .rt-step.hold .n { color: #B42318; }
-  .rt-btn.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; } .rt-btn.warn:hover { background: #FDE9CC; }
-  .rt-btn.danger { background: #fff; color: #B42318; border-color: #F8CFCB; } .rt-btn.danger:hover { background: #FEF3F2; }
+  /* Hold = jaan-boojh ke roka hua kaam -> warning amber (laal sirf breakdown / failed / overdue ke liye) */
+  .rt-chip.hold { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .rt-step.hold { background: #FEF3E2; border-color: #FBD9A5; box-shadow: inset 0 -3px 0 #B45309; } .rt-step.hold .n { color: #B45309; }
+  .rt-btn.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; } .rt-btn.warn:hover { background: #FBD9A5; }
+  .rt-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .rt-btn.danger:hover { background: #FCEBEA; }
+  /* Card ke andar ke alert strips: warn = amber (intezaar / kaam baaki), bad = laal (machine kharab, limit paar) */
+  .rt-alert-warn { background: #FEF3E2; border-color: #FBD9A5; color: #B45309; }
+  .rt-alert-bad { background: #FCEBEA; border-color: #F0C4C0; color: #B42318; }
+  /* Start drawer ke pre-submit boxes (JS inhe dikhata / chhupata hai) */
+  .rt-pop-warn { background: #FEF3E2; border: 1px solid #FBD9A5; }
+  .rt-pop-bad { background: #FCEBEA; border: 1px solid #F0C4C0; }
   /* Stage Complete ke baad "Next on this machine" box + usi stage ke card ka chamakna */
-  .rt-next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border: 1px solid #B7E0C7; border-left: 4px solid #1F7A4D; border-radius: 12px; background: #F3FAF6; }
-  .rt-next .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #1F7A4D; }
-  .rt-next .t { font-size: 14px; color: #0F2F32; }
-  .rt-card.is-focus { border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.22); }
+  .rt-next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border: 1px solid #BCD2FA; border-left: 4px solid #0B5BEF; border-radius: 12px; background: #EDF3FF; }
+  .rt-next .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #0A3CA6; }
+  .rt-next .t { font-size: 14px; color: #0B1220; }
+  .rt-card.is-focus { border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.22); }
   .rt-card.is-focus .rt-act.primary { animation: rt-pulse 1.2s ease-in-out 4; }
-  @keyframes rt-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(196,107,45,.55); } 50% { box-shadow: 0 0 0 7px rgba(196,107,45,0); } }
+  @keyframes rt-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(11,91,239,.55); } 50% { box-shadow: 0 0 0 7px rgba(11,91,239,0); } }
 </style>
 {% endblock %}
 
@@ -85,7 +99,7 @@
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="rt-kpi"><span class="k">Orders running</span><span class="v">{{ kpi.orders }}</span><span class="h">stages still to do</span></div>
-  <div class="rt-kpi {{ 'warn' if kpi.active else '' }}"><span class="k">Stage in progress</span><span class="v">{{ kpi.active }}</span><span class="h">being worked on now</span></div>
+  <div class="rt-kpi {{ 'run' if kpi.active else '' }}"><span class="k">Stage in progress</span><span class="v">{{ kpi.active }}</span><span class="h">being worked on now</span></div>
   <div class="rt-kpi {{ 'bad' if kpi.late else '' }}"><span class="k">Behind plan</span><span class="v">{{ kpi.late }}</span><span class="h">later than the planned dates</span></div>
   <div class="rt-kpi {{ 'good' if kpi.ready else '' }}"><span class="k">All stages done</span><span class="v">{{ kpi.ready }}</span><span class="h">ready for production output</span></div>
 </div>
@@ -104,9 +118,10 @@
     <div class="t"><b>{{ next_up.order.prod_no }}</b> · {{ next_up.order.product.name if next_up.order.product else '—' }} · {{ next_up.stage.stage_name }} · {{ '%g'|format(next_up.order.planned_qty * next_up.order.unit_weight) }} KG batch</div>
     {% if next_up.status != 'In production' %}<div class="rt-meta">This order is only released. Start the order first, then its first stage can be started here.</div>{% endif %}
   </div>
+  {# Start sirf routing Edit wale ko; View user ko ye link bekaar hai (Start button hi nahi hoga) #}
   {% if next_up.status == 'In production' %}
-    <a href="{{ url_for('routing.routing_list', tab='running', focus=next_up.stage.id) }}" class="rt-btn primary">Start {{ next_up.stage.stage_name }} →</a>
-  {% else %}
+    {% if can_edit('routing') %}<a href="{{ url_for('routing.routing_list', tab='running', focus=next_up.stage.id) }}" class="rt-btn primary">Start {{ next_up.stage.stage_name }} →</a>{% endif %}
+  {% elif can_do('production_orders.production_orders_list', 'GET') %}
     <a href="{{ url_for('production_orders.production_orders_list') }}" class="rt-btn primary">Open production orders →</a>
   {% endif %}
 </div>
@@ -127,22 +142,22 @@
         <div class="rt-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
         <div class="rt-meta">{{ '%g'|format(o.planned_qty * o.unit_weight) }} KG batch{% if o.started_date %} · started {{ dshort(o.started_date) }}{% endif %}</div>
         {# C14: stage complete ke baad jo maal bacha wo store ko lautana hai #}
-        {% if leftover_text.get(o.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FFF7ED;border-color:#F5D9B5;color:#8A4A1C">Left over, return to store: {{ leftover_text[o.id] }} · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Return now</a></div>{% endif %}
+        {% if leftover_text.get(o.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold rt-alert-warn">Left over, return to store: {{ leftover_text[o.id] }}{% if can_do('material_issues.material_issues_list', 'GET') %} · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Return now</a>{% endif %}</div>{% endif %}
         {# C7: is stage ka maal poora issue nahi hua — stage Start tab tak block #}
-        {% if cur and material_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">{{ cur.stage_name }} cannot start: material not fully issued ({{ material_alerts[cur.id] }}) · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Issue it</a></div>{% endif %}
+        {% if cur and material_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold rt-alert-warn" role="alert">{{ cur.stage_name }} cannot start: material not fully issued ({{ material_alerts[cur.id] }}){% if can_do('material_issues.material_issues_list', 'GET') %} · <a href="{{ url_for('material_issues.material_issues_list', tab='issue') }}" style="text-decoration:underline">Issue it</a>{% endif %}</div>{% endif %}
         {# G13: pichhle Lab-QC stage ka test + TC baaki hai — card band ho tab bhi dikhe, aur yahin se record ho; tab tak Start band #}
         {% set lab_block = lab_qc_blocker(o, cur) if cur and cur.status == 'Pending' else None %}
-        {% if lab_block %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">Lab test + TC pending: {{ cur.stage_name }} cannot start until {{ lab_block.stage_name }} has a passed lab test with the TC uploaded.
-          <button type="button" class="rt-labqc-btn rt-btn teal" data-stage="{{ lab_block.id }}" data-name="{{ lab_block.stage_name }}" data-lines='{{ lab_lines(o, lab_block)|tojson }}' style="margin-left:6px;padding:2px 10px">Record lab test + TC</button></div>{% endif %}
+        {% if lab_block %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold rt-alert-warn" role="alert">Lab test + TC pending: {{ cur.stage_name }} cannot start until {{ lab_block.stage_name }} has a passed lab test with the TC uploaded.
+          {% if can_edit('routing') %}<button type="button" class="rt-labqc-btn rt-btn outline" data-stage="{{ lab_block.id }}" data-name="{{ lab_block.stage_name }}" data-lines='{{ lab_lines(o, lab_block)|tojson }}' style="margin-left:6px;padding:2px 10px">Record lab test + TC</button>{% endif %}</div>{% endif %}
         {# G27: is stage ki machine kharab / maintenance me hai #}
-        {% if cur and machine_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="background:#FEF3F2;border-color:#FDA29B;color:#B42318" role="alert">Machine not available: {{ machine_alerts[cur.id] }}</div>{% endif %}
+        {% if cur and machine_alerts.get(cur.id) %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold rt-alert-bad" role="alert">Machine not available: {{ machine_alerts[cur.id] }}</div>{% endif %}
         {# C12: Melting ke baad garam maal Casting ke intezaar me — kab se, limit kitni #}
         {% set mw = wait_payload(metal_wait(o, cur)) if cur and cur.status == 'Pending' else None %}
-        {% if mw %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold" style="{{ 'background:#FEF3F2;border-color:#FDA29B;color:#B42318' if mw.over else 'background:#FFF7ED;border-color:#F5D9B5;color:#8A4A1C' }}" role="alert">Molten metal waiting since {{ mw.since }} · {{ mw.minutes }} of {{ mw.limit }} min{% if mw.over %} · limit crossed, a reason is needed to start {{ cur.stage_name }}{% endif %}</div>{% endif %}
+        {% if mw %}<div class="mt-1.5 rounded border px-2 py-1 text-[12px] font-semibold {{ 'rt-alert-bad' if mw.over else 'rt-alert-warn' }}" role="alert">Molten metal waiting since {{ mw.since }} · {{ mw.minutes }} of {{ mw.limit }} min{% if mw.over %} · limit crossed, a reason is needed to start {{ cur.stage_name }}{% endif %}</div>{% endif %}
       </div>
       <div>
         <div class="text-[13px]"><b>{{ sm.done }}</b> of {{ sm.total }} stages done</div>
-        <div class="rt-bar"><div style="width:{{ sm.pct }}%"></div></div>
+        <div class="rt-bar{% if sm.delay > 0 and not sm.all_done %} late{% endif %}"><div style="width:{{ sm.pct }}%"></div></div>
         <div class="rt-meta mt-1">{% if sm.done %}{{ sm.actual_h }} h worked (plan {{ sm.planned_h }} h){% else %}Nothing done yet{% endif %}</div>
       </div>
       <div>
@@ -156,15 +171,16 @@
       </div>
       <div class="flex gap-2 justify-end flex-wrap">
         {% if cur %}
-          {% if cur.status == 'Pending' %}{% if lab_block %}<button type="button" class="rt-btn primary" disabled style="opacity:.45;cursor:not-allowed" title="Lab test + TC pending">Start {{ cur.stage_name }}</button>{% else %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>{% endif %}
+          {% if not can_edit('routing') %}{# View user: Start / Hold / Complete / Cancel kuch nahi #}
+          {% elif cur.status == 'Pending' %}{% if lab_block %}<button type="button" class="rt-btn primary" disabled title="Lab test + TC pending">Start {{ cur.stage_name }}</button>{% else %}<button type="button" class="rt-act rt-btn primary" data-mode="start" data-stage="{{ cur.id }}">Start {{ cur.stage_name }}</button>{% endif %}
           {% elif cur.status == 'On hold' %}
             <form method="post" action="{{ url_for('routing.routing_resume', stage_id=cur.id) }}" class="js-confirm-submit" data-confirm-title="Resume stage" data-confirm-ok="Resume" data-confirm-message="Resume {{ cur.stage_name }} for {{ o.prod_no }} now? The timer starts again from where it stopped.">
               <button type="submit" class="rt-btn primary">Resume</button></form>
             <button type="button" class="rt-reason rt-btn danger" data-do="cancel" data-stage="{{ cur.id }}" data-name="{{ cur.stage_name }}" data-order="{{ o.prod_no }}">Cancel run</button>
-          {% else %}<button type="button" class="rt-act rt-btn teal" data-mode="complete" data-stage="{{ cur.id }}">Complete {{ cur.stage_name }}</button>
+          {% else %}<button type="button" class="rt-act rt-btn primary" data-mode="complete" data-stage="{{ cur.id }}">Complete {{ cur.stage_name }}</button>
             <button type="button" class="rt-reason rt-btn warn" data-do="hold" data-stage="{{ cur.id }}" data-name="{{ cur.stage_name }}" data-order="{{ o.prod_no }}">Hold</button>
             <button type="button" class="rt-reason rt-btn danger" data-do="cancel" data-stage="{{ cur.id }}" data-name="{{ cur.stage_name }}" data-order="{{ o.prod_no }}">Cancel run</button>{% endif %}
-        {% else %}
+        {% elif can_do('production_output.production_output_list', 'GET') %}
           <a href="{{ url_for('production_output.production_output_list') }}" class="rt-btn primary">Record output →</a>
         {% endif %}
       </div>
@@ -173,8 +189,8 @@
 
     <div class="rt-pipe">
       {% for st in sm.stages %}
-      <div class="rt-step {{ 'done' if st.status == 'Done' else ('hold' if st.status == 'On hold' else ('cur' if st.status == 'In progress' or st.id == (cur.id if cur else 0) else '')) }}">
-        <div class="n">{{ '✓' if st.status == 'Done' else loop.index }} · {{ st.status }}</div>
+      <div class="rt-step {{ 'done' if st.status == 'Done' else ('hold' if st.status == 'On hold' else ('cur' if st.status == 'In progress' else ('next' if st.id == (cur.id if cur else 0) else ''))) }}">
+        <div class="n">{{ '✓' if st.status == 'Done' else loop.index }} · {{ 'Next' if (st.status == 'Pending' and cur and st.id == cur.id) else st.status }}</div>
         <div class="t">{{ st.stage_name }}</div>
         <div class="s">{% if st.status == 'Done' %}{{ st.actual_hours }} h <span style="opacity:.7">(plan {{ '%.1f'|format(st.planned_hours or 0) }})</span>
           {% elif st.status == 'In progress' %}since {{ tshort(st.started_at) }}
@@ -195,26 +211,26 @@
               <div class="rt-meta">{% for m in st.machines if m.is_planned %}{{ m.machine_name }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
               {% set sp = stage_plan(o, st) %}
               {% if sp %}
-              <div class="rt-meta rt-stage-mat" style="margin-top:6px;color:#0F2F32"><b>Material for this stage:</b> {% for m in sp.materials %}{{ m.name }} {{ '%g'|format(m.qty) }} {{ m.unit }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+              <div class="rt-meta rt-stage-mat" style="margin-top:6px;color:#0B1220"><b>Material for this stage:</b> {% for m in sp.materials %}{{ m.name }} {{ '%g'|format(m.qty) }} {{ m.unit }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
               {% if sp.lots %}
-              <div class="rt-meta rt-lots" style="color:#8A4A1C"><b>Furnace lots:</b> {{ sp.lots|length }} lot{{ 's' if sp.lots|length != 1 else '' }} of up to {{ '%g'|format(sp.lot_kg) }} KG ({% if sp.lot_hours %}each lot takes {{ '%g'|format(sp.lot_hours) }} h{% else %}one lot per hour{% endif %}){% if sp.unused_kg > 0.0005 %} <span style="color:#B42318">· {{ '%g'|format(sp.unused_kg) }} KG of furnace capacity unused</span>{% endif %}
+              <div class="rt-meta rt-lots" style="color:#0A3CA6"><b>Furnace lots:</b> {{ sp.lots|length }} lot{{ 's' if sp.lots|length != 1 else '' }} of up to {{ '%g'|format(sp.lot_kg) }} KG ({% if sp.lot_hours %}each lot takes {{ '%g'|format(sp.lot_hours) }} h{% else %}one lot per hour{% endif %}){% if sp.unused_kg > 0.0005 %} <span style="color:#B45309">· {{ '%g'|format(sp.unused_kg) }} KG of furnace capacity unused</span>{% endif %}
                 {% for lot in sp.lots %}<div>Lot {{ lot.n }}: {{ '%g'|format(lot.kg) }} KG — {% for m in lot.mats %}{{ m.name }} {{ '%g'|format(m.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}</div>
               {% endif %}
               {# C9 phase 2: melt (heat number) — same alloy ke orders ek melt me jodo; shuru hone ke baad heat number dikhta hai #}
               {% if sp.melt %}{% set me = sp.melt %}
-              <div class="rt-meta rt-melt" style="margin-top:6px;padding:8px 10px;border:1px solid #CFE0E2;background:#F3FAFA;border-radius:8px;color:#0F2F32">
+              <div class="rt-meta rt-melt" style="margin-top:6px;padding:8px 10px;border:1px solid #B2DDE4;background:#E6F6F8;border-radius:8px;color:#0B1220">
                 <b>Melt{% if me.heat_no %} · Heat number {{ me.heat_no }}{% else %} · heat number is given when it starts{% endif %}</b>
                 {% if me.members|length > 1 %}
                 <div>Melted together ({{ '%g'|format(me.total_kg) }} KG):
-                  {% for m in me.members %}<span style="font-weight:600">{{ m.prod_no }}</span> ({{ '%g'|format(m.kg) }} KG){% if me.can_edit %}
+                  {% for m in me.members %}<span style="font-weight:600">{{ m.prod_no }}</span> ({{ '%g'|format(m.kg) }} KG){% if me.can_edit and can_edit('routing') %}
                     <form method="post" action="{{ url_for('routing.routing_uncombine', stage_id=m.stage_id) }}" style="display:inline"><button type="submit" class="rt-btn" style="padding:1px 8px;font-size:11.5px">Remove</button></form>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
                 </div>
                 {% endif %}
-                {% if me.can_edit and st.status == 'Pending' %}
+                {% if me.can_edit and can_edit('routing') and st.status == 'Pending' %}
                   {% for c in me.candidates %}
                   <form method="post" action="{{ url_for('routing.routing_combine', stage_id=st.id) }}" style="display:inline-block;margin:4px 6px 0 0">
                     <input type="hidden" name="other_stage_id" value="{{ c.stage_id }}" />
-                    <button type="submit" class="rt-btn teal" style="padding:3px 10px;font-size:12px">Melt together with {{ c.prod_no }} ({{ '%g'|format(c.kg) }} KG)</button></form>
+                    <button type="submit" class="rt-btn outline" style="padding:3px 10px;font-size:12px">Melt together with {{ c.prod_no }} ({{ '%g'|format(c.kg) }} KG)</button></form>
                   {% endfor %}
                   {% if me.others %}<div>Same alloy but not in production yet: {% for c in me.others %}{{ c.prod_no }} ({{ '%g'|format(c.kg) }} KG){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
                 {% endif %}
@@ -222,14 +238,14 @@
               {% endif %}
               {% endif %}
               {% if st.work_stage and st.work_stage.requires_lab_qc %}
-              <div class="rt-labqc" style="margin-top:8px;padding:8px 10px;border:1px solid {{ '#B7E0C7' if lab_qc_passed(st) else '#F5D9B5' }};background:{{ '#F3FAF6' if lab_qc_passed(st) else '#FFF4E5' }};border-radius:8px">
-                <div style="font-weight:700;font-size:12.5px;color:{{ '#1F7A4D' if lab_qc_passed(st) else '#7A4A12' }}">Lab QC · {{ 'Passed — TC uploaded, next stage can start' if lab_qc_passed(st) else 'TC pending — next stage is blocked' }}</div>
+              <div class="rt-labqc" style="margin-top:8px;padding:8px 10px;border:1px solid {{ '#B7E0C7' if lab_qc_passed(st) else '#FBD9A5' }};background:{{ '#E6F5EC' if lab_qc_passed(st) else '#FEF3E2' }};border-radius:8px">
+                <div style="font-weight:700;font-size:12.5px;color:{{ '#1F7A4D' if lab_qc_passed(st) else '#B45309' }}">Lab QC · {{ 'Passed — TC uploaded, next stage can start' if lab_qc_passed(st) else 'TC pending — next stage is blocked' }}</div>
                 {% for q in st.lab_qcs %}
-                <div class="rt-meta">{{ q.tested_at.strftime('%d %b %H:%M') }} · {{ q.tested_by }} · <b style="color:{{ '#1F7A4D' if q.result == 'Pass' else ('#8A4A1C' if q.result == 'Need correction' else '#B42318') }}">{{ q.result }}</b>{% if q.tc_file %} · <a href="{{ url_for('routing.routing_tc', qc_id=q.id) }}" target="_blank" style="color:#8A4A1C;font-weight:600">View TC</a> · <a href="{{ url_for('routing.routing_tc_print', qc_id=q.id) }}" target="_blank" style="color:#8A4A1C;font-weight:600">Print TC</a>{% endif %}{% if q.remarks %} · {{ q.remarks }}{% endif %}</div>
+                <div class="rt-meta">{{ q.tested_at.strftime('%d %b %H:%M') }} · {{ q.tested_by }} · <b style="color:{{ '#1F7A4D' if q.result == 'Pass' else ('#B45309' if q.result == 'Need correction' else '#B42318') }}">{{ q.result }}</b>{% if q.tc_file %} · <a href="{{ url_for('routing.routing_tc', qc_id=q.id) }}" target="_blank" style="color:#0A3CA6;font-weight:600">View TC</a> · <a href="{{ url_for('routing.routing_tc_print', qc_id=q.id) }}" target="_blank" style="color:#0A3CA6;font-weight:600">Print TC</a>{% endif %}{% if q.remarks %} · {{ q.remarks }}{% endif %}</div>
                 {% for c in (q.corrections or []) %}<div class="rt-meta" style="padding-left:12px">+ {{ '%g'|format(c.qty) }} {{ c.unit }} {{ c.material }} added by {{ c.added_by }} · issued automatically ({{ c.issue_no }}){% if c.reason %} · {{ c.reason }}{% endif %}</div>{% endfor %}
                 {% endfor %}
                 {% if st.status != 'Pending' and not lab_qc_passed(st) %}
-                <button type="button" class="rt-labqc-btn rt-btn teal" data-stage="{{ st.id }}" data-name="{{ st.stage_name }}" data-lines='{{ lab_lines(o, st)|tojson }}' style="margin-top:6px;padding:4px 12px">Record lab test + TC</button>
+                {% if can_edit('routing') %}<button type="button" class="rt-labqc-btn rt-btn outline" data-stage="{{ st.id }}" data-name="{{ st.stage_name }}" data-lines='{{ lab_lines(o, st)|tojson }}' style="margin-top:6px;padding:4px 12px">Record lab test + TC</button>{% endif %}
                 {% elif st.status == 'Pending' %}<div class="rt-meta">Available once this stage has started.</div>{% endif %}
               </div>
               {% endif %}
@@ -241,7 +257,7 @@
               {% if st.completed_at %}
                 {% set diff = st.actual_hours - (st.planned_hours or 0) %}
                 <div class="rt-meta"><span style="color:{{ '#B42318' if diff > 0.05 else '#1F7A4D' }}; font-weight:600">{{ st.actual_hours }} h ({{ '%+.1f'|format(diff) }} h vs plan)</span></div>
-              {% elif st.status == 'On hold' %}<div class="rt-meta" style="color:#B42318;font-weight:600">On hold since {{ tshort(st.held_at) }}: {{ st.hold_reason }}</div>
+              {% elif st.status == 'On hold' %}<div class="rt-meta" style="color:#B45309;font-weight:600">On hold since {{ tshort(st.held_at) }}: {{ st.hold_reason }}</div>
               {% else %}<div class="rt-meta">In progress</div>{% endif %}
               {% if st.hold_minutes %}<div class="rt-meta">Held earlier: {{ '%g'|format(st.hold_minutes|round(0)) }} min (not counted in the hours)</div>{% endif %}
               <div class="rt-meta">Machines: {% for m in st.machines if m.used %}{{ m.machine_name }}{% if not m.is_planned %} <i>(added)</i>{% endif %}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</div>
@@ -257,7 +273,7 @@
               {% if st.qty_out is not none and st.qty_in %}<div class="rt-meta">Yield {{ '%.1f'|format(100 * st.qty_out / st.qty_in) }}%</div>{% endif %}
               {% else %}<span class="rt-meta">—</span>{% endif %}</td>
             <td style="text-align:right">
-              {% if st.status == 'Done' and loop.last or (st.status == 'Done' and sm.stages[loop.index0 + 1].status == 'Pending') %}
+              {% if can_edit('routing') and (st.status == 'Done' and loop.last or (st.status == 'Done' and sm.stages[loop.index0 + 1].status == 'Pending')) %}
               <form method="post" action="{{ url_for('routing.routing_reopen', stage_id=st.id) }}" class="js-confirm-submit" data-confirm-title="Reopen stage" data-confirm-ok="Reopen" data-confirm-message="Reopen {{ st.stage_name }} for {{ o.prod_no }}? Use this only to correct a mistake. If you want it to wait instead, use Cancel run after reopening.">
                 <button type="submit" class="rt-btn ghost" style="padding:4px 10px">Reopen</button></form>
               {% endif %}
@@ -267,7 +283,7 @@
         </tbody>
       </table>
       {% if sm.all_done %}
-      <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-[13px]" style="border-color:#B7E0C7;background:#F3FAF6">
+      <div class="mt-3 rounded-lg border border-success-border bg-success-bg px-3 py-2 text-[13px]">
         <b>All stages are complete.</b> Total {{ sm.actual_h }} h worked against {{ sm.planned_h }} h planned{% if sm.yield_pct %} · final yield {{ sm.yield_pct }}% of the batch{% endif %}{% if sm.scrap %} · scrap {{ sm.scrap }} KG{% endif %}. The next step is recording the production output.
       </div>
       {% endif %}
@@ -288,6 +304,8 @@
 {% endblock %}
 
 {% block modals %}
+{# Saare drawers (Start / Complete / Hold / Lab QC) sirf routing Edit wale ke liye; page_js bhi isi shart par #}
+{% if can_edit('routing') %}
 <div id="lq-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="lq-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-md bg-mist border-l border-slate-200 flex flex-col shadow-xl">
@@ -310,7 +328,7 @@
       <div class="rt-box space-y-3" id="lq-corr-box">
         <div class="text-[12.5px] text-ink-muted"><b>Correction — extra material added</b> (optional). It is issued from the store automatically when you save. It cannot be more than the free stock in the store. The quantity also counts as used in this stage.</div>
         <div id="lq-corr-rows" class="space-y-2"></div>
-        <button type="button" id="lq-corr-add" class="text-[12.5px] font-semibold underline" style="color:#8A4A1C">+ add a material</button>
+        <button type="button" id="lq-corr-add" class="text-[12.5px] font-semibold underline" style="color:#0A3CA6">+ add a material</button>
         <div id="lq-corr-who" style="display:none" class="space-y-3">
           <div><label class="rt-label">Added by *</label><input type="text" name="extra_by" id="lq-extra-by" maxlength="60" class="rt-input" placeholder="Who put the extra metal in?" autocomplete="off" /></div>
           <div><label class="rt-label">Reason</label><input type="text" name="extra_reason" maxlength="200" class="rt-input" placeholder="Defaults to the remarks above" autocomplete="off" /></div>
@@ -358,41 +376,41 @@
           <datalist id="rt-operators">{% for name in operators %}<option value="{{ name }}">{% endfor %}</datalist>
         </div>
         {# Timing clash lock: agle stage ki machine par doosre order ka garam maal aane wala hai #}
-        <div id="rt-clash-box" style="display:none" class="rounded-lg p-3" role="alert">
-          <div class="text-[13px] font-semibold" style="color:#B42318">Timing clash: hot metal is coming to this machine</div>
-          <p id="rt-clash-text" class="text-[12.5px] mt-1" style="color:#7A271A"></p>
+        <div id="rt-clash-box" style="display:none" class="rounded-lg p-3 rt-pop-warn" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#B45309">Timing clash: hot metal is coming to this machine</div>
+          <p id="rt-clash-text" class="text-[12.5px] mt-1" style="color:#B45309"></p>
           <label class="rt-label mt-2" for="rt-clash-reason">Start anyway? Write the reason</label>
           <input type="text" name="clash_reason" id="rt-clash-reason" maxlength="150" class="rt-input" placeholder="Leave empty to wait; fill to start anyway" autocomplete="off" />
         </div>
         {# G27: planned machine kharab / maintenance me — doosri Active machine chuno #}
-        <div id="rt-down-box" style="display:none" class="rounded-lg p-3" role="alert">
+        <div id="rt-down-box" style="display:none" class="rounded-lg p-3 rt-pop-bad" role="alert">
           <div class="text-[13px] font-semibold" style="color:#B42318">Machine not available</div>
-          <p id="rt-down-text" class="text-[12.5px] mt-1" style="color:#7A271A"></p>
+          <p id="rt-down-text" class="text-[12.5px] mt-1" style="color:#B42318"></p>
           <div id="rt-down-pick" style="display:none">
             <label class="rt-label mt-2" for="rt-down-swap">Use this machine instead *</label>
             <select name="swap_machine_id" id="rt-down-swap" class="rt-input"></select>
           </div>
         </div>
         {# C8a: furnace poori nahi bhar rahi — wajah likhe bina Melting Start nahi #}
-        <div id="rt-waste-box" style="display:none" class="rounded-lg p-3" role="alert">
-          <div class="text-[13px] font-semibold" style="color:#8A4A1C">Furnace will not be full</div>
-          <p id="rt-waste-text" class="text-[12.5px] mt-1" style="color:#7A4A1C"></p>
+        <div id="rt-waste-box" style="display:none" class="rounded-lg p-3 rt-pop-warn" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#B45309">Furnace will not be full</div>
+          <p id="rt-waste-text" class="text-[12.5px] mt-1" style="color:#B45309"></p>
           <label class="rt-label mt-2" for="rt-waste-reason">Why start now? *</label>
           <input type="text" name="waste_reason" id="rt-waste-reason" maxlength="100" class="rt-input" placeholder="e.g. no other order of the same alloy is ready" autocomplete="off" />
         </div>
         {# G14-4: melt taiyar hone par Casting machine free nahi — limit se zyada wait ho to wajah likhe bina Start nahi #}
-        <div id="rt-cast-box" style="display:none" class="rounded-lg p-3" role="alert">
-          <div class="text-[13px] font-semibold" style="color:#8A4A1C">Casting machine will be busy</div>
-          <p id="rt-cast-text" class="text-[12.5px] mt-1" style="color:#7A4A1C"></p>
+        <div id="rt-cast-box" style="display:none" class="rounded-lg p-3 rt-pop-warn" role="alert">
+          <div class="text-[13px] font-semibold" style="color:#B45309">Casting machine will be busy</div>
+          <p id="rt-cast-text" class="text-[12.5px] mt-1" style="color:#B45309"></p>
           <div id="rt-cast-reason-wrap" style="display:none">
             <label class="rt-label mt-2" for="rt-cast-reason">Why start the melt now? *</label>
             <input type="text" name="cast_reason" id="rt-cast-reason" maxlength="100" class="rt-input" placeholder="e.g. casting machine will be freed early, or metal can be held hot" autocomplete="off" />
           </div>
         </div>
         {# C12: garam maal limit se zyada ruka — wajah likhe bina Start nahi #}
-        <div id="rt-wait-box" style="display:none" class="rounded-lg p-3" role="alert">
+        <div id="rt-wait-box" style="display:none" class="rounded-lg p-3 rt-pop-bad" role="alert">
           <div class="text-[13px] font-semibold" style="color:#B42318">Molten metal waited too long</div>
-          <p id="rt-wait-text" class="text-[12.5px] mt-1" style="color:#7A271A"></p>
+          <p id="rt-wait-text" class="text-[12.5px] mt-1" style="color:#B42318"></p>
           <label class="rt-label mt-2" for="rt-wait-reason">What was done? *</label>
           <input type="text" name="rewait_reason" id="rt-wait-reason" maxlength="100" class="rt-input" placeholder="e.g. metal re-heated, or re-melted" autocomplete="off" />
         </div>
@@ -443,7 +461,7 @@
           {# Sirf scrap likhna hai; good output = aaya hua - scrap, system khud nikaalta hai (client change 8) #}
           <div id="rt-scrap-wrap"><label class="rt-label">Scrap (<span class="rt-unit">KG</span>)</label><input type="number" step="any" min="0" name="scrap_qty" id="rt-scrap" value="0" class="rt-input" /></div>
           <div id="rt-defer-note" class="text-[12px] text-ink-muted" style="display:none"></div>
-          <div><label class="rt-label">Good output (<span class="rt-unit">KG</span>)</label><div id="rt-qty-out" class="rt-input" style="background:#F3F4F6;font-weight:600">0</div></div>
+          <div><label class="rt-label">Good output (<span class="rt-unit">KG</span>)</label><div id="rt-qty-out" class="rt-input" style="background:#F1F5F9;font-weight:600">0</div></div>
           <div id="rt-good-note" class="col-span-2 text-[11.5px] text-ink-faint">Enter only the scrap. Good output is worked out for you: came in − scrap.</div>
         </div>
         <div class="rt-box space-y-3" id="rt-scrap-box" style="display:none">
@@ -470,18 +488,21 @@
       </div>
     </form>
     <div class="px-5 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
-      <span id="rt-used-warn" class="mr-auto text-[12.5px]" style="color:#B42318;display:none">Used is more than issued. Issue the extra in <a href="/material_issues" class="underline">Material issue</a> first.</span>
+      <span id="rt-used-warn" class="mr-auto text-[12.5px]" style="color:#B42318;display:none">Used is more than issued. Issue the extra in {% if can_do('material_issues.material_issues_list', 'GET') %}<a href="/material_issues" class="underline">Material issue</a>{% else %}Material issue{% endif %} first.</span>
       <button type="button" id="rt-cancel" class="rt-btn ghost">Cancel</button>
       <button type="submit" form="rt-form" id="rt-submit" class="rt-btn primary" style="padding:8px 20px">Start stage</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 <script>
   // "Start <stage>" box se aaye (?focus=) to us order ka card screen me laao
   (function () { var f = document.getElementById('rt-focus'); if (f) f.scrollIntoView({ block: 'center' }); })();
+  {# Stage form / Hold / Lab QC ka JS sirf Edit wale ke liye (View user ko ye drawers hi nahi milte) #}
+  {% if can_edit('routing') %}
   var ACTIONS = {{ actions | tojson }};
   var NOW = {{ now | tojson }};
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
@@ -497,7 +518,7 @@
     document.getElementById('rt-title').textContent = (start ? 'Start ' : 'Complete ') + a.stage;
     document.getElementById('rt-sub').textContent = a.order + (a.planned_hours ? ' · planned ' + a.planned_hours.toFixed(1) + ' h' : '');
     document.getElementById('rt-submit').textContent = start ? 'Start stage' : 'Complete stage';
-    document.getElementById('rt-submit').className = 'rt-btn ' + (start ? 'primary' : 'teal');
+    document.getElementById('rt-submit').className = 'rt-btn primary';
     document.getElementById('rt-complete-fields').style.display = start ? 'none' : 'block';
     document.getElementById('rt-operator').value = a.operator || '';
     document.getElementById('rt-operator').required = start;
@@ -508,7 +529,6 @@
     var clashBox = document.getElementById('rt-clash-box');
     var clashOn = start && !!a.clash;
     clashBox.style.display = clashOn ? 'block' : 'none';
-    clashBox.style.background = '#FEF3F2'; clashBox.style.border = '1px solid #FDA29B';
     document.getElementById('rt-clash-text').textContent = clashOn ? a.clash : '';
     document.getElementById('rt-clash-reason').value = '';
     document.getElementById('rt-clash-reason').disabled = !clashOn;
@@ -516,7 +536,6 @@
     var downBox = document.getElementById('rt-down-box'), downPick = document.getElementById('rt-down-pick'), downSel = document.getElementById('rt-down-swap');
     var down = start && a.down ? a.down : null;
     downBox.style.display = down ? 'block' : 'none';
-    downBox.style.background = '#FEF3F2'; downBox.style.border = '1px solid #FDA29B';
     downSel.disabled = !(down && down.all_down); downSel.required = !!(down && down.all_down);
     downPick.style.display = down && down.all_down ? 'block' : 'none';
     if (down) {
@@ -530,7 +549,6 @@
     var wasteBox = document.getElementById('rt-waste-box'), wasteIn = document.getElementById('rt-waste-reason');
     var waste = start && a.waste ? a.waste : null;
     wasteBox.style.display = waste ? 'block' : 'none';
-    wasteBox.style.background = '#FFF7ED'; wasteBox.style.border = '1px solid #F5D9B5';
     wasteIn.value = ''; wasteIn.disabled = !waste; wasteIn.required = !!waste;
     document.getElementById('rt-waste-text').textContent = waste ? ('The furnace (' + waste.machine + ') holds ' + waste.cap + ' KG per melt. This melt leaves ' + waste.unused + ' KG of it unused'
       + (waste.suggest.length ? '. These orders of the same alloy could share the melt: ' + waste.suggest.map(function (s) { return s.prod_no + ' (' + s.kg + ' KG)'; }).join(', ') + '.' : '.')) : '';
@@ -538,7 +556,6 @@
     var castBox = document.getElementById('rt-cast-box'), castIn = document.getElementById('rt-cast-reason');
     var cast = start && a.cast ? a.cast : null;
     castBox.style.display = cast ? 'block' : 'none';
-    castBox.style.background = '#FFF7ED'; castBox.style.border = '1px solid #F5D9B5';
     castIn.value = ''; castIn.disabled = !(cast && cast.needs_reason); castIn.required = !!(cast && cast.needs_reason);
     document.getElementById('rt-cast-reason-wrap').style.display = cast && cast.needs_reason ? 'block' : 'none';
     document.getElementById('rt-cast-text').textContent = cast ? cast.text : '';
@@ -546,7 +563,6 @@
     var waitBox = document.getElementById('rt-wait-box'), waitIn = document.getElementById('rt-wait-reason');
     var wait = start && a.wait && a.wait.over ? a.wait : null;
     waitBox.style.display = wait ? 'block' : 'none';
-    waitBox.style.background = '#FEF3F2'; waitBox.style.border = '1px solid #FDA29B';
     waitIn.value = ''; waitIn.disabled = !wait; waitIn.required = !!wait;
     document.getElementById('rt-wait-text').textContent = wait ? ('The metal from ' + wait.prev + ' has been waiting since ' + wait.since + ' (' + wait.minutes + ' min, limit ' + wait.limit + ' min). It may have cooled.') : '';
     document.getElementById('rt-used-warn').style.display = 'none';
@@ -598,7 +614,7 @@
           '<td class="py-1 text-right tabular-nums">' + m.issued + '</td>' +
           '<td class="py-1"><input type="number" step="any" min="0" name="used_' + m.id + '" value="' + m.default + '" data-id="' + m.id + '" data-issued="' + m.issued + '" data-counts="' + (m.counts ? 1 : 0) + '"' + (m.kgpp ? ' data-kgpp="' + m.kgpp + '"' : '') + ' required class="rt-input rt-used" /></td></tr>' +
           (m.kgpp ? '<tr class="rt-avg" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-1 text-[12px]"></td></tr>' : '') +
-            '<tr class="rt-extra" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-2"><div class="rounded-lg border border-copper-border bg-copper-soft px-3 py-2 space-y-2">' +
+            '<tr class="rt-extra" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-2"><div class="rounded-lg border border-warning-border bg-warning-bg px-3 py-2 space-y-2">' +
             '<div class="text-[12.5px] rt-extra-msg"></div>' +
             '<div class="grid grid-cols-2 gap-2"><div><label class="rt-label">Taken by *</label><input type="text" name="extra_by_' + m.id + '" maxlength="60" class="rt-input rt-extra-by" placeholder="Who took them from the store?" autocomplete="off" /></div>' +
             '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. lab correction, more spools wound" autocomplete="off" /></div></div>' +
@@ -805,6 +821,7 @@
       }
     });
   })();
+  {% endif %}
 
   document.querySelectorAll('.rt-card').forEach(function (card) {
     card.querySelector('.rt-head').addEventListener('click', function (event) {

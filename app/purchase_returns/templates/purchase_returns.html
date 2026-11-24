@@ -13,16 +13,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 8px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .pr-table thead th:first-child,
   .pr-table tbody td:first-child { text-align: left; padding-left: 16px; }
@@ -31,13 +31,13 @@
     padding: 11px 8px;
     font-size: 13.5px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .pr-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .pr-table tbody tr:hover { background: #FBF4EE; }
+  .pr-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .pr-table tbody tr:hover { background: #F1F5F9; }  /* hover = neutral grey (accent tint sirf selected row ke liye) */
   .search-wrap input { padding-left: 32px; }
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
@@ -48,7 +48,8 @@
   #pr-view-modal.hidden { display: none; }
   #pr-view-modal { display: flex; }
   .status-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .status-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  /* Cancelled = neutral grey (red sirf rejected / failed / overdue ke liye) */
+  .status-cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
 </style>
 {% endblock %}
 
@@ -69,15 +70,15 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-pr" placeholder="Search return no., vendor, bill, reason…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex flex-wrap items-center gap-1">
             {# data-label = JS count ke saath dikhne wala naam #}
-            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="posted" data-label="Posted" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Posted (0)</button>
             <button type="button" data-filter="cancelled" data-label="Cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Cancelled (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
               A return is made against a <strong>posted purchase invoice</strong> · only the quantity not yet returned can be sent back · the credit amount reduces what you owe the vendor
@@ -140,7 +141,7 @@
                   <div class="flex flex-wrap justify-center gap-1">
                   {# View: return ki poori detail read-only panel me. Lines / charges ka JSON models ki "summary" property se #}
                   <button type="button"
-                    class="btn-view-pr px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                    class="btn-view-pr px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent"
                     data-pr="{{ r.pr_no }}"
                     data-status="{{ r.status }}"
                     data-vendor="{{ inv.vendor.name if inv and inv.vendor else '' }}"
@@ -156,7 +157,7 @@
                     data-lines='{{ (r.lines | map(attribute="summary") | list) | tojson }}'
                     data-charge-lines='{{ (r.charge_lines | map(attribute="summary") | list) | tojson }}'>View</button>
                   {# Cancel sirf Posted return par. Message simple English me: kya hoga wahi likha hai #}
-                  {% if r.status == 'Posted' %}
+                  {% if r.status == 'Posted' and can_edit('purchase_returns') %}
                   <form method="post" action="{{ url_for('purchase_returns.purchase_returns_cancel', ret_id=r.id) }}" class="inline js-confirm-submit"
                         data-confirm-title="Cancel return"
                         data-confirm-ok="Cancel return"
@@ -189,7 +190,7 @@
 <div id="pr-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="pr-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="pr-view-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="pr-view-title" class="text-[16px] font-bold text-ink">Return detail</h2>
         <p id="pr-view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -243,10 +244,10 @@
     btn.addEventListener('click', function () {
       activeFilter = btn.getAttribute('data-filter');
       document.querySelectorAll('.filter-btn').forEach(function (b) {
-        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.remove('border-accent', 'bg-accent', 'text-white', 'font-semibold');
         b.classList.add('border-slate-300', 'bg-white', 'text-ink');
       });
-      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.add('border-accent', 'bg-accent', 'text-white', 'font-semibold');
       btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
       applyFilters();
     });

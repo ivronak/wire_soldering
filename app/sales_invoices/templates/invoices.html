@@ -5,30 +5,35 @@
 {% block page_css %}
 <style>
   .d-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D1D9D8; }
-  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
-  .d-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
+  .d-table tbody tr:nth-child(even) { background: #F8FAFD; }
   .d-table .num { text-align: right; }
   .q-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid; }
   .q-chip.Posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .q-chip.Waiting { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  /* Waiting for Owner / Loss chip = amber (pending approval, failure nahi) — laal sirf Rejected / overdue ke liye */
+  .q-chip.Waiting { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .q-chip.Cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .q-chip.Paid { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
   .q-chip.Part { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .q-chip.Unpaid { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
-  .q-chip.Credited { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
+  .q-chip.Credited { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
   #i-modal.hidden, #a-modal.hidden, #x-modal.hidden { display: none; }
   #i-modal, #a-modal, #x-modal { display: flex; }
-  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
+  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #5A6577; }
   .ql-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .ql-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
-  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .ql-table th { background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
+  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
   .ql-table .num { text-align: right; }
-  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
-  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
-  .ql-hint { font-size: 11.5px; color: #6B7F82; margin-top: 2px; }
-  .loss-box { background: #FCEBEA; border: 1px solid #F0C4C0; color: #B42318; border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
+  .ql-input:disabled { background: #F1F5F9; color: #5A6577; cursor: not-allowed; }
+  /* Keyboard focus: custom buttons / links par saaf outline */
+  .d-table a:focus-visible, .d-table button:focus-visible, #i-modal button:focus-visible, #a-modal button:focus-visible, #x-modal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ql-hint { font-size: 11.5px; color: #5A6577; margin-top: 2px; }
+  /* Create-invoice drawer ka below-cost hint (save ho jaata hai, sirf post Owner approval par) = amber */
+  .loss-box { background: #FEF3E2; border: 1px solid #FBD9A5; color: #B45309; border-radius: 6px; padding: 8px 10px; font-size: 13px; }
 </style>
 {% endblock %}
 
@@ -45,7 +50,7 @@
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
           {% for key, label in (('todo', 'To invoice'), ('waiting', 'Waiting approval'), ('done', 'Invoices'), ('cancelled', 'Cancelled')) %}
           <a href="{{ url_for('sales_invoices.invoices_list', tab=key) }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
           </a>
           {% endfor %}
@@ -54,12 +59,13 @@
         <div class="flex-1 overflow-auto min-h-0">
           {% if tab == 'todo' %}
           <table class="d-table">
-            <colgroup><col style="width:15%"><col style="width:20%"><col style="width:45%"><col style="width:20%"></colgroup>
-            <thead><tr><th>Quotation</th><th>Customer</th><th>Challans not billed yet</th><th>Action</th></tr></thead>
+            {# Action column me sirf Create invoice button hai — View user ke liye header + cell dono hide #}
+            <colgroup><col style="width:15%"><col style="width:20%"><col style="width:45%">{% if can_edit('invoices') %}<col style="width:20%">{% endif %}</colgroup>
+            <thead><tr><th>Quotation</th><th>Customer</th><th>Challans not billed yet</th>{% if can_edit('invoices') %}<th>Action</th>{% endif %}</tr></thead>
             <tbody>
               {% for r in todo %}
               <tr>
-                <td><a href="{{ url_for('quotations.quotations_detail', quotation_id=r.q.id) }}" class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1 hover:underline">{{ r.q.quote_no }}</a></td>
+                <td>{% if can_do('quotations.quotations_detail', 'GET') %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=r.q.id) }}" class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1 hover:underline">{{ r.q.quote_no }}</a>{% else %}<span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ r.q.quote_no }}</span>{% endif %}</td>
                 <td class="font-semibold text-ink">{{ r.q.customer.name }}{% if r.q.customer_po_no %}<div class="text-[12px] text-ink-faint font-normal">PO {{ r.q.customer_po_no }}</div>{% endif %}</td>
                 <td>
                   {% for c in r.challans %}
@@ -67,7 +73,7 @@
                     — {% for l in c.lines %}{{ l.quotation_line.product.name }} {{ '%g'|format(l.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
                   {% endfor %}
                 </td>
-                <td><button type="button" class="btn-invoice px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-q="{{ r.q.id }}">Create invoice</button></td>
+                {% if can_edit('invoices') %}<td><button type="button" class="btn-invoice px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark" data-q="{{ r.q.id }}">Create invoice</button></td>{% endif %}
               </tr>
               {% endfor %}
             </tbody>
@@ -87,7 +93,7 @@
               {% for i in invoices %}
               <tr>
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ i.invoice_no }}</span>
-                  <div class="text-[12px] text-ink-faint mt-1"><a class="hover:underline" href="{{ url_for('quotations.quotations_detail', quotation_id=i.quotation_id) }}">{{ i.quotation.quote_no }}</a>
+                  <div class="text-[12px] text-ink-faint mt-1">{% if can_do('quotations.quotations_detail', 'GET') %}<a class="hover:underline" href="{{ url_for('quotations.quotations_detail', quotation_id=i.quotation_id) }}">{{ i.quotation.quote_no }}</a>{% else %}{{ i.quotation.quote_no }}{% endif %}
                     · {% for c in i.challans %}{{ c.challan_no }}{% if not loop.last %}, {% endif %}{% endfor %}</div></td>
                 <td>{{ i.invoice_date.strftime('%d %b %Y') }}</td>
                 <td class="font-semibold text-ink">{{ i.quotation.customer.name }}</td>
@@ -105,13 +111,13 @@
                   {% if i.outstanding > 0 %}<div class="text-[12px] text-ink-faint font-normal mt-1">₹ {{ '{:,.2f}'.format(i.outstanding) }} due by {{ i.due_on.strftime('%d %b %Y') }}{% if i.days_overdue(today_date) > 0 %} · <span class="text-stop font-semibold">{{ i.days_overdue(today_date) }} days late</span>{% endif %}</div>{% endif %}{% endif %}
                   {% if tab == 'waiting' %}<div class="mt-1"><span class="q-chip Waiting">Loss ₹{{ '{:,.2f}'.format(i.loss_amount) }}</span></div>{% endif %}</td>
                 <td>
-                  {% if tab == 'waiting' %}
-                  <button type="button" class="btn-approve px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark" data-id="{{ i.id }}" data-no="{{ i.invoice_no }}" data-loss="{{ '{:,.2f}'.format(i.loss_amount) }}">Owner approve</button>
+                  {% if tab == 'waiting' and can_edit('invoices') %}
+                  <button type="button" class="btn-approve px-3 py-1.5 text-[13px] font-semibold text-white bg-warning border border-warning rounded hover:opacity-90" data-id="{{ i.id }}" data-no="{{ i.invoice_no }}" data-loss="{{ '{:,.2f}'.format(i.loss_amount) }}">Owner approve</button>
                   {% endif %}
                   {% if tab != 'cancelled' %}
                   {% if tab == 'done' %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">Print</a>
-                  {% if i.returnable_total > 0 %}<a href="{{ url_for('sales_returns.returns_list', i=i.id) }}" class="inline-block mt-1 px-3 py-1.5 text-[13px] font-semibold text-copper-text bg-white border border-copper-border rounded hover:bg-copper-soft">Return goods</a>{% endif %}{% endif %}
-                  <button type="button" class="btn-cancel-i mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ i.id }}" data-no="{{ i.invoice_no }}">Cancel</button>
+                  {% if i.returnable_total > 0 and can_do('sales_returns.returns_add') %}<a href="{{ url_for('sales_returns.returns_list', i=i.id) }}" class="inline-block mt-1 px-3 py-1.5 text-[13px] font-semibold text-accent-text bg-white border border-accent-border rounded hover:bg-accent-soft">Return goods</a>{% endif %}{% endif %}
+                  {% if can_edit('invoices') %}<button type="button" class="btn-cancel-i mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ i.id }}" data-no="{{ i.invoice_no }}">Cancel</button>{% endif %}
                   {% endif %}
                 </td>
               </tr>
@@ -129,16 +135,17 @@
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span>Invoice is made on the goods actually dispatched (extra goods are billed too) · charges of a quotation are filled in on its first invoice (you can change them)</span>
-          <span class="text-ink-muted">Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{# Create invoice / Owner approve / Cancel drawers sirf Edit wale user ke liye #}
+{% if can_edit('invoices') %}
 <div id="i-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="i-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="i-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="i-title" class="text-[16px] font-bold text-ink">Create invoice</h2>
         <p class="text-[12.5px] text-ink-faint" id="i-sub">Invoice number is made automatically</p>
@@ -167,7 +174,7 @@
           <thead><tr><th>Charge</th><th class="num">Amount (₹)</th><th>Effect</th><th></th></tr></thead>
           <tbody id="i-charges"></tbody>
         </table>
-        <button type="button" id="i-add-charge" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-brand-teal border border-brand-border rounded bg-brand-soft hover:bg-white">+ Add charge</button>
+        <button type="button" id="i-add-charge" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-accent border border-accent rounded bg-white hover:bg-accent-soft">+ Add charge</button>
         <p class="ql-hint">The quotation's charges are filled in on its first invoice. You can change or remove them, or add a new charge.</p>
       </div>
       <div id="i-loss" class="loss-box hidden"></div>
@@ -185,7 +192,7 @@
     </form>
     <div class="px-4 py-3 border-t border-slate-200 bg-mist flex items-center justify-end gap-2 shrink-0">
       <button type="button" id="i-cancel" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Close</button>
-      <button type="submit" form="i-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Create invoice</button>
+      <button type="submit" form="i-form" class="px-5 py-2.5 text-[14px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">Create invoice</button>
     </div>
   </div>
 </div>
@@ -201,7 +208,7 @@
     </div>
     <div class="flex justify-end gap-2">
       <button type="button" id="a-close" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Not now</button>
-      <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold text-white bg-copper rounded border border-copper-dark hover:bg-copper-dark">Approve and post</button>
+      <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold text-white bg-warning rounded border border-warning hover:opacity-90">Approve and post</button>
     </div>
   </form>
 </div>
@@ -221,9 +228,11 @@
     </div>
   </form>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
+{% if can_edit('invoices') %}
 <script>
   var DRAWER = {{ drawer|tojson }};
   var CHARGES = {{ charge_master|tojson }};
@@ -349,4 +358,5 @@
   });
   if (OPEN_Q) openInvoice(OPEN_Q);
 </script>
+{% endif %}
 {% endblock %}

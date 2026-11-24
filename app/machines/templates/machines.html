@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Machine Master{% endblock %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 
 {% block page_css %}
 <style>
@@ -8,21 +9,22 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    min-width: 1100px; /* Actions me 3 icon + status picker ek line me aaye */
   }
   .machine-table thead th {
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 12px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .machine-table thead th:first-child,
   .machine-table tbody td:first-child { text-align: left; padding-left: 18px; }
@@ -31,13 +33,15 @@
     padding: 11px 12px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .machine-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .machine-table tbody tr:hover { background: #FBF4EE; }
+  .machine-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  /* Hover = halka neutral grey; accent-soft sirf selected/active ke liye reserved hai */
+  .machine-table tbody tr:hover { background: #F1F5F9; }
+  .machine-table button:focus-visible, .status-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* Sirf Retired dim — Maintenance/Breakdown pe dhyaan chahiye */
   .machine-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
@@ -52,9 +56,9 @@
     border-radius: 6px;
     border: 1px solid #CBD5E1;
     background: #fff;
-    color: #1C2B2D;
+    color: #121A2B;
   }
-  .status-select:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
+  .status-select:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 1px #0B5BEF; }
 
   /* Status picker — native select ki jagah badge-style control */
   .status-picker { position: relative; display: inline-block; text-align: left; }
@@ -76,7 +80,7 @@
   .status-trigger:hover { filter: brightness(0.97); }
   .status-trigger:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(196, 107, 45, 0.35);
+    box-shadow: 0 0 0 2px rgba(11,91,239, 0.35);
   }
   .status-trigger .status-dot {
     width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
@@ -90,7 +94,7 @@
   }
   .status-picker.is-open .status-chevron { transform: rotate(180deg); }
   .status-picker.is-open .status-trigger {
-    box-shadow: 0 0 0 2px rgba(196, 107, 45, 0.35);
+    box-shadow: 0 0 0 2px rgba(11,91,239, 0.35);
   }
 
   .status-trigger[data-status="active"] {
@@ -116,9 +120,9 @@
     min-width: 11.5rem;
     padding: 4px;
     background: #fff;
-    border: 1px solid #D1D9D8;
+    border: 1px solid #D4DBE6;
     border-radius: 8px;
-    box-shadow: 0 10px 28px rgba(15, 47, 50, 0.12), 0 2px 6px rgba(15, 47, 50, 0.06);
+    box-shadow: 0 10px 28px rgba(11,18,32, 0.12), 0 2px 6px rgba(11,18,32, 0.06);
   }
   .status-menu.hidden { display: none; }
   .status-option {
@@ -132,12 +136,12 @@
     background: transparent;
     font-size: 12.5px;
     font-weight: 600;
-    color: #1C2B2D;
+    color: #121A2B;
     cursor: pointer;
     text-align: left;
   }
-  .status-option:hover { background: #F4F6F5; }
-  .status-option.is-current { background: #FBF4EE; }
+  .status-option:hover { background: #F1F5F9; }
+  .status-option.is-current { background: #EDF3FF; }
   .status-option .status-dot {
     width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
   }
@@ -159,11 +163,14 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Machines</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Machines</h1>
         </div>
+        {# View-only user ko Add button nahi dikhta (server 403 deta) #}
+        {% if can_edit('machines') %}
         <button type="button" id="btn-add-machine"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add machine
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -173,16 +180,16 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-machines" placeholder="Search code or name…" autocomplete="off"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1 flex-wrap">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (7)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (7)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (4)</button>
             <button type="button" data-filter="maintenance" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Maintenance (1)</button>
             <button type="button" data-filter="breakdown" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Breakdown (1)</button>
             <button type="button" data-filter="retired" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Retired (1)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Work Stage = the production stage this machine is used in · Change status directly from the dropdown · Used by Production routing
@@ -195,14 +202,14 @@
           <table class="machine-table">
             <colgroup>
               <col style="width:4%" />
-              <col style="width:8%" />
-              <col style="width:16%" />
-              <col style="width:11%" />
-              <col style="width:9%" />
+              <col style="width:7%" />
+              <col style="width:14%" />
               <col style="width:10%" />
-              <col style="width:11%" />
+              <col style="width:8%" />
+              <col style="width:12%" />
+              <col style="width:9%" />
               <col style="width:13%" />
-              <col style="width:18%" />
+              <col style="width:23%" />
             </colgroup>
             <thead>
               <tr>
@@ -223,10 +230,10 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ m.code }}</span></td>
                 <td><span class="font-medium text-ink">{{ m.name }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ m.work_stage.name if m.work_stage else "_" }}</td>
+                <td class="text-[13px] text-ink-muted">{{ m.work_stage.name if m.work_stage else "—" }}</td>
                 <td class="text-[13px] text-ink-muted">{{ m.line.name if m.line else "—" }}</td>
                 <td class="text-[13px] text-ink-muted tabular-nums">{{ m.capacity_text }}</td>
-                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ m.installed_date or '_' }}</td>
+                <td class="text-[12.5px] text-ink-faint tabular-nums">{{ m.installed_date or '—' }}</td>
                 <td class="text-center">
                   {% if m.status == 'active' %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
@@ -246,37 +253,43 @@
                   </span>
                   {% endif %}
                 </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2.5 flex-wrap">
-                    <button type="button"
-                      class="btn-edit-machine px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ m.id }}"
-                      data-code="{{ m.code }}"
-                      data-name="{{ m.name }}"
-                      data-line-id="{{ m.line_id or '' }}"
-                      data-work-stage-id="{{ m.work_stage_id or '' }}"
-                      data-capacity="{{ m.capacity or '' }}"
-                      data-per-hour="{{ m.capacity_per_hour if m.capacity_per_hour else '' }}"
-                      data-unit-id="{{ m.capacity_unit_id or '' }}"
-                      data-hours="{{ m.hours_per_day if m.hours_per_day else 8 }}"
-                      data-batch-kg="{{ m.batch_capacity_kg if m.batch_capacity_kg else '' }}"
-                      data-batch-hours="{{ m.hours_per_batch if m.hours_per_batch else '' }}"
-                      data-installed="{{ m.installed_date or '' }}"
-                      data-status="{{ m.status }}">
-                      Edit
-                    </button>
+                {# Actions: Product master jaisa icon row — View sabko; Edit/Delete/Status picker sirf edit-permission wale ko #}
+                <td style="white-space:nowrap">
+                  {% set m_status_label = {'active': 'Active', 'maintenance': 'Under Maintenance', 'breakdown': 'Breakdown', 'retired': 'Retired'}.get(m.status, 'Retired') %}
+                  {% set m_status_tone = {'active': 'success', 'maintenance': 'warning', 'breakdown': 'stop', 'retired': 'neutral'}.get(m.status, 'neutral') %}
+                  <div class="row-actions">
+                    {{ view_btn("Machine details", m.code ~ " — " ~ m.name, [
+                      ["Code", m.code],
+                      ["Machine Name", m.name],
+                      ["Work Stage", m.work_stage.name if m.work_stage else ""],
+                      ["Production Line", m.line.name if m.line else ""],
+                      ["Capacity", m.capacity_text if m.capacity_text != "—" else ""],
+                      ["Working Hours Per Day", ('%g'|format(m.hours_per_day)) if m.hours_per_day else ""],
+                      ["Daily Capacity", (('%g'|format(m.daily_capacity)) ~ (' ' ~ m.capacity_unit.code if m.capacity_unit else '')) if m.daily_capacity else ""],
+                      ["Installed Date", m.installed_date.strftime('%d %b %Y') if m.installed_date else ""],
+                      ["Created", m.created_at.strftime('%d %b %Y') if m.created_at else ""],
+                      ["Status", m_status_label, m_status_tone]
+                    ]) }}
+                    {% if can_edit('machines') %}
+                    {{ edit_btn("btn-edit-machine", "machine", {
+                      "id": m.id,
+                      "code": m.code,
+                      "name": m.name,
+                      "line-id": m.line_id or '',
+                      "work-stage-id": m.work_stage_id or '',
+                      "capacity": m.capacity or '',
+                      "per-hour": m.capacity_per_hour if m.capacity_per_hour else '',
+                      "unit-id": m.capacity_unit_id or '',
+                      "hours": m.hours_per_day if m.hours_per_day else 8,
+                      "batch-kg": m.batch_capacity_kg if m.batch_capacity_kg else '',
+                      "batch-hours": m.hours_per_batch if m.hours_per_batch else '',
+                      "installed": m.installed_date or '',
+                      "status": m.status
+                    }) }}
                     {# Soft-delete — confirm = showConfirm (erp-toast.js), Flash route pe #}
-                    <form method="post"
-                          action="{{ url_for('machines.machines_delete', machine_id=m.id) }}"
-                          class="inline js-confirm-submit"
-                          data-confirm-title="Remove machine"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this machine from the master list? It will be kept in the database but hidden.">
-                      <button type="submit"
-                              class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">
-                        Delete
-                      </button>
-                    </form>
+                    {{ delete_form(url_for('machines.machines_delete', machine_id=m.id), "machine") }}
+                    {{ act_sep() }}
+                    {# Machine ka status 4 tarah ka hai (Active / Maintenance / Breakdown / Retired) — isliye plain toggle ki jagah status picker #}
                     <form method="post"
                           action="{{ url_for('machines.machines_status', machine_id=m.id) }}"
                           class="status-picker inline">
@@ -286,14 +299,10 @@
                               data-status="{{ m.status }}"
                               aria-haspopup="listbox"
                               aria-expanded="false"
-                              title="Change status">
+                              title="Change status"
+                              aria-label="Change status">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span class="status-label">
-                          {% if m.status == 'active' %}Active
-                          {% elif m.status == 'maintenance' %}Under Maintenance
-                          {% elif m.status == 'breakdown' %}Breakdown
-                          {% else %}Retired{% endif %}
-                        </span>
+                        <span class="status-label">{{ m_status_label }}</span>
                         <svg class="status-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
                         </svg>
@@ -313,6 +322,7 @@
                         </button>
                       </div>
                     </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -325,23 +335,25 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No machines found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new machine.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add machine</button>
+            {% if can_edit('machines') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add machine</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count}} of {{total_count}} machines</span>
           <span>Tip: change status here — production routing sees the new status instantly</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('machines') %}
 <div id="machine-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
     <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
     <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
         <div>
           <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add machine</h2>
           <p class="text-[12.5px] text-ink-faint">Code is auto-generated · just fill the rest</p>
@@ -354,17 +366,17 @@
           <label for="machine-code" class="block text-[12.5px] font-semibold text-ink mb-1">Machine code</label>
           <input type="text" id="machine-code" name="code" value="{{ next_code }}" disabled
             class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
-          <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated, read-only — disabled so it is never sent with the form; the route generates the real code itself.</p>
+          <p class="text-[11.5px] text-ink-faint mt-1">Created automatically when you save.</p>
         </div>
         <div>
           <label for="machine-name" class="block text-[12.5px] font-semibold text-ink mb-1">Machine name *</label>
           <input type="text" id="machine-name" name="name" required placeholder="Wire Stripper 3" autocomplete="off"
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="machine-stage" class="block text-[12.5px] font-semibold text-ink mb-1">Work stage *</label>
           <select id="machine-stage" name="work_stage_id" required
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">Select work stage</option>
             {% for s in stages %}
             <option value="{{ s.id }}" data-batch="{{ 1 if s.is_batch else 0 }}">{{ s.code }} — {{ s.name }}</option>
@@ -374,7 +386,7 @@
         <div>
           <label for="machine-line" class="block text-[12.5px] font-semibold text-ink mb-1">Production line</label>
           <select id="machine-line" name="line_id"
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">No line yet</option>
             {% for l in lines %}
             <option value="{{ l.id }}">{{ l.code }} — {{ l.name }}</option>
@@ -386,8 +398,8 @@
           <label for="machine-per-hour" class="block text-[12.5px] font-semibold text-ink mb-1">Output per hour</label>
           <div class="flex gap-2">
             <input type="number" id="machine-per-hour" name="capacity_per_hour" min="0" step="any" placeholder="e.g. 120" autocomplete="off"
-              class="w-1/2 px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-            <select id="machine-unit" name="capacity_unit_id" class="w-1/2 px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+              class="w-1/2 px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
+            <select id="machine-unit" name="capacity_unit_id" class="w-1/2 px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
               <option value="">Unit</option>
               {% for u in units %}<option value="{{ u.id }}">{{ u.code }}</option>{% endfor %}
             </select>
@@ -395,33 +407,33 @@
           <p class="text-[11.5px] text-ink-faint mt-1" id="machine-per-hour-help">How much this machine can make in one hour. Used to plan production time.</p>
         </div>
         {# C8a: sirf batch stage (furnace / mixer) ki machine me — ek melt me kitna aur ek batch me kitne ghante; per-hour inse apne aap banta hai #}
-        <div id="machine-batch-box" class="hidden rounded border border-copper-border bg-copper-soft p-3 space-y-3">
+        <div id="machine-batch-box" class="hidden rounded border border-accent-border bg-accent-soft p-3 space-y-3">
           <div>
             <label for="machine-batch-kg" class="block text-[12.5px] font-semibold text-ink mb-1">Batch capacity (per melt)</label>
             <input type="number" id="machine-batch-kg" name="batch_capacity" min="0" step="any" placeholder="e.g. 500" autocomplete="off"
-              class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
             <p class="text-[11.5px] text-ink-faint mt-1">The most this machine can melt or mix in one go, in the unit chosen above (for example 500 KG).</p>
           </div>
           <div>
             <label for="machine-batch-hours" class="block text-[12.5px] font-semibold text-ink mb-1">Hours per batch</label>
             <input type="number" id="machine-batch-hours" name="hours_per_batch" min="0" step="any" placeholder="e.g. 5" autocomplete="off"
-              class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
             <p class="text-[11.5px] text-ink-faint mt-1">How long one full batch takes. Output per hour is worked out from these two numbers (500 / 5 = 100 per hour).</p>
           </div>
         </div>
         <div>
           <label for="machine-hours" class="block text-[12.5px] font-semibold text-ink mb-1">Working hours per day</label>
           <input type="number" id="machine-hours" name="hours_per_day" min="1" max="24" step="any" value="8" autocomplete="off"
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="machine-installed" class="block text-[12.5px] font-semibold text-ink mb-1">Installed date</label>
           <input type="date" id="machine-installed" name="installed_date"
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="machine-status" class="block text-[12.5px] font-semibold text-ink mb-1">Status</label>
-          <select id="machine-status" name="status" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          <select id="machine-status" name="status" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="active" selected>Active</option>
             <option value="maintenance">Under Maintenance</option>
             <option value="breakdown">Breakdown</option>
@@ -431,16 +443,20 @@
       </form>
       <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
         <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-        <button type="submit" form="machine-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save machine</button>
+        <button type="submit" form="machine-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save machine</button>
       </div>
     </div>
   </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 <script>
+  {# Modal / form sirf Edit user ke liye render hote hain — unka JS bhi same condition me (View user pe null error na aaye) #}
+  {% if can_edit('machines') %}
   const modal = document.getElementById('machine-modal');
   const form = document.getElementById('machine-form');
+  {% endif %}
   const searchInput = document.getElementById('search-machines');
   const rows = Array.from(document.querySelectorAll('.machine-row'));
   const emptyState = document.getElementById('empty-state');
@@ -468,9 +484,9 @@
   function applyFilterButtonStyles(selectedBtn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === selectedBtn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -506,6 +522,7 @@
     retired: { label: 'Retired', classes: 'bg-neutral-bg text-neutral border-neutral-border', dot: 'bg-neutral' }
   };
 
+  {% if can_edit('machines') %}
   // C8a: Work stage "Batch stage" ho to Batch capacity + Hours per batch dikhao; Output per hour tab apne aap (capacity / hours) aur lock
   function syncBatchBox() {
     var sel = document.getElementById('machine-stage');
@@ -516,7 +533,7 @@
     document.getElementById('machine-batch-box').classList.toggle('hidden', !isBatch);
     var derived = isBatch && kg > 0 && hrs > 0;
     perHour.readOnly = derived;
-    perHour.style.background = derived ? '#F2F4F7' : '';
+    perHour.style.background = derived ? '#F1F5F9' : '';
     if (derived) perHour.value = Math.round(kg / hrs * 10000) / 10000;
     document.getElementById('machine-per-hour-help').textContent = derived ? 'Worked out from Batch capacity and Hours per batch.' : 'How much this machine can make in one hour. Used to plan production time.';
   }
@@ -565,6 +582,7 @@
     document.getElementById('machine-status').value = btn.getAttribute('data-status') || 'active';
     openModal();
   }
+  {% endif %}
 
   function applyFilters() {
     const q = (searchInput.value || '').trim().toLowerCase();
@@ -585,6 +603,7 @@
     resultCount.textContent = 'Showing ' + visible + ' of ' + rows.length + ' machines';
   }
 
+  {% if can_edit('machines') %}
   // Required fields: khali / sirf spaces → toast, Flask mat bhejo
   // Code ab auto-generated (disabled) — isliye validation me nahi
   form.addEventListener('submit', function (e) {
@@ -602,6 +621,7 @@
     }
     // valid → preventDefault mat karo → browser form POST karega
   });
+  {% endif %}
 
   function updateFilterCounts() {
     const counts = { active: 0, maintenance: 0, breakdown: 0, retired: 0 };
@@ -616,6 +636,7 @@
     document.querySelector('[data-filter="retired"]').textContent = 'Retired (' + counts.retired + ')';
   }
 
+  {% if can_edit('machines') %}
   document.getElementById('btn-add-machine').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
@@ -628,6 +649,7 @@
   document.querySelectorAll('.btn-edit-machine').forEach(function (btn) {
     btn.addEventListener('click', function () { openEditModal(btn); });
   });
+  {% endif %}
 
   // Status picker — badge-style dropdown (native <select> replace)
   // Menu position:fixed — table/card overflow:hidden se cut na ho

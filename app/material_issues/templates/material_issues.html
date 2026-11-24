@@ -3,77 +3,81 @@
 
 {% block page_css %}
 <style>
-  /* Material issue UI — Production queue jaisa card-row look (Linear / Asana pattern), copper-teal theme */
-  .mi-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .mi-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .mi-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .mi-kpi .h { font-size: 12px; color: #6B7F82; }
-  .mi-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .mi-kpi.warn .v { color: #8A4A1C; }
-  .mi-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .mi-kpi.bad .v { color: #B42318; }
-  .mi-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .mi-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .mi-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .mi-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
-  .mi-group { display: flex; align-items: center; gap: 8px; padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; }
-  .mi-group b { background: #E9EEED; color: #3D5A5D; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
-  .mi-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; transition: box-shadow .15s, border-color .15s; }
-  .mi-card:hover { border-color: #BFC9C8; box-shadow: 0 2px 8px rgba(15,47,50,.07); }
-  .mi-card.is-run { border-left: 4px solid #C46B2D; }
+  /* Material issue UI — Production queue jaisa card-row look (Linear / Asana pattern), blue accent theme */
+  .mi-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .mi-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .mi-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .mi-kpi .h { font-size: 12px; color: #5A6577; }
+  /* KPI variants: warn = sirf jahan action chahiye (amber); info = sirf jaankari ki ginti (accent-soft, jaise 'Draft issues') */
+  .mi-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .mi-kpi.warn .v { color: #B45309; }
+  .mi-kpi.info { background: #EDF3FF; border-color: #BCD2FA; } .mi-kpi.info .v { color: #0A3CA6; }
+  .mi-kpi.bad { background: #FCEBEA; border-color: #F0C4C0; } .mi-kpi.bad .v { color: #B42318; }
+  .mi-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .mi-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .mi-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .mi-tabs a span { font-weight: 500; color: #5A6577; margin-left: 3px; }
+  .mi-group { display: flex; align-items: center; gap: 8px; padding: 14px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5A6577; }
+  .mi-group b { background: #E7ECF4; color: #475266; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  .mi-card { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; margin-bottom: 8px; transition: box-shadow .15s, border-color .15s; }
+  .mi-card:hover { border-color: #B9C4D6; box-shadow: 0 2px 8px rgba(11,18,32,.07); }
+  .mi-card.is-run { border-left: 4px solid #0B5BEF; }   /* running = accent */
+  .mi-card.is-act { border-left: 4px solid #B45309; }   /* action chahiye (Return to store) = amber, running wala accent nahi */
   .mi-card.is-dim { opacity: .72; }
   .mi-row { display: grid; grid-template-columns: 54px minmax(210px, 1.5fr) minmax(190px, 1.3fr) minmax(150px, 1fr) auto 28px; gap: 14px; align-items: center; padding: 12px 14px; cursor: pointer; }
   .mi-row.plain { grid-template-columns: minmax(210px, 1.5fr) minmax(220px, 1.6fr) minmax(150px, 1fr) auto 28px; }
-  .mi-pos { text-align: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #8A4A1C; }
-  .mi-pos small { display: block; font-family: inherit; font-size: 10.5px; font-weight: 600; color: #98A5A4; letter-spacing: .04em; text-transform: uppercase; }
-  .mi-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .mi-prod { font-size: 13.5px; color: #1C2B2D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mi-meta { font-size: 12px; color: #6B7F82; }
+  .mi-pos { text-align: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #0A3CA6; }
+  .mi-pos small { display: block; font-family: inherit; font-size: 10.5px; font-weight: 600; color: #94A0B4; letter-spacing: .04em; text-transform: uppercase; }
+  .mi-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0B1220; }
+  .mi-prod { font-size: 13.5px; color: #121A2B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mi-meta { font-size: 12px; color: #5A6577; }
   .mi-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .mi-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .mi-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .mi-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .mi-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .mi-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
-  .mi-chip.rel { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .mi-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .mi-chip.bad { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .mi-chip.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .mi-chip.rel { background: #E6F6F8; color: #0B7285; border-color: #B2DDE4; }
   .mi-chip.draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
-  .mi-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
-  .mi-bar { height: 6px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 6px; }
-  .mi-bar div { height: 100%; background: #2A6B6E; border-radius: 999px; }
+  .mi-chip.gone { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .mi-bar { height: 6px; border-radius: 999px; background: #E7ECF4; overflow: hidden; margin-top: 6px; }
+  .mi-bar div { height: 100%; background: #0B5BEF; border-radius: 999px; }
   .mi-act { display: flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
   .mi-btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
-  .mi-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .mi-btn.primary:hover { background: #A35522; }
-  .mi-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .mi-btn.teal:hover { background: #1F5558; }
-  .mi-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .mi-btn.ghost:hover { background: #F4F6F5; }
-  .mi-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .mi-btn.danger:hover { background: #FDECEC; }
+  .mi-btn.primary { background: #0B5BEF; color: #fff; border-color: #0843C2; } .mi-btn.primary:hover { background: #0843C2; }
+  .mi-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .mi-btn.ghost:hover { background: #F3F6FB; }
+  .mi-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .mi-btn.danger:hover { background: #FCEBEA; }
   .mi-menu { position: relative; }
-  .mi-menu summary { list-style: none; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #D1D9D8; color: #3D5A5D; background: #fff; font-size: 18px; line-height: 1; }
+  .mi-menu summary { list-style: none; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #D4DBE6; color: #475266; background: #fff; font-size: 18px; line-height: 1; }
   .mi-menu summary::-webkit-details-marker { display: none; }
-  .mi-menu .items { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 190px; background: #fff; border: 1px solid #D1D9D8; border-radius: 10px; box-shadow: 0 8px 24px rgba(15,47,50,.15); padding: 5px; }
-  .mi-menu .items button, .mi-menu .items a { display: block; width: 100%; text-align: left; padding: 8px 10px; font-size: 13.5px; color: #1C2B2D; border: 0; background: transparent; border-radius: 6px; cursor: pointer; text-decoration: none; }
-  .mi-menu .items button:hover, .mi-menu .items a:hover { background: #F4F6F5; }
+  .mi-menu .items { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 190px; background: #fff; border: 1px solid #D4DBE6; border-radius: 10px; box-shadow: 0 8px 24px rgba(11,18,32,.15); padding: 5px; }
+  .mi-menu .items button, .mi-menu .items a { display: block; width: 100%; text-align: left; padding: 8px 10px; font-size: 13.5px; color: #121A2B; border: 0; background: transparent; border-radius: 6px; cursor: pointer; text-decoration: none; }
+  .mi-menu .items button:hover, .mi-menu .items a:hover { background: #F3F6FB; }
   .mi-menu .items .danger { color: #B42318; }
-  .mi-chev { border: 0; background: transparent; color: #98A5A4; font-size: 13px; transition: transform .15s; cursor: pointer; }
+  .mi-left { color: #B45309; }   /* View modal: leftover qty (JS class toggle) */
+  .mi-btn:focus-visible, .mi-tabs a:focus-visible, .mi-menu summary:focus-visible, .mi-chev:focus-visible, .mi-menu .items button:focus-visible, .mi-menu .items a:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
+  .mi-chev { border: 0; background: transparent; color: #94A0B4; font-size: 13px; transition: transform .15s; cursor: pointer; }
   .mi-card.is-open .mi-chev { transform: rotate(180deg); }
-  .mi-detail { display: none; border-top: 1px solid #E4EAE9; background: #F8FAF9; border-radius: 0 0 12px 12px; padding: 12px 16px 14px; }
+  .mi-detail { display: none; border-top: 1px solid #E5EAF2; background: #F8FAFD; border-radius: 0 0 12px 12px; padding: 12px 16px 14px; }
   .mi-card.is-open .mi-detail { display: block; }
   .mi-dl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  .mi-dl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; padding: 4px 8px 6px; }
-  .mi-dl td { padding: 8px; border-top: 1px dashed #DDE5E4; vertical-align: middle; }
+  .mi-dl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; padding: 4px 8px 6px; }
+  .mi-dl td { padding: 8px; border-top: 1px dashed #DEE5EF; vertical-align: middle; }
   .mi-dl .r { text-align: right; font-variant-numeric: tabular-nums; }
-  .mi-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .mi-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .mi-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .mi-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
   @media (max-width: 1100px) {
     .mi-row, .mi-row.plain { grid-template-columns: 1fr auto 28px; }
     .mi-row > :nth-child(n+3):not(.mi-act):not(.mi-chev) { grid-column: 1 / 3; }
   }
   /* Drawers */
-  .mi-step { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
-  .mi-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
-  .mi-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
-  .mi-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
+  .mi-step { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 14px 16px; }
+  .mi-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 8px; background: #fff; }
+  .mi-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.15); }
+  .mi-label { display: block; font-size: 12.5px; font-weight: 600; color: #0B1220; margin-bottom: 4px; }
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 8px; border: 1px solid #D1D9D8; text-align: left; }
-  .lines-table td { padding: 7px 8px; border: 1px solid #E2E8E7; }
-  .lines-table input[type=number] { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 6px; text-align: right; }
+  .lines-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 8px; border: 1px solid #D4DBE6; text-align: left; }
+  .lines-table td { padding: 7px 8px; border: 1px solid #E2E8F1; }
+  .lines-table input[type=number] { width: 100%; padding: 6px 8px; border: 1px solid #C7D0DE; border-radius: 6px; text-align: right; }
   #mi-modal.hidden, #mi-view-modal.hidden, #mr-modal.hidden { display: none; }
   #mi-modal, #mi-view-modal, #mr-modal { display: flex; }
 </style>
@@ -81,6 +85,9 @@
 
 {% block content %}
 {% macro dshort(d) %}{{ d.strftime('%d %b') }}{% endmacro %}
+{# ed = Edit access (issue / post / cancel / return buttons); po_link = production queue page khol sakta hai #}
+{% set ed = can_edit('material_issues') %}
+{% set po_link = can_do('production_orders.production_orders_list', 'GET') %}
 
 <div class="flex flex-wrap items-end justify-between gap-3 shrink-0">
   <div>
@@ -93,8 +100,8 @@
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="mi-kpi"><span class="k">Orders to issue</span><span class="v">{{ kpi.orders }}</span><span class="h">in queue order</span></div>
   <div class="mi-kpi {{ 'bad' if kpi.short else '' }}"><span class="k">Short of stock</span><span class="v">{{ kpi.short }}</span><span class="h">PO coming or need to buy</span></div>
-  <div class="mi-kpi {{ 'warn' if kpi.drafts else '' }}"><span class="k">Draft issues</span><span class="v">{{ kpi.drafts }}</span><span class="h">not posted yet</span></div>
-  <div class="mi-kpi"><span class="k">To return</span><span class="v"{% if kpi.returnable %} style="color:#B42318"{% endif %}>{{ kpi.returnable }}</span><span class="h">orders with left-over material</span></div>
+  <div class="mi-kpi {{ 'info' if kpi.drafts else '' }}"><span class="k">Draft issues</span><span class="v">{{ kpi.drafts }}</span><span class="h">not posted yet</span></div>
+  <div class="mi-kpi {{ 'warn' if kpi.returnable else '' }}"><span class="k">To return</span><span class="v">{{ kpi.returnable }}</span><span class="h">orders with left-over material</span></div>
 </div>
 
 <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
@@ -111,16 +118,16 @@
 {% if tab == 'issue' %}
   {# C14: stage complete hone ke baad jo maal bacha (issued - used) wo yahin sabse upar dikhta hai, taaki koi return karna bhool na jaye #}
   {% if to_return %}
-  <div class="mi-group" style="color:#B42318">Left over, return to store <b>{{ to_return|length }}</b></div>
+  <div class="mi-group" style="color:#B45309">Left over, return to store <b>{{ to_return|length }}</b></div>
   {% for order in to_return %}
-  <article class="mi-card is-run">
+  <article class="mi-card is-act">
     <div class="mi-row plain" style="cursor:default">
-      <div><div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ order.prod_no }}</span><span class="mi-chip bad"><i></i>Return to store</span></div>
+      <div><div class="flex items-center gap-2 flex-wrap"><span class="mi-no">{{ order.prod_no }}</span><span class="mi-chip warn"><i></i>Return to store</span></div>
         <div class="mi-prod mt-0.5">{{ order.product.name if order.product else '—' }}</div></div>
-      <div>{% for i in leftovers[order.id] %}<div class="text-[13px]"><b style="color:#B42318">{{ '%g'|format(i.qty) }} {{ i.unit }}</b> {{ i.name }} <span class="mi-meta">· issued {{ '%g'|format(i.issued) }}, used {{ '%g'|format(i.used) }}</span></div>{% endfor %}
+      <div>{% for i in leftovers[order.id] %}<div class="text-[13px]"><b style="color:#B45309">{{ '%g'|format(i.qty) }} {{ i.unit }}</b> {{ i.name }} <span class="mi-meta">· issued {{ '%g'|format(i.issued) }}, used {{ '%g'|format(i.used) }}</span></div>{% endfor %}
         <div class="mi-meta mt-0.5">Not used in production. Return it to the store, or it must be written off before the output.</div></div>
       <div class="mi-meta">{% if order.issues %}Received by {{ (order.issues|selectattr('status', 'equalto', 'Posted')|map(attribute='received_by')|select|list|last) or '—' }}{% endif %}</div>
-      <div class="mi-act"><button type="button" class="btn-return mi-btn primary" data-plan='{{ return_plans[order.id]|tojson }}'>Return now</button></div>
+      <div class="mi-act">{% if ed %}<button type="button" class="btn-return mi-btn primary" data-plan='{{ return_plans[order.id]|tojson }}'>Return now</button>{% endif %}</div>
       <span></span>
     </div>
   </article>
@@ -138,12 +145,16 @@
         <div class="mi-meta">{{ issue_text[issue.id] }}</div></div>
       <div class="mi-meta">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</div>
       <div class="mi-act">
+        {% if ed %}
         <form method="post" action="{{ url_for('material_issues.material_issues_post', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Post issue" data-confirm-ok="Post" data-confirm-message="Post {{ issue.issue_no }}? The material will move from the store to WIP.">
-          <button type="submit" class="mi-btn teal">Post</button></form>
+          <button type="submit" class="mi-btn primary">Post</button></form>
+        {% endif %}
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ view_data[issue.id] | tojson }}'>View</button>
         <a href="{{ url_for('material_issues.material_issues_print', issue_id=issue.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
+        {% if ed %}
         <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Cancel draft" data-confirm-ok="Cancel issue" data-confirm-message="Cancel draft {{ issue.issue_no }}?">
           <button type="submit" class="mi-btn danger">Cancel</button></form>
+        {% endif %}
       </div>
       <span></span>
     </div>
@@ -180,21 +191,23 @@
         {% set short_names = plan.lines | selectattr('short') | map(attribute='name') | list %}
         {% if short_names %}<div class="mi-meta mt-1">{{ short_names | join(', ') }}</div>{% endif %}
         {# G21: maal kam ho to operator ko rasta: Material plan (PO / ghar me banana) #}
-        {% if mat and mat.status in ('buy', 'coming', 'making') %}<div class="mi-meta mt-1"><a href="{{ url_for('material_plan.material_plan_page') }}" style="color:#8A4A1C;font-weight:600;text-decoration:underline">What to do? Open Material plan →</a></div>{% endif %}
+        {% if mat and mat.status in ('buy', 'coming', 'making') and can_do('material_plan.material_plan_page', 'GET') %}<div class="mi-meta mt-1"><a href="{{ url_for('material_plan.material_plan_page') }}" style="color:#0A3CA6;font-weight:600;text-decoration:underline">What to do? Open Material plan →</a></div>{% endif %}
       </div>
       <div class="mi-act">
+        {% if ed %}
         <button type="button" class="btn-issue mi-btn primary" data-plan='{{ plan|tojson }}'>Issue material</button>
-        {% if plan.lines | selectattr('can_all') | list %}
+        {% endif %}
+        {% if ed and plan.lines | selectattr('can_all') | list %}
         <form method="post" action="{{ url_for('material_issues.material_issues_add') }}" class="js-confirm-submit" data-confirm-title="Issue all available" data-confirm-ok="Issue now"
               data-confirm-message="Issue everything that is still needed and in the store for {{ order.prod_no }}? The material moves from the store to WIP right away.">
           <input type="hidden" name="production_order_id" value="{{ order.id }}"><input type="hidden" name="issue_date" value="{{ today }}"><input type="hidden" name="issue_action" value="post">
           {% for l in plan.lines %}{% if l.suggest > 0 %}<input type="hidden" name="line_id_{{ loop.index0 }}" value="{{ l.id }}"><input type="hidden" name="qty_{{ loop.index0 }}" value="{{ l.suggest }}">{% endif %}{% endfor %}
           <button type="submit" class="mi-btn ghost">Issue all available</button></form>
         {% endif %}
-        {% if return_plans.get(order.id) %}
+        {% if return_plans.get(order.id) and (ed or po_link) %}
         <details class="mi-menu"><summary aria-label="More">⋯</summary><div class="items">
-          <button type="button" class="btn-return" data-plan='{{ return_plans[order.id]|tojson }}'>Return material to store</button>
-          <a href="{{ url_for('production_orders.production_orders_list') }}">Open production queue</a>
+          {% if ed %}<button type="button" class="btn-return" data-plan='{{ return_plans[order.id]|tojson }}'>Return material to store</button>{% endif %}
+          {% if po_link %}<a href="{{ url_for('production_orders.production_orders_list') }}">Open production queue</a>{% endif %}
         </div></details>
         {% endif %}
       </div>
@@ -238,8 +251,8 @@
       </div>
       <div><span class="mi-chip ok"><i></i>Fully issued</span><div class="mi-meta mt-1">Need more material on the floor? Issue extra and write the reason in Remarks.</div></div>
       <div class="mi-act">
-        <button type="button" class="btn-issue mi-btn ghost" data-plan='{{ plan|tojson }}'>Issue extra material</button>
-        {% if return_plans.get(order.id) %}<button type="button" class="btn-return mi-btn ghost" data-plan='{{ return_plans[order.id]|tojson }}'>Return material</button>{% endif %}
+        {% if ed %}<button type="button" class="btn-issue mi-btn ghost" data-plan='{{ plan|tojson }}'>Issue extra material</button>{% endif %}
+        {% if ed and return_plans.get(order.id) %}<button type="button" class="btn-return mi-btn ghost" data-plan='{{ return_plans[order.id]|tojson }}'>Return material</button>{% endif %}
       </div>
     </div>
   </article>
@@ -263,18 +276,20 @@
         <div class="mi-meta">{{ issue_text[issue.id] }}</div></div>
       <div>
         <div class="mi-meta">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</div>
-        {% if rs > 0 and issue.status == 'Posted' %}<span class="mi-chip warn mt-1"><i></i>{{ '%g'|format(rs) }} returned</span>{% endif %}
+        {% if rs > 0 and issue.status == 'Posted' %}<span class="mi-chip draft mt-1"><i></i>{{ '%g'|format(rs) }} returned</span>{% endif %}
         {% if issue.issued_by or issue.received_by %}<div class="mi-meta mt-1">{% if issue.issued_by %}by {{ issue.issued_by }}{% endif %}{% if issue.received_by %} → {{ issue.received_by }}{% endif %}</div>{% endif %}
       </div>
       <div class="mi-act">
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ view_data[issue.id] | tojson }}'>View</button>
         {% if issue.status == 'Posted' %}
         <a href="{{ url_for('material_issues.material_issues_print', issue_id=issue.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
+        {% if ed %}
         <details class="mi-menu"><summary aria-label="More">⋯</summary><div class="items">
           {% if return_plans.get(issue.production_order_id) %}<button type="button" class="btn-return" data-plan='{{ return_plans[issue.production_order_id]|tojson }}'>Return material to store</button>{% endif %}
           <form method="post" action="{{ url_for('material_issues.material_issues_cancel', issue_id=issue.id) }}" class="js-confirm-submit" data-confirm-title="Cancel issue" data-confirm-ok="Cancel issue" data-confirm-message="Cancel {{ issue.issue_no }}? The material will go back from WIP to the store.">
             <button type="submit" class="danger">Cancel issue</button></form>
         </div></details>
+        {% endif %}
         {% endif %}
       </div>
       <span></span>
@@ -298,7 +313,7 @@
       <div class="mi-act">
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ return_view[ret.id] | tojson }}'>View</button>
         <a href="{{ url_for('material_issues.material_returns_print', return_id=ret.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
-        {% if ret.status == 'Posted' %}
+        {% if ret.status == 'Posted' and ed %}
         <form method="post" action="{{ url_for('material_issues.material_returns_cancel', return_id=ret.id) }}" class="js-confirm-submit" data-confirm-title="Cancel return" data-confirm-ok="Cancel return" data-confirm-message="Cancel {{ ret.return_no }}? The material goes back from the store to WIP.">
           <button type="submit" class="mi-btn danger">Cancel</button></form>
         {% endif %}
@@ -314,6 +329,8 @@
 {% endblock %}
 
 {% block modals %}
+{# Issue + Return drawers sirf Edit wale ko (unke saare opener buttons bhi usi condition me hain) #}
+{% if can_edit('material_issues') %}
 {# ---- Issue drawer ---- #}
 <div id="mi-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="mi-backdrop" class="absolute inset-0 bg-ink/40"></div>
@@ -396,6 +413,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 {# ---- View drawer (issue ya return) ---- #}
 <div id="mi-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
@@ -421,6 +439,7 @@
   function show(el) { el.classList.remove('hidden'); el.setAttribute('aria-hidden', 'false'); }
   function hide(el) { el.classList.add('hidden'); el.setAttribute('aria-hidden', 'true'); }
 
+  {% if can_edit('material_issues') %}
   // ---------- Issue drawer ----------
   function openIssue(btn) {
     var plan = JSON.parse(btn.getAttribute('data-plan') || '{}');
@@ -470,7 +489,7 @@
         '<td class="text-right tabular-nums">' + fmt(l.returned) + '</td>' +
         '<td class="text-right tabular-nums font-semibold">' + fmt(l.returnable) + '</td>' +
         '<td class="text-right tabular-nums">' + (l.used == null ? '<span class="text-ink-faint" title="Stage not complete yet">—</span>' : fmt(l.used)) + '</td>' +
-        '<td class="text-right tabular-nums font-semibold" style="color:' + (l.leftover > 0 ? '#B42318' : 'inherit') + '">' + (l.used == null ? '—' : fmt(l.leftover)) + '</td>' +
+        '<td class="text-right tabular-nums font-semibold' + (l.leftover > 0 ? ' mi-left' : '') + '">' + (l.used == null ? '—' : fmt(l.leftover)) + '</td>' +
         '<td><input type="number" class="mr-qty" data-max="' + l.returnable + '" data-suggest="' + (l.suggest || 0) + '" name="qty_' + i + '" min="0" max="' + l.returnable + '" step="any" value="' + (l.suggest > 0 ? l.suggest : '') + '"></td></tr>';
     });
     document.getElementById('mr-lines').innerHTML = html;
@@ -484,6 +503,7 @@
     document.querySelectorAll('#mr-lines .mr-qty').forEach(function (i) { i.value = i.getAttribute('data-max'); });
   });
   ['mr-close', 'mr-cancel', 'mr-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(mrModal); }); });
+  {% endif %}
 
   // ---------- View drawer ----------
   function openView(btn) {
@@ -509,7 +529,7 @@
   ['mi-view-close', 'mi-view-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', function () { hide(miView); }); });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    [miModal, mrModal, miView].forEach(function (m) { if (!m.classList.contains('hidden')) hide(m); });
+    [{% if can_edit('material_issues') %}miModal, mrModal, {% endif %}miView].forEach(function (m) { if (!m.classList.contains('hidden')) hide(m); });
   });
 
   // ---------- cards: expand + menu ----------

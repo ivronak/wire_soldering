@@ -4,23 +4,30 @@
 {% block page_css %}
 <style>
   .q-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .q-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .q-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: center; border-bottom: 1px solid #D4DBE6; border-right: 1px solid #E5EAF2; }
   .q-table thead th:last-child { border-right: none; }
-  .q-table tbody td { padding: 11px 10px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
-  .q-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .q-table tbody tr:hover { background: #FBF4EE; }
+  .q-table tbody td { padding: 11px 10px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8F1; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  .q-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  /* hover = slate (selected/active row ke accent-soft se alag dikhe) */
+  .q-table tbody tr:hover { background: #F1F5F9; }
   .q-table td.left, .q-table th.left { text-align: left; }
   .search-wrap input { padding-left: 32px; }
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
   .q-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid; }
   .q-chip.Draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
-  .q-chip.Sent { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  /* Sent = accent-soft (customer ko bheja gaya, abhi jawab baaki) — info cyan nahi */
+  .q-chip.Sent { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
   .q-chip.Approved { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .q-chip.Ordered { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
-  .q-chip.Rejected, .q-chip.Cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .q-chip.Ordered { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
+  .q-chip.Rejected { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  /* Cancelled = neutral grey (red sirf Rejected ke liye); Waiting for Owner = amber (pending, failure nahi) */
+  .q-chip.Cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .q-chip.Waiting { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .q-chip.Expired { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  /* Keyboard focus: custom buttons / links par saaf outline */
+  .filter-btn:focus-visible, .q-table a:focus-visible, #btn-add-q:focus-visible, #btn-add-q-empty:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* Drawer ki styling _quote_drawer.html me hai */
 </style>
 {% endblock %}
@@ -32,18 +39,20 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Quotations</h1>
           <p class="text-[12.5px] text-ink-faint mt-0.5">Quotation number is auto-generated · send it to the customer, then mark it approved</p>
         </div>
+        {% if can_edit('quotations') %}
         <button type="button" id="btn-add-q"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           New quotation
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
           {% for key, label in (('open', 'Open'), ('approved', 'Approved'), ('ordered', 'Ordered'), ('closed', 'Rejected / Cancelled')) %}
           <a href="{{ url_for('quotations.quotations_list', tab=key) }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
           </a>
           {% endfor %}
@@ -53,10 +62,10 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-q" placeholder="Search quotation no. or customer…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1 flex-wrap">
-            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             {% if tab == 'open' %}
             <button type="button" data-filter="draft" data-label="Draft" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft (0)</button>
             <button type="button" data-filter="sent" data-label="Sent" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Sent (0)</button>
@@ -66,7 +75,7 @@
             <button type="button" data-filter="cancelled" data-label="Cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Cancelled (0)</button>
             {% endif %}
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Draft → Sent (given to the customer) → Approved or Rejected → Finalize when the customer's PO arrives (production orders are created) · Discount per product, then charges (shipping, labour), then GST · Click View for the full quotation
@@ -96,7 +105,8 @@
                 <td class="text-ink-muted">{{ q.lines|length }}</td>
                 <td class="tabular-nums font-semibold">₹ {{ '{:,.2f}'.format(s.grand_total) }}</td>
                 <td><span class="q-chip {{ q.status }}">{{ q.status }}</span>{% if expired %}<br><span class="q-chip Expired mt-1">Expired</span>{% endif %}</td>
-                <td>{% if q.status == 'Approved' %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id, finalize=1) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Finalize</a>{% else %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">View</a>{% endif %}</td>
+                {# Finalize drawer sirf detail page par Edit wale ke liye hai, isliye View user ko hamesha View link #}
+                <td>{% if q.status == 'Approved' and can_edit('quotations') %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id, finalize=1) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Finalize</a>{% else %}<a href="{{ url_for('quotations.quotations_detail', quotation_id=q.id) }}" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-ink bg-white border border-slate-300 rounded hover:bg-mist">View</a>{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -112,8 +122,8 @@
             <p class="text-[13px] text-ink-faint mt-1">
               {% if tab == 'open' and not quotations %}Make the first quotation for a customer.{% elif quotations %}Clear the search or pick another filter.{% else %}They will show up here.{% endif %}
             </p>
-            {% if tab == 'open' and not quotations %}
-            <button type="button" id="btn-add-q-empty" class="mt-4 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark">+ New quotation</button>
+            {% if tab == 'open' and not quotations and can_edit('quotations') %}
+            <button type="button" id="btn-add-q-empty" class="mt-4 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark">+ New quotation</button>
             {% endif %}
           </div>
         </div>
@@ -121,13 +131,15 @@
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="q-count">Showing {{ quotations|length }} of {{ quotations|length }} quotations</span>
           <span>Quotation number auto-generated on save</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{# New quotation drawer sirf Edit wale user ke liye — View user ke paas isko kholne wala button hi nahi #}
+{% if can_edit('quotations') %}
 {% include '_quote_drawer.html' %}
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
@@ -154,7 +166,7 @@
       activeFilter = f;
       document.querySelectorAll('.filter-btn').forEach(function (b) {
         var on = b === btn;
-        b.className = 'filter-btn px-3 py-1.5 text-[12.5px] rounded border ' + (on ? 'border-copper bg-copper text-white font-semibold' : 'border-slate-300 bg-white text-ink');
+        b.className = 'filter-btn px-3 py-1.5 text-[12.5px] rounded border ' + (on ? 'border-accent bg-accent text-white font-semibold' : 'border-slate-300 bg-white text-ink');
       });
       applyFilter();
     });
@@ -162,5 +174,5 @@
   document.getElementById('search-q').addEventListener('input', applyFilter);
   applyFilter();
 </script>
-{% include '_quote_drawer_js.html' %}
+{% if can_edit('quotations') %}{% include '_quote_drawer_js.html' %}{% endif %}
 {% endblock %}

@@ -3,34 +3,42 @@
 
 {% block page_css %}
 <style>
-  .mp-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .mp-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .mp-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .mp-kpi .h { font-size: 12px; color: #6B7F82; }
-  .mp-kpi.bad { background: #FFF5F4; border-color: #F3C9C4; } .mp-kpi.bad .v { color: #B42318; }
-  .mp-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .mp-kpi.warn .v { color: #8A4A1C; }
-  .mp-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .mp-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .mp-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .mp-card { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; margin-bottom: 8px; }
+  .mp-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .mp-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .mp-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .mp-kpi .h { font-size: 12px; color: #5A6577; }
+  .mp-kpi.bad { background: #FCEBEA; border-color: #F0C4C0; } .mp-kpi.bad .v { color: #B42318; }
+  /* warn = sirf jahan action chahiye (Orders affected, Chase vendor) */
+  .mp-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .mp-kpi.warn .v { color: #B45309; }
+  .mp-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .mp-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .mp-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .mp-card { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; margin-bottom: 8px; }
   .mp-head { display: grid; grid-template-columns: minmax(180px, 1.2fr) repeat(4, minmax(90px, .6fr)) minmax(200px, 1.3fr); gap: 12px; align-items: center; padding: 12px 16px; }
-  .mp-name { font-size: 14.5px; font-weight: 700; color: #0F2F32; }
-  .mp-meta { font-size: 12px; color: #6B7F82; }
-  .mp-num { font-size: 17px; font-weight: 700; color: #0F2F32; font-variant-numeric: tabular-nums; }
+  .mp-name { font-size: 14.5px; font-weight: 700; color: #0B1220; }
+  .mp-meta { font-size: 12px; color: #5A6577; }
+  .mp-num { font-size: 17px; font-weight: 700; color: #0B1220; font-variant-numeric: tabular-nums; }
   .mp-num.neg { color: #B42318; }
   .mp-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .mp-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
-  .mp-chip.bad { background: #FDECEA; color: #B42318; border-color: #F3C9C4; }
-  .mp-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
+  .mp-chip.bad { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .mp-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .mp-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .mp-chip.gone { background: #F5F7F7; color: #6B7F82; border-color: #E4EAE9; }
+  .mp-chip.gone { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  /* Order status (production_orders / material_issues jaise SAME rang): In production = accent, Released = info cyan, Draft = neutral */
+  .mp-chip.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .mp-chip.rel { background: #E6F6F8; color: #0B7285; border-color: #B2DDE4; }
+  /* View filter pill ('All N' / 'Only needing attention'): selected = accent-soft (pass/fail jaisa nahi lagna chahiye), unselected = neutral 'gone' */
+  .mp-chip.on { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  a.mp-chip:focus-visible, .mp-tabs a:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
   .mp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .mp-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 7px 10px; border: 1px solid #D1D9D8; text-align: left; }
-  .mp-table td { padding: 6px 10px; border: 1px solid #E2E8E7; }
+  .mp-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 7px 10px; border: 1px solid #D4DBE6; text-align: left; }
+  .mp-table td { padding: 6px 10px; border: 1px solid #E2E8F1; }
+  .mp-table tbody tr:hover td { background: #F1F5F9; }   /* hover = neutral slate, accent-soft sirf selected ke liye */
   .mp-table .r { text-align: right; font-variant-numeric: tabular-nums; }
-  .mp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .mp-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
-  details.mp-det > summary { list-style: none; cursor: pointer; padding: 6px 16px 10px; font-size: 12.5px; font-weight: 600; color: #8A4A1C; }
+  .mp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .mp-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
+  details.mp-det > summary { list-style: none; cursor: pointer; padding: 6px 16px 10px; font-size: 12.5px; font-weight: 600; color: #0A3CA6; }
   details.mp-det > summary::-webkit-details-marker { display: none; }
   @media (max-width: 1100px) { .mp-head { grid-template-columns: 1fr 1fr; } }
 </style>
@@ -80,7 +88,7 @@
   <article class="mp-card" style="padding:12px 16px">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div><span class="mp-name font-mono">{{ o.order.prod_no }}</span>
-        <span class="mp-chip {{ 'warn' if o.order.status == 'In production' else 'gone' }} ml-1"><i></i>{{ o.order.status }}</span>
+        <span class="mp-chip {{ 'run' if o.order.status == 'In production' else ('rel' if o.order.status == 'Released' else 'gone') }} ml-1"><i></i>{{ o.order.status }}</span>
         <span class="mp-meta ml-1">{{ o.order.product.name if o.order.product else '' }} · {{ '%g'|format(o.order.planned_qty) }} {{ o.order.product.base_unit.code if o.order.product and o.order.product.base_unit else '' }}{% if o.start %} · starts {{ o.start.strftime('%d %b') }}{% endif %}</span></div>
       {% if o.short_lines %}<span class="mp-chip bad"><i></i>Short of {{ o.short_lines|length }} material{{ '' if o.short_lines|length == 1 else 's' }}</span>
       {% elif o.lines %}<span class="mp-chip ok"><i></i>All material available</span>
@@ -100,7 +108,7 @@
             <td>{{ l.when.strftime('%d %b') }}</td>
             <td class="mp-meta">
               {% if l.short <= 0.000001 %}Covered by store stock / PO on the way
-              {% elif r and r.maker %}<a class="text-copper-text font-semibold hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">Make {{ r.maker.name }}</a> in house
+              {% elif r and r.maker %}{% if can_do('production_orders.production_orders_list', 'GET') %}<a class="text-accent-text font-semibold hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">Make {{ r.maker.name }}</a>{% else %}Make {{ r.maker.name }}{% endif %} in house
               {% elif r and r.urgency == 'late' %}<span style="color:#B42318;font-weight:600">Place PO now</span> · {{ r.days_late }} day{{ '' if r.days_late == 1 else 's' }} late
               {% elif r and r.place_by %}Place PO before {{ r.place_by.strftime('%d %b') }}
               {% elif r and r.vendor is none %}No supplier yet: raise the PO by hand
@@ -111,7 +119,7 @@
         </tbody>
       </table>
     </div>
-    {% if o.short_lines and plan.suggested %}<div class="mt-2 text-right"><a href="{{ url_for('material_plan.material_plan_page', view='po') }}" class="text-[12.5px] font-semibold text-copper-text hover:underline">Create purchase orders &rarr;</a></div>{% endif %}
+    {% if o.short_lines and plan.suggested %}<div class="mt-2 text-right"><a href="{{ url_for('material_plan.material_plan_page', view='po') }}" class="text-[12.5px] font-semibold text-accent-text hover:underline">Create purchase orders &rarr;</a></div>{% endif %}
     {% endif %}
   </article>
   {% else %}
@@ -125,10 +133,11 @@
     <div class="mp-name">Suggested purchase orders</div>
     <p class="mp-meta mb-2">One PO per vendor for everything that runs short, so several orders are bought together. Change the quantities if you want, then create the draft. It is saved as a Draft on the Purchase orders page; the rate, tax and unit are taken from the last PO of that material.</p>
     {% for g in plan.suggested %}
-    <form method="post" action="{{ url_for('material_plan.material_plan_create_po') }}" class="border border-slate-200 rounded-lg p-3 mb-2">
+    {# View user ke liye <form> ki jagah simple <div> (usse POST hoga hi nahi) #}
+    {% if can_edit('material_plan') %}<form method="post" action="{{ url_for('material_plan.material_plan_create_po') }}" class="border border-slate-200 rounded-lg p-3 mb-2">{% else %}<div class="border border-slate-200 rounded-lg p-3 mb-2">{% endif %}
       <input type="hidden" name="vendor_id" value="{{ g.vendor.id }}" />
       <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div><span class="mp-name">{{ g.vendor.name }}</span>{% if g.vendor.grade %} <span class="mp-chip {{ 'ok' if g.vendor.grade == 'A' else 'gone' }}">Grade {{ g.vendor.grade }}</span>{% endif %}
+        <div><span class="mp-name">{{ g.vendor.name }}</span>{% if g.vendor.grade %} <span class="mp-chip {{ 'ok' if g.vendor.grade == 'A' else ('on' if g.vendor.grade == 'B' else ('warn' if g.vendor.grade == 'C' else 'gone')) }}">Grade {{ g.vendor.grade }}</span>{% endif %}
           <span class="mp-meta">· {% if g.vendor.lead_time_days is not none %}lead time {{ g.vendor.lead_time_days }} days, goods about {{ g.expected.strftime('%d %b') }}{% else %}lead time not set{% endif %}</span></div>
         {% if g.late %}<span class="mp-chip bad"><i></i>Will arrive after {{ g.late_lines | map(attribute='row.material.name') | join(', ') }} runs short ({{ g.late_lines[0].row.short_date.strftime('%d %b') }}{% if g.late_lines|length > 1 %}, ...{% endif %})</span>{% endif %}
       </div>
@@ -144,11 +153,11 @@
               <td class="mp-meta">{{ line.row.orders|join(', ') }}</td>
               <td>{{ vendor_pick(line.row) }}</td>
               <td class="r">₹{{ '%g'|format(line.row.last_line.rate) }}</td>
-              <td class="r"><input type="number" name="qty_{{ loop.index0 }}" value="{{ '%g'|format(line.qty) }}" min="0" step="any" class="w-24 px-2 py-1 text-[13px] border border-slate-300 rounded text-right" /> {{ line.row.unit }}</td>
+              <td class="r">{% if can_edit('material_plan') %}<input type="number" name="qty_{{ loop.index0 }}" value="{{ '%g'|format(line.qty) }}" min="0" step="any" class="w-24 px-2 py-1 text-[13px] border border-slate-300 rounded text-right" />{% else %}{{ '%g'|format(line.qty) }}{% endif %} {{ line.row.unit }}</td>
             </tr>
             {% endfor %}
             {% for line in g.lines if line.draft_po %}
-            <tr style="color:#6B7F82">
+            <tr style="color:#5A6577">
               <td><b>{{ line.row.material.name }}</b> <span class="mp-meta">{{ line.row.material.code }}</span></td>
               <td>{{ line.row.short_date.strftime('%d %b') }}</td>
               <td colspan="4">Already in draft {{ line.draft_po }}. Confirm that PO instead.</td>
@@ -157,10 +166,10 @@
           </tbody>
         </table>
       </div>
-      {% if g.open_lines %}
-      <div class="mt-2 text-right"><button type="submit" class="px-3.5 py-2 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Create draft PO for {{ g.vendor.name }}</button></div>
+      {% if g.open_lines and can_edit('material_plan') %}
+      <div class="mt-2 text-right"><button type="submit" class="px-3.5 py-2 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Create draft PO for {{ g.vendor.name }}</button></div>
       {% endif %}
-    </form>
+    {% if can_edit('material_plan') %}</form>{% else %}</div>{% endif %}
     {% endfor %}
     {% if plan.no_supplier %}
     <p class="mp-meta">No supplier yet (never bought before): {{ plan.no_supplier|map(attribute='material.name')|join(', ') }}. Raise these POs by hand on the Purchase orders page.</p>
@@ -173,8 +182,8 @@
   {% endif %}
   {% if view == 'all' %}
   <div class="flex items-center gap-2 mb-2 text-[12.5px]">
-    <a href="{{ url_for('material_plan.material_plan_page', view='all') }}" class="mp-chip {{ 'gone' if only_short else 'ok' }}" style="text-decoration:none">All {{ plan.kpi.materials }}</a>
-    <a href="{{ url_for('material_plan.material_plan_page', view='all', only='short') }}" class="mp-chip {{ 'bad' if only_short else 'gone' }}" style="text-decoration:none">Only needing attention</a>
+    <a href="{{ url_for('material_plan.material_plan_page', view='all') }}" class="mp-chip {{ 'gone' if only_short else 'on' }}" style="text-decoration:none">All {{ plan.kpi.materials }}</a>
+    <a href="{{ url_for('material_plan.material_plan_page', view='all', only='short') }}" class="mp-chip {{ 'on' if only_short else 'gone' }}" style="text-decoration:none">Only needing attention</a>
   </div>
   {% endif %}
   {% for r in (rows if view == 'all' else []) %}
@@ -199,7 +208,7 @@
           <span class="mp-chip ok"><i></i>Enough for {{ horizon }} days</span>
         {% endif %}
         <div class="mp-meta mt-1">
-          {% if r.maker %}Made in house by {{ r.maker.name }}.{% if r.short_date %} Plan a production order of at least {{ '%g'|format(r.shortage) }} {{ r.unit }}: <a class="text-copper-text font-semibold hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">Production order</a>{% endif %}
+          {% if r.maker %}Made in house by {{ r.maker.name }}.{% if r.short_date %} Plan a production order of at least {{ '%g'|format(r.shortage) }} {{ r.unit }}{% if can_do('production_orders.production_orders_list', 'GET') %}: <a class="text-accent-text font-semibold hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">Production order</a>{% endif %}{% endif %}
           {% elif r.vendor %}{{ r.vendor.name }}{% if r.vendor.grade %} (Grade {{ r.vendor.grade }}){% endif %}{% if r.lead is not none %} · lead time {{ r.lead }} days{% else %} · lead time not set{% endif %}{% else %}No purchase order yet, so no supplier{% endif %}
         </div>
         {% if r.undated > 0 %}<div class="mp-meta">{{ '%g'|format(r.undated) }} {{ r.unit }} on order has no expected date, so it is not counted.</div>{% endif %}

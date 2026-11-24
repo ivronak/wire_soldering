@@ -5,14 +5,16 @@
 {% block page_css %}
 <style>
   .d-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
-  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 11px 10px; text-align: left; border-bottom: 1px solid #D1D9D8; }
-  .d-table tbody td { padding: 10px; font-size: 14px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 11px 10px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .d-table tbody td { padding: 10px; font-size: 14px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
   .d-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .d-table tfoot td { padding: 11px 10px; font-weight: 700; background: #EEF2F1; border-top: 2px solid #D1D9D8; }
-  .ql-input { padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
-  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
-  .open-row td { background: #FAFBFB; font-weight: 600; }
+  .d-table tfoot td { padding: 11px 10px; font-weight: 700; background: #E9EEF6; border-top: 2px solid #D4DBE6; }
+  .ql-input { padding: 7px 8px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
+  /* Keyboard focus: custom buttons / links par saaf outline */
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .open-row td { background: #FAFBFD; font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -35,8 +37,8 @@
           <input type="date" name="from" id="st-from" value="{{ date_from.isoformat() }}" class="ql-input">
           <label class="text-[13px] text-ink-muted" for="st-to">To</label>
           <input type="date" name="to" id="st-to" value="{{ date_to.isoformat() }}" max="{{ today.isoformat() }}" class="ql-input">
-          <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Show</button>
-          {% if customer %}<a id="btn-print" target="_blank" href="{{ url_for('customer_statement.statement_print', c=customer.id, **{'from': date_from.isoformat(), 'to': date_to.isoformat()}) }}" class="px-3 py-1.5 text-[13px] font-semibold text-copper-text bg-white border border-copper-border rounded hover:bg-copper-soft">Print</a>{% endif %}
+          <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
+          {% if customer %}<a id="btn-print" target="_blank" href="{{ url_for('customer_statement.statement_print', c=customer.id, **{'from': date_from.isoformat(), 'to': date_to.isoformat()}) }}" class="px-3 py-1.5 text-[13px] font-semibold text-accent-text bg-white border border-accent-border rounded hover:bg-accent-soft">Print</a>{% endif %}
         </form>
       </div>
 
@@ -45,7 +47,7 @@
         <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Opening balance</div><div class="text-[18px] font-bold text-ink tabular-nums" id="st-open">₹ {{ bal(data.opening) }}</div></div>
         <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Billed (debit)</div><div class="text-[18px] font-bold text-ink tabular-nums" id="st-debit">₹ {{ '{:,.2f}'.format(data.debit_total) }}</div></div>
         <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Received + credit notes (credit)</div><div class="text-[18px] font-bold text-success tabular-nums" id="st-credit">₹ {{ '{:,.2f}'.format(data.credit_total) }}</div></div>
-        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Closing balance</div><div class="text-[18px] font-bold text-copper-text tabular-nums" id="st-close">₹ {{ bal(data.closing) }}</div></div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Closing balance</div><div class="text-[18px] font-bold text-ink tabular-nums" id="st-close">₹ {{ bal(data.closing) }}</div></div>
       </div>
       {% endif %}
 

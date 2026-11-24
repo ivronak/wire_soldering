@@ -13,16 +13,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 8px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .pi-table thead th:first-child,
   .pi-table tbody td:first-child { text-align: left; padding-left: 16px; }
@@ -31,13 +31,13 @@
     padding: 11px 8px;
     font-size: 13.5px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .pi-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .pi-table tbody tr:hover { background: #FBF4EE; }
+  .pi-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .pi-table tbody tr:hover { background: #F1F5F9; }  /* hover = neutral grey (accent tint sirf selected row ke liye) */
   .search-wrap input { padding-left: 32px; }
   #pi-modal.hidden, #pi-view-modal.hidden, #rt-modal.hidden { display: none; }
   #pi-modal, #pi-view-modal, #rt-modal { display: flex; }
@@ -48,7 +48,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #8A4A1C;
+    color: #5A6577;  /* drawer section label = neutral */
     margin-top: 4px;
   }
   .status-pill {
@@ -58,22 +58,23 @@
   .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .status-tobill { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .status-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .status-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  /* Cancelled = neutral grey (red sirf rejected / failed / overdue ke liye) */
+  .status-cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
 
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .lines-table th {
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     padding: 8px 6px;
-    border: 1px solid #D1D9D8;
+    border: 1px solid #D4DBE6;
     text-align: center;
   }
   .lines-table td {
     padding: 4px;
-    border: 1px solid #E2E8E7;
+    border: 1px solid #E2E8F1;
     vertical-align: middle;
   }
   .lines-table input, .lines-table select {
@@ -85,10 +86,10 @@
   }
   .lines-table input:focus, .lines-table select:focus {
     outline: none;
-    border-color: #C46B2D;
-    box-shadow: 0 0 0 1px #C46B2D;
+    border-color: #0B5BEF;
+    box-shadow: 0 0 0 1px #0B5BEF;
   }
-  .lines-table input:read-only { background: #F4F6F5; color: #3D5A5D; }
+  .lines-table input:read-only { background: #F3F6FB; color: #475266; }
 </style>
 {% endblock %}
 
@@ -106,7 +107,7 @@
          isliye ek baar yahan likha. Bill ki lines / charges ka JSON "summary" property se aata hai (models.py) #}
       {% macro pi_view_button(inv) %}
       <button type="button"
-        class="btn-view-pi px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+        class="btn-view-pi px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent"
         data-pi="{{ inv.pi_no }}"
         data-vendor="{{ inv.vendor.name if inv.vendor else '' }}"
         data-status="{{ inv.status }}"
@@ -131,11 +132,11 @@
         {# §10.6 tabs: GRN / QC page jaisa. Flask route ?tab=pending|completed ke hisaab se list + counts bhejta hai #}
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
           <a href="{{ url_for('purchase_invoices.purchase_invoices_list', tab='pending') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             Pending action <span class="tabular-nums">({{ pending_count }})</span>
           </a>
           <a href="{{ url_for('purchase_invoices.purchase_invoices_list', tab='completed') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             Completed <span class="tabular-nums">({{ completed_count }})</span>
           </a>
         </div>
@@ -144,11 +145,11 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-pi" placeholder="{{ 'Search GRN, QC, vendor, material, lot…' if tab == 'pending' else 'Search PI no., vendor, vendor invoice no…' }}"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex flex-wrap items-center gap-1">
             {# Har tab me sirf usi tab ke pills. data-label = JS count ke saath dikhne wala naam #}
-            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             {% if tab == 'completed' %}
             <button type="button" data-filter="posted" data-label="Posted" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Posted (0)</button>
             <button type="button" data-filter="cancelled" data-label="Cancelled" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Cancelled (0)</button>
@@ -157,7 +158,7 @@
             <button type="button" data-filter="draft" data-label="Draft bill" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft bill (0)</button>
             {% endif %}
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
               One bill per <strong>GRN</strong>, made after its quality check · the bill covers everything received, <strong>including rejected quantity</strong> (the vendor's invoice is final) · rejected goods go back with <strong>Return</strong> on the posted bill · to change a draft bill, cancel it and create it again · a bill with an active return cannot be cancelled until the return is cancelled
@@ -224,9 +225,11 @@
                 <td><span class="status-pill status-tobill">To bill</span></td>
                 <td>
                   {# Is GRN ka saara data button par JSON me rakha hai (GRN.billing_data): form kholne par JS isi se lines banata hai #}
+{% if can_edit('purchase_invoices') %}
                   <button type="button"
-                    class="btn-create-bill px-2 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
+                    class="btn-create-bill px-2 py-1 text-[12px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark"
                     data-bill='{{ grn.billing_data|tojson }}'>Create bill</button>
+{% endif %}
                 </td>
               </tr>
               {% else %}
@@ -251,11 +254,12 @@
                 <td>
                   <div class="flex flex-wrap justify-center gap-1">
                     {{ pi_view_button(inv) }}
+{% if can_edit('purchase_invoices') %}
                     <form method="post" action="{{ url_for('purchase_invoices.purchase_invoices_post', inv_id=inv.id) }}" class="inline js-confirm-submit"
                           data-confirm-title="Post bill"
                           data-confirm-ok="Post"
                           data-confirm-message="Post {{ inv.pi_no }}? ₹{{ '{:,.2f}'.format(inv.total_amount or 0) }} will be added to what you owe {{ inv.vendor.name if inv.vendor else 'the vendor' }}.">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post</button>
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post</button>
                     </form>
                     <form method="post" action="{{ url_for('purchase_invoices.purchase_invoices_cancel', inv_id=inv.id) }}" class="inline js-confirm-submit"
                           data-confirm-title="Cancel draft bill"
@@ -263,6 +267,7 @@
                           data-confirm-message="Cancel draft {{ inv.pi_no }}? Its quantity will be free to bill again.">
                       <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
                     </form>
+{% endif %}
                   </div>
                 </td>
               </tr>
@@ -329,8 +334,9 @@
                     {# Return sirf Posted bill par aur jab kuch qty wapas bhejne ko bachi ho. Poora wapas ja chuka ho to "Fully returned".
                        Lines ka data button par rakha hai: panel kholne par JS isi se rows banata hai #}
                     {% if inv.can_return %}
+{% if can_do('purchase_returns.purchase_returns_add') %}
                     <button type="button"
-                      class="btn-return px-2 py-1 text-[12px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
+                      class="btn-return px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-accent-soft rounded hover:bg-accent hover:text-white"
                       data-invoice-id="{{ inv.id }}"
                       data-pi="{{ inv.pi_no }}"
                       data-vendor="{{ inv.vendor.name if inv.vendor else '' }}"
@@ -339,11 +345,12 @@
                       data-returned="{{ inv.returned_amount }}"
                       data-invoice-date="{{ inv.invoice_date.isoformat() if inv.invoice_date else '' }}"
                       data-return-lines='{{ (inv.lines | map(attribute="return_info") | list) | tojson }}'>Return</button>
+{% endif %}
                     {% elif inv.status == 'Posted' and inv.active_returns %}
                     <span class="self-center text-[11.5px] text-ink-faint">Fully returned</span>
                     {% endif %}
                     {# Active return wale bill par Cancel nahi dikhate (server bhi refuse karta hai): pehle return cancel karo #}
-                    {% if inv.status == 'Posted' and not inv.active_returns %}
+                    {% if inv.status == 'Posted' and not inv.active_returns and can_edit('purchase_invoices') %}
                     <form method="post" action="{{ url_for('purchase_invoices.purchase_invoices_cancel', inv_id=inv.id) }}" class="inline js-confirm-submit"
                           data-confirm-title="Cancel posted bill"
                           data-confirm-ok="Cancel bill"
@@ -379,10 +386,11 @@
 
 {% block modals %}
 {# ---- Create bill: right se khulne wala panel. Vendor / lots / tax type Pending row ke "Create bill" se aate hain ---- #}
+{% if can_edit('purchase_invoices') %}
 <div id="pi-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="pi-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="pi-modal-title" class="relative ml-auto h-full w-full max-w-5xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="pi-modal-title" class="text-[16px] font-bold text-ink">Create purchase bill</h2>
         <p id="pi-modal-sub" class="text-[12.5px] text-ink-faint">Enter the vendor's bill for everything received in this GRN</p>
@@ -404,14 +412,14 @@
         </div>
         <div>
           <label for="pi-vinv" class="block text-[12.5px] font-semibold text-ink mb-1">Vendor invoice no. *</label>
-          <input type="text" id="pi-vinv" name="vendor_invoice_no" required maxlength="50" placeholder="As printed on the vendor's bill" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper font-mono" />
+          <input type="text" id="pi-vinv" name="vendor_invoice_no" required maxlength="50" placeholder="As printed on the vendor's bill" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent font-mono" />
         </div>
         <div>
           <label for="pi-date" class="block text-[12.5px] font-semibold text-ink mb-1">Invoice date *</label>
-          <input type="date" id="pi-date" name="invoice_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <input type="date" id="pi-date" name="invoice_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
-      <div id="pi-tax-type-box" class="w-full px-2.5 py-2 text-[13.5px] border border-brand-border rounded bg-brand-soft text-brand-teal font-medium"></div>
+      <div id="pi-tax-type-box" class="w-full px-2.5 py-2 text-[13.5px] border border-cat2-border rounded bg-cat2-bg text-cat2 font-medium"></div>
 
       <hr class="border-slate-200" />
       <p class="form-section-title !mt-0">Goods on this bill</p>
@@ -434,7 +442,7 @@
 
       <div class="flex items-center justify-between">
         <p class="form-section-title !mt-0 !mb-0">Charges</p>
-        <button type="button" id="btn-add-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
+        <button type="button" id="btn-add-charge" class="text-[12.5px] font-semibold text-accent-text hover:underline">+ Add charge</button>
       </div>
       <p class="text-[12.5px] text-ink-faint">Optional (freight, packing…). Pick a charge from the master. Add increases the total. Minus reduces it. GST is calculated on items + charges together.</p>
       <div class="border border-slate-200 rounded">
@@ -458,7 +466,7 @@
       <div>
         <label for="pi-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
         <textarea id="pi-remarks" name="remarks" rows="2" maxlength="255" placeholder="Anything to note about this bill…"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent"></textarea>
       </div>
 
       <div class="bg-mist border border-slate-200 rounded p-3 space-y-1.5 text-[13px]">
@@ -471,7 +479,7 @@
           <span>Bill total</span><span id="pi-grand-total" class="tabular-nums">₹0.00</span>
         </div>
       </div>
-      <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+      <p class="text-[11.5px] text-ink-faint bg-info-bg border border-info-border rounded px-2.5 py-2">
         <strong>Save as draft</strong> keeps the bill for checking (the amount is not added to the vendor yet).
         <strong>Post bill</strong> adds the total to what you owe the vendor. Totals are recalculated on the server when you save.
       </p>
@@ -480,16 +488,17 @@
     <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="submit" form="pi-form" name="invoice_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
       <button type="button" id="btn-cancel-pi" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="pi-form" name="invoice_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post bill</button>
+      <button type="submit" form="pi-form" name="invoice_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post bill</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 {# ---- View bill: sirf padhne ke liye ---- #}
 <div id="pi-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="pi-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="pi-view-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="pi-view-title" class="text-[16px] font-bold text-ink">Bill detail</h2>
         <p id="pi-view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -505,10 +514,11 @@
 
 {# ---- Return goods: Posted bill ki row ke "Return" button se khulta hai. Form Purchase return ke route par jaata hai.
         Wording jaan-boojhkar saral hai (Add / Minus jaise shabd nahi): non-technical user ke liye ---- #}
+{% if can_do('purchase_returns.purchase_returns_add') %}
 <div id="rt-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="rt-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="rt-modal-title" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="rt-modal-title" class="text-[16px] font-bold text-ink">Return goods to vendor</h2>
         <p id="rt-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -545,11 +555,11 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label for="rt-date" class="block text-[12.5px] font-semibold text-ink mb-1">Return date *</label>
-            <input type="date" id="rt-date" name="return_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <input type="date" id="rt-date" name="return_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="md:col-span-2">
             <label for="rt-reason" class="block text-[12.5px] font-semibold text-ink mb-1">Reason for the return *</label>
-            <input type="text" id="rt-reason" name="reason" required maxlength="255" placeholder="Wire was damaged on arrival" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <input type="text" id="rt-reason" name="reason" required maxlength="255" placeholder="Wire was damaged on arrival" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
         </div>
       </div>
@@ -557,7 +567,7 @@
       <div>
         <div class="flex items-center justify-between">
           <p class="text-[14px] font-semibold text-ink">3. Extra charges <span class="font-normal text-ink-faint">(optional)</span></p>
-          <button type="button" id="btn-add-rt-charge" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add charge</button>
+          <button type="button" id="btn-add-rt-charge" class="text-[12.5px] font-semibold text-accent-text hover:underline">+ Add charge</button>
         </div>
         <div class="border border-slate-200 rounded">
           <table class="lines-table">
@@ -598,10 +608,11 @@
 
     <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel-rt" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="rt-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post return</button>
+      <button type="submit" form="rt-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post return</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
@@ -670,10 +681,10 @@
     btn.addEventListener('click', function () {
       activeFilter = btn.getAttribute('data-filter');
       document.querySelectorAll('.filter-btn').forEach(function (b) {
-        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.remove('border-accent', 'bg-accent', 'text-white', 'font-semibold');
         b.classList.add('border-slate-300', 'bg-white', 'text-ink');
       });
-      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.add('border-accent', 'bg-accent', 'text-white', 'font-semibold');
       btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
       applyFilters();
     });
@@ -720,7 +731,7 @@
         '<div class="font-semibold">' + fmtQty(l.received) + ' ' + esc(l.unit) + '</div>' +
         '<div class="text-[11px] text-ink-faint">' + qc + '</div></td>' +
       '<td><input type="number" class="line-rate tabular-nums" min="0" step="any" required value="' + l.rate + '" data-po-rate="' + l.rate + '" />' +
-        '<div class="rate-flag text-[11px] text-copper-text"></div></td>' +
+        '<div class="rate-flag text-[11px] text-warning font-medium"></div></td>' +
       '<td><select class="line-tax">' + taxSelectHtml(l.tax_id) + '</select></td>' +
       '<td class="line-amount tabular-nums text-right">₹0.00</td>' +
       '</tr>';
@@ -739,10 +750,10 @@
     var box = document.getElementById('pi-tax-type-box');
     if (currentTaxType === 'inter') {
       box.textContent = 'Inter-state purchase (IGST)';
-      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-copper-border rounded bg-copper-soft text-copper-text font-medium';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-cat1-border rounded bg-cat1-bg text-cat1 font-medium';
     } else {
       box.textContent = 'Intra-state purchase (CGST + SGST)';
-      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-brand-border rounded bg-brand-soft text-brand-teal font-medium';
+      box.className = 'w-full px-2.5 py-2 text-[13.5px] border border-cat2-border rounded bg-cat2-bg text-cat2 font-medium';
     }
   }
 
@@ -851,6 +862,7 @@
     resetChargeList();
   }
 
+{% if can_edit('purchase_invoices') %}
   document.querySelectorAll('.btn-create-bill').forEach(function (btn) {
     btn.addEventListener('click', function () { openCreate(btn); });
   });
@@ -870,8 +882,10 @@
     renumberCharges();
     calcTotals();
   });
+{% endif %}
 
   // "Post bill" par confirm (asli jaanch server karta hai)
+{% if can_edit('purchase_invoices') %}
   piForm.addEventListener('submit', function (e) {
     if (piForm.getAttribute('data-confirmed') === '1') {
       piForm.removeAttribute('data-confirmed');
@@ -892,6 +906,7 @@
       });
     }
   });
+{% endif %}
 
   // ---------- View bill ----------
   function viewField(label, value) {
@@ -932,7 +947,7 @@
     var gstOnCharges = btn.getAttribute('data-gst-on-charges') === '1';
     var rejected = JSON.parse(btn.getAttribute('data-rejected') || '[]');
     if (rejected.length) {
-      html += '<div class="bg-copper-soft border border-copper-border rounded p-3 text-[13px] text-ink">' +
+      html += '<div class="bg-warning-bg border border-warning-border rounded p-3 text-[13px] text-ink">' +
         '<strong>Rejected in QC but billed here:</strong> ' +
         rejected.map(function (r) { return esc(r.material) + ' ' + fmtQty(r.qty) + ' ' + esc(r.unit); }).join(', ') +
         '. The vendor\'s invoice is final, so this quantity is on the bill. Send it back with <strong>Return</strong>.</div>';
@@ -1168,6 +1183,7 @@
     rtResetCharges();
   }
 
+{% if can_do('purchase_returns.purchase_returns_add') %}
   document.querySelectorAll('.btn-return').forEach(function (btn) {
     btn.addEventListener('click', function () { openReturn(btn); });
   });
@@ -1187,8 +1203,10 @@
     rtRenumber();
     calcReturn();
   });
+{% endif %}
 
   // Submit se pehle browser par jaldi jaanch (asli jaanch server karta hai) aur "Post return" par saade shabdon me confirm
+{% if can_do('purchase_returns.purchase_returns_add') %}
   rtForm.addEventListener('submit', function (e) {
     if (rtForm.getAttribute('data-confirmed') === '1') {
       rtForm.removeAttribute('data-confirmed');
@@ -1216,12 +1234,17 @@
       rtForm.requestSubmit();
     });
   });
+{% endif %}
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!viewModal.classList.contains('hidden')) closeView();
+{% if can_do('purchase_returns.purchase_returns_add') %}
     else if (!rtModal.classList.contains('hidden')) closeReturn();
+{% endif %}
+{% if can_edit('purchase_invoices') %}
     else if (!piModal.classList.contains('hidden')) closeCreate();
+{% endif %}
   });
 
   updateFilterCounts();

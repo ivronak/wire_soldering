@@ -52,7 +52,11 @@
   }
   // Step sirf tab chalta hai jab uska `when()` true ho (jaise Production line ka modal tabhi jab lines bani hon)
   function stepOn(st) { try { return !st.when || !!st.when(); } catch (e) { return true; } }
-  function navLink(href) { return 'aside a.nav-link[href="' + href + '"]'; }
+  // Sidebar ke link tak jaate waqt uske drawers khol do (band drawer me link chhupa hota hai)
+  function navLink(href) {
+    var sel = 'aside a.nav-link[href="' + href + '"]';
+    return function () { var el = document.querySelector(sel); if (el && window.ErpNav) window.ErpNav.reveal(el); return el; };
+  }
   // Is order wala card (production queue / issue / routing / output ... ka koi bhi card)
   function orderCard(sel) {
     var cards = $$(sel);
@@ -443,7 +447,7 @@
       { id: 'cv-done', type: 'info', path: '/consumption_variance', target: '.cv-card', title: 'Reviewed ✅', text: 'કાર્ડ પર <b>Reviewed</b> દેખાય છે અને "not reviewed" ગણતરી ઘટી.' },
       { id: 'mp-seed', type: 'action', path: '/production_orders', target: 'main h1', title: 'ડેમો: મોટો ઓર્ડર',
         text: 'Material plan બતાવવા ડેમો માટે <b>1500 KG નો એક મોટો ઓર્ડર</b> કતારમાં મૂકીએ — જેનો માલ સ્ટોકમાં પૂરતો નથી.',
-        button: { label: 'ડેમો ઓર્ડર બનાવો', run: function () { return fetch('/tour/shortage_order', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (j) { if (!j.ok) throw new Error(j.message); return j; }); } } },
+        button: { label: 'ડેમો ઓર્ડર બનાવો', run: function () { return fetch('/tour/shortage_order', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (j) { if (!j.ok) throw new Error(j.message || j.error || 'Request failed'); return j; }); } } },
       { id: 'mp-link', type: 'click', target: navLink('/material_plan'), title: 'Material plan ખોલો', text: '<b>Manufacturing</b> હેઠળ <b>Material plan</b>.', todo: 'ક્લિક કરો: Material plan' },
       { id: 'mp-kpi', type: 'info', path: '/material_plan', target: '.mp-kpi', title: 'Material plan — 30 દિવસ',
         text: '<b>પહેલા:</b> દરેક ઓર્ડરનું અલગ ચેક, અને ફક્ત આજનો સ્ટોક.<br><b>હવે:</b> આખી કતારના <b>આવતા 30 દિવસ</b>નો હિસાબ: સ્ટોર + PO થી આવનાર − કતારના ઓર્ડરની જરૂર. ઉપર ચાર સાદા કાર્ડ: <b>Materials short</b>, <b>Orders affected</b>, <b>Buy now</b>, <b>Chase vendor</b>.' },
@@ -611,7 +615,11 @@
           else fd.append('actual_' + i, String(goodFromLimits(p.min_value, p.max_value)));
         });
         fd.append('qc_action', 'submit');
-        return fetch('/inward_qc/add', { method: 'POST', body: fd }).then(function (r) { return r.text(); }).then(function (html) {
+        return fetch('/inward_qc/add', { method: 'POST', body: fd }).then(function (r) {
+          // guard / CSRF ka jawab JSON {success:false,error} hota hai (Phase 0) — use bhi error maano
+          if ((r.headers.get('Content-Type') || '').indexOf('json') !== -1) return r.json().then(function (j) { if (j && j.success === false) throw new Error(j.error || 'Request failed'); return ''; });
+          return r.text();
+        }).then(function (html) {
           // flash message page ke showToast(...) me aata hai; error ho to dikhao
           var m = html.match(/showToast\(("(?:[^"\\]|\\.)*"),\s*"(error|warning)"\)/);
           if (m) throw new Error(JSON.parse(m[1]));
@@ -672,7 +680,7 @@
       if (!j.ok) throw new Error(j.message || 'Order not found');
       return fetch('/tour/finish_stages/' + j.id, { method: 'POST' });
     }).then(function (r) { return r.json(); }).then(function (j) {
-      if (!j.ok) throw new Error(j.message);
+      if (!j.ok) throw new Error(j.message || j.error || 'Request failed');
       return j;
     });
   }
@@ -1043,7 +1051,7 @@
     box.innerHTML = '<div class="top"><h2>🎓 ડેમો ટૂર (ગુજરાતી)</h2><p>ખરીદીથી લઈને તૈયાર માલ, Scrap અને Variance સુધીનું બધું <b>જાતે કરીને</b> શીખો. દરેક પગલું ગુજરાતીમાં સમજાવેલું છે.</p></div>' +
       '<div class="alert">⚠️ ટૂર <b>સાચી એન્ટ્રીઓ</b> બનાવશે — PO, GRN, QC, બિલ, પ્રોડક્શન ઓર્ડર, માલ આપવો/પાછો, રૂટિંગ, output વગેરે. ટ્રેનિંગ / ડેમો માટે જ ચલાવો.<label><input type="checkbox" id="tour-ok"> હું સમજું છું કે ટૂર સાચી એન્ટ્રીઓ બનાવશે.</label></div>';
     var auto = mk('div', 'tour-ch', box);
-    auto.style.cssText += ';background:#FBF4EE;border-color:#E8C9A8';
+    auto.style.cssText += ';background:#EDF3FF;border-color:#BCD2FA';
     auto.innerHTML = '<div class="n">▶</div><div class="t"><b>1-ક્લિક ઓટો ડેમો (ગુજરાતી અવાજ સાથે)</b><span>તમારે કંઈ કરવાનું નથી — ડેમો પોતે બધું ક્લિક કરશે અને ગુજરાતીમાં સમજાવશે. થોભાવી શકાય, ઝડપ બદલી શકાય.</span></div>';
     var autoBtn = btn('શરૂ કરો', 'primary', function () { location.href = '/demo'; });
     auto.appendChild(autoBtn);
@@ -1065,11 +1073,11 @@
     });
     menuEl.addEventListener('click', function (e) { if (e.target === menuEl) closeMenu(); });
     var note = mk('div', 'alert', box);
-    note.style.background = '#EAF3F3'; note.style.borderColor = '#C5D9DA'; note.style.color = '#1F5558';
+    note.style.background = '#E6F6F8'; note.style.borderColor = '#B2DDE4'; note.style.color = '#0B7285';
     note.innerHTML = 'સૂચન: <b>"આખો ટૂર"</b> ક્રમમાં ચલાવવો — પછીના ભાગ આગળના ભાગમાં બનેલા ઓર્ડર/સ્ટોક પર આધારિત છે. અલગ ભાગ ચલાવો તો પહેલાં ઓર્ડર બનેલો હોવો જોઈએ.';
   }
   function okBox() { return $('#tour-ok'); }
-  function warnBox() { var a = $('.tour-menu .alert'); if (a) { a.style.outline = '3px solid #C46B2D'; setTimeout(function () { a.style.outline = ''; }, 1200); } }
+  function warnBox() { var a = $('.tour-menu .alert'); if (a) { a.style.outline = '3px solid #0B5BEF'; setTimeout(function () { a.style.outline = ''; }, 1200); } }
   function closeMenu() { if (menuEl && menuEl.parentNode) menuEl.parentNode.removeChild(menuEl); menuEl = null; }
 
   function addLauncher() {
@@ -1103,7 +1111,8 @@
       };
       return;
     }
-    addLauncher();
+    // Sidebar ka "ડેમો ટૂર" card hata diya (user ka kehna 24 Nov): launcher ab nahi jodte. addLauncher() code rakha hai — dobara chahiye to yahan call wapas.
+    // addLauncher();
     if (/[?&]tourauto=1/.test(location.search)) localStorage.setItem(DEV_KEY, '1');
     if (/[?&]tourauto=0/.test(location.search)) localStorage.removeItem(DEV_KEY);
     if (state && state.on) { render(); startTicker(); }

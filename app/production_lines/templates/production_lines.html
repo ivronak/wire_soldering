@@ -1,16 +1,19 @@
 {% extends "base.html" %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 {% block title %}Production Lines{% endblock %}
 
 {% block page_css %}
 <style>
   .line-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .line-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 14px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .line-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 14px; text-align: center; border-bottom: 1px solid #D4DBE6; border-right: 1px solid #E5EAF2; }
   .line-table thead th:first-child, .line-table tbody td:first-child { text-align: left; padding-left: 18px; }
-  .line-table tbody td { padding: 11px 14px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
-  .line-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .line-table tbody tr:hover { background: #FBF4EE; }
+  .line-table tbody td { padding: 11px 14px; font-size: 14px; text-align: center; border-bottom: 1px solid #E2E8F1; vertical-align: middle; }
+  .line-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  /* Hover = halka neutral grey; accent-soft sirf selected ke liye */
+  .line-table tbody tr:hover { background: #F1F5F9; }
+  .line-table button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .line-table tbody tr.row-muted { opacity: 0.72; }
-  .line-machines { font-size: 12px; color: #3D5A5D; line-height: 1.5; text-align: left; }
+  .line-machines { font-size: 12px; color: #475266; line-height: 1.5; text-align: left; }
   #line-modal.hidden { display: none; }
   #line-modal { display: flex; }
 </style>
@@ -22,22 +25,25 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Production lines</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Production lines</h1>
         </div>
+        {# View-only user ko Add button nahi dikhta (server 403 deta) #}
+        {% if can_edit('production_lines') %}
         <button type="button" id="btn-add-line"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add line
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0 text-[12.5px] text-ink-faint">
-          <span><b class="text-ink">Line</b> = one complete set of stages with its own machines. A machine belongs to one line only. Set each machine's line on the <a href="{{ url_for('machines.machines_list') }}" class="text-copper-text font-semibold hover:underline">Machines</a> page.</span>
+          <span><b class="text-ink">Line</b> = one complete set of stages with its own machines. A machine belongs to one line only. Set each machine's line on the {% if can_do('machines.machines_list', 'GET') %}<a href="{{ url_for('machines.machines_list') }}" class="text-accent-text font-semibold hover:underline">Machines</a>{% else %}Machines{% endif %} page.</span>
         </div>
 
         <div class="flex-1 overflow-auto min-h-0">
           <table class="line-table">
             <colgroup>
-              <col style="width:5%" /><col style="width:10%" /><col style="width:18%" /><col style="width:13%" /><col style="width:15%" /><col style="width:17%" /><col style="width:22%" />
+              <col style="width:5%" /><col style="width:9%" /><col style="width:17%" /><col style="width:13%" /><col style="width:15%" /><col style="width:17%" />{# Actions sabko dikhta hai (View sabke liye) — fixed px taaki 5 icon ek line me aayein #}<col style="width:210px" />
             </colgroup>
             <thead>
               <tr><th>#</th><th>Code</th><th>Line name</th><th>Capacity</th><th>Handler</th><th>Machines</th><th>Actions</th></tr>
@@ -49,7 +55,7 @@
                 <td><span class="inline-block font-mono text-[13.5px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ l.code }}</span></td>
                 <td>
                   <span class="font-medium text-ink">{{ l.name }}</span>
-                  {% if not l.is_active %}<div class="text-[11.5px] text-stop font-semibold">Stopped</div>{% endif %}
+                  {% if not l.is_active %}<div class="text-[11.5px] text-neutral font-semibold">Inactive</div>{% endif %}
                 </td>
                 <td class="tabular-nums font-semibold">{{ '%g'|format(l.daily_capacity_kg) }} KG/day</td>
                 <td class="text-[13px] text-ink-muted">{{ l.handler or '—' }}</td>
@@ -59,27 +65,30 @@
                   <div class="line-machines"><b>{{ ms|length }}</b> machine{{ 's' if ms|length != 1 else '' }}<br>{% for m in ms[:4] %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% if ms|length > 4 %} +{{ ms|length - 4 }} more{% endif %}</div>
                   {% else %}<span class="text-ink-faint text-[12.5px]">No machines yet</span>{% endif %}
                 </td>
-                <td>
-                  <div class="flex items-center justify-center gap-2 flex-wrap">
-                    <button type="button" class="btn-edit-line px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ l.id }}" data-code="{{ l.code }}" data-name="{{ l.name }}" data-capacity="{{ '%g'|format(l.daily_capacity_kg) }}" data-handler="{{ l.handler or '' }}">Edit</button>
-                    <form method="post" action="{{ url_for('production_lines.production_lines_delete', line_id=l.id) }}" class="inline js-confirm-submit"
-                          data-confirm-title="Remove production line" data-confirm-ok="Remove"
-                          data-confirm-message="Remove this line from the master list? It will be kept in the database but hidden.">
-                      <button type="submit" class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">Delete</button>
-                    </form>
-                    <form method="post" action="{{ url_for('production_lines.production_lines_toggle', line_id=l.id) }}" class="inline">
-                      <label class="relative inline-flex items-center cursor-pointer" title="Click to toggle In use / Stopped">
-                        <input type="checkbox" class="sr-only peer" {% if l.is_active %}checked{% endif %} onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                <td style="white-space:nowrap">
+                  <div class="row-actions">
+                    {# View sabko; Edit/Delete/toggle sirf edit permission wale ko (backend bhi alag se rokta hai) #}
+                    {{ view_btn("Production line details", l.code, [
+                      ["Code", l.code],
+                      ["Line name", l.name],
+                      ["Daily capacity", ('%g'|format(l.daily_capacity_kg)) ~ " KG/day"],
+                      ["Handler", l.handler or ""],
+                      ["Machines", l.active_machines|map(attribute='name')|join(", ")],
+                      ["Created", l.created_at|ist],
+                      ["Status", "Active" if l.is_active else "Inactive", "success" if l.is_active else "neutral"]
+                    ]) }}
+                    {% if can_edit('production_lines') %}
+                    {{ edit_btn("btn-edit-line", "production line", {"id": l.id, "code": l.code, "name": l.name, "capacity": '%g'|format(l.daily_capacity_kg), "handler": l.handler or ""}) }}
+                    {# Soft-delete — hard delete nahi, sirf hidden #}
+                    {{ delete_form(url_for('production_lines.production_lines_delete', line_id=l.id), "production line", None, "Remove this line from the master list? It will be kept in the database but hidden.") }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('production_lines.production_lines_toggle', line_id=l.id), l.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
               {% else %}
-              <tr><td colspan="7" class="py-12 text-ink-faint">No production lines yet. Click <b>Add line</b> to create Line 1.</td></tr>
+              <tr><td colspan="7" class="py-12 text-ink-faint">No production lines yet.{% if can_edit('production_lines') %} Click <b>Add line</b> to create Line 1.{% endif %}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -93,10 +102,11 @@
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('production_lines') %}
 <div id="line-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add production line</h2>
         <p class="text-[12.5px] text-ink-faint">Code is auto-generated</p>
@@ -110,27 +120,30 @@
       </div>
       <div>
         <label for="line-name" class="block text-[12.5px] font-semibold text-ink mb-1">Line name *</label>
-        <input type="text" id="line-name" name="name" required placeholder="Line 1" autocomplete="off" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <input type="text" id="line-name" name="name" required placeholder="Line 1" autocomplete="off" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="line-capacity" class="block text-[12.5px] font-semibold text-ink mb-1">Daily capacity (KG per day) *</label>
-        <input type="number" id="line-capacity" name="daily_capacity_kg" required min="0" step="any" placeholder="200" class="w-full px-2.5 py-2.5 text-[14.5px] tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <input type="number" id="line-capacity" name="daily_capacity_kg" required min="0" step="any" placeholder="200" class="w-full px-2.5 py-2.5 text-[14.5px] tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="mt-1 text-[12px] text-ink-faint">How much finished wire this whole line can make in one day.</p>
       </div>
       <div>
         <label for="line-handler" class="block text-[12.5px] font-semibold text-ink mb-1">Handler / in-charge</label>
-        <input type="text" id="line-handler" name="handler" maxlength="100" placeholder="Person who runs this line" autocomplete="off" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+        <input type="text" id="line-handler" name="handler" maxlength="100" placeholder="Person who runs this line" autocomplete="off" class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="line-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save line</button>
+      <button type="submit" form="line-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save line</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
+{# Poora script modal ke liye hai — modal sirf Edit user ko milta hai, to script bhi sirf unhe #}
+{% if can_edit('production_lines') %}
 <script>
   var modal = document.getElementById('line-modal');
   var form = document.getElementById('line-form');
@@ -154,4 +167,5 @@
     });
   });
 </script>
+{% endif %}
 {% endblock %}

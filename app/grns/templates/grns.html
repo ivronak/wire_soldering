@@ -13,16 +13,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 8px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .grn-table thead th:first-child,
   .grn-table tbody td:first-child { text-align: left; padding-left: 16px; }
@@ -31,13 +31,13 @@
     padding: 11px 8px;
     font-size: 13.5px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .grn-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .grn-table tbody tr:hover { background: #FBF4EE; }
+  .grn-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .grn-table tbody tr:hover { background: #F1F5F9; }  /* hover = neutral grey (accent tint sirf selected row ke liye) */
   .search-wrap input { padding-left: 32px; }
   #grn-modal.hidden, #view-modal.hidden { display: none; }
   #grn-modal, #view-modal { display: flex; }
@@ -48,7 +48,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #8A4A1C;
+    color: #5A6577;  /* drawer section label = neutral */
     margin-top: 4px;
   }
   .status-pill {
@@ -57,23 +57,24 @@
   }
   .status-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .status-pending-qc { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
-  .status-partial-qc { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  /* Partial = warning amber har jagah (PO / GRN / QC) — pehle teal tha */
+  .status-partial-qc { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .status-closed { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
 
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .lines-table th {
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     padding: 8px 6px;
-    border: 1px solid #D1D9D8;
+    border: 1px solid #D4DBE6;
     text-align: center;
   }
   .lines-table td {
     padding: 4px;
-    border: 1px solid #E2E8E7;
+    border: 1px solid #E2E8F1;
     vertical-align: middle;
   }
   .lines-table input, .lines-table select {
@@ -85,10 +86,10 @@
   }
   .lines-table input:focus, .lines-table select:focus {
     outline: none;
-    border-color: #C46B2D;
-    box-shadow: 0 0 0 1px #C46B2D;
+    border-color: #0B5BEF;
+    box-shadow: 0 0 0 1px #0B5BEF;
   }
-  .lines-table input:read-only { background: #F4F6F5; color: #3D5A5D; }
+  .lines-table input:read-only { background: #F3F6FB; color: #475266; }
 </style>
 {% endblock %}
 
@@ -106,7 +107,7 @@
          isliye ek baar yahan likha, dono jagah grn_view_button(g) se bulaya (copy-paste do jagah nahi) #}
       {% macro grn_view_button(g) %}
       <button type="button"
-        class="btn-view-grn px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+        class="btn-view-grn px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent"
         data-grn="{{ g.grn_no }}"
         data-po="{{ g.po.po_no if g.po else '' }}"
         data-vendor="{{ g.po.vendor.name if g.po and g.po.vendor else '' }}"
@@ -131,11 +132,11 @@
         {# §10.6 tabs — PO page jaisa: <a> link se ?tab=... jaata hai, route us tab ki list + counts bhejta hai #}
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
           <a href="{{ url_for('grns.grns_list', tab='pending') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             Pending action <span class="tabular-nums">({{ pending_count }})</span>
           </a>
           <a href="{{ url_for('grns.grns_list', tab='completed') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             Completed <span class="tabular-nums">({{ completed_count }})</span>
           </a>
         </div>
@@ -143,11 +144,11 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-grn" placeholder="Search GRN, PO, vendor, challan…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex flex-wrap items-center gap-1">
             {# Har tab me sirf usi tab ke status pills. data-label = JS count ke saath dikhne wala naam #}
-            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             {% if tab == 'completed' %}
             <button type="button" data-filter="pending qc" data-label="Pending QC" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Pending QC (0)</button>
             <button type="button" data-filter="partial qc" data-label="Partial QC" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial QC (0)</button>
@@ -158,7 +159,7 @@
             <button type="button" data-filter="draft" data-label="Draft GRN" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft GRN (0)</button>
             {% endif %}
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
               Record vendor delivery at gate (challan, transporter, vehicle, gross weight) · Post GRN to move stock to <strong>QC Hold Bay</strong> · Inward QC comes next
@@ -231,10 +232,12 @@
                   {% endif %}
                 </td>
                 <td>
-                  <button type="button" class="btn-receive px-2.5 py-1 text-[12px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark"
+{% if can_edit('grns') %}
+                  <button type="button" class="btn-receive px-2.5 py-1 text-[12px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark"
                     data-po-id="{{ po.id }}">
                     Receive goods
                   </button>
+{% endif %}
                 </td>
               </tr>
               {% else %}
@@ -255,12 +258,14 @@
                 <td>
                   <div class="flex flex-wrap justify-center gap-1">
                     {{ grn_view_button(g) }}
+{% if can_edit('grns') %}
                     <form method="post" action="{{ url_for('grns.grns_post', grn_id=g.id) }}" class="inline js-confirm-submit"
                           data-confirm-title="Post GRN"
                           data-confirm-ok="Post"
                           data-confirm-message="Post {{ g.grn_no }}? Its lots will move to Inward QC.">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post GRN</button>
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post GRN</button>
                     </form>
+{% endif %}
                   </div>
                 </td>
               </tr>
@@ -306,7 +311,8 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold {% if g.status == 'Draft' %}text-ink-faint{% else %}text-ink{% endif %}">{{ g.grn_no }}</td>
                 <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
-                <td><span class="text-brand-teal font-medium">{{ g.po.po_no if g.po else "—" }}</span></td>
+                {# PO number link nahi hai, isliye plain ink text (link jaisa rang sirf asli link ke liye) #}
+                <td><span class="text-ink font-medium">{{ g.po.po_no if g.po else "—" }}</span></td>
                 <td class="text-left {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.po.vendor.name if g.po and g.po.vendor else "—" }}</td>
                 <td class="font-mono text-[12.5px] {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.challan_no or "—" }}</td>
                 <td class="font-mono text-[12.5px] {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.vehicle_no or "—" }}</td>
@@ -320,7 +326,9 @@
                     {{ grn_view_button(g) }}
                     {% if g.status in ("Pending QC", "Partial QC") %}
                     {# Post ho chuki GRN ka agla kaam lab QC — Inward QC ke Pending tab pe le jao #}
-                    <a href="{{ url_for('inward_qc.inward_qc_list', tab='pending') }}" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Inward QC</a>
+{% if can_do('inward_qc.inward_qc_list', 'GET') %}
+                    <a href="{{ url_for('inward_qc.inward_qc_list', tab='pending') }}" class="px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Inward QC</a>
+{% endif %}
                     {% endif %}
                   </div>
                 </td>
@@ -351,10 +359,11 @@
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('grns') %}
 <div id="grn-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="grn-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="grn-modal-title" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="grn-modal-title" class="text-[16px] font-bold text-ink">Receive goods (GRN)</h2>
         <p class="text-[12.5px] text-ink-faint">Gate inward details + quantities received against PO</p>
@@ -371,7 +380,7 @@
         </div>
         <div>
           <label for="grn-date" class="block text-[12.5px] font-semibold text-ink mb-1">GRN date *</label>
-          <input type="date" id="grn-date" name="grn_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <input type="date" id="grn-date" name="grn_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div class="md:col-span-2">
           <label for="grn-po" class="block text-[12.5px] font-semibold text-ink mb-1">Purchase order *</label>
@@ -393,11 +402,11 @@
         </div>
         <div>
           <label for="grn-warehouse" class="block text-[12.5px] font-semibold text-ink mb-1">Stock location after post</label>
-          <input type="text" id="grn-warehouse" readonly value="QC Hold warehouse — Under QC inspection" class="w-full px-2.5 py-2 text-[13px] bg-brand-soft border border-brand-border rounded text-brand-teal font-medium" />
+          <input type="text" id="grn-warehouse" readonly value="QC Hold warehouse — Under QC inspection" class="w-full px-2.5 py-2 text-[13px] bg-info-bg border border-info-border rounded text-info font-medium" />
         </div>
         <div>
           <label for="grn-gross" class="block text-[12.5px] font-semibold text-ink mb-1">Gross weight (kg)</label>
-          <input type="number" id="grn-gross" name="gross_weight" min="0" step="0.01" placeholder="Weighbridge / estimate" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          <input type="number" id="grn-gross" name="gross_weight" min="0" step="0.01" placeholder="Weighbridge / estimate" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent tabular-nums" />
         </div>
       </div>
 
@@ -405,15 +414,15 @@
       <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
           <label for="grn-challan" class="block text-[12.5px] font-semibold text-ink mb-1">Delivery challan no.</label>
-          <input type="text" id="grn-challan" name="challan_no" placeholder="Vendor DC number" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper font-mono" />
+          <input type="text" id="grn-challan" name="challan_no" placeholder="Vendor DC number" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent font-mono" />
         </div>
         <div>
           <label for="grn-transporter" class="block text-[12.5px] font-semibold text-ink mb-1">Transporter</label>
-          <input type="text" id="grn-transporter" name="transporter" placeholder="Carrier name" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <input type="text" id="grn-transporter" name="transporter" placeholder="Carrier name" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="grn-vehicle" class="block text-[12.5px] font-semibold text-ink mb-1">Vehicle no.</label>
-          <input type="text" id="grn-vehicle" name="vehicle_no" placeholder="e.g. GJ-01-XX-0000" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper font-mono uppercase" />
+          <input type="text" id="grn-vehicle" name="vehicle_no" placeholder="e.g. GJ-01-XX-0000" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent font-mono uppercase" />
         </div>
       </div>
 
@@ -444,9 +453,9 @@
 
       <div>
         <label for="grn-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
-        <textarea id="grn-remarks" name="remarks" rows="2" placeholder="Seal condition, short supply notes…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        <textarea id="grn-remarks" name="remarks" rows="2" placeholder="Seal condition, short supply notes…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent"></textarea>
       </div>
-      <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+      <p class="text-[11.5px] text-ink-faint bg-info-bg border border-info-border rounded px-2.5 py-2">
         The Purchase Invoice will be made on the <strong>whole received qty</strong> (including any QC-rejected qty). Rejected material is sent back with a Purchase Return. QC happens in the next step.
       </p>
     </form>
@@ -454,15 +463,16 @@
     <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="submit" form="grn-form" name="grn_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
       <button type="button" id="btn-cancel-grn" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="grn-form" name="grn_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post GRN</button>
+      <button type="submit" form="grn-form" name="grn_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post GRN</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="view-title" class="text-[16px] font-bold text-ink">GRN detail</h2>
         <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -570,8 +580,10 @@
     });
     if (!anyLine && firstQty) firstQty.setCustomValidity('Enter the received quantity and batch for at least one line.');
   }
+{% if can_edit('grns') %}
   receiptTbody.addEventListener('input', checkReceiptLines);
   grnForm.addEventListener('submit', checkReceiptLines, true);
+{% endif %}
 
   // Har row ke inputs ko index ke hisaab se naam do (Flask ke liye)
   function renumberReceiptLines() {
@@ -652,29 +664,36 @@
   }
 
   // "New GRN" button ab nahi hai — form sirf Pending row ke "Receive goods" se khulta hai
+{% if can_edit('grns') %}
   document.querySelectorAll('.btn-receive').forEach(function (btn) {
     btn.addEventListener('click', function () { openReceive(btn.getAttribute('data-po-id')); });
   });
   document.getElementById('btn-close-grn-modal').addEventListener('click', closeGrnModal);
   document.getElementById('btn-cancel-grn').addEventListener('click', closeGrnModal);
   document.getElementById('grn-modal-backdrop').addEventListener('click', closeGrnModal);
+{% endif %}
   document.getElementById('btn-close-view').addEventListener('click', closeView);
   document.getElementById('btn-close-view-2').addEventListener('click', closeView);
   document.getElementById('view-backdrop').addEventListener('click', closeView);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!viewModal.classList.contains('hidden')) closeView();
+{% if can_edit('grns') %}
     else if (!grnModal.classList.contains('hidden')) closeGrnModal();
+{% endif %}
   });
 
+{% if can_edit('grns') %}
   document.getElementById('grn-po').addEventListener('change', function (e) {
     renderReceiptLines(e.target.value);
   });
+{% endif %}
 
   document.querySelectorAll('.btn-view-grn').forEach(function (btn) {
     btn.addEventListener('click', function () { openView(btn); });
   });
 
+{% if can_edit('grns') %}
   grnForm.addEventListener('submit', function (e) {
     // Over-qty warning confirm ke baad dobara submit — flag pe ignore
     if (grnForm.getAttribute('data-over-qty-ok') === '1') {
@@ -769,16 +788,17 @@
       }
     }
   });
+{% endif %}
 
   searchInput.addEventListener('input', applyFilters);
   document.querySelectorAll('.filter-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       activeFilter = btn.getAttribute('data-filter');
       document.querySelectorAll('.filter-btn').forEach(function (b) {
-        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.remove('border-accent', 'bg-accent', 'text-white', 'font-semibold');
         b.classList.add('border-slate-300', 'bg-white', 'text-ink');
       });
-      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.add('border-accent', 'bg-accent', 'text-white', 'font-semibold');
       btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
       applyFilters();
     });

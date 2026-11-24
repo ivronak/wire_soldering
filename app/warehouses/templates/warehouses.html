@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Warehouse Master{% endblock %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 
 {% block page_css %}
 <style>
@@ -7,21 +8,22 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    min-width: 960px; /* Actions me View + Edit + toggle ek line me aaye */
   }
   .wh-table thead th {
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 14px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .wh-table thead th:first-child,
   .wh-table tbody td:first-child { text-align: left; padding-left: 18px; }
@@ -30,13 +32,13 @@
     padding: 11px 14px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .wh-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .wh-table tbody tr:hover { background: #FBF4EE; }
+  .wh-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .wh-table tbody tr:hover { background: #F1F5F9; }  /* hover = neutral grey (accent tint sirf selected row ke liye) */
   .wh-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
   #wh-modal.hidden { display: none; }
@@ -44,15 +46,17 @@
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
 
-  /* Type badges — RM/WIP/FG/SCRAP/QC_HOLD alag color taaki table me turant pehchaan ho */
+  /* Type badges — categorical rang (stock.html / stock_valuation.html / stock_lot.html jaisa SAME map):
+     RM = cyan, WIP = accent blue, FG = indigo, SCRAP = neutral grey, QC_HOLD = warning amber.
+     Green/red yahan nahi — wo status ke liye reserved hain. */
   .type-badge {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid;
   }
-  .type-rm { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
-  .type-wip { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
-  .type-fg { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .type-scrap { background: #F4F6F5; color: #3D5A5D; border-color: #D1D9D8; }
+  .type-rm { background: #E6F6F8; color: #0E7490; border-color: #B2DDE4; }
+  .type-wip { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .type-fg { background: #EEF0FD; color: #4338CA; border-color: #C7CCF5; }
+  .type-scrap { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .type-qc { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
 </style>
 {% endblock %}
@@ -64,11 +68,13 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Warehouses</h1>
           <p class="text-[12.5px] text-ink-faint mt-0.5">Code is auto-generated · just fill the rest</p>
         </div>
+        {% if can_edit('warehouses') %}
         <button type="button" id="btn-add-wh"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add warehouse
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -77,14 +83,14 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-wh" placeholder="Search code, name, location…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1 flex-wrap">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
-            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Stopped (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <select id="filter-type" class="px-2.5 py-1.5 text-[12.5px] border border-slate-300 rounded bg-white text-ink focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper">
+          <select id="filter-type" class="px-2.5 py-1.5 text-[12.5px] border border-slate-300 rounded bg-white text-ink focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">All types</option>
             <option value="RM">RM — Raw material</option>
             <option value="WIP">WIP — Work in progress</option>
@@ -92,10 +98,10 @@
             <option value="SCRAP">SCRAP</option>
             <option value="QC_HOLD">QC_HOLD</option>
           </select>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Type decides what stock can live here · Stock transfer / issue / scrap screens pick warehouses from this list · Soft-stop only (no hard delete)
+              Type decides what stock can live here · Stock transfer / issue / scrap screens pick warehouses from this list · Set Inactive only (no hard delete)
             </p>
           </details>
         </div>
@@ -104,13 +110,13 @@
           <table class="wh-table">
             <colgroup>
               <col style="width:4%" />
-              <col style="width:10%" />
-              <col style="width:20%" />
-              <col style="width:12%" />
-              <col style="width:15%" />
-              <col style="width:17%" />
-              <col style="width:10%" />
-              <col style="width:12%" />
+              <col style="width:9%" />
+              <col style="width:19%" />
+              <col style="width:11%" />
+              <col style="width:14%" />
+              <col style="width:16%" />
+              <col style="width:11%" />
+              <col style="width:16%" />
             </colgroup>
             <thead>
               <tr>
@@ -154,32 +160,37 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  {# Inactive = normal band hui master entry, error nahi — isliye neutral grey (red sirf fault/rejection ke liye) #}
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
-                <td>
-                  <div class="flex items-center justify-center gap-3 flex-wrap">
-                    <button type="button"
-                      class="btn-edit-wh px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ w.id }}"
-                      data-code="{{ w.code }}"
-                      data-name="{{ w.name }}"
-                      data-type="{{ w.warehouse_type }}"
-                      data-branch-id="{{ w.branch_id or '' }}"
-                      data-location="{{ w.location or '' }}"
-                      data-active="{{ '1' if w.is_active else '0' }}">
-                      Edit
-                    </button>
-                    <form method="post" action="{{ url_for('warehouses.warehouses_toggle', w_id=w.id) }}" class="inline">
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if w.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                {# Actions: View sabko; Edit + toggle sirf edit-permission wale ko. Warehouse ka delete route hi nahi hai (sirf Inactive karte hain), isliye Delete icon nahi #}
+                <td style="white-space:nowrap">
+                  <div class="row-actions">
+                    {{ view_btn("Warehouse details", w.code ~ " — " ~ w.name, [
+                      ["Code", w.code],
+                      ["Warehouse Name", w.name],
+                      ["Type", w.warehouse_type],
+                      ["Branch", w.branch.name if w.branch else ""],
+                      ["Location", w.location or ""],
+                      ["Created", w.created_at.strftime('%d %b %Y') if w.created_at else ""],
+                      ["Status", "Active" if w.is_active else "Inactive", "success" if w.is_active else "neutral"]
+                    ]) }}
+                    {% if can_edit('warehouses') %}
+                    {{ edit_btn("btn-edit-wh", "warehouse", {
+                      "id": w.id,
+                      "code": w.code,
+                      "name": w.name,
+                      "type": w.warehouse_type,
+                      "branch-id": w.branch_id or '',
+                      "location": w.location or '',
+                      "active": '1' if w.is_active else '0'
+                    }) }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('warehouses.warehouses_toggle', w_id=w.id), w.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -192,23 +203,25 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No warehouses found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear search/filters or add a new warehouse.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add warehouse</button>
+            {% if can_edit('warehouses') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add warehouse</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} warehouses</span>
           <span>Create RM + FG + Scrap + QC Hold first — stock screens need them</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('warehouses') %}
 <div id="wh-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add warehouse</h2>
         <p class="text-[12.5px] text-ink-faint">Name, type, branch, location</p>
@@ -226,12 +239,12 @@
       <div>
         <label for="wh-name" class="block text-[12.5px] font-semibold text-ink mb-1">Warehouse name *</label>
         <input type="text" id="wh-name" name="name" required placeholder="Main RM Warehouse" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="wh-type" class="block text-[12.5px] font-semibold text-ink mb-1">Type *</label>
         <select id="wh-type" name="warehouse_type" required
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select type…</option>
           <option value="RM">RM — Raw material store</option>
           <option value="WIP">WIP — Work in progress</option>
@@ -244,10 +257,10 @@
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
           <label for="wh-branch" class="text-[12.5px] font-semibold text-ink">Branch *</label>
-          <button type="button" id="btn-show-add-branch" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add branch</button>
+          <button type="button" id="btn-show-add-branch" class="text-[12px] font-semibold text-accent-text hover:underline">+ Add branch</button>
         </div>
         <select id="wh-branch" name="branch_id" required
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select branch…</option>
           {% for b in branches %}
           <option value="{{ b.id }}">{{ b.name }}</option>
@@ -255,18 +268,18 @@
         </select>
 
         {# Inline mini-form — pehle chhupa; +Add branch pe khulta hai. fetch() se real-time add hota hai, form reload nahi hota. #}
-        <div id="branch-inline" class="hidden mt-2.5 border border-copper-border bg-copper-soft rounded-md p-3 space-y-2.5">
+        <div id="branch-inline" class="hidden mt-2.5 border border-accent-border bg-accent-soft rounded-md p-3 space-y-2.5">
           <div class="text-[12.5px] font-semibold text-ink">New branch</div>
           <div>
             <label for="new-branch-name" class="block text-[11.5px] font-semibold text-ink mb-0.5">Branch name *</label>
             <input type="text" id="new-branch-name" placeholder="e.g. Ahmedabad Depot" autocomplete="off"
-              class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label for="new-branch-state" class="block text-[11.5px] font-semibold text-ink mb-0.5">State</label>
               <select id="new-branch-state"
-                class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+                class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
                 <option value="">Select state…</option>
                 {# States ab State Master table se aate hain — option value = State.id #}
                 {% for s in states %}
@@ -277,28 +290,29 @@
             <div>
               <label for="new-branch-gstin" class="block text-[11.5px] font-semibold text-ink mb-0.5">GSTIN</label>
               <input type="text" id="new-branch-gstin" placeholder="If separate reg." maxlength="15" autocomplete="off"
-                class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+                class="w-full px-2.5 py-2 text-[13.5px] font-mono border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
             </div>
           </div>
           <div class="flex justify-end gap-2 pt-0.5">
             <button type="button" id="btn-cancel-branch" class="px-2.5 py-1.5 text-[12.5px] text-ink-faint hover:bg-white rounded">Cancel</button>
-            <button type="button" id="btn-save-branch" class="px-2.5 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save to list</button>
+            <button type="button" id="btn-save-branch" class="px-2.5 py-1.5 text-[12.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save to list</button>
           </div>
         </div>
       </div>
       <div>
         <label for="wh-loc" class="block text-[12.5px] font-semibold text-ink mb-1">Location</label>
         <input type="text" id="wh-loc" name="location" placeholder="Shed A, Bay 1–4" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="mt-1 text-[11.5px] text-ink-faint">Physical place inside the branch (optional but useful for store staff).</p>
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="wh-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save warehouse</button>
+      <button type="submit" form="wh-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save warehouse</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
@@ -327,9 +341,9 @@
   function applyFilterButtonStyles(selectedBtn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === selectedBtn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -391,6 +405,8 @@
   }
 
   // ---- Inline "+ Add branch" — fetch() se real-time add (page reload nahi hota) ----
+  {# Branch add + modal sirf Edit user ko milta hai — View user ke liye ye elements hi nahi hain, isliye listeners bhi nahi lagte #}
+  {% if can_edit('warehouses') %}
   document.getElementById('btn-show-add-branch').addEventListener('click', function () {
     document.getElementById('branch-inline').classList.remove('hidden');
     document.getElementById('new-branch-name').focus();
@@ -429,6 +445,7 @@
         if (typeof showToast === 'function') showToast('Something went wrong adding the branch.', 'error');
       });
   });
+  {% endif %}
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -461,9 +478,10 @@
     });
     document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
     document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
-    document.querySelector('[data-filter="inactive"]').textContent = 'Stopped (' + counts.inactive + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {% if can_edit('warehouses') %}
   document.getElementById('btn-add-wh').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
@@ -486,6 +504,7 @@
       if (typeof showToast === 'function') showToast('Name, Type and Branch are required.', 'error');
     }
   });
+  {% endif %}
 
   document.querySelectorAll('td form').forEach(function (f) {
     f.addEventListener('submit', function () { saveListState(); });

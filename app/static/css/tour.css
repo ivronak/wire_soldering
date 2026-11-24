@@ -1,54 +1,57 @@
-/* Demo tour (Gujarati) — spotlight + step card, ERP ke theme (Ink / Copper / Teal) ke saath. JS: static/js/tour.js */
+/* Demo tour (Gujarati) — spotlight + step card, ERP ke theme (Ink / Accent blue / Info) ke saath — rang app/static/js/theme.js ke tokens jaise hi (yahan exact hex). JS: static/js/tour.js */
 .tour-gu, .tour-gu * { font-family: 'Noto Sans Gujarati', 'Nirmala UI', 'Shruti', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; }
 
 /* Sidebar me launcher */
-.tour-launch { display: flex; align-items: center; gap: 9px; margin: 8px 8px 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid #E8C9A8; background: #FBF4EE;
-  color: #8A4A1C; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; width: calc(100% - 16px); }
-.tour-launch:hover { background: #F6E7D8; }
-.tour-launch small { display: block; font-weight: 500; font-size: 11.5px; color: #8A6A4C; }
+.tour-launch { display: flex; align-items: center; gap: 9px; margin: 8px 8px 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid #BCD2FA; background: #EDF3FF;
+  color: #0A3CA6; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; width: calc(100% - 16px); }
+.tour-launch:hover { background: #fff; border-color: #0B5BEF; }
+.tour-launch small { display: block; font-weight: 500; font-size: 11.5px; color: #5A6577; }
 
 /* Shade (spotlight ke bahar ka andhera) */
-.tour-shade { position: fixed; background: rgba(15, 47, 50, .58); z-index: 9990; }
-.tour-ring { position: fixed; z-index: 9992; border: 3px solid #C46B2D; border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 4px rgba(196, 107, 45, .25); animation: tourPulse 1.6s ease-in-out infinite; }
-@keyframes tourPulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(196, 107, 45, .25); } 50% { box-shadow: 0 0 0 9px rgba(196, 107, 45, .10); } }
+.tour-shade { position: fixed; background: rgba(11,18,32, .58); z-index: 9990; }
+.tour-ring { position: fixed; z-index: 9992; border: 3px solid #0B5BEF; border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 4px rgba(11,91,239, .25); animation: tourPulse 1.6s ease-in-out infinite; }
+@keyframes tourPulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(11,91,239, .25); } 50% { box-shadow: 0 0 0 9px rgba(11,91,239, .10); } }
 
 /* Step card */
-.tour-card { position: fixed; z-index: 9995; width: 372px; max-width: calc(100vw - 24px); background: #fff; border: 1px solid #D1D9D8; border-radius: 14px;
-  box-shadow: 0 18px 48px rgba(15, 47, 50, .28); overflow: hidden; }
-.tour-card .bar { height: 5px; background: #E9EEED; }
-.tour-card .bar i { display: block; height: 100%; background: #C46B2D; transition: width .3s; }
-.tour-card .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px 0; font-size: 11.5px; color: #6B7F82; font-weight: 700; }
-.tour-card .chip { display: inline-block; background: #FBF4EE; color: #8A4A1C; border: 1px solid #E8C9A8; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 700; }
-.tour-card h3 { margin: 6px 14px 0; font-size: 17px; line-height: 1.35; font-weight: 800; color: #0F2F32; }
-.tour-card .body { padding: 6px 14px 4px; font-size: 14.5px; line-height: 1.75; color: #1C2B2D; }
-.tour-card .body b { color: #8A4A1C; }
+.tour-card { position: fixed; z-index: 9995; width: 372px; max-width: calc(100vw - 24px); background: #fff; border: 1px solid #D4DBE6; border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(11,18,32, .28); overflow: hidden; }
+.tour-card .bar { height: 5px; background: #E9EEF6; }
+.tour-card .bar i { display: block; height: 100%; background: #0B5BEF; transition: width .3s; }
+.tour-card .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px 0; font-size: 11.5px; color: #5A6577; font-weight: 700; }
+.tour-card .chip { display: inline-block; background: #EDF3FF; color: #0A3CA6; border: 1px solid #BCD2FA; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 700; }
+.tour-card h3 { margin: 6px 14px 0; font-size: 17px; line-height: 1.35; font-weight: 800; color: #0B1220; }
+.tour-card .body { padding: 6px 14px 4px; font-size: 14.5px; line-height: 1.75; color: #0B1220; }
+.tour-card .body b { color: #0A3CA6; }
 .tour-card .body ul { margin: 6px 0 4px 18px; padding: 0; list-style: disc; }
-.tour-card .body code { background: #EEF2F1; border-radius: 4px; padding: 0 5px; font-size: 13px; }
-.tour-card .do { margin: 8px 14px 0; padding: 8px 10px; background: #EAF3F3; border: 1px solid #C5D9DA; border-radius: 9px; font-size: 13.5px; color: #1F5558; font-weight: 600; display: flex; gap: 8px; align-items: flex-start; }
-.tour-card .do .dot { width: 9px; height: 9px; border-radius: 50%; background: #2A6B6E; margin-top: 8px; flex: none; animation: tourPulse 1.4s infinite; }
-.tour-card .warn { margin: 8px 14px 0; padding: 8px 10px; background: #FDECEC; border: 1px solid #F8CFCB; border-radius: 9px; font-size: 13px; color: #B42318; }
+.tour-card .body code { background: #E9EEF6; border-radius: 4px; padding: 0 5px; font-size: 13px; }
+.tour-card .do { margin: 8px 14px 0; padding: 8px 10px; background: #E6F6F8; border: 1px solid #B2DDE4; border-radius: 9px; font-size: 13.5px; color: #0B7285; font-weight: 600; display: flex; gap: 8px; align-items: flex-start; }
+.tour-card .do .dot { width: 9px; height: 9px; border-radius: 50%; background: #0B7285; margin-top: 8px; flex: none; animation: tourPulse 1.4s infinite; }
+.tour-card .warn { margin: 8px 14px 0; padding: 8px 10px; background: #FCEBEA; border: 1px solid #F0C4C0; border-radius: 9px; font-size: 13px; color: #B42318; }
 .tour-card .ok { margin: 8px 14px 0; padding: 6px 10px; background: #E6F5EC; border: 1px solid #B7E0C7; border-radius: 9px; font-size: 13px; color: #1F7A4D; }
 .tour-card .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 14px; }
 .tour-card .foot .left, .tour-card .foot .right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.tour-btn { font-size: 13.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; border: 1px solid #D1D9D8; background: #fff; color: #0F2F32; cursor: pointer; }
-.tour-btn:hover { background: #F4F6F5; }
-.tour-btn.primary { background: #C46B2D; border-color: #A35522; color: #fff; } .tour-btn.primary:hover { background: #A35522; }
-.tour-btn.teal { background: #2A6B6E; border-color: #1F5558; color: #fff; } .tour-btn.teal:hover { background: #1F5558; }
-.tour-btn.link { border: 0; background: transparent; color: #6B7F82; font-weight: 600; padding: 7px 6px; font-size: 12.5px; }
-.tour-btn.link:hover { color: #B42318; background: transparent; }
+.tour-btn { font-size: 13.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; border: 1px solid #D4DBE6; background: #fff; color: #0B1220; cursor: pointer; }
+.tour-btn:hover { background: #F1F5F9; }
+.tour-btn.primary { background: #0B5BEF; border-color: #0843C2; color: #fff; } .tour-btn.primary:hover { background: #0843C2; }
+/* Chhota / doosra action (jaise 'Start' ek chapter ka, 'Prefill'): accent OUTLINE — solid accent sirf .primary ka. (Class naam 'teal' tour.js me hai, rang ab blue outline) */
+.tour-btn.teal, .tour-btn.outline { background: #fff; border-color: #0B5BEF; color: #0B5BEF; } .tour-btn.teal:hover, .tour-btn.outline:hover { background: #EDF3FF; }
+.tour-btn.link { border: 0; background: transparent; color: #5A6577; font-weight: 600; padding: 7px 6px; font-size: 12.5px; }
+.tour-btn.link:hover { color: #0B1220; background: transparent; text-decoration: underline; }
 
 /* Chapter menu */
-.tour-menu-back { position: fixed; inset: 0; z-index: 9996; background: rgba(15, 47, 50, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.tour-menu { width: 100%; max-width: 640px; max-height: calc(100vh - 32px); overflow-y: auto; background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(15, 47, 50, .35); border: 1px solid #D1D9D8; }
+.tour-menu-back { position: fixed; inset: 0; z-index: 9996; background: rgba(11,18,32, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.tour-menu { width: 100%; max-width: 640px; max-height: calc(100vh - 32px); overflow-y: auto; background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(11,18,32, .35); border: 1px solid #D4DBE6; }
 .tour-menu .top { padding: 18px 20px 8px; }
-.tour-menu .top h2 { font-size: 21px; font-weight: 800; color: #0F2F32; margin: 0; }
-.tour-menu .top p { font-size: 14px; color: #3D5A5D; line-height: 1.7; margin: 6px 0 0; }
-.tour-menu .alert { margin: 10px 20px; padding: 10px 12px; background: #FFF4E5; border: 1px solid #F5D9B5; border-radius: 10px; font-size: 13.5px; line-height: 1.7; color: #7A4A12; }
+.tour-menu .top h2 { font-size: 21px; font-weight: 800; color: #0B1220; margin: 0; }
+.tour-menu .top p { font-size: 14px; color: #475266; line-height: 1.7; margin: 6px 0 0; }
+.tour-menu .alert { margin: 10px 20px; padding: 10px 12px; background: #FEF3E2; border: 1px solid #FBD9A5; border-radius: 10px; font-size: 13.5px; line-height: 1.7; color: #B45309; }
 .tour-menu .alert label { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; font-weight: 700; cursor: pointer; }
-.tour-ch { display: flex; align-items: center; gap: 12px; margin: 8px 20px; padding: 11px 12px; border: 1px solid #D1D9D8; border-radius: 12px; background: #fff; }
-.tour-ch .n { width: 32px; height: 32px; border-radius: 50%; background: #FBF4EE; color: #8A4A1C; border: 1px solid #E8C9A8; display: flex; align-items: center; justify-content: center; font-weight: 800; flex: none; }
+.tour-ch { display: flex; align-items: center; gap: 12px; margin: 8px 20px; padding: 11px 12px; border: 1px solid #D4DBE6; border-radius: 12px; background: #fff; }
+.tour-ch .n { width: 32px; height: 32px; border-radius: 50%; background: #EDF3FF; color: #0A3CA6; border: 1px solid #BCD2FA; display: flex; align-items: center; justify-content: center; font-weight: 800; flex: none; }
 .tour-ch .t { flex: 1; min-width: 0; }
-.tour-ch .t b { display: block; font-size: 15px; color: #0F2F32; }
-.tour-ch .t span { font-size: 12.5px; color: #6B7F82; line-height: 1.5; }
+.tour-ch .t b { display: block; font-size: 15px; color: #0B1220; }
+.tour-ch .t span { font-size: 12.5px; color: #5A6577; line-height: 1.5; }
 .tour-menu .bottom { display: flex; justify-content: space-between; gap: 8px; padding: 14px 20px 18px; flex-wrap: wrap; }
 .tour-btn[disabled] { opacity: .45; cursor: not-allowed; }
+/* Keyboard focus: erp-ui.css ka global ring buttons par bhi lagta hai; tour card dark shade ke upar hai isliye offset thoda andar */
+.tour-btn:focus-visible { outline-offset: 1px; }

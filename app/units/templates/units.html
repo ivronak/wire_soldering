@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 {% block title %}Unit Master{% endblock %}
 
 {% block content %}
@@ -8,11 +9,14 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Units</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Measurement units</h1>
         </div>
+        {# View-only user ko Add button nahi dikhta (server 403 deta) #}
+        {% if can_edit('units') %}
         <button type="button" id="btn-add-unit"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add unit
         </button>
+        {% endif %}
       </div>
 
       <!-- Ek hi bada card — table poori width -->
@@ -26,7 +30,7 @@
               {# name=q → Flask request.args.get("q"); typing pe chhota JS form submit karega #}
               <input type="search" name="q" id="units-search-input" value="{{ q or '' }}"
                 placeholder="Search code or name…" autocomplete="off"
-                class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+                class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
               <input type="hidden" name="status" value="{{ status or 'all' }}" />
             </div>
             {# Button optional — Enter / auto-submit se bhi chalega; UI me chhupa sakte ho #}
@@ -36,24 +40,24 @@
             {# status filter = GET links; q preserve taaki search + filter saath chale #}
             <a href="{{ url_for('units.units_list', q=q or None, status='all') }}"
                class="filter-btn px-3 py-1.5 text-[12.5px] rounded border font-semibold
-               {% if status == 'all' %}border-copper bg-copper text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">
+               {% if status == 'all' %}border-accent bg-accent text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">
               All ({{ total_count }})
             </a>
             <a href="{{ url_for('units.units_list', q=q or None, status='active') }}"
                class="filter-btn px-3 py-1.5 text-[12.5px] rounded border font-semibold
-               {% if status == 'active' %}border-copper bg-copper text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">
-              In use ({{ active_count }})
+               {% if status == 'active' %}border-accent bg-accent text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">
+              Active ({{ active_count }})
             </a>
             <a href="{{ url_for('units.units_list', q=q or None, status='inactive') }}"
                class="filter-btn px-3 py-1.5 text-[12.5px] rounded border font-semibold
-               {% if status == 'inactive' %}border-copper bg-copper text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">
-              Stopped ({{ inactive_count }})
+               {% if status == 'inactive' %}border-accent bg-accent text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">
+              Inactive ({{ inactive_count }})
             </a>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Code = short identifier · Base = primary unit for conversions · Stop = deactivate (not deleted) · Used by Materials &amp; Products
+              Code = short identifier · Base = primary unit for conversions · Inactive = deactivated (not deleted) · Used by Materials &amp; Products
             </p>
           </details>
         </div>
@@ -76,8 +80,8 @@
               <col style="width:9%" />
               <col style="width:22%" />
               <col style="width:14%" />
-              <col style="width:20%" />
-              <col style="width:30%" />
+              <col style="width:14%" />
+              <col style="width:26%" />
             </colgroup>
             <thead>
               <tr>
@@ -100,7 +104,7 @@
                 <td><span class="font-medium {% if u.is_active %}text-ink{% else %}text-ink-faint{% endif %}">{{ u.name }}</span></td>
                 <td class="text-center">
                   {% if u.is_base_unit %}
-                  <span class="text-[12.5px] font-semibold px-2 py-1 rounded bg-copper-soft text-copper-text border border-copper-border">Yes</span>
+                  <span class="text-[12.5px] font-semibold px-2 py-1 rounded bg-neutral-bg text-neutral border border-neutral-border">Yes</span>
                   {% else %}
                   <span class="text-[13.5px] text-ink-faint">No</span>
                   {% endif %}
@@ -108,51 +112,30 @@
                 <td class="text-center">
                   {% if u.is_active %}
                   <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-success-bg text-success border-success-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> In use
+                    <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
                 <td>
-                  <div class="flex items-center justify-center gap-3 flex-wrap">
-                    
-                    <button type="button"
-                      class="btn-edit-unit px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ u.id }}"
-                      data-code="{{ u.code }}"
-                      data-name="{{ u.name }}"
-                      data-base="{{ 1 if u.is_base_unit else 0 }}">
-                      Edit
-                    </button>
-
-                    <form method="post"
-                          action="{{ url_for('units.units_delete', unit_id=u.id) }}"
-                          class="inline js-confirm-submit"
-                          data-confirm-title="Remove unit"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this unit from the master list? It will be kept in the database but hidden.">
-                      <input type="hidden" name="q" value="{{ q or '' }}" />
-                      <input type="hidden" name="status" value="{{ status or 'all' }}" />
-                      <button type="submit"
-                              class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">
-                        Delete
-                      </button>
-                    </form>
-
-                    <form method="post" action="{{ url_for('units.units_toggle', unit_id=u.id) }}" class="inline">
-                      {# POST ke baad list pe wapas — search + filter na tootey #}
-                      <input type="hidden" name="q" value="{{ q or '' }}" />
-                      <input type="hidden" name="status" value="{{ status or 'all' }}" />
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Inactive">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if u.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                  {# Product master jaisa icon actions: View sabko, baaki (Edit/Delete/toggle) sirf can_edit walon ko #}
+                  <div class="row-actions">
+                    {{ view_btn("Unit details", u.code, [
+                      ["Code", u.code],
+                      ["Full Name", u.name],
+                      ["Base Unit", "Yes" if u.is_base_unit else "No"],
+                      ["Created", u.created_at|ist],
+                      ["Status", "Active" if u.is_active else "Inactive", "success" if u.is_active else "neutral"]
+                    ]) }}
+                    {% if can_edit('units') %}
+                    {{ edit_btn("btn-edit-unit", "unit", {"id": u.id, "code": u.code, "name": u.name, "base": 1 if u.is_base_unit else 0}) }}
+                    {{ delete_form(url_for('units.units_delete', unit_id=u.id), "unit", {"q": q or "", "status": status or "all"}) }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('units.units_toggle', unit_id=u.id), u.is_active, {"q": q or "", "status": status or "all"}) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -165,7 +148,9 @@
           <div id="empty-state" class="{% if units %}hidden{% endif %} py-12 text-center">
             <p class="font-semibold text-ink">No units found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new unit.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add unit</button>
+            {% if can_edit('units') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add unit</button>
+            {% endif %}
           </div>
         </div>
 
@@ -173,16 +158,16 @@
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} units</span>
           <span>Tip: set base units (KG, PCS, MTR) first — others can convert from them</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('units') %}
 <div id="unit-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
     <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
     <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-      <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+      <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
         <div>
           <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add unit</h2>
           <p class="text-[12.5px] text-ink-faint">Code, Name, Base checkbox</p>
@@ -195,29 +180,32 @@
         <div>
           <label for="unit-code" class="block text-[12.5px] font-semibold text-ink mb-1">Short code *</label>
           <input type="text" id="unit-code" name="code" required placeholder="KG" maxlength="10" autocomplete="off"
-            class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="unit-name" class="block text-[12.5px] font-semibold text-ink mb-1">Full name *</label>
           <input type="text" id="unit-name" name="name" required placeholder="Kilogram" autocomplete="off"
-            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <label class="flex items-center gap-2 border border-slate-200 bg-mist rounded px-3 py-3 cursor-pointer">
-          <input type="checkbox" id="is-base-unit" name="is_base_unit" value="1" class="h-4 w-4 rounded text-copper focus:ring-copper" />
+          <input type="checkbox" id="is-base-unit" name="is_base_unit" value="1" class="h-4 w-4 rounded text-accent focus:ring-accent" />
           <span class="text-[13.5px] font-medium text-ink">This is a base (primary) unit</span>
         </label>
       </form>
       <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
         <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-        <button type="submit" form="unit-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save unit</button>
+        <button type="submit" form="unit-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save unit</button>
       </div>
     </div>
   </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 {# Modal = chhota JS. Search filter = Flask. Typing = sirf form auto-submit (debounce). #}
 <script>
+  {# Modal / form sirf Edit user ke liye render hote hain — isliye unka saara JS bhi same condition me #}
+  {% if can_edit('units') %}
   const modal = document.getElementById('unit-modal');
   const form = document.getElementById('unit-form');
 
@@ -287,6 +275,7 @@
     }
     // valid → preventDefault nahi → Add/Edit Flask POST
   });
+  {% endif %}
 
   // --- Live search: typing ke thodi der baad GET form submit (filter Flask karta hai) ---
   var searchForm = document.getElementById('units-search-form');

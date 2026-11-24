@@ -5,21 +5,24 @@
 {% block page_css %}
 <style>
   .d-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12.5px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D1D9D8; }
-  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
-  .d-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
+  .d-table tbody tr:nth-child(even) { background: #F8FAFD; }
   .d-table .num { text-align: right; }
   #s-modal.hidden, #x-modal.hidden { display: none; }
   #s-modal, #x-modal { display: flex; }
-  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7F82; }
+  .form-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #5A6577; }
   .ql-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .ql-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
-  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8E7; vertical-align: top; }
+  .ql-table th { background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; text-align: left; }
+  .ql-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
   .ql-table .num { text-align: right; }
-  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 4px; background: #fff; }
-  .ql-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 1px #C46B2D; }
-  .ql-hint { font-size: 11.5px; color: #6B7F82; margin-top: 2px; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
+  .ql-input:disabled { background: #F1F5F9; color: #5A6577; cursor: not-allowed; }
+  /* Keyboard focus: custom buttons / links par saaf outline */
+  .d-table a:focus-visible, .d-table button:focus-visible, #btn-new:focus-visible, #s-modal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ql-hint { font-size: 11.5px; color: #5A6577; margin-top: 2px; }
 </style>
 {% endblock %}
 
@@ -30,14 +33,14 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Sales returns</h1>
           <p class="text-[12.5px] text-ink-faint mt-0.5">Goods a customer sends back · credit note · good goods go back into stock</p>
         </div>
-        <button type="button" id="btn-new" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New sales return</button>
+        {% if can_edit('sales_returns') %}<button type="button" id="btn-new" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">+ New sales return</button>{% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
           {% for key, label in (('done', 'Credit notes'), ('cancelled', 'Cancelled')) %}
           <a href="{{ url_for('sales_returns.returns_list', tab=key) }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
           </a>
           {% endfor %}
@@ -65,8 +68,8 @@
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.total_amount) }}</td>
                 <td>
                   {% if tab == 'done' %}
-                  <a href="{{ url_for('sales_returns.returns_print', return_id=r.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-copper-text bg-white border border-copper-border rounded hover:bg-copper-soft">Print</a>
-                  <button type="button" class="btn-cancel-r mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ r.id }}" data-no="{{ r.return_no }}">Cancel</button>
+                  <a href="{{ url_for('sales_returns.returns_print', return_id=r.id) }}" target="_blank" class="inline-block px-3 py-1.5 text-[13px] font-semibold text-accent-text bg-white border border-accent-border rounded hover:bg-accent-soft">Print</a>
+                  {% if can_edit('sales_returns') %}<button type="button" class="btn-cancel-r mt-1 px-3 py-1.5 text-[13px] font-semibold text-stop bg-white border border-stop-border rounded hover:bg-stop-bg" data-id="{{ r.id }}" data-no="{{ r.return_no }}">Cancel</button>{% endif %}
                   {% endif %}
                 </td>
               </tr>
@@ -83,16 +86,17 @@
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span>Credit = quantity × the invoice rate (after discount) + GST. Charges on the invoice (shipping etc.) are not returned.</span>
-          <span class="text-ink-muted">Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{# New sales return / Cancel drawers sirf Edit wale user ke liye #}
+{% if can_edit('sales_returns') %}
 <div id="s-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="s-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="s-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="s-title" class="text-[16px] font-bold text-ink">New sales return</h2>
         <p class="text-[12.5px] text-ink-faint">Credit note number is made automatically</p>
@@ -132,7 +136,7 @@
     </form>
     <div class="px-4 py-3 border-t border-slate-200 bg-mist flex items-center justify-end gap-2 shrink-0">
       <button type="button" id="s-cancel" class="px-4 py-2.5 text-[14px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">Close</button>
-      <button type="submit" form="s-form" class="px-5 py-2.5 text-[14px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Save credit note</button>
+      <button type="submit" form="s-form" class="px-5 py-2.5 text-[14px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">Save credit note</button>
     </div>
   </div>
 </div>
@@ -152,9 +156,11 @@
     </div>
   </form>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
+{% if can_edit('sales_returns') %}
 <script>
   var INVOICES = {{ invoices|tojson }};
   var OPEN_I = {{ open_invoice|tojson }};
@@ -216,4 +222,5 @@
   });
   if (OPEN_I) openReturn(OPEN_I);
 </script>
+{% endif %}
 {% endblock %}

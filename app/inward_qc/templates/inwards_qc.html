@@ -13,16 +13,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 8px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .qc-table thead th:first-child,
   .qc-table tbody td:first-child { text-align: left; padding-left: 16px; }
@@ -31,13 +31,13 @@
     padding: 11px 8px;
     font-size: 13.5px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .qc-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .qc-table tbody tr:hover { background: #FBF4EE; }
+  .qc-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .qc-table tbody tr:hover { background: #F1F5F9; }  /* hover = neutral grey (accent tint sirf selected row ke liye) */
   .search-wrap input { padding-left: 32px; }
   #inspect-modal.hidden, #view-modal.hidden, #memo-modal.hidden { display: none; }
   #inspect-modal, #view-modal, #memo-modal { display: flex; }
@@ -48,23 +48,23 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #8A4A1C;
+    color: #5A6577;  /* drawer section label = neutral */
     margin-top: 4px;
   }
   .param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .param-table th {
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     padding: 8px 6px;
-    border: 1px solid #D1D9D8;
+    border: 1px solid #D4DBE6;
     text-align: center;
   }
   .param-table td {
     padding: 6px;
-    border: 1px solid #E2E8E7;
+    border: 1px solid #E2E8F1;
     vertical-align: middle;
   }
 </style>
@@ -84,11 +84,11 @@
         {# §10.6 tabs — PO/GRN jaisa. QC me Pending = jin GRN lots ka inspection baaki hai, Completed = final QC records #}
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
           <a href="{{ url_for('inward_qc.inward_qc_list', tab='pending') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             Pending action <span class="tabular-nums">({{ pending_count }})</span>
           </a>
           <a href="{{ url_for('inward_qc.inward_qc_list', tab='completed') }}"
-            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
             Completed <span class="tabular-nums">({{ completed_count }})</span>
           </a>
         </div>
@@ -96,11 +96,11 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-sm">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-qc" placeholder="{{ 'Search GRN, PO, material, lot…' if tab == 'pending' else 'Search QC no., GRN, material, lot, memo…' }}"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex flex-wrap items-center gap-1">
             {# Har tab me sirf usi tab ke pills. data-label = JS count ke saath dikhne wala naam #}
-            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" data-label="All" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             {% if tab == 'completed' %}
             <button type="button" data-filter="passed" data-label="Passed" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Passed (0)</button>
             <button type="button" data-filter="partial" data-label="Partial" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Partial (0)</button>
@@ -110,7 +110,7 @@
             <button type="button" data-filter="draft" data-label="Draft saved" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Draft saved (0)</button>
             {% endif %}
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-lg text-right leading-snug">
               Inspect one GRN lot at a time · The whole received qty is billed on the vendor's invoice · <strong>Rejected qty</strong> gets a rejection memo and goes back with a Purchase Return
@@ -133,7 +133,9 @@
               <col style="width:10%" />
               <col style="width:8%" />
               <col style="width:10%" />
+{% if can_edit('inward_qc') %}
               <col style="width:8%" />
+{% endif %}
             </colgroup>
             <thead>
               <tr>
@@ -146,12 +148,14 @@
                 <th>Lot / batch</th>
                 <th>Received</th>
                 <th>Status</th>
+{% if can_edit('inward_qc') %}
                 <th>Actions</th>
+{% endif %}
               </tr>
             </thead>
             <tbody>
               {% for a in awaiting %}
-              {% if loop.first or a.grn.po_id != loop.previtem.grn.po_id %}{{ po_group_row(a.grn.po, 10) }}{% endif %}
+              {% if loop.first or a.grn.po_id != loop.previtem.grn.po_id %}{{ po_group_row(a.grn.po, 10 if can_edit('inward_qc') else 9) }}{% endif %}
               {% set g = a.grn %}
               {% set gl = a.line %}
               {% set po_line = gl.po_line %}
@@ -162,7 +166,8 @@
                 <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ g.grn_no }}</td>
                 <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
-                <td><span class="text-brand-teal font-medium">{{ g.po.po_no if g.po else '—' }}</span></td>
+                {# PO number link nahi hai, isliye plain ink text #}
+                <td><span class="text-ink font-medium">{{ g.po.po_no if g.po else '—' }}</span></td>
                 <td class="text-[13px]">{{ g.po.vendor.name if g.po and g.po.vendor else '—' }}</td>
                 <td class="text-left pl-3 !text-left text-[13px]">{% if rm %}{{ rm.code }} {{ rm.name }}{% else %}—{% endif %}</td>
                 <td class="font-mono text-[12.5px]">{{ gl.batch_lot_no or '—' }}</td>
@@ -178,14 +183,16 @@
                   </span>
                   {% endif %}
                 </td>
+{% if can_edit('inward_qc') %}
                 <td>
                   {# Inspect = wahi "New inspection" modal, bas GRN + line pehle se select (JS neeche) #}
-                  <button type="button" class="btn-inspect-line px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white"
+                  <button type="button" class="btn-inspect-line px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark"
                     data-grn-id="{{ g.id }}"
                     data-line-id="{{ gl.id }}">
                     Inspect
                   </button>
                 </td>
+{% endif %}
               </tr>
               {% endfor %}
             </tbody>
@@ -240,7 +247,11 @@
                 <td>
                   {% if grn %}
                   {# GRN Closed ho to wo GRN list ke Completed tab me milegi, warna Pending me #}
-                  <a href="{{ url_for('grns.grns_list', tab='completed' if grn.status == 'Closed' else 'pending') }}" class="text-brand-teal font-medium hover:underline">{{ grn.grn_no }}</a>
+{% if can_do('grns.grns_list', 'GET') %}
+                  <a href="{{ url_for('grns.grns_list', tab='completed' if grn.status == 'Closed' else 'pending') }}" class="text-accent-text font-medium hover:underline">{{ grn.grn_no }}</a>
+{% else %}
+                  {{ grn.grn_no }}
+{% endif %}
                   {% else %}—{% endif %}
                 </td>
                 <td class="text-left pl-3 !text-left text-[13px]">
@@ -257,8 +268,8 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Passed
                   </span>
                   {% elif st == 'partial' %}
-                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-brand-soft text-brand-teal border-brand-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-brand-teal"></span> Partial
+                  <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-warning-bg text-warning border-warning-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Partial
                   </span>
                   {% elif st == 'failed' %}
                   <span class="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
@@ -272,7 +283,7 @@
                 </td>
                 <td>
                   <div class="flex flex-wrap justify-center gap-1">
-                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white"
+                    <button type="button" class="btn-view px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent"
                       data-qc="{{ q.qc_no }}"
                       data-date="{{ q.inspection_date.strftime('%Y-%m-%d') if q.inspection_date else '' }}"
                       data-inspector="{{ q.inspector or '' }}"
@@ -337,10 +348,11 @@
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('inward_qc') %}
 <div id="inspect-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="inspect-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="inspect-modal-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="inspect-modal-title" class="text-[16px] font-bold text-ink">Inward QC inspection</h2>
         <p class="text-[12.5px] text-ink-faint">One GRN lot · pass / reject quantities</p>
@@ -360,13 +372,13 @@
         </div>
         <div>
           <label for="qc-date" class="block text-[12.5px] font-semibold text-ink mb-1">Inspection date *</label>
-          <input type="date" id="qc-date" name="inspection_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          <input type="date" id="qc-date" name="inspection_date" required class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="qc-inspector" class="block text-[12.5px] font-semibold text-ink mb-1">Inspector *</label>
           {# Model me text field hai — User master baad me #}
           <input type="text" id="qc-inspector" name="inspector" required placeholder="Lab inspector name" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -395,15 +407,15 @@
         </div>
         <div>
           <label for="qc-sample" class="block text-[12.5px] font-semibold text-ink mb-1">Sample size *</label>
-          <input type="number" id="qc-sample" name="sample_size" required min="0" step="0.01" placeholder="0" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          <input type="number" id="qc-sample" name="sample_size" required min="0" step="0.01" placeholder="0" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent tabular-nums" />
         </div>
         <div>
           <label for="qc-pass" class="block text-[12.5px] font-semibold text-ink mb-1">Passed qty *</label>
-          <input type="number" id="qc-pass" name="passed_qty" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          <input type="number" id="qc-pass" name="passed_qty" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent tabular-nums" />
         </div>
         <div>
           <label for="qc-reject" class="block text-[12.5px] font-semibold text-ink mb-1">Rejected qty *</label>
-          <input type="number" id="qc-reject" name="rejected_qty" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper tabular-nums" />
+          <input type="number" id="qc-reject" name="rejected_qty" required min="0" step="0.01" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent tabular-nums" />
         </div>
       </div>
 
@@ -436,15 +448,15 @@
 
       <div>
         <label for="qc-remarks" class="block text-[12.5px] font-semibold text-ink mb-1">Remarks</label>
-        <textarea id="qc-remarks" name="remarks" rows="2" placeholder="Visual notes, instrument ID…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+        <textarea id="qc-remarks" name="remarks" rows="2" placeholder="Visual notes, instrument ID…" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent"></textarea>
       </div>
       <div>
         <label for="qc-report" class="block text-[12.5px] font-semibold text-ink mb-1">QC report / certificate <span class="font-normal text-ink-faint">(optional)</span></label>
         <input type="file" id="qc-report" name="report_file" accept=".pdf,.png,.jpg,.jpeg"
-          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2 text-[13.5px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="text-[11.5px] text-ink-faint mt-1">PDF, PNG or JPG, up to 5 MB. A file saved with an earlier draft stays unless you choose a new one.</p>
       </div>
-      <p class="text-[11.5px] text-ink-faint bg-brand-soft border border-brand-border rounded px-2.5 py-2">
+      <p class="text-[11.5px] text-ink-faint bg-info-bg border border-info-border rounded px-2.5 py-2">
         After submit: <strong>passed qty</strong> can move to available stock later · <strong>rejected qty</strong> is on the vendor's bill and goes back to the vendor with a Purchase Return.
       </p>
     </form>
@@ -452,15 +464,16 @@
     <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="submit" form="inspect-form" name="qc_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save draft</button>
       <button type="button" id="btn-cancel-inspect" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="inspect-form" name="qc_action" value="submit" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Submit result</button>
+      <button type="submit" form="inspect-form" name="qc_action" value="submit" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Submit result</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="view-title" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="view-title" class="text-[16px] font-bold text-ink">QC inspection</h2>
         <p id="view-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -569,6 +582,7 @@
       });
   }
 
+{% if can_edit('inward_qc') %}
   qcGrn.addEventListener('change', function () {
     loadGrnLines(qcGrn.value);
   });
@@ -589,6 +603,7 @@
     }
     applyDraft(draft);
   });
+{% endif %}
 
   // Draft ki values wapas form me. Naya save purane draft ko replace karta hai (server), isliye yahan sirf bharna hai.
   function applyDraft(draft) {
@@ -677,6 +692,7 @@
     }).join('');
   }
   // Value badalte hi Pass / Fail turant dikhao (ek listener tbody pe — event delegation, rows dynamic hain)
+{% if can_edit('inward_qc') %}
   document.getElementById('param-tbody').addEventListener('input', function (e) {
     if (e.target.classList.contains('qc-param-input')) updateParamVerdict(parseInt(e.target.getAttribute('data-i'), 10));
   });
@@ -713,6 +729,7 @@
       });
     }
   });
+{% endif %}
 
   // Text ko HTML ke liye safe banao: < > & ko &lt; &gt; &amp; me badal do, taaki user ka text HTML ban ke chale nahi
   function esc(text) {
@@ -762,7 +779,7 @@
     try { results = JSON.parse(btn.getAttribute('data-results') || '[]'); } catch (err) { results = []; }
     var reportUrl = btn.getAttribute('data-report-url') || '';
     var reportHtml = reportUrl
-      ? '<div class="pt-2"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">QC report</div><div class="mt-0.5"><a href="' + reportUrl + '" target="_blank" class="text-copper-text font-semibold hover:underline">View uploaded file</a></div></div>'
+      ? '<div class="pt-2"><div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">QC report</div><div class="mt-0.5"><a href="' + reportUrl + '" target="_blank" class="text-accent-text font-semibold hover:underline">View uploaded file</a></div></div>'
       : '';
     document.getElementById('view-body').innerHTML =
       '<div class="grid grid-cols-2 gap-3">' +
@@ -838,6 +855,7 @@
   }
 
   // Pending tab ki "Inspect" button — modal kholo aur GRN + material/lot pehle se select kar do
+{% if can_edit('inward_qc') %}
   document.querySelectorAll('.btn-inspect-line').forEach(function (btn) {
     btn.addEventListener('click', function () {
       openInspect();
@@ -845,11 +863,14 @@
       loadGrnLines(qcGrn.value, btn.getAttribute('data-line-id'));
     });
   });
+{% endif %}
 
   // "New inspection" button ab nahi hai — form sirf Pending row ke "Inspect" se khulta hai (listener upar)
+{% if can_edit('inward_qc') %}
   document.getElementById('btn-close-inspect').addEventListener('click', closeInspect);
   document.getElementById('btn-cancel-inspect').addEventListener('click', closeInspect);
   document.getElementById('inspect-modal-backdrop').addEventListener('click', closeInspect);
+{% endif %}
   document.getElementById('btn-close-view').addEventListener('click', closeView);
   document.getElementById('btn-close-view-2').addEventListener('click', closeView);
   document.getElementById('view-backdrop').addEventListener('click', closeView);
@@ -860,7 +881,9 @@
     if (e.key !== 'Escape') return;
     if (!memoModal.classList.contains('hidden')) closeMemo();
     else if (!viewModal.classList.contains('hidden')) closeView();
+{% if can_edit('inward_qc') %}
     else if (!inspectModal.classList.contains('hidden')) closeInspect();
+{% endif %}
   });
 
   document.querySelectorAll('.btn-view').forEach(function (btn) {
@@ -875,10 +898,10 @@
     btn.addEventListener('click', function () {
       activeFilter = btn.getAttribute('data-filter');
       document.querySelectorAll('.filter-btn').forEach(function (b) {
-        b.classList.remove('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+        b.classList.remove('border-accent', 'bg-accent', 'text-white', 'font-semibold');
         b.classList.add('border-slate-300', 'bg-white', 'text-ink');
       });
-      btn.classList.add('border-copper', 'bg-copper', 'text-white', 'font-semibold');
+      btn.classList.add('border-accent', 'bg-accent', 'text-white', 'font-semibold');
       btn.classList.remove('border-slate-300', 'bg-white', 'text-ink');
       applyFilters();
     });

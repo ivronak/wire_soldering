@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_row_actions.html" import view_btn, edit_btn, delete_form, toggle_form, act_sep with context %}
 {% block title %}Tax Rate Master{% endblock %}
 
 {% block page_css %}
@@ -13,16 +14,16 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 14px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .rate-table thead th:first-child,
   .rate-table tbody td:first-child { text-align: left; padding-left: 18px; }
@@ -31,19 +32,21 @@
     padding: 11px 14px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .rate-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .rate-table tbody tr:hover { background: #FBF4EE; }
+  .rate-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .rate-table tbody tr:hover { background: #F1F5F9; }
   .rate-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
   #rate-modal.hidden { display: none; }
   #rate-modal { display: flex; }
   details.help-tip summary { cursor: pointer; list-style: none; }
   details.help-tip summary::-webkit-details-marker { display: none; }
+  /* Keyboard focus: buttons / links / summary par saaf outline */
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -53,11 +56,14 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Tax rates</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Tax rates</h1>
         </div>
+        {# View-only user ko Add button nahi dikhta (server 403 deta) #}
+        {% if can_edit('tax_rates') %}
         <button type="button" id="btn-add-rate"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add tax rate
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -66,17 +72,17 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-rate" placeholder="Search code or label…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
-            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Stopped (0)</button>
+            <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
-              Used by Product Master's Tax Rate dropdown · Stop = deactivate (not deleted)
+              Used by Product Master's Tax Rate dropdown · Inactive = deactivated (not deleted)
             </p>
           </details>
         </div>
@@ -87,9 +93,9 @@
               <col style="width:5%" />
               <col style="width:14%" />
               <col style="width:14%" />
-              <col style="width:37%" />
-              <col style="width:14%" />
-              <col style="width:16%" />
+              <col style="width:35%" />
+              <col style="width:12%" />
+              <col style="width:18%" />
             </colgroup>
             <thead>
               <tr>
@@ -128,41 +134,27 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Stopped
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
                 <td>
-                  <div class="flex items-center justify-center gap-3 flex-wrap">
-                    <button type="button"
-                      class="btn-edit-rate px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ r.id }}"
-                      data-code="{{ r.code }}"
-                      data-rate="{{ r.rate_percent }}"
-                      data-label="{{ r.label }}">
-                      Edit
-                    </button>
-                    {# Soft-delete — Flask route names niche match karo #}
-                    <form method="post"
-                          action="{{ url_for('tax_rates.tax_rates_delete', r_id=r.id) }}"
-                          class="inline js-confirm-submit"
-                          data-confirm-title="Remove tax rate"
-                          data-confirm-ok="Remove"
-                          data-confirm-message="Remove this tax rate from the master list? It will be kept in the database but hidden.">
-                      <button type="submit"
-                              class="px-2.5 py-1 text-[12.5px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:opacity-90">
-                        Delete
-                      </button>
-                    </form>
-                    <form method="post" action="{{ url_for('tax_rates.tax_rates_toggle', r_id=r.id) }}" class="inline js-rate-toggle">
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Click to toggle Active / Stopped">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if r.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                  {# Product master jaisa icon actions: View sabko, baaki (Edit/Delete/toggle) sirf can_edit walon ko #}
+                  <div class="row-actions">
+                    {{ view_btn("Tax rate details", r.code, [
+                      ["Code", r.code],
+                      ["Rate %", r.rate_percent ~ "%"],
+                      ["Label", r.label],
+                      ["Created", r.created_at|ist],
+                      ["Status", "Active" if r.is_active else "Inactive", "success" if r.is_active else "neutral"]
+                    ]) }}
+                    {% if can_edit('tax_rates') %}
+                    {{ edit_btn("btn-edit-rate", "tax rate", {"id": r.id, "code": r.code, "rate": r.rate_percent, "label": r.label}) }}
+                    {{ delete_form(url_for('tax_rates.tax_rates_delete', r_id=r.id), "tax rate") }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('tax_rates.tax_rates_toggle', r_id=r.id), r.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -175,23 +167,25 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No tax rates found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new tax rate.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add tax rate</button>
+            {% if can_edit('tax_rates') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add tax rate</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} tax rates</span>
           <span>Feeds Product Master's Tax Rate dropdown</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('tax_rates') %}
 <div id="rate-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add tax rate</h2>
         <p class="text-[12.5px] text-ink-faint">Code, Rate %, Label</p>
@@ -202,31 +196,35 @@
       <div>
         <label for="rate-code" class="block text-[12.5px] font-semibold text-ink mb-1">Short code *</label>
         <input type="text" id="rate-code" name="code" required placeholder="GST18" maxlength="16" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="rate-percent" class="block text-[12.5px] font-semibold text-ink mb-1">Rate % *</label>
         <input type="number" id="rate-percent" name="rate_percent" required placeholder="18" min="0" max="100" step="0.01" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="rate-label" class="block text-[12.5px] font-semibold text-ink mb-1">Label *</label>
         <input type="text" id="rate-label" name="label" required placeholder="Standard rate" autocomplete="off"
-          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2.5 text-[14.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="rate-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save tax rate</button>
+      <button type="submit" form="rate-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save tax rate</button>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 <script>
+  {# Modal / form sirf Edit user ke liye render hote hain — unka JS bhi same condition me (View user pe null error na aaye) #}
+  {% if can_edit('tax_rates') %}
   var modal = document.getElementById('rate-modal');
   var form = document.getElementById('rate-form');
+  {% endif %}
   var searchInput = document.getElementById('search-rate');
   var rows = Array.from(document.querySelectorAll('.rate-row'));
   var emptyState = document.getElementById('empty-state');
@@ -235,9 +233,11 @@
   var activeFilter = 'all';
   var FILTER_KEY = 'erp.tax_rates.statusFilter';
   var SEARCH_KEY = 'erp.tax_rates.searchQ';
+  {% if can_edit('tax_rates') %}
   var modalTitle = document.getElementById('modal-title');
   // Flask Add route ready hone pe url_for yahan / form pe
   var addAction = "{{ url_for('tax_rates.tax_rates_add') }}";
+  {% endif %}
 
   function saveActiveFilter() {
     try { sessionStorage.setItem(FILTER_KEY, activeFilter); } catch (err) {}
@@ -252,9 +252,9 @@
   function applyFilterButtonStyles(selectedBtn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === selectedBtn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -279,6 +279,7 @@
     applyFilters();
   }
 
+  {% if can_edit('tax_rates') %}
   function openModal() {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -307,6 +308,7 @@
     document.getElementById('rate-label').value = btn.getAttribute('data-label') || '';
     openModal();
   }
+  {% endif %}
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -335,9 +337,10 @@
     });
     document.querySelector('[data-filter="all"]').textContent = 'All (' + rows.length + ')';
     document.querySelector('[data-filter="active"]').textContent = 'Active (' + counts.active + ')';
-    document.querySelector('[data-filter="inactive"]').textContent = 'Stopped (' + counts.inactive + ')';
+    document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {% if can_edit('tax_rates') %}
   document.getElementById('btn-add-rate').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
@@ -361,6 +364,7 @@
       return;
     }
   });
+  {% endif %}
 
   document.querySelectorAll('td form').forEach(function (f) {
     f.addEventListener('submit', function () { saveListState(); });

@@ -4,19 +4,23 @@
 {% block page_css %}
 <style>
   .os-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .os-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .os-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D4DBE6; border-right: 1px solid #E5EAF2; }
   .os-table thead th:first-child, .os-table tbody td:first-child { text-align: left; padding-left: 16px; }
-  .os-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
-  .os-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .os-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8F1; vertical-align: middle; }
+  .os-table tbody tr:nth-child(even) { background: #F8FAFD; }
   .os-table td.left, .os-table th.left { text-align: left; }
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
-  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
-  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; }
+  .lines-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D4DBE6; text-align: left; }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8F1; }
+  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #C7D0DE; border-radius: 4px; }
+  /* Drawer ke fields me focus indication nahi tha - accent border + 1px ring (baaki ERP jaisa) */
+  #os-form input:focus, #os-form select:focus, #os-form textarea:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 1px #0B5BEF; }
+  .os-table tbody tr:hover { background: #F1F5F9; }
   .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
   .st-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   .st-posted { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .st-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  /* Cancelled = neutral grey (red sirf rejected / failed / overdue ke liye) */
+  .st-cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   #os-modal.hidden, #os-view-modal.hidden { display: none; }
   #os-modal, #os-view-modal { display: flex; }
 </style>
@@ -29,13 +33,15 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Opening stock</h1>
           <p class="text-[12.5px] text-ink-faint">The raw material already lying in your store before you started using this system.</p>
         </div>
-        <button type="button" id="btn-new-os" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New opening stock</button>
+        {% if can_edit('opening_stock') %}
+        <button type="button" id="btn-new-os" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">+ New opening stock</button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
-          <a href="{{ url_for('opening_stock.opening_stock_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
-          <a href="{{ url_for('opening_stock.opening_stock_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
+          <a href="{{ url_for('opening_stock.opening_stock_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
+          <a href="{{ url_for('opening_stock.opening_stock_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
         </div>
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
           Enter what is physically in the store as of a date, with the cost per unit · every line becomes its own lot (LOT-…) in that warehouse · <strong>only for stock that was never received through a GRN</strong>, otherwise it is counted twice · a posted opening stock can be cancelled only while its goods are untouched; after that, correct with a Stock adjustment.
@@ -56,13 +62,13 @@
                 <td><span class="status-pill {{ 'st-draft' if s.status == 'Draft' else ('st-posted' if s.status == 'Posted' else 'st-cancelled') }}">{{ s.status }}</span></td>
                 <td>
                   <div class="flex flex-wrap justify-center gap-1">
-                    <button type="button" class="btn-view-os px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-sheet='{{ {"no": s.opening_no, "status": s.status, "date": s.as_of_date.strftime("%d %b %Y"), "warehouse": s.warehouse.name, "remarks": s.remarks or "", "lines": (s.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
-                    {% if s.status == 'Draft' %}
+                    <button type="button" class="btn-view-os px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent" data-sheet='{{ {"no": s.opening_no, "status": s.status, "date": s.as_of_date.strftime("%d %b %Y"), "warehouse": s.warehouse.name, "remarks": s.remarks or "", "lines": (s.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    {% if s.status == 'Draft' and can_edit('opening_stock') %}
                     <form method="post" action="{{ url_for('opening_stock.opening_stock_post', sheet_id=s.id) }}" class="inline js-confirm-submit" data-confirm-title="Post opening stock" data-confirm-ok="Post" data-confirm-message="Post {{ s.opening_no }}? The stock will be added to {{ s.warehouse.name }}.">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Post</button>
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post</button>
                     </form>
                     {% endif %}
-                    {% if s.status != 'Cancelled' %}
+                    {% if s.status != 'Cancelled' and can_edit('opening_stock') %}
                     <form method="post" action="{{ url_for('opening_stock.opening_stock_cancel', sheet_id=s.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel opening stock" data-confirm-ok="Cancel" data-confirm-message="Cancel {{ s.opening_no }}?{% if s.status == 'Posted' %} The stock will be taken out again, if it has not been used.{% endif %}">
                       <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
                     </form>
@@ -80,10 +86,12 @@
 {% endblock %}
 
 {% block modals %}
+{# New opening stock drawer sirf Edit wale ko (opener button bhi usi condition me hai) #}
+{% if can_edit('opening_stock') %}
 <div id="os-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="os-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div><h2 class="text-[16px] font-bold text-ink">New opening stock</h2><p class="text-[12.5px] text-ink-faint">Stock that is already in your store, not received through a GRN</p></div>
       <button type="button" id="os-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -101,7 +109,7 @@
           </select>
         </div>
       </div>
-      <div class="flex items-center justify-between"><p class="text-[13px] font-semibold text-ink">Materials</p><button type="button" id="os-add-line" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add material</button></div>
+      <div class="flex items-center justify-between"><p class="text-[13px] font-semibold text-ink">Materials</p><button type="button" id="os-add-line" class="text-[12.5px] font-semibold text-accent-text hover:underline">+ Add material</button></div>
       <div class="overflow-x-auto border border-slate-200 rounded">
         <table class="lines-table">
           <thead><tr><th style="width:34%">Material *</th><th style="width:14%">Quantity *</th><th style="width:16%">Cost per unit (₹) *</th><th style="width:14%">Batch no.</th><th style="width:18%">Value</th><th style="width:4%"></th></tr></thead>
@@ -114,15 +122,17 @@
     <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="submit" form="os-form" name="opening_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
       <button type="button" id="os-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="os-form" name="opening_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Post opening stock</button>
+      <button type="submit" form="os-form" name="opening_action" value="post" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post opening stock</button>
     </div>
   </div>
 </div>
 
+{% endif %}
+
 <div id="os-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="os-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div><h2 id="os-view-title" class="text-[16px] font-bold text-ink">Opening stock</h2><p id="os-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
       <button type="button" id="os-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -144,6 +154,7 @@
   var osView = document.getElementById('os-view-modal');
   var linesBody = document.getElementById('os-lines');
 
+  {% if can_edit('opening_stock') %}
   function materialOptionsHtml() {
     return '<option value="">Select material…</option>' + MATERIALS.map(function (m) {
       return '<option value="' + m.id + '" data-unit="' + esc(m.unit) + '">' + esc(m.label) + '</option>';
@@ -206,6 +217,7 @@
   document.getElementById('os-close').addEventListener('click', closeNew);
   document.getElementById('os-cancel').addEventListener('click', closeNew);
   document.getElementById('os-backdrop').addEventListener('click', closeNew);
+  {% endif %}
 
   function openView(btn) {
     var d = JSON.parse(btn.getAttribute('data-sheet') || '{}');
@@ -228,7 +240,7 @@
   document.getElementById('os-view-backdrop').addEventListener('click', closeView);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (!osModal.classList.contains('hidden')) closeNew(); else if (!osView.classList.contains('hidden')) closeView();
+    if ({% if can_edit('opening_stock') %}!osModal.classList.contains('hidden')) closeNew(); else if ({% endif %}!osView.classList.contains('hidden')) closeView();
   });
 </script>
 {% endblock %}

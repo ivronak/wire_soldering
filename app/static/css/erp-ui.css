@@ -1,0 +1,81 @@
+/* erp-ui.css — poore ERP ke liye SHARED chhote UI rules (focus ring, checkbox/radio colour, text selection).
+ *
+ * Kyun alag file: pehle har page apna focus-ring / input style copy-paste karta tha, aur buttons / links par
+ * koi focus indicator hi nahi tha (keyboard se chalne wale ko pata nahi chalta tha ki cursor kahan hai).
+ * Ab ek jagah define hai; page ke apne <style> / Tailwind classes isse zyada specific hain to woh jeet jaate hain.
+ *
+ * Kaise load hota hai: base.html aur auth/plain.html dono me, tailwind + theme.js ke BAAD (kyunki var(--accent) theme.js set karta hai):
+ *   <link rel="stylesheet" href="{{ url_for('static', filename='css/erp-ui.css') }}" />
+ * Rang badalna ho to yahan nahi — app/static/js/theme.js me.
+ */
+
+/* 1) Keyboard focus ring — sirf keyboard se aane par dikhta hai (mouse click par nahi: :focus-visible).
+      :where() se specificity 0 rakhi hai, taaki kisi bhi page ka apna custom focus style (jaise sidebar / cards) isse override kar sake.
+      tabindex="-1" (sirf JS se focus hone wale elements, jaise dialog) ko ring nahi chahiye. */
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 2) Text boxes / dropdowns: ring ke saath border bhi accent + halka 3px glow, taaki focus door se bhi dikhe.
+      (Checkbox / radio / range / button-type inputs ko halo nahi — unka apna chhota size hai, sirf outline kaafi hai.) */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="color"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 91, 239, .18);
+}
+
+/* 3) Native checkbox / radio / range ka rang brand accent (Tailwind forms plugin load nahi hai, isliye 'text-accent' class se kuch nahi hota) */
+input[type="checkbox"], input[type="radio"], input[type="range"], progress { accent-color: var(--accent); }
+
+/* 4) Text select karne par halka accent tint (default browser neela nahi) */
+::selection { background: rgba(11, 91, 239, .18); }
+
+/* 5) ROW ACTIONS (Product master wala pattern — ab saare masters me same): icon-only buttons + separator + toggle.
+      Markup app/templates/_row_actions.html ke macros se aata hai (view_btn / edit_btn / delete_form / toggle_form / act_sep).
+      Kyun icon-only: ek row me 4-5 text buttons jagah kha jaate the; tooltip (title) + aria-label se naam pata chalta hai. */
+.row-actions { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.act-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 6px;
+  border: 1px solid var(--line); background: #FFFFFF; color: var(--ink-muted);
+  cursor: pointer; padding: 0;
+  transition: background-color .12s, color .12s, border-color .12s;
+}
+.act-btn svg { width: 15px; height: 15px; }
+.act-btn:hover { background: var(--mist); color: var(--ink); }
+.act-btn.act-edit { color: var(--accent-text); border-color: var(--accent-border); background: var(--accent-soft); }
+.act-btn.act-edit:hover { background: var(--accent); border-color: var(--accent-dark); color: #FFFFFF; }
+.act-btn.act-delete { color: var(--stop); border-color: var(--stop-border); background: var(--stop-bg); }
+.act-btn.act-delete:hover { background: var(--stop); border-color: var(--stop); color: #FFFFFF; }
+.act-btn[disabled], .act-btn.is-disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.act-sep { width: 1px; height: 20px; background: var(--line-soft); }
+.act-btn.act-sm { width: 26px; height: 26px; }
+.act-btn.act-sm svg { width: 13px; height: 13px; }
+
+/* 6) VIEW-DETAILS DRAWER (app/static/js/erp-view.js banata hai) — read-only, right se khulta hai, Product master ke view drawer jaisa */
+.vd-root { position: fixed; inset: 0; z-index: 60; display: none; }
+.vd-root.is-open { display: flex; justify-content: flex-end; }
+.vd-backdrop { position: absolute; inset: 0; background: rgba(11, 18, 32, .40); }
+.vd-panel { position: relative; width: 100%; max-width: 32rem; height: 100%; background: #FFFFFF; border-left: 1px solid var(--line); display: flex; flex-direction: column; box-shadow: -8px 0 24px rgba(11, 18, 32, .12); }
+.vd-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--accent-soft); flex-shrink: 0; }
+.vd-title { font-size: 16px; font-weight: 700; color: var(--ink); margin: 0; }
+.vd-sub { font-size: 12.5px; color: var(--ink-faint); margin: 0; }
+.vd-x { width: 32px; height: 32px; border: 0; background: transparent; border-radius: 6px; font-size: 20px; line-height: 1; color: var(--ink-faint); cursor: pointer; }
+.vd-x:hover { background: #FFFFFF; color: var(--ink); }
+.vd-body { flex: 1; overflow-y: auto; padding: 8px 16px 16px; }
+.vd-row { display: grid; grid-template-columns: 9rem 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.vd-row:last-child { border-bottom: 0; }
+.vd-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-faint); padding-top: 2px; }
+.vd-value { color: var(--ink); word-break: break-word; white-space: pre-wrap; }
+.vd-value.is-empty { color: var(--ink-faint); }
+.vd-chip { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--neutral-border); background: var(--neutral-bg); color: var(--neutral); }
+.vd-chip.success { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.vd-chip.warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning); }
+.vd-chip.stop { background: var(--stop-bg); border-color: var(--stop-border); color: var(--stop); }
+.vd-chip.accent { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-text); }
+.vd-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; flex-shrink: 0; }
+.vd-close { padding: 8px 14px; font-size: 13.5px; color: var(--ink-muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.vd-close:hover { background: var(--mist); color: var(--ink); }

@@ -3,35 +3,36 @@
 
 {% block page_css %}
 <style>
-  /* Costing: Production planning / Variance jaisa look (copper-teal) */
-  .cs-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .cs-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .cs-kpi .v { font-size: 24px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .cs-kpi .h { font-size: 12px; color: #6B7F82; }
-  .cs-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .cs-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .cs-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .cs-box { background: #fff; border: 1px solid #D1D9D8; border-radius: 12px; padding: 14px 16px; }
-  .cs-box h3 { font-size: 15px; font-weight: 700; color: #0F2F32; }
-  .cs-note { font-size: 12.5px; color: #6B7F82; }
+  /* Costing: Production planning / Variance jaisa look (blue accent theme) */
+  .cs-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .cs-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .cs-kpi .v { font-size: 24px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .cs-kpi .h { font-size: 12px; color: #5A6577; }
+  .cs-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .cs-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .cs-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .cs-box { background: #fff; border: 1px solid #D4DBE6; border-radius: 12px; padding: 14px 16px; }
+  .cs-box h3 { font-size: 15px; font-weight: 700; color: #0B1220; }
+  .cs-note { font-size: 12.5px; color: #5A6577; }
   .cs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .cs-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D1D9D8; text-align: left; white-space: nowrap; }
-  .cs-table td { padding: 8px; border: 1px solid #E2E8E7; vertical-align: middle; }
+  .cs-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px; border: 1px solid #D4DBE6; text-align: left; white-space: nowrap; }
+  .cs-table td { padding: 8px; border: 1px solid #E2E8F1; vertical-align: middle; }
+  .cs-table tbody tr:hover td { background: #F1F5F9; }   /* hover = neutral slate */
   .cs-table .r { text-align: right; font-variant-numeric: tabular-nums; }
   .cs-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .cs-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .cs-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .cs-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .cs-chip.mute { background: #EEF2F1; color: #5B6F72; border-color: #D1D9D8; }
-  .cs-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #CBD5D4; border-radius: 8px; background: #fff; }
-  .cs-input:focus { outline: none; border-color: #C46B2D; box-shadow: 0 0 0 3px rgba(196,107,45,.15); }
-  .cs-label { display: block; font-size: 12.5px; font-weight: 600; color: #0F2F32; margin-bottom: 4px; }
+  .cs-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  .cs-chip.mute { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .cs-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 8px; background: #fff; }
+  .cs-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.15); }
+  .cs-label { display: block; font-size: 12.5px; font-weight: 600; color: #0B1220; margin-bottom: 4px; }
   .cs-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; white-space: nowrap; }
-  .cs-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .cs-btn.primary:hover { background: #A35522; }
-  .cs-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .cs-btn.teal:hover { background: #1F5558; }
-  .cs-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .cs-btn.ghost:hover { background: #F4F6F5; }
+  .cs-btn.primary { background: #0B5BEF; color: #fff; border-color: #0843C2; } .cs-btn.primary:hover { background: #0843C2; }
+  .cs-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .cs-btn.ghost:hover { background: #F3F6FB; }
   .cs-btn.sm { padding: 4px 10px; font-size: 12px; }
-  .cs-empty { text-align: center; padding: 48px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
+  .cs-btn:focus-visible, .cs-tabs a:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
+  .cs-empty { text-align: center; padding: 48px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
 </style>
 {% endblock %}
 
@@ -111,7 +112,7 @@
         <h3 class="mb-2">History</h3>
         {% if periods %}
         <table class="cs-table">
-          <thead><tr><th>From</th><th class="r">Monthly cost</th><th class="r">Working days</th><th class="r">Per day</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th>From</th><th class="r">Monthly cost</th><th class="r">Working days</th><th class="r">Per day</th><th>Note</th>{% if can_edit('costing') %}<th></th>{% endif %}</tr></thead>
           <tbody>
           {% for p in periods %}
             <tr>
@@ -120,9 +121,9 @@
               <td class="r">{{ p.working_days }}</td>
               <td class="r">₹{{ (p.monthly_amount / p.working_days)|inr }}</td>
               <td>{{ p.note or '' }}</td>
-              <td class="r">{% if p.effective_from > today %}
+              {% if can_edit('costing') %}<td class="r">{% if p.effective_from > today %}
                 <form method="post" action="{{ url_for('costing.costing_period_delete', period_id=p.id) }}" class="js-confirm-submit" data-confirm-title="Remove entry" data-confirm-ok="Remove" data-confirm-message="Remove this fixed cost entry? It has not started yet.">
-                  <button type="submit" class="cs-btn ghost sm">Remove</button></form>{% endif %}</td>
+                  <button type="submit" class="cs-btn ghost sm">Remove</button></form>{% endif %}</td>{% endif %}
             </tr>
           {% endfor %}
           </tbody>
@@ -131,6 +132,7 @@
         {% else %}<p class="cs-note">Nothing added yet.</p>{% endif %}
       </div>
     </div>
+    {% if can_edit('costing') %}
     <div class="cs-box self-start">
       <h3>Add or change fixed cost</h3>
       <p class="cs-note mb-3">Include salary, rent, electricity, office bills, diesel... for one month. It applies from the date below; earlier batches keep their cost.</p>
@@ -142,13 +144,14 @@
         <button type="submit" class="cs-btn primary">Save fixed cost</button>
       </form>
     </div>
+    {% endif %}
   </div>
 
 {% else %}
   <div class="cs-box overflow-x-auto">
     <h3 class="mb-2">Months</h3>
     <table class="cs-table">
-      <thead><tr><th>Month</th><th class="r">Batches</th><th class="r">Good KG</th><th class="r">Estimated cost</th><th class="r">Fixed cost in batches</th><th>Status</th><th class="r">Final cost</th><th class="r">Final per KG</th><th></th></tr></thead>
+      <thead><tr><th>Month</th><th class="r">Batches</th><th class="r">Good KG</th><th class="r">Estimated cost</th><th class="r">Fixed cost in batches</th><th>Status</th><th class="r">Final cost</th><th class="r">Final per KG</th>{% if can_edit('costing') %}<th></th>{% endif %}</tr></thead>
       <tbody>
       {% for m in months %}
         <tr>
@@ -160,11 +163,11 @@
           <td>{% if m.final %}<span class="cs-chip ok"><i></i>Final</span>{% elif m.outputs %}<span class="cs-chip warn"><i></i>Approx</span>{% else %}<span class="cs-chip mute"><i></i>No output</span>{% endif %}</td>
           <td class="r">{% if m.final %}₹{{ m.final.final_amount|inr }}{% else %}—{% endif %}</td>
           <td class="r">{% if m.final %}₹{{ m.final.final_per_kg|inr }}{% else %}—{% endif %}</td>
-          <td class="r">{% if m.can_finalize %}
+          {% if can_edit('costing') %}<td class="r">{% if m.can_finalize %}
             <form method="post" action="{{ url_for('costing.costing_month_finalize') }}" class="js-confirm-submit flex gap-2 items-center justify-end" data-confirm-title="Finalise month" data-confirm-ok="Finalise" data-confirm-message="Finalise {{ m.start.strftime('%B %Y') }}? Its batches will show the final cost, and a finalised month cannot be changed.">
               <input type="hidden" name="month" value="{{ month_key(m.start) }}" />
               <input type="number" name="final_amount" min="1" step="0.01" required placeholder="Final cost ₹" class="cs-input" style="width:130px" />
-              <button type="submit" class="cs-btn teal sm">Finalise</button></form>{% endif %}</td>
+              <button type="submit" class="cs-btn primary sm">Finalise</button></form>{% endif %}</td>{% endif %}
         </tr>
       {% endfor %}
       </tbody>

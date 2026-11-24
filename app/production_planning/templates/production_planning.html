@@ -3,54 +3,60 @@
 
 {% block page_css %}
 <style>
-  /* Production planning: Production queue jaisa card look (copper-teal theme). C1: queue ka saara kaam yahin (plan, release, ▲▼, start, cancel) */
-  .pp-kpi { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .pp-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6B7F82; }
-  .pp-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0F2F32; }
-  .pp-kpi .h { font-size: 12px; color: #6B7F82; }
-  .pp-kpi.warn { background: #FFF9F0; border-color: #F5D9B5; } .pp-kpi.warn .v { color: #8A4A1C; }
-  .pp-kpi.bad { background: #FFF6F5; border-color: #F8CFCB; } .pp-kpi.bad .v { color: #B42318; }
-  .pp-kpi.good { background: #F3FAF6; border-color: #B7E0C7; } .pp-kpi.good .v { color: #1F7A4D; }
-  .pp-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E9EEED; border-radius: 9px; }
-  .pp-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #3D5A5D; border-radius: 7px; text-decoration: none; white-space: nowrap; }
-  .pp-tabs a.on { background: #fff; color: #8A4A1C; box-shadow: 0 1px 2px rgba(15,47,50,.12); }
-  .pp-tabs a span { font-weight: 500; color: #6B7F82; margin-left: 3px; }
-  .pp-group { display: flex; align-items: center; gap: 8px; padding: 12px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7F82; }
-  .pp-group b { background: #E9EEED; color: #3D5A5D; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
-  .pp-card { background: #fff; border: 1px solid #D1D9D8; border-left: 4px solid #C46B2D; border-radius: 12px; margin-bottom: 10px; display: grid; grid-template-columns: 58px minmax(200px, 1.3fr) minmax(170px, 1fr) minmax(170px, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; }
+  /* Production planning: Production queue jaisa card look. C1: queue ka saara kaam yahin (plan, release, ▲▼, start, cancel) */
+  .pp-kpi { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .pp-kpi .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5A6577; }
+  .pp-kpi .v { font-size: 26px; font-weight: 700; line-height: 1.1; color: #0B1220; }
+  .pp-kpi .h { font-size: 12px; color: #5A6577; }
+  .pp-kpi.warn { background: #FEF3E2; border-color: #FBD9A5; } .pp-kpi.warn .v { color: #B45309; }
+  .pp-kpi.bad { background: #FCEBEA; border-color: #F0C4C0; } .pp-kpi.bad .v { color: #B42318; }
+  .pp-kpi.good { background: #E6F5EC; border-color: #B7E0C7; } .pp-kpi.good .v { color: #1F7A4D; }
+  .pp-tabs { display: inline-flex; padding: 3px; gap: 2px; background: #E7ECF4; border-radius: 9px; }
+  .pp-tabs a { padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #475266; border-radius: 7px; text-decoration: none; white-space: nowrap; }
+  .pp-tabs a.on { background: #fff; color: #0A3CA6; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+  .pp-tabs a span { font-weight: 500; color: #5A6577; margin-left: 3px; }
+  .pp-group { display: flex; align-items: center; gap: 8px; padding: 12px 4px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5A6577; }
+  .pp-group b { background: #E7ECF4; color: #475266; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  /* Card ki left stripe = order ki state: needs planning = amber, planned (ready) = green, released = info cyan, in production = accent blue */
+  .pp-card { background: #fff; border: 1px solid #D4DBE6; border-left: 4px solid #B45309; border-radius: 12px; margin-bottom: 10px; display: grid; grid-template-columns: 58px minmax(200px, 1.3fr) minmax(170px, 1fr) minmax(170px, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; }
   .pp-card.is-ready { border-left-color: #1F7A4D; }
-  .pp-card.is-run { border-left-color: #8A4A1C; background: #FFFCF8; }
+  .pp-card.is-rel { border-left-color: #0B7285; }
+  .pp-card.is-run { border-left-color: #0B5BEF; }
   .pp-pos { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-  .pp-pos .n { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #8A4A1C; line-height: 1.2; }
-  .pp-pos button { width: 24px; height: 16px; line-height: 1; font-size: 11px; color: #98A5A4; border-radius: 4px; border: 0; background: transparent; cursor: pointer; }
-  .pp-pos button:hover { background: #FBF4EE; color: #8A4A1C; }
-  .pp-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0F2F32; }
-  .pp-prod { font-size: 13.5px; color: #1C2B2D; }
-  .pp-meta { font-size: 12px; color: #6B7F82; }
-  .pp-dates { font-size: 14px; font-weight: 700; color: #0F2F32; } .pp-dates span { color: #98A5A4; font-weight: 500; margin: 0 4px; }
-  .pp-bar { height: 6px; border-radius: 999px; background: #E9EEED; overflow: hidden; margin-top: 7px; }
-  .pp-bar div { height: 100%; background: #C46B2D; border-radius: 999px; }
+  .pp-pos .n { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #0A3CA6; line-height: 1.2; }
+  .pp-pos button { width: 28px; height: 24px; line-height: 1; font-size: 11px; color: #5A6577; border-radius: 4px; border: 1px solid transparent; background: transparent; cursor: pointer; }
+  .pp-pos button:hover { background: #F1F5F9; color: #0B1220; border-color: #D4DBE6; }
+  .pp-pos button:focus-visible, .pp-btn:focus-visible, .pp-tabs a:focus-visible, a.pp-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pp-no { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 14.5px; color: #0B1220; }
+  .pp-prod { font-size: 13.5px; color: #121A2B; }
+  .pp-meta { font-size: 12px; color: #5A6577; }
+  .pp-dates { font-size: 14px; font-weight: 700; color: #0B1220; } .pp-dates span { color: #5A6577; font-weight: 500; margin: 0 4px; }
+  .pp-bar { height: 6px; border-radius: 999px; background: #E7ECF4; overflow: hidden; margin-top: 7px; }
+  .pp-bar div { height: 100%; background: #0B5BEF; border-radius: 999px; }
   .pp-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; margin: 0 4px 3px 0; }
   .pp-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
   .pp-chip.ok { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .pp-chip.warn { background: #FFF4E5; color: #8A4A1C; border-color: #F5D9B5; }
-  .pp-chip.bnd { background: #E8F1F1; color: #1F5558; border-color: #BCD6D7; text-decoration: none; }
-  .pp-chip.bad { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
-  .pp-chip.run { background: #FBF4EE; color: #8A4A1C; border-color: #E8C9A8; }
-  .pp-chip.rel { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  .pp-chip.warn { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  /* bnd = source / bundle ka tag (status nahi): neutral grey */
+  .pp-chip.bnd { background: #F1F5F9; color: #475569; border-color: #E2E8F0; text-decoration: none; }
+  .pp-chip.bad { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .pp-chip.run { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
+  .pp-chip.rel { background: #E6F6F8; color: #0B7285; border-color: #B2DDE4; }
   .pp-btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
   .pp-btn.sm { padding: 5px 10px; font-size: 12.5px; }
-  .pp-btn.primary { background: #C46B2D; color: #fff; border-color: #A35522; } .pp-btn.primary:hover { background: #A35522; }
-  .pp-btn.teal { background: #2A6B6E; color: #fff; border-color: #1F5558; } .pp-btn.teal:hover { background: #1F5558; }
-  .pp-btn.ghost { background: #fff; color: #0F2F32; border-color: #D1D9D8; } .pp-btn.ghost:hover { background: #F4F6F5; }
-  .pp-btn.danger { background: #fff; color: #B42318; border-color: #F1C4C0; } .pp-btn.danger:hover { background: #FDECEC; }
-  .pp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C9D3D2; border-radius: 14px; background: #fff; color: #6B7F82; }
-  .pp-empty h3 { font-size: 16px; font-weight: 700; color: #0F2F32; margin-bottom: 4px; }
+  .pp-btn.primary { background: #0B5BEF; color: #fff; border-color: #0843C2; } .pp-btn.primary:hover { background: #0843C2; }
+  .pp-btn.outline { background: #fff; color: #0A3CA6; border-color: #BCD2FA; } .pp-btn.outline:hover { background: #EDF3FF; border-color: #0B5BEF; }
+  .pp-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .pp-btn.ghost:hover { background: #F3F6FB; }
+  .pp-btn.danger { background: #fff; color: #B42318; border-color: #F0C4C0; } .pp-btn.danger:hover { background: #FCEBEA; }
+  .pp-empty { text-align: center; padding: 56px 20px; border: 1.5px dashed #C7D0DE; border-radius: 14px; background: #fff; color: #5A6577; }
+  .pp-empty h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin-bottom: 4px; }
   /* C10: Tomorrow tab */
-  .pp-day { display: grid; grid-template-columns: minmax(200px, 1.1fr) minmax(220px, 2fr) 260px; gap: 14px; align-items: center; background: #fff; border: 1px solid #D1D9D8; border-left: 4px solid #2A6B6E; border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
-  .pp-day.idle { border-left-color: #C46B2D; background: #FFFCF8; }
+  .pp-day { display: grid; grid-template-columns: minmax(200px, 1.1fr) minmax(220px, 2fr) 260px; gap: 14px; align-items: center; background: #fff; border: 1px solid #D4DBE6; border-left: 4px solid #0B5BEF; border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+  /* Lane: working = accent blue, idle (kuch plan nahi) = amber, extra shift = green */
+  .pp-day.idle { border-left-color: #B45309; }
   .pp-day.extra { border-left-color: #1F7A4D; }
-  .pp-day input[type=number], .pp-day input[type=text] { border: 1px solid #D1D9D8; border-radius: 7px; padding: 5px 8px; font-size: 13px; background: #fff; }
+  .pp-day input[type=number], .pp-day input[type=text] { border: 1px solid #D4DBE6; border-radius: 7px; padding: 5px 8px; font-size: 13px; background: #fff; }
+  .pp-day input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: #0B5BEF; }
   @media (max-width: 1100px) { .pp-day { grid-template-columns: 1fr; } }
   @media (max-width: 1100px) { .pp-card { grid-template-columns: 1fr; } }
 </style>
@@ -64,12 +70,17 @@
   {% set mat = materials.get(o.id) %}
   {% set late_days = (sc.end - o.needed_by_date).days if (sc and o.needed_by_date and sc.end > o.needed_by_date) else 0 %}
   {% set in_house = o.product and o.product.output_rm_id %}
-  <article class="pp-card {{ 'is-run' if o.status == 'In production' else ('is-ready' if o.plan_confirmed else '') }}">
+  {# Har button ke liye guard wala wahi faisla (can_do): Move / Release / Start / Reschedule = planning Edit, Cancel = orders ya planning Edit #}
+  {% set may_move = can_do('production_orders.production_orders_move') %}
+  {% set may_reschedule = can_do('production_orders.production_orders_reschedule') %}
+  {% set may_cancel = can_do('production_orders.production_orders_cancel') %}
+  {% set may_routing = can_do('routing.routing_list', 'GET') %}
+  <article class="pp-card {{ 'is-run' if o.status == 'In production' else ('is-rel' if o.status == 'Released' else ('is-ready' if o.plan_confirmed else '')) }}">
     <div class="pp-pos">
       {% if o.status in ('Draft', 'Released') %}
-      <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='up') }}"><input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" /><button type="submit" title="Move up (higher priority)" aria-label="Move up">▲</button></form>
+      {% if may_move %}<form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='up') }}"><input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" /><button type="submit" title="Move up (higher priority)" aria-label="Move up">▲</button></form>{% endif %}
       <div class="n" title="Place in the queue">{{ o.queue_position }}</div>
-      <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='down') }}"><input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" /><button type="submit" title="Move down" aria-label="Move down">▼</button></form>
+      {% if may_move %}<form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='down') }}"><input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" /><button type="submit" title="Move down" aria-label="Move down">▼</button></form>{% endif %}
       {% else %}<div class="n" title="Place in the queue">{{ o.queue_position }}</div>{% endif %}
     </div>
 
@@ -83,7 +94,7 @@
         {% set src = sources.get(o.id) %}
         {% if src and src.kind == 'quotation' %}<span class="pp-chip bnd" title="This order is made for this quotation"><i></i>For {{ src.quote_no }}</span>
         {% else %}<span class="pp-chip bnd" title="Made for stock, not for a customer order"><i></i>In-house stock</span>{% endif %}
-        {% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="pp-chip bnd" title="Same party order: see all items of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
+        {% if o.bundle_no %}{% if can_do('production_orders.production_orders_list', 'GET') %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="pp-chip bnd" title="Same party order: see all items of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% else %}<span class="pp-chip bnd" title="Same party order: see all items of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</span>{% endif %}{% endif %}</div>
       <div class="pp-prod mt-0.5">{{ o.product.name if o.product else '—' }}</div>
       <div class="pp-meta">{{ '%g'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if o.unit_weight and o.unit_weight != 1 %} ({{ '%g'|format(o.planned_qty * o.unit_weight) }} KG){% endif %}{% if src and src.extra %} · customer needs {{ '%g'|format(src.customer_qty) }}, extra {{ '%g'|format(src.extra) }} goes to stock{% endif %} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · material {{ o.issue_status|lower }}{% endif %}</div>
     </div>
@@ -95,7 +106,7 @@
         {% if o.status == 'In production' %}
         {% set sn = stage_now.get(o.id) %}
         <div class="pp-bar" title="{{ progress.get(o.id, 0) }}%"><div style="width:{{ progress.get(o.id, 0) }}%"></div></div>
-        {% if sn %}<div class="pp-meta mt-1"><a href="{{ url_for('routing.routing_list') }}" style="color:#8A4A1C;font-weight:600;text-decoration:none">{{ sn.done }}/{{ sn.total }} stages done{% if sn.name %} · {{ sn.name }} {{ 'running' if sn.state == 'In progress' else 'next' }}{% endif %}</a></div>{% endif %}
+        {% if sn %}<div class="pp-meta mt-1">{% if may_routing %}<a href="{{ url_for('routing.routing_list') }}" style="color:#0A3CA6;font-weight:600;text-decoration:none">{{ sn.done }}/{{ sn.total }} stages done{% if sn.name %} · {{ sn.name }} {{ 'running' if sn.state == 'In progress' else 'next' }}{% endif %}</a>{% else %}{{ sn.done }}/{{ sn.total }} stages done{% if sn.name %} · {{ sn.name }} {{ 'running' if sn.state == 'In progress' else 'next' }}{% endif %}{% endif %}</div>{% endif %}
         {% endif %}
         {% if late_days %}<span class="pp-chip bad"><i></i>Late {{ late_days }}d · needed {{ dshort(o.needed_by_date) }}</span>
         {% elif o.needed_by_date %}<span class="pp-chip ok"><i></i>On time · needed {{ dshort(o.needed_by_date) }}</span>{% endif %}
@@ -110,26 +121,27 @@
       {% elif mat.status == 'making' %}<span class="pp-chip warn"><i></i>Will be made</span>
       {% else %}<span class="pp-chip ok"><i></i>{{ 'Material issued' if mat.lines and mat.lines|selectattr('issued_all')|list|length == mat.lines|length else 'Stock OK' }}</span>{% endif %}
       {# C7: baad ke stage ka maal abhi poora issue nahi hua — wo stage tab tak start nahi hoga #}
-      {% for stage_name, gaps in issue_gaps.get(o.id, []) %}<div class="pp-meta" style="color:#B42318;font-weight:600">{{ stage_name }} will wait: {% for g in gaps %}{{ g.name }} {{ '%g'|format(g.short) }} {{ g.unit }} not issued{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
-      {# C6 / G9: in-house maal (Flux) ka make-order queue me — "Will be made by PROD-X"; peeche ho to laal warning #}
+      {% for stage_name, gaps in issue_gaps.get(o.id, []) %}<div class="pp-meta" style="color:#B45309;font-weight:600">{{ stage_name }} will wait: {% for g in gaps %}{{ g.name }} {{ '%g'|format(g.short) }} {{ g.unit }} not issued{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
+      {# C6 / G9: in-house maal (Flux) ka make-order queue me — "Will be made by PROD-X"; peeche ho to amber warning #}
       {% if mat %}{% for l in mat.lines if l.from_make %}<div class="pp-meta">{{ l.name }}: will be made by {% for m in l.from_make %}{{ m[0] }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
-      {% for b in mat.make_behind %}<div class="pp-meta" style="color:#B42318;font-weight:600">{{ b.name }} is made by {{ b.prod_no }}, which is behind this order. Move {{ b.prod_no }} up.</div>{% endfor %}{% endif %}
+      {% for b in mat.make_behind %}<div class="pp-meta" style="color:#B45309;font-weight:600">{{ b.name }} is made by {{ b.prod_no }}, which is behind this order. Move {{ b.prod_no }} up.</div>{% endfor %}{% endif %}
       {% if sc and sc.waits_for_material %}<div><span class="pp-chip warn"><i></i>Waits for material till {{ dshort(sc.waits_for_material) }}</span></div>{% endif %}
     </div>
     <div class="flex gap-2 justify-end flex-wrap" style="max-width:300px">
       {% if o.status == 'Draft' and not o.reviewed %}
       {# Finalize se bana order: pehle Production order form me dekho (kis ke liye, extra pieces, spare %, dates) aur Confirm karo; tab tak Plan / Release band #}
-      <a href="{{ url_for('production_orders.production_orders_list', review=o.id, next='planning') }}" class="pp-btn primary" title="Open the order in the Production order form, check it and press Confirm order">Review order</a>
+      {% if can_do('production_orders.production_orders_review') %}<a href="{{ url_for('production_orders.production_orders_list', review=o.id, next='planning') }}" class="pp-btn primary" title="Open the order in the Production order form, check it and press Confirm order">Review order</a>{% endif %}
       {% elif o.status == 'Draft' %}
-      <button type="button" class="pp-btn {{ 'ghost' if o.plan_confirmed else 'primary' }} btn-resched" data-id="{{ o.id }}">{{ 'Change plan' if o.plan_confirmed else 'Plan' }}</button>
-      {% if o.plan_confirmed %}
+      {% if may_reschedule %}<button type="button" class="pp-btn {{ 'ghost' if o.plan_confirmed else 'primary' }} btn-resched" data-id="{{ o.id }}">{{ 'Change plan' if o.plan_confirmed else 'Plan' }}</button>{% endif %}
+      {% if o.plan_confirmed and can_do('production_orders.production_orders_release') %}
       <form method="post" action="{{ url_for('production_orders.production_orders_release', order_id=o.id) }}" class="js-confirm-submit"
             data-confirm-title="Release production order" data-confirm-ok="Release" data-confirm-message="Release {{ o.prod_no }}? After this, its material can be issued from the store.{% if mat and mat.status == 'buy' %} Material is short: {% for l in mat.lines if l.buy > 0.000001 %}{{ l.name }} {{ '%.0f'|format(l.buy) }} {{ l.unit }}{% if not loop.last %}, {% endif %}{% endfor %}. You can still release, but only the available stock can be issued until the rest is bought.{% endif %}">
         <input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" />
-        <button type="submit" class="pp-btn teal">Release</button></form>
+        <button type="submit" class="pp-btn primary">Release</button></form>
       {% endif %}
       {% elif o.status == 'Released' %}
-      {% if line_board and not in_house %}
+      {% if not can_do('production_orders.production_orders_start') %}{# View user: Start nahi #}
+      {% elif line_board and not in_house %}
       {# Lines bani hain: Start par pehle line chunni padti hai (live status ke saath). In-house product (Flux) ko line / capacity ka sawaal nahi #}
       <button type="button" class="pp-btn primary btn-start-line" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" data-line="{{ o.line_id or '' }}" data-kg="{{ '%g'|format(o.planned_qty * o.unit_weight) }}">Start</button>
       {% else %}
@@ -138,18 +150,18 @@
         <input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" />
         <button type="submit" class="pp-btn primary">Start</button></form>
       {% endif %}
-      <button type="button" class="pp-btn ghost btn-resched" data-id="{{ o.id }}">Reschedule</button>
+      {% if may_reschedule %}<button type="button" class="pp-btn ghost btn-resched" data-id="{{ o.id }}">Reschedule</button>{% endif %}
       {% endif %}
-      {% if o.status in ('Released', 'In production') %}
+      {% if o.status in ('Released', 'In production') and can_do('material_issues.material_issues_list', 'GET') %}
       <a href="{{ url_for('material_issues.material_issues_list') }}" class="pp-btn ghost sm">Material issue</a>
       {% endif %}
       {% if o.status in ('Draft', 'Released') %}
-      <form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" /><button type="submit" class="pp-btn ghost sm">Make first</button></form>
-      <button type="button" class="pp-btn danger sm btn-cancel-order" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>
+      {% if may_move %}<form method="post" action="{{ url_for('production_orders.production_orders_move', order_id=o.id, direction='first') }}"><input type="hidden" name="next" value="planning" /><input type="hidden" name="tab" value="{{ tab }}" /><button type="submit" class="pp-btn ghost sm">Make first</button></form>{% endif %}
+      {% if may_cancel %}<button type="button" class="pp-btn danger sm btn-cancel-order" data-id="{{ o.id }}" data-no="{{ o.prod_no }}">Cancel order</button>{% endif %}
       {% elif o.status == 'In production' %}
-      <a href="{{ url_for('routing.routing_list') }}" class="pp-btn ghost sm">Routing / stages</a>
+      {% if may_routing %}<a href="{{ url_for('routing.routing_list') }}" class="pp-btn ghost sm">Routing / stages</a>{% endif %}
       {# fix_list #7: server ka gate: koi output nahi, koi stage chalta nahi, material issue nahi hua ya poora wapas aa gaya — warna message batata hai kya karna hai #}
-      <button type="button" class="pp-btn danger sm btn-cancel-order" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" title="Possible only when there is no output, no stage is running and all issued material is back in the store">Cancel order</button>
+      {% if may_cancel %}<button type="button" class="pp-btn danger sm btn-cancel-order" data-id="{{ o.id }}" data-no="{{ o.prod_no }}" title="Possible only when there is no output, no stage is running and all issued material is back in the store">Cancel order</button>{% endif %}
       {% endif %}
     </div>
   </article>
@@ -182,16 +194,16 @@
     <div class="flex flex-wrap items-end gap-3 mb-3">
       <div>
         <div class="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Plan for</div>
-        <div class="text-[18px] font-bold text-ink">{{ day.strftime('%A, %d %B %Y') }}{% if (day - today).days == 1 %} <span class="text-[13px] font-semibold" style="color:#8A4A1C">(tomorrow)</span>{% endif %}</div>
+        <div class="text-[18px] font-bold text-ink">{{ day.strftime('%A, %d %B %Y') }}{% if (day - today).days == 1 %} <span class="text-[13px] font-semibold" style="color:#0A3CA6">(tomorrow)</span>{% endif %}</div>
       </div>
       <form method="get" action="{{ url_for('production_planning.production_planning_page') }}" class="flex items-end gap-2">
         <input type="hidden" name="tab" value="tomorrow" />
         <div><label class="text-[11.5px] text-ink-faint block" for="pp-day-pick">Another day</label>
-          <input type="date" id="pp-day-pick" name="date" value="{{ day.isoformat() }}" min="{{ today.isoformat() }}" class="border rounded-md px-2 py-1 text-[13px]" style="border-color:#D1D9D8" /></div>
+          <input type="date" id="pp-day-pick" name="date" value="{{ day.isoformat() }}" min="{{ today.isoformat() }}" class="border rounded-md px-2 py-1 text-[13px]" style="border-color:var(--line)" /></div>
         <button type="submit" class="pp-btn sm ghost">Show</button>
       </form>
       <div class="flex gap-2 ml-auto flex-wrap">
-        <span class="pp-chip rel"><i></i>{{ day_kpi.running }} machine{{ '' if day_kpi.running == 1 else 's' }} working</span>
+        <span class="pp-chip run"><i></i>{{ day_kpi.running }} machine{{ '' if day_kpi.running == 1 else 's' }} working</span>
         <span class="pp-chip {{ 'warn' if day_kpi.idle else 'ok' }}"><i></i>{{ day_kpi.idle }} idle</span>
         <span class="pp-chip ok"><i></i>{{ day_kpi.extra }} with extra shift</span>
       </div>
@@ -208,12 +220,14 @@
           {% if r.jobs %}{% for j in r.jobs %}<div class="text-[13px]"><span class="pp-no" style="font-size:13px">{{ j.prod_no }}</span> <span class="pp-prod">{{ j.product }}</span> <span class="pp-meta">· {{ j.stage }}</span> <span class="pp-chip {{ 'run' if j.status == 'In production' else ('rel' if j.status == 'Released' else 'warn') }}" style="margin-left:4px"><i></i>{{ j.status }}</span></div>{% endfor %}
           {% else %}<span class="pp-chip warn"><i></i>Idle — nothing planned</span>{% endif %}
         </div>
+        {% if can_edit('production_planning') %}
         <form method="post" action="{{ url_for('production_planning.production_planning_extra_hours') }}" class="flex items-center gap-2 flex-wrap">
           <input type="hidden" name="machine_id" value="{{ r.machine.id }}" /><input type="hidden" name="work_date" value="{{ day.isoformat() }}" />
           <input type="number" name="extra_hours" step="0.5" min="0" max="{{ 24 - r.normal_hours }}" value="{{ '%g'|format(r.extra_hours) if r.extra_hours else '' }}" placeholder="Extra h" style="width:74px" aria-label="Extra hours for {{ r.machine.name }}" />
           <input type="text" name="reason" maxlength="120" value="{{ r.reason }}" placeholder="Reason (optional)" style="width:130px" aria-label="Reason" />
-          <button type="submit" class="pp-btn sm teal">Save</button>
+          <button type="submit" class="pp-btn sm outline">Save</button>
         </form>
+        {% endif %}
       </div>
     {% endfor %}
     {% if not day_rows %}<div class="pp-empty"><h3>No active machines</h3><p>Add machines in the Machine master first.</p></div>{% endif %}
@@ -238,13 +252,29 @@
 {% endblock %}
 
 {% block modals %}
+{# Plan / Start drawer sirf wahi jisko Reschedule / Start milta hai (planning Edit); _queue_js.html in drawers ke bina chalta hi nahi, isliye dono ek hi shart par #}
+{% if can_do('production_orders.production_orders_reschedule') %}
 {% include "_queue_modals.html" %}
+{% elif can_do('production_orders.production_orders_cancel') %}
+{# Sirf Cancel milta hai (planning View + orders Edit): Cancel drawer ke po-* styles _queue_modals.html se aate the, wo drawers is user ko nahi dikhane, isliye zaroori styles yahin #}
+<style>
+  .po-input { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 8px; background: #fff; }
+  .po-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 3px rgba(11,91,239,.15); }
+  .po-label { display: block; font-size: 12.5px; font-weight: 600; color: #0B1220; margin-bottom: 4px; }
+  .po-btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .po-btn.ghost { background: #fff; color: #0B1220; border-color: #D4DBE6; } .po-btn.ghost:hover { background: #F3F6FB; }
+</style>
+{% endif %}
+{% if can_do('production_orders.production_orders_cancel') %}
 {% set cancel_next = 'planning' %}
 {% include "_cancel_modal.html" %}
+{% endif %}
 {% endblock %}
 
 {% block page_js %}
 <script>var RESCHED = {{ resched | tojson }};     // {order_id: {prod_no, batch_kg, routing, chosen, start}}</script>
 {% include "_plan_js.html" %}
+{% if can_do('production_orders.production_orders_reschedule') %}
 {% include "_queue_js.html" %}
+{% endif %}
 {% endblock %}

@@ -1,6 +1,6 @@
 # Phase 0 — Login + simple Roles / Permissions (Developer > Admin > Staff) — FLOW (2026-11-23)
 
-**Status: FLOW FINAL — user ne 11 sawal clear kiye (section 11, 23 Nov); build abhi shuru nahi, user ke "shuru karo" par P0-1.** Yeh file `tracker.md` Current Focus aur `memory.md` se linked hai.
+**Status: FLOW FINAL — user ne 11 sawal clear kiye (section 11, 23 Nov); BUILD CHAL RAHA HAI: P0-1 done (23 Nov, tables + 6 starter roles + registry, local DB migrated, uncommitted); next P0-2.** Yeh file `tracker.md` Current Focus aur `memory.md` se linked hai.
 Research ka source: 3 read-only researchers (code inventory, saari md files, secure-design research) — 23 Nov 2026. Sab numbers neeche asli code se hain (`app.url_map` dump).
 
 ---
@@ -221,6 +221,9 @@ Jis Staff ke role me `users` / `roles` page par **Edit** hai wo "manager-staff" 
 - Lockout counter `(mobile, IP)` par; message hamesha "Invalid mobile number or password".
 - Mobile number personal data hai: audit / logs me sirf last 4 digit ya user id, poora number nahi. Do user ka mobile same nahi ho sakta (parivar / shared phone ke liye dikkat ho to bataiye).
 - Password reset flow wahi (Admin / manager-staff temp password dete hain; OTP / SMS **nahi**, wo baad ka kaam).
+
+### 11.4 BADLAV (23 Nov, raat) — "type" hata, sirf Role
+User ne kaha: type (developer/admin/staff) hata do, **Developer aur Admin bhi roles hain**, baaki roles + users abhi ke liye hata do. Isliye upar jahan "kind" / "Staff" / "6 starter roles" likha hai, uska matlab ab: **user ka ek hi Role**; built-in (system) roles = Developer, Admin (`roles.system_key`); baaki roles Admin banata hai; starter roles nahi. Rank rules same: Developer role = sab pages; Admin role = ceiling; custom role = apne pages, ceiling ke andar clamp. Migration `f7b1d4e8a2c6`.
 
 ### 11.3 Ab ye doc ka final build plan hai
 Section 8 ke P0-1 … P0-8 + section 10 ke fix + upar ke faisle. Pehla step: **P0-1 (tables + migration + 6 starter roles seed + registry ka skeleton)**, DB copy par auto-test, local DB par migration backup ke saath, live par kuch nahi jab tak user "deploy" na bole.

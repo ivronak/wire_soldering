@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# Shared row-action macros (Product master jaisa): Edit / toggle yahan se aate hain. View button ka apna drawer hai (btn-view-customer), isliye view_btn macro use nahi hota. #}
+{% from "_row_actions.html" import edit_btn, act_sep, toggle_form with context %}
 {% block title %}Customer Master{% endblock %}
 
 {% block page_css %}
@@ -7,21 +9,22 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    min-width: 960px;   /* narrow screen par Actions (View/Edit/toggle) kat-te the - ab parent overflow-auto se scroll hota hai (Product master jaisa) */
   }
   .customer-table thead th {
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #EEF2F1;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    color: #475266;
     font-size: 12.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 12px 12px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
-    border-right: 1px solid #E4EAE9;
+    border-bottom: 1px solid #D4DBE6;
+    border-right: 1px solid #E5EAF2;
   }
   .customer-table thead th:first-child,
   .customer-table tbody td:first-child { text-align: left; padding-left: 14px; }
@@ -30,13 +33,13 @@
     padding: 10px 12px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E2E8E7;
+    border-bottom: 1px solid #E2E8F1;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .customer-table tbody tr:nth-child(even) { background: #F8FAF9; }
-  .customer-table tbody tr:hover { background: #FBF4EE; }
+  .customer-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .customer-table tbody tr:hover { background: #F1F5F9; }
   .customer-table tbody tr.row-muted { opacity: 0.72; }
   .search-wrap input { padding-left: 32px; }
   #customer-modal.hidden, #view-modal.hidden { display: none; }
@@ -48,8 +51,10 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #6B7F82;
+    color: #5A6577;
   }
+  /* Keyboard focus: buttons / links / summary par saaf outline */
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -60,11 +65,13 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Customers</h1>
           <p class="text-[12.5px] text-ink-faint mt-0.5">Code is auto-generated · just fill the rest</p>
         </div>
+        {% if can_edit('customers') %}
         <button type="button" id="btn-add-customer"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add customer
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -72,14 +79,14 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-customers" placeholder="Search code or name…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
             <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Saving a customer auto-creates a ledger under <span title="The accounting group for everyone who owes your business money (your customers). Its opposite is Sundry Creditors, used for Vendors." class="underline decoration-dotted">Sundry Debtors</span> · Click View for full details
@@ -92,13 +99,13 @@
             <colgroup>
               <col style="width:4%" />
               <col style="width:10%" />
-              <col style="width:19%" />
-              <col style="width:11%" />
+              <col style="width:18%" />
+              <col style="width:10%" />
               <col style="width:15%" />
               <col style="width:11%" />
               <col style="width:12%" />
               <col style="width:8%" />
-              <col style="width:14%" />
+              <col style="width:16%" />
             </colgroup>
             <thead>
               <tr>
@@ -138,15 +145,15 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
                 <td>
-                  <div class="flex items-center justify-center gap-2 flex-wrap">
-                    <button type="button"
-                      class="btn-view-customer px-2.5 py-1 text-[12.5px] font-medium text-ink border border-slate-300 bg-white rounded hover:bg-mist"
+                  <div class="row-actions">
+                    <button type="button" title="View details" aria-label="View details"
+                      class="btn-view-customer act-btn"
                       data-id="{{ c.id }}"
                       data-code="{{ c.code }}"
                       data-name="{{ c.name }}"
@@ -165,38 +172,32 @@
                       data-bank-ifsc="{{ c.bank_ifsc or '' }}"
                       data-bank-account="{{ c.bank_account or '' }}"
                       data-ledger-name="{{ c.ledger.name if c.ledger else '' }}">
-                      View
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
-                    <button type="button"
-                      class="btn-edit-customer px-2.5 py-1 text-[12.5px] font-medium text-copper-text border border-copper-border bg-copper-soft rounded hover:bg-copper hover:text-white"
-                      data-id="{{ c.id }}"
-                      data-code="{{ c.code }}"
-                      data-name="{{ c.name }}"
-                      data-contact="{{ c.contact_person or '' }}"
-                      data-mobile="{{ c.mobile or '' }}"
-                      data-email="{{ c.email or '' }}"
-                      data-address="{{ c.address or '' }}"
-                      data-state="{{ c.state_id or '' }}"
-                      data-gstin="{{ c.gstin or '' }}"
-                      data-pan="{{ c.pan or '' }}"
-                      data-terms="{{ c.payment_terms_id or '' }}"
-                      data-credit-limit="{{ c.credit_limit if c.credit_limit is not none else '' }}"
-                      data-opening-amount="{{ c.ledger.opening_balance if c.ledger else '' }}"
-                      data-opening-type="{{ c.ledger.opening_balance_type if c.ledger else 'Dr' }}"
-                      data-bank-name="{{ c.bank_name or '' }}"
-                      data-bank-ifsc="{{ c.bank_ifsc or '' }}"
-                      data-bank-account="{{ c.bank_account or '' }}">
-                      Edit
-                    </button>
-                    {# TODO: Toggle route banne ke baad yahan action me url_for lagao #}
-                    <form method="post" action="{{url_for('customers.customers_toggle', c_id=c.id)}}" class="inline">
-                      <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
-                        <input type="checkbox" class="toggle-input sr-only peer" {% if c.is_active %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
-                        <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
-                      </label>
-                    </form>
+                    {% if can_edit('customers') %}
+                    {# Edit button: pehle jaisa hi class (btn-edit-customer) aur wahi data-* keys - page ka openEditModal() inhi ko padhta hai. Customers ka delete route nahi hai, isliye Delete icon nahi. #}
+                    {{ edit_btn("btn-edit-customer", "customer", {
+                      "id": c.id,
+                      "code": c.code,
+                      "name": c.name,
+                      "contact": c.contact_person or "",
+                      "mobile": c.mobile or "",
+                      "email": c.email or "",
+                      "address": c.address or "",
+                      "state": c.state_id or "",
+                      "gstin": c.gstin or "",
+                      "pan": c.pan or "",
+                      "terms": c.payment_terms_id or "",
+                      "credit-limit": c.credit_limit if c.credit_limit is not none else "",
+                      "opening-amount": c.ledger.opening_balance if c.ledger else "",
+                      "opening-type": c.ledger.opening_balance_type if c.ledger else "Dr",
+                      "bank-name": c.bank_name or "",
+                      "bank-ifsc": c.bank_ifsc or "",
+                      "bank-account": c.bank_account or ""
+                    }) }}
+                    {{ act_sep() }}
+                    {{ toggle_form(url_for('customers.customers_toggle', c_id=c.id), c.is_active) }}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -209,23 +210,25 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No customers found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new customer.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add customer</button>
+            {% if can_edit('customers') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add customer</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} customers</span>
           <span>Auto-creates a Sundry Debtors ledger on save</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('customers') %}
 <div id="customer-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add customer</h2>
         <p class="text-[12.5px] text-ink-faint">Basic info, tax, credit &amp; bank details</p>
@@ -246,35 +249,35 @@
         <div>
           <label for="customer-name" class="block text-[12.5px] font-semibold text-ink mb-1">Customer name *</label>
           <input type="text" id="customer-name" name="name" required placeholder="Customer Pvt Ltd" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="customer-contact" class="block text-[12.5px] font-semibold text-ink mb-1">Contact person</label>
           <input type="text" id="customer-contact" name="contact_person" placeholder="Anil Patel" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="customer-mobile" class="block text-[12.5px] font-semibold text-ink mb-1">Mobile</label>
           <input type="tel" id="customer-mobile" name="mobile" placeholder="98765 43210" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       <div>
         <label for="customer-email" class="block text-[12.5px] font-semibold text-ink mb-1">Email</label>
         <input type="email" id="customer-email" name="email" placeholder="purchase@customer.com" autocomplete="off"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="customer-address" class="block text-[12.5px] font-semibold text-ink mb-1">Address</label>
         <textarea id="customer-address" name="address" rows="2" placeholder="Street, City, PIN"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent"></textarea>
       </div>
       <div>
         <label for="customer-state" class="block text-[12.5px] font-semibold text-ink mb-1">State *</label>
         <select id="customer-state" name="state_id" required
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select state…</option>
           {# States ab State Master table se aate hain — option value = State.id #}
           {% for s in states %}
@@ -289,12 +292,12 @@
         <div>
           <label for="customer-gstin" class="block text-[12.5px] font-semibold text-ink mb-1">GSTIN</label>
           <input type="text" id="customer-gstin" name="gstin" placeholder="24ABCDE1234F1Z5" maxlength="15"
-            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="customer-pan" class="block text-[12.5px] font-semibold text-ink mb-1">PAN</label>
           <input type="text" id="customer-pan" name="pan" placeholder="ABCDE1234F" maxlength="10"
-            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
 
@@ -304,7 +307,7 @@
         <div>
           <label for="customer-terms" class="block text-[12.5px] font-semibold text-ink mb-1">Payment terms</label>
           <select id="customer-terms" name="payment_terms_id"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">Select terms… (optional)</option>
             {# Options ab Payment Terms Master se — blank chhoda to koi terms nahi #}
             {% for pt in payment_terms %}
@@ -315,17 +318,17 @@
         <div>
           <label for="customer-credit-limit" class="block text-[12.5px] font-semibold text-ink mb-1">Credit limit (₹)</label>
           <input type="number" id="customer-credit-limit" name="credit_limit" min="0" step="0.01" placeholder="Leave blank for no limit"
-            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       <div>
         <label class="block text-[12.5px] font-semibold text-ink mb-1">Opening balance (₹)</label>
         <div class="flex gap-1.5">
           <input type="number" id="customer-opening-balance" name="opening_balance" min="0" step="0.01" placeholder="0.00"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
           {# Customer ka normal balance Dr hota hai (customer hume paisa deta hai) — isliye default Dr, Vendor me Cr tha #}
           <select id="customer-opening-balance-type" name="opening_balance_type"
-            class="px-2 py-2 text-[13px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="px-2 py-2 text-[13px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="Dr" selected>Dr</option>
             <option value="Cr">Cr</option>
           </select>
@@ -336,18 +339,18 @@
         <div>
           <label for="customer-bank-name" class="block text-[12.5px] font-semibold text-ink mb-1">Bank name</label>
           <input type="text" id="customer-bank-name" name="bank_name" placeholder="HDFC Bank" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="customer-bank-ifsc" class="block text-[12.5px] font-semibold text-ink mb-1">IFSC code</label>
           <input type="text" id="customer-bank-ifsc" name="bank_ifsc" placeholder="HDFC0001234" maxlength="11"
-            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[13px] font-mono uppercase border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       <div>
         <label for="customer-bank-account" class="block text-[12.5px] font-semibold text-ink mb-1">Account number</label>
         <input type="text" id="customer-bank-account" name="bank_account" placeholder="000123456789" autocomplete="off"
-          class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
 
       <p class="text-[11.5px] text-ink-faint pt-1">Saving this customer will auto-create a ledger under <strong>Sundry Debtors</strong>.</p>
@@ -362,7 +365,7 @@
             <input type="text" id="doc-title-modal" class="w-full px-2 py-1.5 text-[12.5px] border border-slate-300 rounded" placeholder="e.g. GST certificate" /></div>
           <div><label class="block text-[11px] text-ink-faint mb-0.5">File</label>
             <input type="file" id="doc-file-modal" accept=".pdf,.png,.jpg,.jpeg" class="text-[12px]" /></div>
-          <button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Upload</button>
+          <button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Upload</button>
         </form>
         <p class="text-[11px] text-ink-faint -mt-1 mb-2">PDF, PNG or JPG, up to 5 MB.</p>
         <div id="doc-list-modal" class="space-y-1.5 text-[13px]"></div>
@@ -371,15 +374,16 @@
     </div>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="customer-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save customer</button>
+      <button type="submit" form="customer-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save customer</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Customer details</h2>
         <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -420,9 +424,9 @@
   function applyFilterButtonStyles(btn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === btn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -523,14 +527,17 @@
       '</div></div>' +
       '<div class="pt-3 border-t border-slate-200 mt-2">' +
       '<div class="text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Documents</div>' +
+      {# Upload form sirf unko jinke paas customer document upload ki permission hai (View user sirf list dekhta hai) #}
+      {% if can_do('party_documents.party_documents_add', 'POST', party_type='customer') %}
       '<form id="doc-upload-form" class="flex flex-wrap items-end gap-2 mb-2">' +
       '<div class="flex-1 min-w-[140px]"><label class="block text-[11px] text-ink-faint mb-0.5">Title (optional)</label>' +
       '<input type="text" id="doc-title" class="w-full px-2 py-1.5 text-[12.5px] border border-slate-300 rounded" placeholder="e.g. GST certificate" /></div>' +
       '<div><label class="block text-[11px] text-ink-faint mb-0.5">File</label>' +
       '<input type="file" id="doc-file" accept=".pdf,.png,.jpg,.jpeg" class="text-[12px]" /></div>' +
-      '<button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Upload</button>' +
+      '<button type="submit" class="px-3 py-1.5 text-[12.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Upload</button>' +
       '</form>' +
       '<p class="text-[11px] text-ink-faint -mt-1 mb-2">PDF, PNG or JPG, up to 5 MB.</p>' +
+      {% endif %}
       '<div id="doc-list" class="space-y-1.5 text-[13px]"><span class="text-ink-faint">Loading…</span></div>' +
       '</div>';
     wireDocumentsSection('customer', btn.getAttribute('data-id'), '');
@@ -549,33 +556,48 @@
     var list = document.getElementById('doc-list' + idSuffix);
     if (!list) return;
     fetch('/party_documents/' + partyType + '/' + partyId)
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        // 403 / 404 / session khatam: JSON me "documents" nahi hota — isko "No documents uploaded yet." mat dikhao, neeche catch me neutral message
+        if (!res.ok) throw new Error('bad status');
+        return res.json();
+      })
       .then(function (data) {
-        var docs = data.documents || [];
+        if (!data || !Array.isArray(data.documents)) throw new Error('bad data');
+        var docs = data.documents;
         if (!docs.length) {
           list.innerHTML = '<span class="text-ink-faint">No documents uploaded yet.</span>';
           return;
         }
         list.innerHTML = docs.map(function (d) {
           return '<div class="flex items-center justify-between border border-slate-200 rounded px-2.5 py-1.5 gap-2">' +
-            '<a href="' + d.url + '" target="_blank" class="text-copper-text font-medium hover:underline truncate">' + escHtml(d.title) + '</a>' +
+            '<a href="' + d.url + '" target="_blank" class="text-accent-text font-medium hover:underline truncate">' + escHtml(d.title) + '</a>' +
             '<span class="text-ink-faint text-[11.5px] shrink-0">' + d.size_kb + ' KB · ' + escHtml(d.uploaded_at) + '</span>' +
+            {% if can_do('party_documents.party_documents_delete', 'POST', party_type='customer') %}
             '<button type="button" class="btn-delete-doc text-stop text-[12px] font-medium hover:underline shrink-0" data-doc-id="' + d.id + '">Delete</button>' +
+            {% endif %}
             '</div>';
         }).join('');
         list.querySelectorAll('.btn-delete-doc').forEach(function (btn) {
           btn.addEventListener('click', function () {
             fetch('/party_documents/' + btn.getAttribute('data-doc-id') + '/delete', { method: 'POST' })
               .then(function (res) { return res.json(); })
-              .then(function () {
+              .then(function (data) {
+                // Server ne mana kiya (permission / error) to "removed" ka toast nahi — error dikhao
+                if (!data || !data.success) {
+                  if (typeof showToast === 'function') showToast((data && data.error) || 'Could not remove the document.', 'error');
+                  return;
+                }
                 if (typeof showToast === 'function') showToast('Document removed.', 'success');
                 loadPartyDocuments(partyType, partyId, idSuffix);
+              })
+              .catch(function () {
+                if (typeof showToast === 'function') showToast('Could not remove the document.', 'error');
               });
           });
         });
       })
       .catch(function () {
-        list.innerHTML = '<span class="text-stop">Could not load documents.</span>';
+        list.innerHTML = '<span class="text-ink-faint">Documents could not be shown right now.</span>';
       });
   }
   function wireDocumentsSection(partyType, partyId, idSuffix) {
@@ -644,19 +666,24 @@
     document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {# Add / Edit modal sirf Edit user ko milta hai — View user ke liye uske listeners / form code nahi lagte (modal, form null honge) #}
+  {% if can_edit('customers') %}
   document.getElementById('btn-add-customer').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
   document.getElementById('btn-close-modal').addEventListener('click', closeModal);
   document.getElementById('btn-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  {% endif %}
   document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
   document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
   document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!viewModal.classList.contains('hidden')) closeViewModal();
+    {% if can_edit('customers') %}
     else if (!modal.classList.contains('hidden')) closeModal();
+    {% endif %}
   });
   document.querySelectorAll('.btn-edit-customer').forEach(function (btn) {
     btn.addEventListener('click', function () { openEditModal(btn); });
@@ -665,6 +692,7 @@
     btn.addEventListener('click', function () { openViewModal(btn); });
   });
 
+  {% if can_edit('customers') %}
   form.addEventListener('submit', function (e) {
     var name = document.getElementById('customer-name').value.trim();
     var state = document.getElementById('customer-state').value;
@@ -673,6 +701,7 @@
       if (typeof showToast === 'function') showToast('Name and State are required.', 'error');
     }
   });
+  {% endif %}
 
   searchInput.addEventListener('input', function () { saveSearchQ(); applyFilters(); });
   document.querySelectorAll('.filter-btn').forEach(function (btn) {

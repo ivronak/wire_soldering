@@ -43,7 +43,7 @@
     </div>
     {% endif %}
   </div>
-  {% if not stages %}<p class="rp-hint">No production stages set yet. Use the Production stages button (the lines icon) to set them; materials then group stage by stage here.</p>{% endif %}
+  {% if not stages %}<p class="rp-hint">No production stages set yet.{% if can_edit('products') %} Use the Production stages button (the lines icon) to set them; materials then group stage by stage here.{% endif %}</p>{% endif %}
 {% endmacro %}
 
 {% block page_css %}
@@ -60,15 +60,15 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: #F4F6F5;
-    color: #6B7F82;
+    background: #F3F6FB;
+    color: #5A6577;
     font-size: 11.5px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 11px 12px;
     text-align: center;
-    border-bottom: 1px solid #D1D9D8;
+    border-bottom: 1px solid #D4DBE6;
   }
   .product-table thead th:first-child { text-align: left; padding-left: 14px; }
   .product-table .cell-left { text-align: left !important; }
@@ -76,56 +76,34 @@
     padding: 11px 12px;
     font-size: 14px;
     text-align: center;
-    border-bottom: 1px solid #E7ECEB;
+    border-bottom: 1px solid #E6EBF3;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .product-table tbody td:first-child { text-align: left; padding-left: 12px; }
 
-  /* Parent row — hover/open pe left copper bar + soft copper bg */
+  /* Parent row — hover = slate (neutral), OPEN row = accent-soft + left accent bar (hover aur selected confuse na hon) */
   .product-row { cursor: pointer; }
   .product-row td:last-child { cursor: default; }
   .product-row td { background: #FFFFFF; padding-top: 14px; padding-bottom: 14px; transition: background-color 0.12s; }
-  .product-row:hover td { background: #FCF8F4; }
-  .product-row:hover td:first-child { box-shadow: inset 3px 0 0 #E8C9A8; }
-  .product-row:has(.expand-btn.is-open) td { background: #FBF4EE; border-bottom-color: #E8C9A8; }
-  .product-row:has(.expand-btn.is-open) td:first-child { box-shadow: inset 3px 0 0 #C46B2D; }
+  .product-row:hover td { background: #F1F5F9; }
+  .product-row:hover td:first-child { box-shadow: inset 3px 0 0 #C7D0DE; }
+  .product-row:has(.expand-btn.is-open) td { background: #EDF3FF; border-bottom-color: #BCD2FA; }
+  .product-row:has(.expand-btn.is-open) td:first-child { box-shadow: inset 3px 0 0 #0B5BEF; }
   .product-row.row-muted { opacity: 0.72; }
+  /* Row action icon buttons (.act-btn) ab shared hain — app/static/css/erp-ui.css */
 
-  /* Row action icon buttons — ek size, tooltip title se */
-  .act-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 6px;
-    border: 1px solid #D1D9D8;
-    background: #FFFFFF;
-    color: #3D5A5D;
-    transition: background-color 0.12s, color 0.12s, border-color 0.12s;
-  }
-  .act-btn svg { width: 15px; height: 15px; }
-  .act-btn:hover { background: #F4F6F5; color: #0F2F32; }
-  .act-btn.act-edit { color: #8A4A1C; border-color: #E8C9A8; background: #FBF4EE; }
-  .act-btn.act-edit:hover { background: #C46B2D; border-color: #A35522; color: #FFFFFF; }
-  .act-btn.act-delete { color: #B42318; border-color: #F0C4C0; background: #FCEBEA; }
-  .act-btn.act-delete:hover { background: #B42318; border-color: #B42318; color: #FFFFFF; }
-  .act-sep { width: 1px; height: 20px; background: #E2E8E7; }
-  .act-btn.act-sm { width: 26px; height: 26px; }
-  .act-btn.act-sm svg { width: 13px; height: 13px; }
-
-  /* Child rows — halka grey group + left copper line, taaki parent ke andar dikhein */
+  /* Child rows — halka grey group + left grey line, taaki parent ke andar dikhein */
   .variant-row td {
-    background: #F8FAF9;
+    background: #F8FAFD;
     font-size: 13px;
     padding-top: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #EDF1F0;
+    border-bottom: 1px solid #EBF0F6;
   }
   .variant-row.variant-item td { padding-top: 10px; padding-bottom: 10px; }
-  .variant-row.variant-item:hover td { background: #F1F5F4; }
+  .variant-row.variant-item:hover td { background: #EEF2F8; }
 
   /* Tree connector — expand button ke center (≈24px) se neeche line, har variant pe branch,
      last (Add variant) row pe rounded elbow. Sirf CSS, markup me koi extra element nahi. */
@@ -137,7 +115,7 @@
     top: 0;
     bottom: 0;
     width: 2px;
-    background: #D5DDDB;
+    background: #D5DCE8;
   }
   .variant-row.variant-item td:first-child::after {
     content: '';
@@ -147,24 +125,24 @@
     top: 50%;
     height: 2px;
     margin-top: -1px;
-    background: #D5DDDB;
+    background: #D5DCE8;
   }
   .variant-row.variant-add td:first-child::before {
     bottom: 50%;
     right: 0;
     width: auto;
     background: none;
-    border-left: 2px solid #D5DDDB;
-    border-bottom: 2px solid #D5DDDB;
+    border-left: 2px solid #D5DCE8;
+    border-bottom: 2px solid #D5DCE8;
     border-bottom-left-radius: 8px;
     margin-bottom: -1px;
   }
-  .variant-row.variant-item:hover td:first-child::after { background: #E8C9A8; }
+  .variant-row.variant-item:hover td:first-child::after { background: #C7D0DE; }
   .variant-row.variant-item td:nth-child(2),
   .variant-row.variant-add td:nth-child(2) { padding-left: 0; }
   .variant-row.variant-head td {
-    background: #F1F4F3;
-    color: #6B7F82;
+    background: #EEF2F8;
+    color: #5A6577;
     font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
@@ -175,20 +153,20 @@
   .variant-row.variant-add td {
     padding-top: 8px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #D1D9D8;
+    border-bottom: 1px solid #D4DBE6;
   }
   /* Recipe = variant ki child rows, alag table nahi. Doosri line SKU column ke andar. */
   .variant-row.recipe-line td {
-    background: #F4F7F6;
+    background: #F3F6FA;
     font-size: 12.5px;
     padding-top: 6px;
     padding-bottom: 6px;
   }
-  .variant-row.recipe-line:hover td { background: #EEF3F1; }
+  .variant-row.recipe-line:hover td { background: #EAF0F7; }
   .variant-row.recipe-line td:first-child::after { display: none; }
   .variant-row.recipe-head td {
-    background: #EEF2F1;
-    color: #6B7F82;
+    background: #E9EEF6;
+    color: #5A6577;
     font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
@@ -206,7 +184,7 @@
     left: 8px;
     top: 0;
     bottom: 0;
-    border-left: 2px solid #D5DDDB;
+    border-left: 2px solid #D5DCE8;
   }
   .variant-row.recipe-line td:nth-child(2)::after {
     content: '';
@@ -216,11 +194,11 @@
     width: 10px;
     height: 2px;
     margin-top: -1px;
-    background: #D5DDDB;
+    background: #D5DCE8;
   }
   .variant-row.recipe-line.recipe-last td:nth-child(2)::before {
     bottom: 50%;
-    border-bottom: 2px solid #D5DDDB;
+    border-bottom: 2px solid #D5DCE8;
     border-bottom-left-radius: 6px;
   }
   /* Attribute = label | value segmented chip — naam aur value alag dikhein */
@@ -228,7 +206,7 @@
     display: inline-flex;
     align-items: stretch;
     margin: 3px 6px 3px 0;
-    border: 1px solid #D1D9D8;
+    border: 1px solid #D4DBE6;
     border-radius: 6px;
     overflow: hidden;
     background: #FFFFFF;
@@ -239,9 +217,9 @@
     display: flex;
     align-items: center;
     padding: 5px 7px;
-    background: #EEF2F1;
-    border-right: 1px solid #D1D9D8;
-    color: #3D5A5D;
+    background: #E9EEF6;
+    border-right: 1px solid #D4DBE6;
+    color: #475266;
     font-size: 10.5px;
     font-weight: 600;
     text-transform: uppercase;
@@ -251,11 +229,11 @@
     display: flex;
     align-items: center;
     padding: 5px 9px;
-    color: #0F2F32;
+    color: #0B1220;
     font-size: 12.5px;
     font-weight: 600;
   }
-  .variant-row.variant-item:hover .attr-chip { border-color: #E8C9A8; }
+  .variant-row.variant-item:hover .attr-chip { border-color: #C7D0DE; }
   .search-wrap input { padding-left: 32px; }
   #product-modal.hidden, #view-modal.hidden { display: none; }
   #product-modal, #view-modal { display: flex; }
@@ -266,27 +244,31 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #6B7F82;
+    color: #5A6577;
   }
 
   .expand-btn svg { transition: transform 0.15s; }
-  .expand-btn.is-open { color: #8A4A1C; background: #FFFFFF; border-color: #E8C9A8; }
+  .expand-btn.is-open { color: #0A3CA6; background: #FFFFFF; border-color: #BCD2FA; }
   .expand-btn.is-open svg { transform: rotate(90deg); }
   /* Recipe plan: stage-wise cards */
   .rp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px; }
-  .rp-card { background: #fff; border: 1px solid #D9E1E0; border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 5px; }
-  .rp-loose { border-style: dashed; background: #FBFAF8; }
-  .rp-head { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid #EEF2F1; }
-  .rp-no { width: 20px; height: 20px; border-radius: 6px; background: #0F2F32; color: #fff; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .rp-name { font-size: 13px; font-weight: 700; color: #0F2F32; line-height: 1.2; }
+  .rp-card { background: #fff; border: 1px solid #DAE1EC; border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 5px; }
+  .rp-loose { border-style: dashed; background: #F8FAFD; }
+  .rp-head { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid #E9EEF6; }
+  .rp-no { width: 20px; height: 20px; border-radius: 6px; background: #0B1220; color: #fff; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rp-name { font-size: 13px; font-weight: 700; color: #0B1220; line-height: 1.2; }
   .rp-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12.5px; }
-  .rp-mat { color: #1B3A3D; min-width: 0; }
-  .rp-qty { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: #0F2F32; white-space: nowrap; font-size: 12px; }
-  .rp-spare { font-weight: 500; color: #8A4A1C; }
-  .rp-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 5px; border-radius: 4px; background: #FFF0DF; color: #8A4A1C; border: 1px solid #F5D9B5; }
-  .rp-tag.pack { background: #EEF2F1; color: #3D5A5D; border-color: #D9E1E0; }
-  .rp-none { font-size: 12px; color: #8A9A9C; font-style: italic; }
-  .rp-hint { font-size: 12px; color: #6B7F82; margin-top: 8px; }
+  .rp-mat { color: #1B2538; min-width: 0; }
+  .rp-qty { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: #0B1220; white-space: nowrap; font-size: 12px; }
+  /* spare % = recipe ka extra allowance (data), clickable/accent nahi — isliye neutral muted */
+  .rp-spare { font-weight: 600; color: #475266; }
+  /* flux tag = categorical (cat3 violet), pack tag = neutral — dono me accent blue nahi, taaki link/selected jaisa na lage */
+  .rp-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 5px; border-radius: 4px; background: #F1EAFD; color: #6D28D9; border: 1px solid #D9C8F7; }
+  .rp-tag.pack { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .rp-none { font-size: 12px; color: #5A6577; font-style: italic; }
+  .rp-hint { font-size: 12px; color: #5A6577; margin-top: 8px; }
+  /* Keyboard focus: buttons / links / summary par saaf outline */
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -296,11 +278,13 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Masters / Products</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Products</h1>
         </div>
+        {% if can_edit('products') %}
         <button type="button" id="btn-add-product"
-          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+          class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Add product
         </button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
@@ -308,14 +292,14 @@
           <div class="relative search-wrap flex-1 min-w-[160px] max-w-xs">
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
             <input type="search" id="search-products" placeholder="Search code or name…"
-              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full py-2 pr-2 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-copper bg-copper text-white font-semibold">All (0)</button>
+            <button type="button" data-filter="all" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-accent bg-accent text-white font-semibold">All (0)</button>
             <button type="button" data-filter="active" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Active (0)</button>
             <button type="button" data-filter="inactive" class="filter-btn px-3 py-1.5 text-[12.5px] rounded border border-slate-300 bg-white text-ink">Inactive (0)</button>
           </div>
-          <details class="help-tip ml-auto text-[12.5px] text-copper-text">
+          <details class="help-tip ml-auto text-[12.5px] text-accent-text">
             <summary class="font-semibold hover:underline">Quick help ▾</summary>
             <p class="mt-1 text-ink-faint max-w-md text-right leading-snug">
               Category from Product Category master · Base unit from Unit master · Expand a row (▸) to view its recipe
@@ -357,7 +341,7 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">
                   <div class="flex items-center gap-1.5">
                     <button type="button"
-                      class="expand-btn inline-flex items-center justify-center w-6 h-6 shrink-0 rounded-md border border-slate-200 bg-white text-ink-faint hover:border-copper-border hover:text-copper-text focus:outline-none focus-visible:ring-1 focus-visible:ring-copper"
+                      class="expand-btn inline-flex items-center justify-center w-6 h-6 shrink-0 rounded-md border border-slate-200 bg-white text-ink-faint hover:border-accent-border hover:text-accent-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
                       data-target="recipe-{{ p.id }}" aria-label="Show recipe" title="Show / hide recipe">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                     </button>
@@ -373,7 +357,7 @@
                         <span class="font-semibold text-ink truncate">{{ p.name }}</span>
                         {% set rcount = p.recipe_items|length %}
                         {% if rcount %}
-                        <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-teal border border-brand-border">
+                        <span class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-mist text-ink-muted border border-slate-200">
                           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/></svg>
                           {{ rcount }} material{{ 's' if rcount != 1 else '' }}
                         </span>
@@ -387,7 +371,7 @@
                 </td>
                 <td>
                   {% if p.category %}
-                  <span class="inline-flex items-center max-w-full truncate text-[12.5px] font-medium px-2 py-1 rounded-md bg-brand-soft text-brand-teal border border-brand-border">{{ p.category.name }}</span>
+                  <span class="inline-flex items-center max-w-full truncate text-[12.5px] font-medium px-2 py-1 rounded-md bg-mist text-ink border border-slate-200">{{ p.category.name }}</span>
                   {% else %}
                   <span class="text-ink-faint">—</span>
                   {% endif %}
@@ -400,8 +384,8 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
                   </span>
                   {% else %}
-                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-stop-bg text-stop border-stop-border">
-                    <span class="w-1.5 h-1.5 rounded-full bg-stop"></span> Inactive
+                  <span class="status-badge inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2 py-1 rounded border bg-neutral-bg text-neutral border-neutral-border">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral"></span> Inactive
                   </span>
                   {% endif %}
                 </td>
@@ -421,6 +405,7 @@
                       data-max-stock="{{ p.max_stock if p.max_stock is not none else '' }}">
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
+                    {% if can_edit('products') %}
                     <button type="button" title="Production stages (routing)" aria-label="Production stages"
                       class="btn-routing act-btn"
                       data-id="{{ p.id }}"
@@ -461,10 +446,11 @@
                       <label class="toggle-switch relative inline-flex items-center cursor-pointer" title="Active / Inactive">
                         <input type="checkbox" class="toggle-input sr-only peer" {% if p.is_active %}checked{% endif %}
                                onchange="this.form.submit()">
-                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150"></span>
+                        <span class="w-9 h-5 bg-slate-300 peer-checked:bg-success rounded-full transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-1"></span>
                         <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-150 peer-checked:translate-x-4"></span>
                       </label>
                     </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -512,23 +498,25 @@
           <div id="empty-state" class="hidden py-12 text-center">
             <p class="font-semibold text-ink">No products found</p>
             <p class="text-ink-faint mt-1 text-[13.5px]">Clear the search or add a new product.</p>
-            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark">+ Add product</button>
+            {% if can_edit('products') %}
+            <button type="button" id="btn-empty-add" class="mt-3 px-3.5 py-2 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark">+ Add product</button>
+            {% endif %}
           </div>
         </div>
 
         <div class="px-3.5 py-2.5 border-t border-slate-200 bg-mist flex flex-wrap items-center justify-between gap-2 shrink-0 text-[12.5px] text-ink-faint">
           <span id="result-count">Showing {{ result_count }} of {{ total_count }} products</span>
           <span>Expand a row (▸) to view its recipe</span>
-          <span class="text-ink-muted">Page 1 · Live data</span>
         </div>
       </div>
 {% endblock %}
 
 {% block modals %}
+{% if can_edit('products') %}
 <div id="product-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="modal-title" class="relative ml-auto h-full w-full max-w-3xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="modal-title" class="text-[16px] font-bold text-ink">Add product</h2>
         <p class="text-[12.5px] text-ink-faint">Basic details, attributes, and the raw-material recipe</p>
@@ -554,10 +542,12 @@
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
           <label for="product-category" class="text-[12.5px] font-semibold text-ink">Category *</label>
-          <a href="{{ url_for('product_categories.product_categories_list') }}" class="text-[12px] font-semibold text-copper-text hover:underline">Manage categories →</a>
+          {% if can_do('product_categories.product_categories_list', 'GET') %}
+          <a href="{{ url_for('product_categories.product_categories_list') }}" class="text-[12px] font-semibold text-accent-text hover:underline">Manage categories →</a>
+          {% endif %}
         </div>
         <select id="product-category" name="category_id" required
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select category</option>
           {% for cat in categories %}
           <option value="{{ cat.id }}" data-name="{{ cat.name }}" data-fields='{{ (cat.attribute_fields or []) | tojson }}'>{{ cat.code }} — {{ cat.name }}</option>
@@ -567,13 +557,13 @@
       <div>
         <label for="product-description" class="block text-[12.5px] font-semibold text-ink mb-1">Description</label>
         <textarea id="product-description" name="description" rows="2" placeholder="Short spec/notes"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper"></textarea>
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent"></textarea>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="product-base-unit" class="block text-[12.5px] font-semibold text-ink mb-1">Base unit *</label>
           <select id="product-base-unit" name="base_unit_id" required
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
             <option value="">Select unit</option>
             {% for u in units %}
             <option value="{{ u.id }}">{{ u.code }} — {{ u.name }}</option>
@@ -583,30 +573,32 @@
         <div>
           <label for="product-hsn" class="block text-[12.5px] font-semibold text-ink mb-1">HSN code</label>
           <input type="text" id="product-hsn" name="hsn_code" placeholder="8544" maxlength="8"
-            class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[13px] font-mono border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
       </div>
       {# PCS / ROLL jaisi unit me 1 piece ka weight yahin ek baar fix hota hai — order form me ye box nahi aata (client meeting 2, #4) #}
-      <div id="product-weight-box" class="hidden rounded border border-copper-border bg-copper-soft px-3 py-2.5">
+      <div id="product-weight-box" class="hidden rounded border border-slate-200 bg-mist px-3 py-2.5">
         <label for="product-unit-weight" id="product-unit-weight-label" class="block text-[12.5px] font-semibold text-ink mb-1">Kilograms in one unit *</label>
         <input type="number" id="product-unit-weight" name="unit_weight" min="0.001" step="0.001" placeholder="e.g. 1, 0.5 or 0.25"
-          class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="text-[11.5px] text-ink-faint mt-1">Fixed for this product (a 1 KG spool is 1, a 500 g spool is 0.5). Orders are placed in pieces and the KG is worked out from this.</p>
       </div>
       {# Extra % (extra pieces): order me customer qty se itne % zyada pieces bante hain (form, Finalize aur review me default); scrap ka cushion Spare % hai #}
       <div>
         <label for="product-scrap-extra" class="block text-[12.5px] font-semibold text-ink mb-1">Extra % (extra pieces)</label>
         <input type="number" id="product-scrap-extra" name="scrap_extra_percent" min="0" max="50" step="0.1" placeholder="0"
-          class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-40 px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
         <p class="text-[11.5px] text-ink-faint mt-1">Default for orders of this product: make this much % more pieces than the customer asked for (100 ordered with 5% = 105 made). The extra pieces go to finished goods stock. Scrap and wastage are covered by the Spare % of each material, not by this. It can be changed when the order is made or reviewed. Leave empty for none.</p>
       </div>
       <div>
         <div class="flex items-center justify-between gap-2 mb-1">
           <label for="product-tax-rate" class="text-[12.5px] font-semibold text-ink">Tax rate *</label>
-          <a href="{{ url_for('tax_rates.tax_rates_list') }}" class="text-[12px] font-semibold text-copper-text hover:underline">Manage tax rates →</a>
+          {% if can_do('tax_rates.tax_rates_list', 'GET') %}
+          <a href="{{ url_for('tax_rates.tax_rates_list') }}" class="text-[12px] font-semibold text-accent-text hover:underline">Manage tax rates →</a>
+          {% endif %}
         </div>
         <select id="product-tax-rate" name="tax_rate_id" required
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">Select tax rate</option>
           {# Flask: route se tax_rates=... pass hoga (active TaxRate rows) #}
           {% for t in tax_rates %}
@@ -618,7 +610,7 @@
       <div>
         <label for="product-output-rm" class="block text-[12.5px] font-semibold text-ink mb-1">Output goes to raw material stock</label>
         <select id="product-output-rm" name="output_rm_id"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper">
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent">
           <option value="">No, finished goods (normal product)</option>
           {% for m in output_materials %}
           <option value="{{ m.id }}">{{ m.code }} — {{ m.name }}</option>
@@ -630,12 +622,12 @@
         <div>
           <label for="product-min-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Min stock (finished goods)</label>
           <input type="number" id="product-min-stock" name="min_stock" placeholder="Optional" min="0" step="1"
-            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <div>
           <label for="product-max-stock" class="block text-[12.5px] font-semibold text-ink mb-1">Max stock (finished goods)</label>
           <input type="number" id="product-max-stock" name="max_stock" placeholder="Optional" min="0" step="1"
-            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            class="w-full px-2.5 py-2 text-[14px] font-mono tabular-nums border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
         </div>
         <p class="col-span-2 text-[11.5px] text-ink-faint -mt-1">Total quantity in the Finished goods page is compared with these: below the minimum shows "Below minimum", above the maximum shows "Overstock". Leave empty for no alert.</p>
       </div>
@@ -646,7 +638,7 @@
           <p class="text-[12px] text-ink-faint -mt-1 mb-2">These fields come from the category. The product name updates as you type values.</p>
           <p id="spec-attr-empty" class="text-[13px] text-ink-muted mb-2">Select a category to see its attribute fields.</p>
           <div id="spec-attr-list" class="space-y-1.5 mb-2"></div>
-          <button type="button" id="btn-add-spec-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute field</button>
+          <button type="button" id="btn-add-spec-attr" class="text-[12px] font-semibold text-accent-text hover:underline">+ Add attribute field</button>
         </div>
 
         <hr class="border-slate-200" />
@@ -673,7 +665,7 @@
               <tbody id="recipe-body"></tbody>
             </table>
           </div>
-          <button type="button" id="btn-add-recipe-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add material line</button>
+          <button type="button" id="btn-add-recipe-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-accent-text border border-dashed border-accent-border rounded hover:bg-accent-soft">+ Add material line</button>
           <p id="recipe-balance" class="mt-2 text-[13px] text-ink-muted">Base metals total: 0% · Flux total: 0%</p>
         </div>
 
@@ -692,7 +684,7 @@
               <tbody id="packing-body"></tbody>
             </table>
           </div>
-          <button type="button" id="btn-add-packing-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-copper-text border border-dashed border-copper-border rounded hover:bg-copper-soft">+ Add packing line</button>
+          <button type="button" id="btn-add-packing-line" class="mt-2 px-3 py-1.5 text-[13px] font-semibold text-accent-text border border-dashed border-accent-border rounded hover:bg-accent-soft">+ Add packing line</button>
         </div>
         <script type="application/json" id="packing-materials-data">[
           {%- for m in packing_materials -%}
@@ -702,7 +694,7 @@
 
         <hr class="border-slate-200" />
         <!-- IS PURANE BLOCK KO REPLACE KAREIN -->
-        <div class="rounded border border-brand-border bg-brand-soft px-3 py-3 space-y-2">
+        <div class="rounded border border-info-border bg-info-bg px-3 py-3 space-y-2">
           <div class="flex items-center justify-between">
             <p class="text-[12.5px] font-semibold text-ink">Flow check — sample customer order</p>
             <span id="recipe-preview-calc-summary" class="text-[11.5px] font-mono text-ink-muted"></span>
@@ -712,10 +704,10 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
             <div>
               <label class="block text-[12px] font-semibold text-ink mb-1">
-                Order qty (<span id="recipe-preview-unit-label" class="font-mono text-copper">KG</span>)
+                Order qty (<span id="recipe-preview-unit-label" class="font-mono text-accent">KG</span>)
               </label>
               <input type="number" id="recipe-preview-qty" min="0" step="1" value="500"
-                class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+                class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
             </div>
           </div>
 
@@ -730,15 +722,16 @@
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="product-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save product</button>
+      <button type="submit" form="product-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save product</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 <div id="view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="view-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="view-modal-title" class="relative ml-auto h-full w-full max-w-lg bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-brand-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="view-modal-title" class="text-[16px] font-bold text-ink">Product details</h2>
         <p id="view-modal-subtitle" class="text-[12.5px] text-ink-faint">—</p>
@@ -752,10 +745,11 @@
   </div>
 </div>
 
+{% if can_edit('products') %}
 <div id="variant-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="variant-modal-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" aria-labelledby="variant-modal-title" class="relative ml-auto h-full w-full max-w-xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div>
         <h2 id="variant-modal-title" class="text-[16px] font-bold text-ink">Add variant</h2>
         <p class="text-[12.5px] text-ink-faint">Name, SKU, attributes, and recipe</p>
@@ -766,7 +760,7 @@
       <div>
         <label for="variant-modal-name" class="block text-[12.5px] font-semibold text-ink mb-1">Variant name *</label>
         <input type="text" id="variant-modal-name" name="name" required placeholder="e.g. Small / 2MM"
-          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+          class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
       </div>
       <div>
         <label for="variant-modal-sku" class="block text-[12.5px] font-semibold text-ink mb-1">SKU</label>
@@ -782,12 +776,12 @@
         </div>
         <div id="variant-modal-attr-list" class="attribute-list space-y-1.5 mb-2">
           <div class="attribute-row flex gap-1.5">
-            <input type="text" name="attr_key[]" placeholder="e.g. Size" class="attr-key w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
-            <input type="text" name="attr_value[]" placeholder="e.g. Small" class="attr-value w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper" />
+            <input type="text" name="attr_key[]" placeholder="e.g. Size" class="attr-key w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
+            <input type="text" name="attr_value[]" placeholder="e.g. Small" class="attr-value w-1/2 px-2 py-1.5 text-[12.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
             <button type="button" class="btn-remove-attr text-ink-faint hover:text-stop px-1" aria-label="Remove attribute">&times;</button>
           </div>
         </div>
-        <button type="button" id="btn-add-variant-attr" class="text-[12px] font-semibold text-copper-text hover:underline">+ Add attribute</button>
+        <button type="button" id="btn-add-variant-attr" class="text-[12px] font-semibold text-accent-text hover:underline">+ Add attribute</button>
       </div>
       <hr class="border-slate-200" />
       <div>
@@ -808,10 +802,10 @@
             <tbody id="variant-recipe-body"></tbody>
           </table>
         </div>
-        <button type="button" id="btn-add-variant-recipe" class="mt-2 text-[12px] font-semibold text-copper-text hover:underline">+ Add material line</button>
+        <button type="button" id="btn-add-variant-recipe" class="mt-2 text-[12px] font-semibold text-accent-text hover:underline">+ Add material line</button>
         <p id="variant-recipe-balance" class="mt-2 text-[13px] text-ink-muted">Base metals total: 0% · Flux total: 0%</p>
       </div>
-      <div class="rounded border border-brand-border bg-brand-soft px-3 py-3 space-y-2">
+      <div class="rounded border border-info-border bg-info-bg px-3 py-3 space-y-2">
         <div class="flex items-center justify-between gap-2">
           <p class="text-[12.5px] font-semibold text-ink">Flow check — sample customer order</p>
           <span id="variant-preview-calc-summary" class="text-[11.5px] font-mono text-ink-muted"></span>
@@ -819,14 +813,14 @@
         <p class="text-[12px] text-ink-muted">Type an order quantity to see how this recipe explodes into raw material.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-[12px] font-semibold text-ink mb-1">Order qty (<span id="variant-preview-unit-label" class="font-mono text-copper">KG</span>)</label>
+            <label class="block text-[12px] font-semibold text-ink mb-1">Order qty (<span id="variant-preview-unit-label" class="font-mono text-accent">KG</span>)</label>
             <input type="number" id="variant-preview-qty" min="0" step="1" value="500"
-              class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
           <div id="variant-unit-weight-box" class="hidden">
             <label class="block text-[12px] font-semibold text-ink mb-1">Weight per unit (KG)</label>
             <input type="number" id="variant-unit-weight" min="0.001" step="0.001" value="0.5"
-              class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-copper focus:border-copper" />
+              class="w-full px-2.5 py-1.5 text-[13.5px] tabular-nums border border-slate-300 rounded bg-white focus:ring-1 focus:ring-accent focus:border-accent" />
           </div>
         </div>
         <ul id="variant-preview-lines" class="text-[13px] text-ink space-y-1 pt-1"></ul>
@@ -834,10 +828,11 @@
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="btn-cancel-variant" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="variant-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save variant</button>
+      <button type="submit" form="variant-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save variant</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 {% endblock %}
 
@@ -868,9 +863,9 @@
   function applyFilterButtonStyles(btn) {
     document.querySelectorAll('.filter-btn').forEach(function (b) {
       var on = b === btn;
-      b.classList.toggle('bg-copper', on);
+      b.classList.toggle('bg-accent', on);
       b.classList.toggle('text-white', on);
-      b.classList.toggle('border-copper', on);
+      b.classList.toggle('border-accent', on);
       b.classList.toggle('font-semibold', on);
       b.classList.toggle('bg-white', !on);
       b.classList.toggle('text-ink', !on);
@@ -911,7 +906,7 @@
     input.type = 'text';
     input.name = 'attr_value_0[]';
     input.setAttribute('autocomplete', 'off');
-    input.className = 'spec-attr-value flex-1 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper';
+    input.className = 'spec-attr-value flex-1 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent';
     input.addEventListener('input', refreshProductName);
     return input;
   }
@@ -927,7 +922,7 @@
     key.placeholder = 'New field name';
     key.value = keyText || '';
     key.setAttribute('autocomplete', 'off');
-    key.className = 'spec-attr-key w-2/5 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-copper focus:border-copper';
+    key.className = 'spec-attr-key w-2/5 px-2 py-1.5 text-[13px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent';
     var value = specValueInput();
     value.placeholder = 'Value';
     value.value = valueText || '';
@@ -1200,6 +1195,8 @@
     openVariantModal();
   }
 
+  {# Add / Edit / Variant / Routing modals sirf Edit user ko milte hain — View user ke liye unke listeners hi nahi lagte (elements null honge) #}
+  {% if can_edit('products') %}
   document.getElementById('btn-close-variant-modal').addEventListener('click', closeVariantModal);
   document.getElementById('btn-cancel-variant').addEventListener('click', closeVariantModal);
   document.getElementById('variant-modal-backdrop').addEventListener('click', closeVariantModal);
@@ -1258,6 +1255,7 @@
       if (typeof showToast === 'function') showToast('Variant name is required.', 'error');
     }
   });
+  {% endif %}
 
   function applyFilters() {
     var q = (searchInput.value || '').trim().toLowerCase();
@@ -1287,19 +1285,23 @@
     document.querySelector('[data-filter="inactive"]').textContent = 'Inactive (' + counts.inactive + ')';
   }
 
+  {% if can_edit('products') %}
   document.getElementById('btn-add-product').addEventListener('click', openAddModal);
   var emptyAdd = document.getElementById('btn-empty-add');
   if (emptyAdd) emptyAdd.addEventListener('click', openAddModal);
   document.getElementById('btn-close-modal').addEventListener('click', closeModal);
   document.getElementById('btn-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  {% endif %}
   document.getElementById('btn-close-view').addEventListener('click', closeViewModal);
   document.getElementById('btn-close-view-2').addEventListener('click', closeViewModal);
   document.getElementById('view-modal-backdrop').addEventListener('click', closeViewModal);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!viewModal.classList.contains('hidden')) closeViewModal();
+    {% if can_edit('products') %}
     else if (!modal.classList.contains('hidden')) closeModal();
+    {% endif %}
   });
   document.querySelectorAll('.btn-edit-product').forEach(function (btn) {
     btn.addEventListener('click', function () { openEditModal(btn); });
@@ -1308,6 +1310,7 @@
     btn.addEventListener('click', function () { openViewModal(btn); });
   });
 
+  {% if can_edit('products') %}
   form.addEventListener('submit', function (e) {
     var name = document.getElementById('product-name').value.trim();
     var cat = document.getElementById('product-category').value;
@@ -1323,6 +1326,7 @@
       if (typeof showToast === 'function') showToast('Wire Flask Add route first (form action).', 'error');
     }
   });
+  {% endif %}
 
   document.querySelectorAll('.expand-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1756,10 +1760,11 @@
 </script>
 
 {# ---- Production stages (routing): is product kaun-kaun se work stages se guzarta hai ---- #}
+{% if can_edit('products') %}
 <div id="routing-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="routing-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div><h2 class="text-[16px] font-bold text-ink">Production stages</h2><p id="routing-sub" class="text-[12.5px] text-ink-faint">—</p></div>
       <button type="button" id="routing-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -1778,7 +1783,7 @@
     </form>
     <div class="px-4 py-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
       <button type="button" id="routing-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="routing-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Save stages</button>
+      <button type="submit" form="routing-form" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save stages</button>
     </div>
   </div>
 </div>
@@ -1799,4 +1804,5 @@
     ['routing-close', 'routing-cancel', 'routing-backdrop'].forEach(function (id) { document.getElementById(id).addEventListener('click', close); });
   })();
 </script>
+{% endif %}
 {% endblock %}

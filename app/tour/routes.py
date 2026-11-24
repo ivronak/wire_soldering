@@ -73,7 +73,12 @@ def tour_shortage_order():
         data += [(f"machines_{row.work_stage_id}", str(m.id)) for m in machines.all()]
     from werkzeug.datastructures import MultiDict
     before = ProductionOrder.query.count()
-    current_app.test_client().post("/production_orders/add", data=MultiDict(data))
+    # Pehle yahan current_app.test_client().post(...) tha — ab login guard + CSRF ke aage wo bina login ke bounce ho jaata hai.
+    # Isliye wahi view function seedha bulate hain (nayi request context me, form data ke saath): guard / CSRF is route par pehle hi
+    # lag chuka hai (tour sirf Developer ke liye, guard_map me), aur order banane ka asli logic wahi rehta hai.
+    from app.production_orders.routes import production_orders_add
+    with current_app.test_request_context("/production_orders/add", method="POST", data=MultiDict(data)):
+        production_orders_add()
     order = ProductionOrder.query.order_by(ProductionOrder.id.desc()).first()
     if ProductionOrder.query.count() == before or order is None:
         return jsonify({"ok": False, "message": "The demo order could not be created."}), 400

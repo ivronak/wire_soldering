@@ -3,36 +3,42 @@
 
 {% block page_css %}
 <style>
-  .sv-card { border: 1px solid #D1D9D8; border-radius: 10px; background: #fff; padding: 10px 14px; }
+  .sv-card { border: 1px solid #D4DBE6; border-radius: 10px; background: #fff; padding: 10px 14px; }
   .sv-big { font-size: 22px; font-weight: 700; line-height: 1.1; }
-  .sv-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; font-size: 12.5px; border: 1px solid #D1D9D8; background: #fff; color: #3D5A5D; }
-  .sv-pill.on { background: #B5672C; border-color: #B5672C; color: #fff; font-weight: 600; }
+  .sv-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; font-size: 12.5px; border: 1px solid #D4DBE6; background: #fff; color: #475266; }
+  .sv-pill { text-decoration: none; }
+  .sv-pill:hover { border-color: #0B5BEF; }
+  .sv-pill:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
+  .sv-pill.on { background: #0B5BEF; border-color: #0B5BEF; color: #fff; font-weight: 600; }
   .sv-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
-  /* Warehouse type ke rang (Stock page jaise) */
-  .t-RM { --c: #2E9E68; --bg: #E6F5EC; --fg: #1F7A4D; --bd: #B7E0C7; }
-  .t-QC_HOLD { --c: #E0A04A; --bg: #FFF4E5; --fg: #8A4A1C; --bd: #F5D9B5; }
-  .t-WIP { --c: #5B8DD6; --bg: #EAF1FB; --fg: #2B5FA8; --bd: #C9D8F0; }
-  .t-SCRAP { --c: #D9534F; --bg: #FDECEC; --fg: #B42318; --bd: #F8CFCB; }
-  .t-FG { --c: #1B9AA5; --bg: #E8F3F4; --fg: #0F6B73; --bd: #BFDDE0; }
-  .t-TRANSIT { --c: #98A5A4; --bg: #F5F7F7; --fg: #3D5A5D; --bd: #D1D9D8; }
-  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--bd, #D1D9D8); background: var(--bg, #F5F7F7); color: var(--fg, #3D5A5D); white-space: nowrap; }
+  /* Warehouse type ka categorical rang — Stock / Warehouses / Lot / Finished goods pages jaisa SAME map:
+     RM = cyan, WIP = accent blue, FG = indigo, SCRAP = neutral grey, QC_HOLD = warning amber, TRANSIT = slate.
+     --c = bar / dot / stripe ka solid rang, --bg/--fg/--bd = badge. Status green/red type ke liye use nahi hota. */
+  .t-RM { --c: #0E7490; --bg: #E6F6F8; --fg: #0E7490; --bd: #B2DDE4; }
+  .t-QC_HOLD { --c: #B45309; --bg: #FEF3E2; --fg: #B45309; --bd: #FBD9A5; }
+  .t-WIP { --c: #0B5BEF; --bg: #EDF3FF; --fg: #0A3CA6; --bd: #BCD2FA; }
+  .t-SCRAP { --c: #475569; --bg: #F1F5F9; --fg: #475569; --bd: #E2E8F0; }
+  .t-FG { --c: #4338CA; --bg: #EEF0FD; --fg: #4338CA; --bd: #C7CCF5; }
+  .t-TRANSIT { --c: #64748B; --bg: #EEF2F6; --fg: #475569; --bd: #CBD5E1; }
+  .wh-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--bd, #D4DBE6); background: var(--bg, #F5F7FB); color: var(--fg, #475266); white-space: nowrap; }
   /* Table jaisa column alignment, par har material ek card-jaisa block (Stock page ka look) */
   .sv-cols { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 12px; align-items: center; }
-  .sv-head { padding: 8px 14px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #3D5A5D; background: #EEF2F1; border: 1px solid #D1D9D8; border-radius: 10px; margin-bottom: 8px; }
+  .sv-head { padding: 8px 14px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #475266; background: #E9EEF6; border: 1px solid #D4DBE6; border-radius: 10px; margin-bottom: 8px; }
   .sv-head .num, .sv-row .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .sv-group { background: #fff; border: 1px solid #D1D9D8; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
-  .sv-group:hover { border-color: #C9B8A6; }
+  .sv-group { background: #fff; border: 1px solid #D4DBE6; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .sv-group:hover { border-color: #B8C4DA; }
   .sv-gh { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; padding: 10px 14px 8px; }
-  .sv-row { padding: 6px 14px; font-size: 13.5px; border-top: 1px solid #EEF2F1; }
-  .sv-row.place:hover { background: #FBF4EE; }
+  .sv-row { padding: 6px 14px; font-size: 13.5px; border-top: 1px solid #E9EEF6; }
+  .sv-row.place:hover { background: #F1F5F9; }  /* hover = neutral grey (accent tint sirf selected ke liye) */
   /* Cost layers (lots): warehouse ke rang ki patti ke saath andar ka chhota table */
-  .sv-layers { background: #F7FAF9; border-top: 1px solid #E2E8E7; border-left: 4px solid var(--c, #98A5A4); }
-  .sv-lhead { padding: 6px 14px 2px 22px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7C8D8B; }
-  .sv-row.layer { font-size: 13px; color: #3D5A5D; padding: 5px 14px 5px 22px; border-top: 1px dashed #E2E8E7; }
+  .sv-layers { background: #F8FAFD; border-top: 1px solid #E2E8F1; border-left: 4px solid var(--c, #94A0B4); }
+  .sv-lhead { padding: 6px 14px 2px 22px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #5A6577; }
+  .sv-row.layer { font-size: 13px; color: #475266; padding: 5px 14px 5px 22px; border-top: 1px dashed #E2E8F1; }
   .sv-lhead + .sv-row.layer { border-top: 0; }
-  .lot-chip { font-family: ui-monospace, Consolas, monospace; font-size: 12px; font-weight: 700; color: #0F2F32; background: #fff; border: 1px solid #D1D9D8; border-radius: 6px; padding: 0 7px; margin-right: 6px; }
-  .lay-btn { font-size: 12px; font-weight: 600; color: #8A4A1C; background: none; border: 0; cursor: pointer; padding: 0 2px; }
+  .lot-chip { font-family: ui-monospace, Consolas, monospace; font-size: 12px; font-weight: 700; color: #0B1220; background: #fff; border: 1px solid #D4DBE6; border-radius: 6px; padding: 0 7px; margin-right: 6px; }
+  .lay-btn { font-size: 12px; font-weight: 600; color: #0A3CA6; background: none; border: 0; cursor: pointer; padding: 0 2px; }
   .lay-btn:hover { text-decoration: underline; }
+  .lay-btn:focus-visible { outline: 2px solid #0B5BEF; outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -44,7 +50,7 @@
           <h1 class="text-[20px] font-bold text-ink leading-tight">Stock valuation</h1>
           <p class="text-[12.5px] text-ink-faint">What your stock is worth, material by material and place by place.</p>
         </div>
-        <details class="text-[12.5px] text-copper-text">
+        <details class="text-[12.5px] text-accent-text">
           <summary class="font-semibold cursor-pointer hover:underline">How is it valued? ▾</summary>
           <div class="mt-1.5 max-w-sm text-ink-muted leading-snug bg-white border border-slate-200 rounded-lg p-3 shadow-sm">Each lot keeps its own purchase cost: the PO rate until the vendor bill is posted, then the bill rate. The unit cost shown for a place is the average of the lots in that place. Click a material to see every lot's cost.</div>
         </details>

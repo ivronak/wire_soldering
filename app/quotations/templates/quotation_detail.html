@@ -3,18 +3,24 @@
 
 {% block page_css %}
 <style>
-  .qd-label { font-size: 12px; font-weight: 600; color: #6B7F82; text-transform: uppercase; letter-spacing: 0.03em; }
+  .qd-label { font-size: 12px; font-weight: 600; color: #5A6577; text-transform: uppercase; letter-spacing: 0.03em; }
   .qd-table { width: 100%; border-collapse: collapse; }
-  .qd-table th { background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 9px 10px; text-align: left; }
-  .qd-table td { padding: 9px 10px; border-bottom: 1px solid #E2E8E7; font-size: 14px; }
+  .qd-table th { background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 9px 10px; text-align: left; }
+  .qd-table td { padding: 9px 10px; border-bottom: 1px solid #E2E8F1; font-size: 14px; }
   .qd-table .num { text-align: right; font-variant-numeric: tabular-nums; }
   .q-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid; }
   .q-chip.Draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
-  .q-chip.Sent { background: #EAF3F3; color: #2A6B6E; border-color: #C5D9DA; }
+  /* Sent = accent-soft (customer ko bheja gaya, abhi jawab baaki) — info cyan nahi */
+  .q-chip.Sent { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }
   .q-chip.Approved { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .q-chip.Ordered { background: #E8EEFB; color: #1E40AF; border-color: #C3D1F5; }
-  .q-chip.Rejected, .q-chip.Cancelled { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  .q-chip.Ordered { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
+  .q-chip.Rejected { background: #FCEBEA; color: #B42318; border-color: #F0C4C0; }
+  /* Cancelled = neutral grey (red sirf Rejected ke liye); Waiting for Owner = amber (pending, failure nahi) */
+  .q-chip.Cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+  .q-chip.Waiting { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
   .q-chip.Expired { background: #FEF3E2; color: #B45309; border-color: #FBD9A5; }
+  /* Keyboard focus: buttons / links par saaf outline */
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 {% endblock %}
 
@@ -30,12 +36,13 @@
           </h1>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          {% if can_edit('quotations') %}
           {% for to in next_statuses %}
           <form method="post" action="{{ url_for('quotations.quotations_status', quotation_id=q.id) }}"
                 {% if to in ('Rejected', 'Cancelled') %}onsubmit="return confirm('Mark {{ q.quote_no }} as {{ to }}? This cannot be undone.');"{% endif %}>
             <input type="hidden" name="to" value="{{ to }}">
             {% if to in ('Sent', 'Approved') %}
-            <button type="submit" class="px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">
+            <button type="submit" class="px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
               {{ 'Mark as Sent to customer' if to == 'Sent' else 'Customer approved' }}
             </button>
             {% else %}
@@ -45,10 +52,11 @@
             {% endif %}
           </form>
           {% endfor %}
-          {% if finalizable %}
-          <button type="button" id="btn-finalize" class="px-4 py-2.5 text-[13.5px] font-semibold bg-copper text-white rounded border border-copper-dark hover:bg-copper-dark shadow-sm">Finalize order</button>
           {% endif %}
-          {% if edit %}
+          {% if finalizable and can_edit('quotations') %}
+          <button type="button" id="btn-finalize" class="px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">Finalize order</button>
+          {% endif %}
+          {% if edit and can_edit('quotations') %}
           <button type="button" id="btn-edit-q" class="px-4 py-2.5 text-[13.5px] font-semibold text-ink border border-slate-300 rounded bg-white hover:bg-mist">
             {{ 'Revise (R' ~ edit.next_revision ~ ')' if edit.revising else 'Edit' }}
           </button>
@@ -69,17 +77,18 @@
         </div>
 
         {% if q.status == 'Ordered' %}
-        <div class="border border-blue-200 bg-blue-50 rounded p-3 grid grid-cols-2 md:grid-cols-4 gap-4" id="order-card">
+        <div class="border border-slate-200 bg-mist rounded p-3 grid grid-cols-2 md:grid-cols-4 gap-4" id="order-card">
           <div><div class="qd-label">Customer PO</div><div class="font-semibold text-ink">{{ q.customer_po_no or "—" }}</div></div>
           <div><div class="qd-label">PO date</div><div>{{ q.customer_po_date.strftime('%d %b %Y') if q.customer_po_date else '—' }}</div></div>
-          <div><div class="qd-label">PO copy</div><div>{% if q.po_file %}<a class="text-copper-text font-semibold hover:underline" href="{{ url_for('quotations.quotations_po_file', quotation_id=q.id) }}" target="_blank">{{ po_file_name }}</a>{% else %}—{% endif %}</div></div>
+          <div><div class="qd-label">PO copy</div><div>{% if q.po_file %}<a class="text-accent-text font-semibold hover:underline" href="{{ url_for('quotations.quotations_po_file', quotation_id=q.id) }}" target="_blank">{{ po_file_name }}</a>{% else %}—{% endif %}</div></div>
           <div><div class="qd-label">Finalized</div><div>{{ q.finalized_at|ist }}</div></div>
           {% if q.bundle_no %}<div class="col-span-2 md:col-span-4 text-[13px] text-ink-muted">All items are in production bundle <b>{{ q.bundle_no }}</b>.</div>{% endif %}
         </div>
         {% endif %}
 
         {% if below_cost %}
-        <div id="cost-warning" class="rounded border px-3 py-2 text-[13.5px]" style="background:#FCEBEA;border-color:#F0C4C0;color:#B42318">
+        {# Below-cost = chetavni (save/continue ruka nahi, sirf invoice Owner approval maangega) isliye amber; laal sirf neeche line ke "Below cost" label par #}
+        <div id="cost-warning" class="rounded border border-warning-border bg-warning-bg text-warning px-3 py-2 text-[13.5px]">
           <b>Price below cost.</b> The rate is lower than the last production cost of:
           {% for line in q.lines if line.id in below_cost %}<span class="block">· {{ line.product.name }}: price ₹ {{ '{:,.2f}'.format(below_cost[line.id].price) }} against cost ₹ {{ '{:,.2f}'.format(below_cost[line.id].cost) }} <span class="opacity-75">({{ below_cost[line.id].note }})</span></span>{% endfor %}
           <span class="block mt-1 text-[12.5px]">You can still continue. The invoice of such an order waits for the Owner's approval.</span>
@@ -95,11 +104,11 @@
                 <td>{{ loop.index }}</td>
                 <td><b>{{ line.product.name }}</b> <span class="text-ink-faint text-[12.5px]">{{ line.product.code }}</span></td>
                 <td class="num">{{ '{:,.3f}'.format(line.qty).rstrip('0').rstrip('.') }} {{ line.product.base_unit.code if line.product.base_unit else '' }}</td>
-                <td class="num">{{ '{:,.2f}'.format(line.rate) }}{% if line.id in below_cost %}<div class="text-[11.5px] font-semibold" style="color:#B42318">Below cost</div>{% endif %}</td>
+                <td class="num">{{ '{:,.2f}'.format(line.rate) }}{% if line.id in below_cost %}<div class="text-[11.5px] font-semibold text-stop">Below cost</div>{% endif %}</td>
                 <td class="num">{{ '%g'|format(line.discount_percent) }}</td>
                 <td>{{ line.tax_rate.label if line.tax_rate else '—' }}</td>
                 <td class="num font-semibold">{{ '{:,.2f}'.format(line.net_value) }}</td>
-                {% if q.status == 'Ordered' %}<td class="num">{{ '%g'|format(sent_qty[line.id]) }}</td><td>{% if line.production_order %}<a class="font-mono text-[13px] font-bold text-copper-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a> <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if line.production_order.status == 'Draft' and not line.production_order.reviewed %} · needs review{% elif not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}<span class="text-[12px] font-semibold text-copper-text">From stock</span>{% endif %}</td>{% endif %}
+                {% if q.status == 'Ordered' %}<td class="num">{{ '%g'|format(sent_qty[line.id]) }}</td><td>{% if line.production_order %}{% if can_do('production_orders.production_orders_list', 'GET') %}<a class="font-mono text-[13px] font-bold text-accent-text hover:underline" href="{{ url_for('production_orders.production_orders_list') }}">{{ line.production_order.prod_no }}</a>{% else %}<span class="font-mono text-[13px] font-bold text-ink">{{ line.production_order.prod_no }}</span>{% endif %} <span class="text-ink-faint text-[12px]">{{ line.production_order.status }}{% if line.production_order.status == 'Draft' and not line.production_order.reviewed %} · needs review{% elif not line.production_order.plan_confirmed %} · needs planning{% endif %}</span>{% else %}<span class="text-[12px] font-semibold text-ink-muted">From stock</span>{% endif %}</td>{% endif %}
               </tr>
               {% endfor %}
             </tbody>
@@ -131,16 +140,17 @@
         <div id="challan-list">
           <div class="flex items-center justify-between mb-2">
             <div class="qd-label">Dispatch</div>
-            {% if dispatch_status != 'Dispatched' %}<a href="{{ url_for('dispatch.dispatch_list', q=q.id) }}" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Dispatch goods</a>{% endif %}
+            {# Dispatch goods / Create invoice sirf drawer kholte hain (open_q) — drawer Edit wale ko hi milta hai, isliye POST wala endpoint check #}
+            {% if dispatch_status != 'Dispatched' and can_do('dispatch.dispatch_add') %}<a href="{{ url_for('dispatch.dispatch_list', q=q.id) }}" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Dispatch goods</a>{% endif %}
           </div>
           {% if q.challans %}
           <div class="space-y-1">
             {% for c in q.challans %}
             <div class="flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded px-3 py-2 text-[13.5px]">
               <div><b class="font-mono">{{ c.challan_no }}</b> <span class="text-ink-faint">· {{ c.challan_date.strftime('%d %b %Y') }}</span>
-                {% if c.status == 'Cancelled' %}<span class="q-chip Rejected ml-1">Cancelled</span>{% endif %}</div>
+                {% if c.status == 'Cancelled' %}<span class="q-chip Cancelled ml-1">Cancelled</span>{% endif %}</div>
               <div class="text-ink-muted">{% for l in c.lines %}{{ l.quotation_line.product.name }} {{ '%g'|format(l.qty) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-              <a href="{{ url_for('dispatch.dispatch_print', challan_id=c.id) }}" target="_blank" class="text-copper-text font-semibold hover:underline">Print</a>
+              {% if can_do('dispatch.dispatch_print', 'GET') %}<a href="{{ url_for('dispatch.dispatch_print', challan_id=c.id) }}" target="_blank" class="text-accent-text font-semibold hover:underline">Print</a>{% else %}<span></span>{% endif %}
             </div>
             {% endfor %}
           </div>
@@ -153,16 +163,16 @@
         <div id="invoice-list">
           <div class="flex items-center justify-between mb-2">
             <div class="qd-label">Invoices {% if billing_status %}<span class="q-chip {{ 'Approved' if billing_status == 'Billed' else ('Expired' if billing_status == 'Partly billed' else 'Draft') }} ml-1">{{ billing_status }}</span>{% endif %}</div>
-            {% if billing_status != 'Billed' %}<a href="{{ url_for('sales_invoices.invoices_list', q=q.id) }}" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Create invoice</a>{% endif %}
+            {% if billing_status != 'Billed' and can_do('sales_invoices.invoices_add') %}<a href="{{ url_for('sales_invoices.invoices_list', q=q.id) }}" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Create invoice</a>{% endif %}
           </div>
           {% if q.invoices %}
           <div class="space-y-1">
             {% for i in q.invoices %}
             <div class="flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded px-3 py-2 text-[13.5px]">
               <div><b class="font-mono">{{ i.invoice_no }}</b> <span class="text-ink-faint">· {{ i.invoice_date.strftime('%d %b %Y') }}</span>
-                {% if i.status == 'Cancelled' %}<span class="q-chip Rejected ml-1">Cancelled</span>{% elif i.status == 'Waiting approval' %}<span class="q-chip Rejected ml-1">Waiting for Owner</span>{% endif %}</div>
+                {% if i.status == 'Cancelled' %}<span class="q-chip Cancelled ml-1">Cancelled</span>{% elif i.status == 'Waiting approval' %}<span class="q-chip Waiting ml-1">Waiting for Owner</span>{% endif %}</div>
               <div class="text-ink-muted">₹ {{ '{:,.2f}'.format(i.total_amount) }}{% if i.payment_state %} · <span class="font-semibold">{{ i.payment_state }}</span>{% if i.outstanding > 0 and i.paid > 0 %} (₹ {{ '{:,.2f}'.format(i.outstanding) }} due){% endif %}{% endif %}</div>
-              {% if i.status == 'Posted' %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="text-copper-text font-semibold hover:underline">Print</a>{% else %}<span></span>{% endif %}
+              {% if i.status == 'Posted' and can_do('sales_invoices.invoices_print', 'GET') %}<a href="{{ url_for('sales_invoices.invoices_print', invoice_id=i.id) }}" target="_blank" class="text-accent-text font-semibold hover:underline">Print</a>{% else %}<span></span>{% endif %}
             </div>
             {% endfor %}
           </div>
@@ -201,10 +211,11 @@
 {% endblock %}
 
 {% block modals %}
-{% if edit %}{% include '_quote_drawer.html' %}{% endif %}
-{% if finalizable %}{% include '_finalize_drawer.html' %}{% endif %}
+{# Drawers ke opener buttons View user ko dikhte hi nahi, isliye drawer aur unka JS bhi sirf Edit wale ke liye #}
+{% if edit and can_edit('quotations') %}{% include '_quote_drawer.html' %}{% endif %}
+{% if finalizable and can_edit('quotations') %}{% include '_finalize_drawer.html' %}{% endif %}
 {% endblock %}
 
 {% block page_js %}
-{% if edit %}{% include '_quote_drawer_js.html' %}{% endif %}
+{% if edit and can_edit('quotations') %}{% include '_quote_drawer_js.html' %}{% endif %}
 {% endblock %}

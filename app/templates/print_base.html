@@ -10,64 +10,71 @@
   <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@1&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     @page { size: A4; margin: 11mm; }
+    /* Grand-total bar aur status pills printer par bhi chhapein (browser default me background colours print nahi hote) */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #e8eef3; color: #142033; font-family: "Source Sans 3", "Segoe UI", Arial, sans-serif; }
+    body { margin: 0; background: #E9EEF6; color: #0B1220; font-family: "Source Sans 3", "Segoe UI", Arial, sans-serif; }
     .toolbar { max-width: 210mm; margin: 16px auto 0; display: flex; justify-content: flex-end; gap: 8px; }
     .toolbar a, .toolbar button { font: 600 13px "Source Sans 3", sans-serif; padding: 8px 16px; border-radius: 6px; cursor: pointer; text-decoration: none; }
-    .toolbar a { color: #3d5166; background: #fff; border: 1px solid #d5dee6; }
-    .toolbar button { color: #fff; background: #0e3a8a; border: 1px solid #0e3a8a; }
-    .sheet { width: 210mm; margin: 14px auto 28px; background: #fff; padding: 14mm 15mm 12mm; box-shadow: 0 12px 32px rgba(20, 32, 51, 0.08); }
+    .toolbar a { color: #475266; background: #fff; border: 1px solid #D4DBE6; }
+    .toolbar button { color: #fff; background: #0A3CA6; border: 1px solid #0A3CA6; }
+    .sheet { width: 210mm; margin: 14px auto 28px; background: #fff; padding: 14mm 15mm 12mm; box-shadow: 0 12px 32px rgba(11, 18, 32, 0.08); }
     .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
     .brand img { height: 48px; width: auto; display: block; }
-    .tagline { margin-top: 7px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; color: #8b9aab; }
-    .company { text-align: right; font-size: 11.5px; line-height: 1.4; color: #526273; max-width: 250px; }
-    .company strong { display: block; font-size: 14px; color: #142033; margin-bottom: 3px; }
-    .ids { margin-top: 5px; font-size: 10.5px; font-weight: 600; color: #142033; letter-spacing: 0.01em; }
-    .doc { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; padding-top: 12px; border-top: 2px solid #0e3a8a; }
-    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #0e3a8a; }
+    .tagline { margin-top: 7px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; color: #5A6577; }
+    .company { text-align: right; font-size: 11.5px; line-height: 1.4; color: #475266; max-width: 250px; }
+    .company strong { display: block; font-size: 14px; color: #0B1220; margin-bottom: 3px; }
+    .ids { margin-top: 5px; font-size: 10.5px; font-weight: 600; color: #0B1220; letter-spacing: 0.01em; }
+    .doc { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; padding-top: 12px; border-top: 2px solid #0A3CA6; }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #0A3CA6; }
     .pono { margin-top: 2px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
-    .status { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 4px 10px; border: 1px solid #d5dee6; color: #3d5166; background: #f4f7fa; }
-    .status-open, .status-posted, .status-released { color: #0f6b4c; background: #e7f6ef; border-color: #b7e4cc; }
-    .status-draft { color: #5c6b7a; background: #f4f6f8; border-color: #e1e6eb; }
-    .status-partial, .status-in-production { color: #8a5a12; background: #fbf6ea; border-color: #ead7b0; }
-    .status-cancelled { color: #a12b2b; background: #fdeeee; border-color: #f0c9c9; }
-    .meta { display: grid; grid-template-columns: repeat(4, 1fr); margin: 14px 0 16px; border: 1px solid #e6edf2; border-radius: 8px; overflow: hidden; }
-    .meta div { padding: 8px 12px; background: #f7f9fb; }
-    .meta div + div { border-left: 1px solid #e6edf2; }
-    .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8b9aab; }
+    .status { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 4px 10px; border: 1px solid #E2E8F0; color: #475569; background: #F1F5F9; }
+    /* Status pills: screen ke status colours jaisa hi. Neutral = default (draft / cancelled / short closed / used up) */
+    .status-open, .status-released { color: #0B7285; background: #E6F6F8; border-color: #B2DDE4; }
+    .status-sent, .status-in-production { color: #0A3CA6; background: #EDF3FF; border-color: #BCD2FA; }
+    .status-posted, .status-completed, .status-approved, .status-pass, .status-dispatched, .status-in-stock { color: #1F7A4D; background: #E6F5EC; border-color: #B7E0C7; }
+    .status-partial, .status-need-correction, .status-pending, .status-waiting-approval { color: #B45309; background: #FEF3E2; border-color: #FBD9A5; }
+    .status-rejected, .status-fail { color: #B42318; background: #FCEBEA; border-color: #F0C4C0; }
+    .status-ordered, .status-credited, .status-on-account { color: #5B21B6; background: #EDE9FE; border-color: #DDD6FE; }
+    .status-draft, .status-cancelled, .status-short-closed, .status-used-up { color: #475569; background: #F1F5F9; border-color: #E2E8F0; }
+    .meta { display: grid; grid-template-columns: repeat(4, 1fr); margin: 14px 0 16px; border: 1px solid #E2E8F1; border-radius: 8px; overflow: hidden; }
+    .meta div { padding: 8px 12px; background: #F3F6FB; }
+    .meta div + div { border-left: 1px solid #E2E8F1; }
+    .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #5A6577; }
     .val { display: block; margin-top: 2px; font-size: 13px; font-weight: 600; }
     .supplier { margin-bottom: 16px; }
     .supplier .lbl { margin-bottom: 4px; }
     .supplier strong { font-size: 15px; }
-    .supplier p { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: #526273; }
-    .sec { margin: 16px 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #0e3a8a; }
+    .supplier p { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: #475266; }
+    .sec { margin: 16px 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #0A3CA6; }
     table.lines { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-    table.lines th { text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5c6e80; background: #f7f9fb; padding: 8px; border-bottom: 1px solid #d5dee6; }
-    table.lines td { padding: 8px; border-bottom: 1px solid #eef2f6; vertical-align: top; }
-    table.lines tbody tr:last-child td { border-bottom: 1px solid #d5dee6; }
+    table.lines th { text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5A6577; background: #F3F6FB; padding: 8px; border-bottom: 1px solid #D4DBE6; }
+    table.lines td { padding: 8px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
+    table.lines tbody tr:last-child td { border-bottom: 1px solid #D4DBE6; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .mat-name { font-weight: 600; }
-    .mat-sub { display: block; margin-top: 1px; font-size: 11px; color: #8b9aab; }
+    .mat-sub { display: block; margin-top: 1px; font-size: 11px; color: #5A6577; }
     .amt { font-weight: 700; }
     .close { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; margin-top: 14px; }
     .side { flex: 1; min-width: 0; }
-    .remarks p { margin: 4px 0 0; font-size: 13px; color: #526273; }
-    .sign-head { margin-top: 28px; font-size: 12.5px; color: #526273; }
+    .remarks p { margin: 4px 0 0; font-size: 13px; color: #475266; }
+    .sign-head { margin-top: 28px; font-size: 12.5px; color: #475266; }
     .signs { display: flex; gap: 28px; }
-    .sign { width: 190px; font-size: 12.5px; color: #526273; }
-    .sign .name { min-height: 18px; font-weight: 600; color: #142033; font-size: 13px; }
-    .sign .line { margin-top: 18px; border-top: 1px solid #142033; padding-top: 5px; color: #142033; font-weight: 600; font-size: 12px; }
-    .totals { width: 268px; border: 1px solid #e6edf2; border-radius: 8px; overflow: hidden; font-size: 13px; }
-    .totals .row { display: flex; justify-content: space-between; padding: 6px 14px; color: #526273; }
-    .totals .grand { display: flex; justify-content: space-between; background: #0e3a8a; color: #fff; padding: 10px 14px; font-weight: 700; font-size: 15px; }
-    .chips span { display: inline-block; margin: 0 6px 4px 0; border: 1px solid #d5dee6; border-radius: 5px; font-size: 11.5px; overflow: hidden; }
-    .chips b { background: #f7f9fb; padding: 2px 6px; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: #5c6e80; border-right: 1px solid #d5dee6; }
+    .sign { width: 190px; font-size: 12.5px; color: #475266; }
+    .sign .name { min-height: 18px; font-weight: 600; color: #0B1220; font-size: 13px; }
+    .sign .line { margin-top: 18px; border-top: 1px solid #0B1220; padding-top: 5px; color: #0B1220; font-weight: 600; font-size: 12px; }
+    .totals { width: 268px; border: 1px solid #E2E8F1; border-radius: 8px; overflow: hidden; font-size: 13px; }
+    .totals .row { display: flex; justify-content: space-between; padding: 6px 14px; color: #475266; }
+    .totals .grand { display: flex; justify-content: space-between; background: #0A3CA6; color: #fff; padding: 10px 14px; font-weight: 700; font-size: 15px; }
+    .chips span { display: inline-block; margin: 0 6px 4px 0; border: 1px solid #D4DBE6; border-radius: 5px; font-size: 11.5px; overflow: hidden; }
+    .chips b { background: #F3F6FB; padding: 2px 6px; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: #5A6577; border-right: 1px solid #D4DBE6; }
     .chips i { font-style: normal; padding: 2px 8px; font-weight: 600; }
-    footer.foot { margin-top: 26px; padding-top: 8px; border-top: 2px solid #0e3a8a; display: flex; justify-content: space-between; align-items: baseline; }
-    .script { font-family: "Libre Baskerville", Georgia, serif; font-style: italic; font-size: 16px; color: #0e3a8a; }
-    .tomorrow { font-size: 9.5px; letter-spacing: 0.16em; font-weight: 700; color: #8b9aab; }
+    footer.foot { margin-top: 26px; padding-top: 8px; border-top: 2px solid #0A3CA6; display: flex; justify-content: space-between; align-items: baseline; }
+    .script { font-family: "Libre Baskerville", Georgia, serif; font-style: italic; font-size: 16px; color: #0A3CA6; }
+    .tomorrow { font-size: 9.5px; letter-spacing: 0.16em; font-weight: 700; color: #5A6577; }
     {% block page_css %}{% endblock %}
     @media print {
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { background: #fff; }
       .toolbar { display: none; }
       .sheet { margin: 0; width: auto; box-shadow: none; padding: 0; }

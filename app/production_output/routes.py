@@ -297,7 +297,7 @@ def fg_categories(groups):
             products=len(entry["groups"]),
             batches=sum(g["in_stock"] for g in entry["groups"]),
             alerts=len([g for g in entry["groups"] if g["alert"]]),
-            worst="bad" if any(g["alert"] and g["alert"][1] == "bad" for g in entry["groups"]) else ("warn" if any(g["alert"] for g in entry["groups"]) else ""),
+            worst="bad" if any(g["alert"] and g["alert"][1] == "bad" for g in entry["groups"]) else ("warn" if any(g["alert"] and g["alert"][1] == "warn" for g in entry["groups"]) else ("over" if any(g["alert"] for g in entry["groups"]) else "")),
         )
         result.append(entry)
     result.sort(key=lambda e: e["name"].lower())
@@ -329,7 +329,7 @@ def fg_groups(rows):
             if low and qty < low:
                 alert = ("Below minimum", "warn")
             elif high and qty > high:
-                alert = ("Overstock", "warn")
+                alert = ("Overstock", "over")   # "over" = alag (info) rang — Below minimum (warn/amber) se alag dikhe
         # Pehle jinme maal bacha hai (naya upar), used-up batch neeche
         group["batches"].sort(key=lambda r: (r["qty"] <= 0.00005, -r["batch"].id))
         category = product.category if product else None

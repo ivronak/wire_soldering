@@ -4,20 +4,24 @@
 {% block page_css %}
 <style>
   .tr-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .tr-table thead th { position: sticky; top: 0; z-index: 5; background: #EEF2F1; color: #3D5A5D; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D1D9D8; border-right: 1px solid #E4EAE9; }
+  .tr-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 12px 8px; text-align: center; border-bottom: 1px solid #D4DBE6; border-right: 1px solid #E5EAF2; }
   .tr-table thead th:first-child, .tr-table tbody td:first-child { text-align: left; padding-left: 16px; }
-  .tr-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8E7; vertical-align: middle; }
-  .tr-table tbody tr:nth-child(even) { background: #F8FAF9; }
+  .tr-table tbody td { padding: 11px 8px; font-size: 13.5px; text-align: center; border-bottom: 1px solid #E2E8F1; vertical-align: middle; }
+  .tr-table tbody tr:nth-child(even) { background: #F8FAFD; }
   .tr-table td.left, .tr-table th.left { text-align: left; }
   .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .lines-table th { background: #EEF2F1; color: #3D5A5D; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D1D9D8; text-align: left; }
-  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8E7; }
-  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #CBD5D4; border-radius: 4px; }
+  .lines-table th { background: #E9EEF6; color: #475266; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 6px; border: 1px solid #D4DBE6; text-align: left; }
+  .lines-table td { padding: 6px 8px; border: 1px solid #E2E8F1; }
+  .lines-table input, .lines-table select { width: 100%; padding: 6px 8px; border: 1px solid #C7D0DE; border-radius: 4px; }
+  /* Drawer ke fields me focus indication nahi tha - accent border + 1px ring (baaki ERP jaisa) */
+  #tr-form input:focus, #tr-form select:focus, #tr-form textarea:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 1px #0B5BEF; }
+  .tr-table tbody tr:hover { background: #F1F5F9; }
   .status-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
   .st-draft { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
-  .st-transit { background: #EAF1FB; color: #2B5FA8; border-color: #C9D8F0; }
+  .st-transit { background: #EDF3FF; color: #0A3CA6; border-color: #BCD2FA; }  /* In transit = in-progress = accent (stock.html ke 'In transit' chip jaisa) */
   .st-received { background: #E6F5EC; color: #1F7A4D; border-color: #B7E0C7; }
-  .st-cancelled { background: #FDECEC; color: #B42318; border-color: #F8CFCB; }
+  /* Cancelled = neutral grey (red sirf rejected / failed / overdue ke liye) */
+  .st-cancelled { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
   #tr-modal.hidden, #tr-view-modal.hidden { display: none; }
   #tr-modal, #tr-view-modal { display: flex; }
 </style>
@@ -29,13 +33,15 @@
           <div class="text-[12.5px] text-ink-faint font-medium">Inventory / Stock transfer</div>
           <h1 class="text-[20px] font-bold text-ink leading-tight">Stock transfer</h1>
         </div>
-        <button type="button" id="btn-new-tr" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">+ New transfer</button>
+        {% if can_edit('stock_transfers') %}
+        <button type="button" id="btn-new-tr" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">+ New transfer</button>
+        {% endif %}
       </div>
 
       <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
         <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
-          <a href="{{ url_for('stock_transfers.stock_transfers_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
-          <a href="{{ url_for('stock_transfers.stock_transfers_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-copper text-copper-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
+          <a href="{{ url_for('stock_transfers.stock_transfers_list', tab='pending') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'pending' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Pending action <span class="tabular-nums">({{ pending_count }})</span></a>
+          <a href="{{ url_for('stock_transfers.stock_transfers_list', tab='completed') }}" class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == 'completed' %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">Completed <span class="tabular-nums">({{ completed_count }})</span></a>
         </div>
         <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist text-[12.5px] text-ink-faint shrink-0">
           Move goods from one warehouse to another · <strong>Dispatch</strong> takes the goods out of the From warehouse (they show as <em>In transit</em> on the Stock page) · <strong>Receive</strong> puts them into the To warehouse · a different-GSTIN branch needs an E-Way Bill number · to scrap rejected goods, transfer them from QC Hold to the Scrap warehouse.
@@ -55,21 +61,23 @@
                 <td><span class="status-pill {{ 'st-draft' if t.status == 'Draft' else ('st-transit' if t.status == 'In transit' else ('st-received' if t.status == 'Received' else 'st-cancelled')) }}">{{ t.status }}</span></td>
                 <td>
                   <div class="flex flex-wrap justify-center gap-1">
-                    <button type="button" class="btn-view-tr px-2 py-1 text-[12px] font-medium text-brand-teal border border-brand-border bg-brand-soft rounded hover:bg-brand-teal hover:text-white" data-transfer='{{ {"no": t.transfer_no, "status": t.status, "date": t.transfer_date.strftime("%d %b %Y"), "from": t.from_warehouse.name, "to": t.to_warehouse.name, "vehicle": t.vehicle_no or "", "eway": t.eway_bill_no or "", "remarks": t.remarks or "", "lines": (t.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    <button type="button" class="btn-view-tr px-2 py-1 text-[12px] font-medium text-accent-text border border-accent-border bg-white rounded hover:bg-accent hover:text-white hover:border-accent" data-transfer='{{ {"no": t.transfer_no, "status": t.status, "date": t.transfer_date.strftime("%d %b %Y"), "from": t.from_warehouse.name, "to": t.to_warehouse.name, "vehicle": t.vehicle_no or "", "eway": t.eway_bill_no or "", "remarks": t.remarks or "", "lines": (t.lines | map(attribute="summary") | list)} | tojson }}'>View</button>
+                    {% if can_edit('stock_transfers') %}
                     {% if t.status == 'Draft' %}
                     <form method="post" action="{{ url_for('stock_transfers.stock_transfers_dispatch', transfer_id=t.id) }}" class="inline js-confirm-submit" data-confirm-title="Dispatch transfer" data-confirm-ok="Dispatch" data-confirm-message="Dispatch {{ t.transfer_no }}? The goods will leave {{ t.from_warehouse.name }}.">
                       {% if t.needs_eway and not t.eway_bill_no %}<input type="text" name="eway_bill_no" placeholder="E-Way Bill no." class="w-28 px-1.5 py-1 text-[12px] border border-slate-300 rounded" required />{% endif %}
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-success border border-success-border bg-success-bg rounded hover:bg-success hover:text-white">Dispatch</button>
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Dispatch</button>
                     </form>
                     {% elif t.status == 'In transit' %}
                     <form method="post" action="{{ url_for('stock_transfers.stock_transfers_receive', transfer_id=t.id) }}" class="inline js-confirm-submit" data-confirm-title="Receive transfer" data-confirm-ok="Receive" data-confirm-message="Receive {{ t.transfer_no }} into {{ t.to_warehouse.name }}?">
-                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Receive</button>
+                      <button type="submit" class="px-2 py-1 text-[12px] font-medium text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Receive</button>
                     </form>
                     {% endif %}
                     {% if t.status in ('Draft', 'In transit') %}
                     <form method="post" action="{{ url_for('stock_transfers.stock_transfers_cancel', transfer_id=t.id) }}" class="inline js-confirm-submit" data-confirm-title="Cancel transfer" data-confirm-ok="Cancel transfer" data-confirm-message="Cancel {{ t.transfer_no }}?{% if t.status == 'In transit' %} The goods will go back to {{ t.from_warehouse.name }}.{% endif %}">
                       <button type="submit" class="px-2 py-1 text-[12px] font-medium text-stop border border-stop-border bg-stop-bg rounded hover:bg-stop hover:text-white">Cancel</button>
                     </form>
+                    {% endif %}
                     {% endif %}
                   </div>
                 </td>
@@ -84,10 +92,12 @@
 {% endblock %}
 
 {% block modals %}
+{# New transfer drawer sirf Edit wale ko (opener button bhi usi condition me) #}
+{% if can_edit('stock_transfers') %}
 <div id="tr-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="tr-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-4xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div><h2 class="text-[16px] font-bold text-ink">New stock transfer</h2><p class="text-[12.5px] text-ink-faint">Move goods from one warehouse to another</p></div>
       <button type="button" id="tr-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -112,14 +122,14 @@
           </select>
         </div>
       </div>
-      <div id="tr-eway-note" class="hidden text-[12.5px] text-copper-text bg-copper-soft border border-copper-border rounded px-3 py-2">These warehouses belong to branches with different GSTIN, so an <strong>E-Way Bill number</strong> is required before dispatch.</div>
+      <div id="tr-eway-note" class="hidden text-[12.5px] text-warning bg-warning-bg border border-warning-border rounded px-3 py-2">These warehouses belong to branches with different GSTIN, so an <strong>E-Way Bill number</strong> is required before dispatch.</div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div><label class="block text-[12.5px] font-semibold text-ink mb-1">Vehicle no.</label><input type="text" name="vehicle_no" maxlength="30" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" /></div>
         <div><label class="block text-[12.5px] font-semibold text-ink mb-1">E-Way Bill no.</label><input type="text" name="eway_bill_no" maxlength="30" class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded" /></div>
       </div>
       <div class="flex items-center justify-between">
         <p class="text-[13px] font-semibold text-ink">Lots to move</p>
-        <button type="button" id="tr-add-line" class="text-[12.5px] font-semibold text-copper-text hover:underline">+ Add lot</button>
+        <button type="button" id="tr-add-line" class="text-[12.5px] font-semibold text-accent-text hover:underline">+ Add lot</button>
       </div>
       <div class="overflow-x-auto border border-slate-200 rounded">
         <table class="lines-table">
@@ -132,15 +142,16 @@
     <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button type="submit" form="tr-form" name="transfer_action" value="draft" class="px-3.5 py-2 text-[13.5px] font-medium text-ink border border-slate-300 rounded hover:bg-mist">Save as draft</button>
       <button type="button" id="tr-cancel" class="px-3.5 py-2 text-[13.5px] text-ink-faint hover:bg-mist rounded">Cancel</button>
-      <button type="submit" form="tr-form" name="transfer_action" value="dispatch" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-copper border border-copper-dark rounded hover:bg-copper-dark">Dispatch now</button>
+      <button type="submit" form="tr-form" name="transfer_action" value="dispatch" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Dispatch now</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 <div id="tr-view-modal" class="hidden fixed inset-0 z-50 items-stretch justify-end" aria-hidden="true">
   <div id="tr-view-backdrop" class="absolute inset-0 bg-ink/40"></div>
   <div role="dialog" class="relative ml-auto h-full w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-xl">
-    <div class="px-4 py-3 border-b border-slate-200 bg-copper-soft flex items-center justify-between shrink-0">
+    <div class="px-4 py-3 border-b border-slate-200 bg-accent-soft flex items-center justify-between shrink-0">
       <div><h2 id="tr-view-title" class="text-[16px] font-bold text-ink">Transfer</h2><p id="tr-view-sub" class="text-[12.5px] text-ink-faint">—</p></div>
       <button type="button" id="tr-view-close" class="w-8 h-8 flex items-center justify-center text-ink-faint hover:bg-white rounded text-lg" aria-label="Close">&times;</button>
     </div>
@@ -163,6 +174,7 @@
   var TODAY = {{ today|tojson }};
   var trModal = document.getElementById('tr-modal');
   var trView = document.getElementById('tr-view-modal');
+  {% if can_edit('stock_transfers') %}
   var linesBody = document.getElementById('tr-lines');
   var fromSel = document.getElementById('tr-from');
   var toSel = document.getElementById('tr-to');
@@ -227,6 +239,7 @@
   document.getElementById('tr-close').addEventListener('click', closeNew);
   document.getElementById('tr-cancel').addEventListener('click', closeNew);
   document.getElementById('tr-backdrop').addEventListener('click', closeNew);
+  {% endif %}
 
   function openView(btn) {
     var d = JSON.parse(btn.getAttribute('data-transfer') || '{}');
@@ -250,7 +263,7 @@
   document.getElementById('tr-view-backdrop').addEventListener('click', closeView);
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (!trModal.classList.contains('hidden')) closeNew(); else if (!trView.classList.contains('hidden')) closeView();
+    if ({% if can_edit('stock_transfers') %}!trModal.classList.contains('hidden')) closeNew(); else if ({% endif %}!trView.classList.contains('hidden')) closeView();
   });
 </script>
 {% endblock %}

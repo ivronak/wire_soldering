@@ -3,15 +3,17 @@
 from datetime import timedelta
 
 # Stage / order ke rang (bg, border, text) — ek hi stage hamesha ek hi rang me dikhta hai
+# Rang theme.js ke categorical tokens (cat2, cat7, cat1, cat4, cat6, cat5, cat3) + ek extra dark indigo se hain.
+# Jaan-boojh ke red / green / amber / royal-blue nahi liye: woh status aur brand ke liye reserved hain, lane ka matlab "status" nahi hota.
 PALETTE = [
-    ("#E3F1F1", "#9CCACB", "#1F5E61"),
-    ("#FBE9D9", "#EDBE93", "#8A4A1C"),
-    ("#E6EEFB", "#B4C9EC", "#2B5FA8"),
-    ("#E8F5EC", "#A9D6BA", "#1F7A4D"),
-    ("#F3E8F9", "#D3B4E6", "#6B2E8A"),
-    ("#FDF3D6", "#EAD38A", "#8A6A0C"),
-    ("#FCE7EC", "#EDB5C3", "#A12B4C"),
-    ("#EAEFF2", "#BCC8CF", "#46606E"),
+    ("#E6F6F8", "#B2DDE4", "#0E7490"),   # cat2 cyan
+    ("#F6EEE6", "#E3CDB6", "#8A5A2B"),   # cat7 brown
+    ("#EEF0FD", "#C7CCF5", "#4338CA"),   # cat1 indigo
+    ("#FAEAFB", "#EBC3F0", "#A21CAF"),   # cat4 magenta
+    ("#EEF2F6", "#CBD5E1", "#475569"),   # cat6 slate
+    ("#FCE9F1", "#F3BFD6", "#BE185D"),   # cat5 rose
+    ("#F1EAFD", "#D9C8F7", "#6D28D9"),   # cat3 violet
+    ("#E0E7FF", "#C7D2FE", "#3730A3"),   # extra: dark indigo
 ]
 
 
