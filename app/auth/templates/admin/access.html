@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "admin/_matrix.html" import matrix %}
+{% block title %}Admin access · Nrupex ERP{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Administration / Admin access</div>
+  <h1 class="text-[20px] font-bold text-ink leading-tight">Admin access</h1>
+</div>
+
+<form method="post" action="{{ url_for('admin_access.access_page') }}" class="flex-1 min-h-0 overflow-auto space-y-3 pr-1">
+  {% if errors %}
+  <div class="px-3 py-2 rounded border bg-stop-bg border-stop-border text-stop text-[13px]" role="alert">
+    <ul class="list-disc pl-5">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <div class="bg-white border border-slate-300 rounded-lg shadow-sm p-4 text-[12.5px] text-ink-muted space-y-1">
+    <p>This is the <b>ceiling</b> for Admins: what an Admin can do, and the most any role created by an Admin can give. Users and Roles pages are always available to Admins.</p>
+    <p>Lowering a page here takes effect immediately for every Admin and every Staff role — role settings are not changed, they are simply limited by this ceiling.</p>
+  </div>
+
+  {% if exceeding %}
+  <div class="px-3 py-2 rounded border bg-warning-bg border-warning-border text-warning text-[12.5px]">
+    <b>These roles have more access saved than the ceiling allows (the extra is ignored for now):</b>
+    <ul class="list-disc pl-5 mt-1">{% for item in exceeding %}<li>{{ item.role }}: {{ item.pages|join(', ') }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% call matrix(modules, current, allowed, locked) %}
+    <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">Save admin access</button>
+  {% endcall %}
+</form>
+{% endblock %}

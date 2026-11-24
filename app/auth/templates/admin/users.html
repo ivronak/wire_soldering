@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Users · Nrupex ERP{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Administration / Users</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Users</h1>
+  </div>
+  {% if can_add %}
+  <a href="{{ url_for('admin_users.users_new') }}"
+     class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+    Add user
+  </a>
+  {% endif %}
+</div>
+
+<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex flex-wrap items-center gap-2.5 shrink-0">
+    <form method="get" action="{{ url_for('admin_users.users_list') }}" class="relative flex-1 min-w-[160px] max-w-xs">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search name or mobile…" autocomplete="off"
+             class="w-full py-2 px-3 text-[13.5px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
+      <input type="hidden" name="status" value="{{ status }}" />
+    </form>
+    <div class="flex items-center gap-1">
+      {% for key, label, count in [('all', 'All', total), ('active', 'Active', active_count), ('inactive', 'Inactive', inactive_count)] %}
+      <a href="{{ url_for('admin_users.users_list', q=q or None, status=key) }}"
+         class="px-3 py-1.5 text-[12.5px] rounded border font-semibold {% if status == key %}border-accent bg-accent text-white{% else %}border-slate-300 bg-white text-ink{% endif %}">{{ label }} ({{ count }})</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="flex-1 overflow-auto min-h-0">
+    <table class="unit-table">
+      <colgroup>
+        <col style="width:4%" /><col style="width:22%" /><col style="width:14%" /><col style="width:18%" /><col style="width:10%" /><col style="width:14%" /><col />
+      </colgroup>
+      <thead>
+        <tr><th>#</th><th>Name</th><th>Mobile (login)</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set u = row.user %}
+        <tr class="{% if not u.is_active %}row-muted{% endif %}">
+          <td>{{ loop.index }}</td>
+          <td class="font-semibold text-ink">{{ u.full_name }}{% if me and u.id == me.id %} <span class="text-[11px] font-medium text-ink-faint">(you)</span>{% endif %}</td>
+          <td>{{ u.mobile }}</td>
+          <td>
+            <span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border
+              {# Role badge: Developer = solid ink (sabse upar), Admin = accent-soft, baaki Staff = neutral #}{% if u.role.system_key == 'developer' %}bg-ink text-white border-ink{% elif u.role.system_key == 'admin' %}bg-accent-soft text-accent-text border-accent-border{% else %}bg-neutral-bg text-neutral border-neutral-border{% endif %}">{{ u.role.name }}</span>
+            {% if not u.role.is_active %}<span class="text-[11px] text-neutral">(inactive role)</span>{% endif %}
+          </td>
+          <td>
+            {% if not u.is_active %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-neutral-bg text-neutral border-neutral-border">Inactive</span>
+            {% elif row.locked %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-warning-bg text-warning border-warning-border">Locked</span>
+            {% elif u.must_change_password %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-info-bg text-info border-info-border" title="Has not set their own password yet">New</span>
+            {% else %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-success-bg text-success border-success-border">Active</span>{% endif %}
+          </td>
+          <td class="text-[12.5px] text-ink-muted">{{ (u.last_login_at|ist) if u.last_login_at else 'Never' }}</td>
+          <td>
+            {% if row.manage and can('users', 2) %}
+            <div class="flex flex-wrap items-center justify-center gap-1.5">
+              <a href="{{ url_for('admin_users.users_edit', user_id=u.id) }}" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Edit</a>
+              <form method="post" action="{{ url_for('admin_users.users_reset', user_id=u.id) }}" data-name="{{ u.full_name }}" onsubmit="return confirm('Reset the password for ' + this.dataset.name + '? A new temporary password will be shown once.');">
+                <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Reset password</button>
+              </form>
+              {% if row.locked %}
+              <form method="post" action="{{ url_for('admin_users.users_unlock', user_id=u.id) }}">
+                <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border border-warning-border rounded bg-warning-bg text-warning hover:opacity-90">Unlock</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('admin_users.users_toggle', user_id=u.id) }}">
+                <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border rounded {% if u.is_active %}border-stop-border text-stop bg-white hover:bg-stop-bg{% else %}border-success-border text-success bg-white hover:bg-success-bg{% endif %}">{% if u.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+              </form>
+            </div>
+            {% else %}<span class="text-[12px] text-ink-faint">—</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="py-10 text-ink-faint">No users found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

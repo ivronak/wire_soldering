@@ -1,0 +1,8 @@
+{% extends "auth/plain.html" %}
+{# CSRF fail / session khatam jaise chhote error pages (anonymous bhi dekh sakta hai, isliye sidebar nahi) #}
+{% block title %}{{ heading }} · Nrupex ERP{% endblock %}
+{% block card %}
+<h1 class="text-[19px] font-bold text-ink">{{ heading }}</h1>
+<p class="text-[14px] text-ink-muted mt-1">{{ message }}</p>
+<a href="{{ url_for('home') }}" class="inline-flex mt-4 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">Back to the app</a>
+{% endblock %}

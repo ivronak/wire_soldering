@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Roles · Nrupex ERP{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Administration / Roles</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Roles</h1>
+  </div>
+  {% if can_add %}
+  <a href="{{ url_for('admin_roles.roles_new') }}"
+     class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+    Add role
+  </a>
+  {% endif %}
+</div>
+
+<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <div class="flex-1 overflow-auto min-h-0">
+    <table class="unit-table">
+      <colgroup><col style="width:4%" /><col style="width:22%" /><col style="width:26%" /><col style="width:14%" /><col style="width:8%" /><col style="width:9%" /><col /></colgroup>
+      <thead><tr><th>#</th><th>Role</th><th>Description</th><th>Access</th><th>Users</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        {% set r = row.role %}
+        <tr class="{% if not r.is_active %}row-muted{% endif %}">
+          <td>{{ loop.index }}</td>
+          <td class="font-semibold text-ink">{{ r.name }}{% if r.system_key %} <span class="text-[11px] font-medium text-ink-faint">(built-in)</span>{% endif %}</td>
+          <td class="text-ink-muted text-[12.5px]">{{ r.description or '—' }}</td>
+          <td class="text-[12.5px]">{{ row.pages }} page(s){% if row.edits %}, {{ row.edits }} with edit{% endif %}</td>
+          <td>{{ row.users }}</td>
+          <td>
+            {% if r.is_active %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-success-bg text-success border-success-border">Active</span>
+            {% else %}<span class="inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border bg-neutral-bg text-neutral border-neutral-border">Inactive</span>{% endif %}
+          </td>
+          <td>
+            {% if r.system_key == 'admin' %}<span class="text-[12px] text-ink-faint">{% if me.kind == 'developer' %}<a href="{{ url_for('admin_access.access_page') }}" class="underline hover:text-ink">Set on Admin access</a>{% else %}Built-in{% endif %}</span>
+            {% elif r.system_key %}<span class="text-[12px] text-ink-faint">Built-in</span>
+            {% elif can_add and not row.own and row.within %}
+            <div class="flex flex-wrap items-center justify-center gap-1.5">
+              <a href="{{ url_for('admin_roles.roles_edit', role_id=r.id) }}" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Edit</a>
+              <form method="post" action="{{ url_for('admin_roles.roles_copy', role_id=r.id) }}">
+                <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border border-slate-300 rounded bg-white hover:bg-mist">Copy</button>
+              </form>
+              <form method="post" action="{{ url_for('admin_roles.roles_toggle', role_id=r.id) }}">
+                <button type="submit" class="px-2.5 py-1 text-[12px] font-semibold border rounded {% if r.is_active %}border-stop-border text-stop bg-white hover:bg-stop-bg{% else %}border-success-border text-success bg-white hover:bg-success-bg{% endif %}">{% if r.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+              </form>
+            </div>
+            {% elif row.own %}<span class="text-[12px] text-ink-faint">Your own role</span>
+            {% elif can_add and not row.within %}<span class="text-[12px] text-ink-faint" title="This role has pages beyond your own access">Above your access</span>
+            {% else %}<span class="text-[12px] text-ink-faint">—</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="py-10 text-ink-faint">No roles yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

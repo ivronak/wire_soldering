@@ -1,6 +1,6 @@
 # Yeh file Flask app banati hai - poore project ka main object.
 import os
-from flask import Flask, flash, jsonify, redirect, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 from app.units.routes import units_bp
 from app.dashboard.routes import dashboard_bp
 from app.machines.routes import machines_bp
@@ -56,10 +56,10 @@ from app.timeutil import format_ist
 def create_app():
     app = Flask(__name__)
 
-    # Flash messages / session ke liye zaroori.
-    # Server (VPS) pe ERP_SECRET_KEY environment variable me ek lamba random secret daalna —
-    # code me likha hua secret sabko dikhta hai (GitHub pe bhi). Local pe na ho to purana dev key chalega.
-    app.config["SECRET_KEY"] = os.environ.get("ERP_SECRET_KEY", "dev-wire-soldering-change-later")
+    # Secret key, cookie flags, ProxyFix, DB timeout — sab app/auth/setup.py me (Phase 0).
+    # Live par ERP_SECRET_KEY (32+ random characters) zaroori hai; local par run.py khud ERP_DEV=1 lagata hai (dev key chalti hai).
+    from app.auth.setup import configure_security, init_auth
+    configure_security(app)
 
     #SQLite file: instance/erp.db (Flask khud instance/ folder sambhalta hai )
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
@@ -137,9 +137,17 @@ def create_app():
     app.register_blueprint(dispatch_bp)
     app.register_blueprint(sales_invoices_bp)
 
+    # Login / guard / CSRF / admin screens (Phase 0) — sab blueprints register hone ke baad
+    init_auth(app)
+
     # Sidebar me Stock ledger ke saamne lal ginti: kitne materials ka reorder / minimum level aa gaya (app/inventory/alerts.py)
+    # Sirf logged-in user jise Stock ledger dikhta hai uske liye chalta hai — login / 403 page par ye query nahi chalti.
     @app.context_processor
     def inject_stock_alert_count():
+        from app.auth import service as auth_service
+        user = auth_service.current()
+        if user is None or not auth_service.user_can(user, "stock"):
+            return {"stock_alert_count": 0}
         return {"stock_alert_count": alert_count()}
 
     # "flask inventory-backfill": inventory banne se pehle ke GRN / QC / Return ki stock rows banata hai (dobara chalao to double nahi hoga)
@@ -153,8 +161,13 @@ def create_app():
 
     @app.route("/")
     def home():
-        # Home ab Units pe bhej do — pehla real page
-        return redirect(url_for("units.units_list"))
+        # Login ke baad sidebar ke order me pehla page jo user dekh sakta hai (pehle hardcoded Units tha — bina Units permission wale ko 403 deta)
+        from app.auth import service as auth_service
+        endpoint = auth_service.first_permitted_endpoint(auth_service.current())
+        if endpoint is None:
+            return render_template("auth/forbidden.html", active_nav=None,
+                                   message="No pages are assigned to your account yet. Please ask your administrator."), 403
+        return redirect(url_for(endpoint))
 
     @app.errorhandler(413)
     def file_too_large(error):

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{% if user %}Edit user{% else %}Add user{% endif %} · Nrupex ERP{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('admin_users.users_list') }}" class="hover:underline">Administration / Users</a> / {% if user %}Edit{% else %}New{% endif %}</div>
+  <h1 class="text-[20px] font-bold text-ink leading-tight">{% if user %}Edit user{% else %}Add user{% endif %}</h1>
+</div>
+
+<div class="max-w-lg bg-white border border-slate-300 rounded-lg shadow-sm p-6 overflow-auto">
+  {% if error %}
+  <div class="mb-3 px-3 py-2 rounded border bg-stop-bg border-stop-border text-stop text-[13px]" role="alert">{{ error }}</div>
+  {% endif %}
+  <form method="post" action="{% if user %}{{ url_for('admin_users.users_edit', user_id=user.id) }}{% else %}{{ url_for('admin_users.users_new') }}{% endif %}">
+    <label for="full_name" class="block text-[12.5px] font-semibold text-ink-muted mb-1">Full name</label>
+    <input id="full_name" name="full_name" type="text" maxlength="100" required value="{{ values.get('full_name', '') }}"
+           class="w-full px-3 py-2.5 text-[14px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
+
+    <label for="mobile" class="block text-[12.5px] font-semibold text-ink-muted mt-3 mb-1">Mobile number (this is the login ID)</label>
+    <input id="mobile" name="mobile" type="tel" inputmode="numeric" maxlength="20" required value="{{ values.get('mobile', '') }}" {% if user %}readonly{% endif %}
+           placeholder="10-digit mobile number"
+           class="w-full px-3 py-2.5 text-[14px] border border-slate-300 rounded {% if user %}bg-mist text-ink-muted{% else %}bg-white{% endif %} focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent" />
+    {% if user %}<div class="text-[11.5px] text-ink-faint mt-1">The mobile number cannot be changed.</div>{% endif %}
+
+    <div id="role-wrap">
+      <label for="role_id" class="block text-[12.5px] font-semibold text-ink-muted mt-3 mb-1">Role</label>
+      <select id="role_id" name="role_id" class="w-full px-3 py-2.5 text-[14px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent">
+        <option value="">Select a role…</option>
+        {% for role in roles %}
+        <option value="{{ role.id }}" {% if values.get('role_id') == role.id|string %}selected{% endif %}>{{ role.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="text-[11.5px] text-ink-faint mt-1">Only roles within your own access are listed. The Admin role uses the pages set under Admin access.{% if not user %} A temporary password is generated and shown once after saving.{% endif %}</div>
+    </div>
+
+    <div class="mt-5 flex items-center gap-3">
+      <button type="submit" class="px-4 py-2.5 text-[14px] font-semibold bg-accent text-white rounded border border-accent-dark hover:bg-accent-dark shadow-sm">{% if user %}Save changes{% else %}Create user{% endif %}</button>
+      <a href="{{ url_for('admin_users.users_list') }}" class="px-3 py-2.5 text-[13px] text-ink-muted hover:underline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,3 +1,4 @@
+from flask_login import UserMixin
 from sqlalchemy import event, text
 from app.extensions import db
 from datetime import datetime
@@ -2617,3 +2618,100 @@ class SalesReturnLine(CreatedAtMixin, db.Model):
     batch = db.relationship("FGBatch", foreign_keys=[batch_id])
     qty = db.Column(db.Float, nullable=False)
     good_qty = db.Column(db.Float, default=0, nullable=False)
+
+
+# ======================= Phase 0: Login + Roles / Permissions =======================
+# Ab user ka koi "type" nahi — sirf Role (23 Nov user ka faisla). Developer aur Admin bhi ordinary roles hain (Role.system_key), baaki Admin ke banaye roles.
+# Login ID = mobile number (user ka faisla 23 Nov) — 10 digit, unique. Hard delete nahi: is_active se band karte hain.
+class User(UserMixin, CreatedAtMixin, db.Model):   # UserMixin = Flask-Login ke liye (get_id, is_authenticated)
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(100), nullable=False)
+    mobile = db.Column(db.String(15), unique=True, nullable=False)       # normalize hoke (sirf 10 digit); inactive users ka bhi unique rehta hai
+    password_hash = db.Column(db.String(255), nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)   # har user ka ek role (Developer / Admin bhi role hi hain)
+    role = db.relationship("Role", foreign_keys=[role_id], backref="users")
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    must_change_password = db.Column(db.Boolean, default=True, nullable=False)   # naya user / Admin reset ke baad pehle login par password badalna zaroori
+    # session_version: Admin user ko deactivate / reset kare ya role badle to +1 — uske purane khule session agli request par band
+    session_version = db.Column(db.Integer, default=1, nullable=False)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    @property
+    def kind(self):
+        # Sirf padhne ke liye, column nahi: role.system_key se "developer" / "admin", warna "staff" (= koi custom role).
+        # Rights ka asli faisla yahi system role karta hai — alag se koi account type store nahi hota.
+        key = self.role.system_key if self.role is not None else None
+        return key or "staff"
+
+
+# Role = pages ki list + har page par level. Roles DB me hote hain (hardcoded nahi). Developer + Admin do built-in (system) roles hain; baaki Admin banata hai.
+class Role(CreatedAtMixin, db.Model):
+    __tablename__ = "roles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), unique=True, nullable=False)
+    description = db.Column(db.String(200), nullable=True)
+    is_starter = db.Column(db.Boolean, default=False, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    # system_key: "developer" / "admin" = built-in role (naam / rights UI se nahi badalte, deactivate nahi hota); NULL = custom role
+    system_key = db.Column(db.String(20), unique=True, nullable=True)
+
+
+# Role ki ek row = ek page key + level (1 = View, 2 = Edit). Row nahi = No access. Special permission (jaise stock_adjustments.approve) bhi yahin, level 2.
+class RolePermission(db.Model):
+    __tablename__ = "role_permissions"
+    __table_args__ = (
+        db.UniqueConstraint("role_id", "page_key", name="uq_role_permissions_role_page"),
+        db.CheckConstraint("level IN (1, 2)", name="ck_role_permissions_level"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)
+    role = db.relationship("Role", foreign_keys=[role_id], backref=db.backref("permissions", cascade="all, delete-orphan"))
+    page_key = db.Column(db.String(60), nullable=False)
+    level = db.Column(db.Integer, nullable=False)
+
+
+# Admin ceiling: Developer tay karta hai ki Admin kaun se pages / levels use kar sakta aur dusron ko de sakta hai.
+# Alag table me, taaki normal Role-edit route se ye kabhi dikhe / badle nahi (security).
+class AdminCeiling(db.Model):
+    __tablename__ = "admin_ceiling"
+    __table_args__ = (db.CheckConstraint("level IN (1, 2)", name="ck_admin_ceiling_level"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    page_key = db.Column(db.String(60), unique=True, nullable=False)
+    level = db.Column(db.Integer, nullable=False)
+
+
+# Audit log: login / logout / failed login, aur user / role / permission ke badlav. Kisne, kab, kya.
+# Poora mobile number yahan nahi likhte (privacy) — actor_label me naam + aakhri 4 digit.
+class AuditLog(db.Model):
+    __tablename__ = "audit_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    at = db.Column(db.DateTime, default=utc_now, nullable=False, index=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    actor_label = db.Column(db.String(100), nullable=True)
+    action = db.Column(db.String(40), nullable=False, index=True)       # jaise login_ok, login_failed, user_created, role_permissions_changed
+    target_type = db.Column(db.String(30), nullable=True)
+    target_id = db.Column(db.Integer, nullable=True)
+    detail = db.Column(db.Text, nullable=True)
+    ip = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(200), nullable=True)
+
+
+# Login lockout ka counter: (mobile ka hash, IP) ke hisaab se galat password ginti — DB me, taaki 2 workers mil ke ginein.
+# Mobile ka seedha number yahan nahi rakhte (privacy + unknown numbers ke liye bhi row banti hai) — secret-key se bana hash rakhte hain.
+class LoginAttempt(db.Model):
+    __tablename__ = "login_attempts"
+    __table_args__ = (db.UniqueConstraint("mobile_hash", "ip", name="uq_login_attempts_mobile_ip"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    mobile_hash = db.Column(db.String(64), nullable=False)
+    ip = db.Column(db.String(45), nullable=False)
+    failed_count = db.Column(db.Integer, default=0, nullable=False)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    last_failed_at = db.Column(db.DateTime, nullable=True)
