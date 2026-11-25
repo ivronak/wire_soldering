@@ -43,6 +43,14 @@
     el.dispatchEvent(new ctx.win.Event('input', { bubbles: true }));
     el.dispatchEvent(new ctx.win.Event('change', { bubbles: true }));
   }
+  // W2 person dropdown (Users list): demo me pehla asli option chuno (login user pehle se selected ho to wahi rehne do)
+  function setPerson(el) {
+    if (!el || el.tagName !== 'SELECT') return '';
+    if (!el.value) {
+      for (var i = 0; i < el.options.length; i++) { if (el.options[i].value) { setVal(el, el.options[i].value); break; } }
+    }
+    return el.value;
+  }
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* private mode */ } }
   function clearState() { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } }
@@ -297,7 +305,7 @@
       { id: 'mi-open', type: 'click', path: '/material_issues', target: inCard('.mi-card', '.btn-issue'), title: 'Issue material', text: 'તમારા ઓર્ડરના કાર્ડમાં <b>Issue material</b> બટન.', todo: 'ક્લિક કરો: Issue material' },
       { id: 'mi-fill', type: 'fill', path: '/material_issues', target: '#mi-form', title: 'કેટલો માલ આપવો',
         text: 'દરેક material માટે <b>Issue now</b> માં જથ્થો લખાયેલો છે (જેટલો જોઈએ, પણ સ્ટોરમાં છે એનાથી વધુ નહિ). <b>Issued by</b> (સ્ટોરમાંથી કોણે આપ્યું) અને <b>Received by</b> (ઉત્પાદનમાં કોણે લીધું) લખો — પ્રિન્ટમાં આવશે.',
-        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#mi-form [name=issued_by]'), 'સ્ટોર ઇન્ચાર્જ'); setVal($('#mi-form [name=received_by]'), 'પ્રોડક્શન સુપરવાઇઝર'); var f = $('#mi-fill'); if (f) f.click(); return Promise.resolve(); } } },
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setPerson($('#mi-form [name=issued_by_user_id]')); setPerson($('#mi-form [name=received_by_user_id]')); var f = $('#mi-fill'); if (f) f.click(); return Promise.resolve(); } } },
       { id: 'mi-post', type: 'submit', path: '/material_issues', target: '#mi-form', submitter: 'post', retryTo: 'mi-open', title: 'Post issue',
         text: '<b>Post issue</b> દબાવો. Post થતાં જ માલ <b>Store → WIP</b> (ઉત્પાદનમાં) આપોઆપ ચાલ્યો જાય છે — અલગથી Stock transfer કરવાની જરૂર નથી. લોટ <b>જૂનો પહેલો</b> (FIFO) આપમેળે પસંદ થાય.', todo: 'ક્લિક કરો: Post issue' },
       { id: 'mi-done', type: 'info', path: '/material_issues', target: function () { return orderCard('.mi-card'); }, title: 'માલ આપાઈ ગયો ✅',
@@ -308,7 +316,7 @@
       { id: 'mi-ret', type: 'click', path: '/material_issues', target: inCard('.mi-card', '.btn-return'), title: 'Return material', text: '<b>Return material to store</b> પસંદ કરો.', todo: 'ક્લિક કરો: Return material to store' },
       { id: 'mi-ret-fill', type: 'fill', path: '/material_issues', target: '#mr-form', title: 'કેટલો પાછો',
         text: 'જે <b>લોટમાંથી</b> માલ ગયો હતો તે જ લોટમાં પાછો જશે. <b>કારણ</b> પસંદ કરો અને <b>Return now</b> માં જથ્થો લખો. ડેમો માટે 1 KG પાછો મોકલીશું.',
-        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { var q = $('#mr-lines .mr-qty'); if (q) setVal(q, '1'); setVal($('#mr-form [name=returned_by]'), 'પ્રોડક્શન'); return Promise.resolve(); } } },
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { var q = $('#mr-lines .mr-qty'); if (q) setVal(q, '1'); setPerson($('#mr-form [name=returned_by_user_id]')); return Promise.resolve(); } } },
       { id: 'mi-ret-post', type: 'submit', path: '/material_issues', target: '#mr-form', retryTo: 'mi-menu', title: 'Post return', text: '<b>Post return</b> દબાવો. માલ WIP માંથી સ્ટોરમાં પાછો આવી જશે.', todo: 'ક્લિક કરો: Post return' },
       { id: 'mi-ret-done', type: 'info', path: '/material_issues', target: '.mi-card', title: 'Return નોંધાયું ✅',
         text: 'હવે <b>Returns</b> ટૅબમાં આ MR (Material return) દેખાય છે. આ ઓર્ડરનો ગણાતો "આપેલો માલ" 1 KG ઘટ્યો, એટલે ફરી થોડો માલ આપવાનો બાકી છે.' },
@@ -345,7 +353,7 @@
       { id: 'rt-start', type: 'click', path: '/routing', target: inCard('.rt-card', '.rt-act'), title: 'પહેલું સ્ટેજ Start કરો', text: 'કાર્ડના જમણે નારંગી <b>Start …</b> બટન.', todo: 'ક્લિક કરો: Start (સ્ટેજ)' },
       { id: 'rt-start-fill', type: 'fill', path: '/routing', target: '#rt-form', title: 'ઓપરેટર અને સમય',
         text: '<b>Operator</b> — આ સ્ટેજ કોણ ચલાવે છે તેનું નામ. <b>Started at</b> — ડિફોલ્ટ હમણાંનો સમય (મોડું નોંધતા હો તો બદલી શકાય).',
-        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#rt-operator'), 'રમેશભાઈ'); return Promise.resolve(); } } },
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setPerson($('#rt-operator')); return Promise.resolve(); } } },
       { id: 'rt-start-post', type: 'submit', path: '/routing', target: '#rt-form', retryTo: 'rt-start', title: 'Start stage', text: '<b>Start stage</b> દબાવો.', todo: 'ક્લિક કરો: Start stage' },
       { id: 'db-link', type: 'click', target: navLink('/dashboard'), title: 'Dashboard ખોલો (નવું)', text: 'સ્ટેજ ચાલુ છે. હવે જોઈએ કે મશીન પર શું ચાલે છે — ડાબા મેનુમાં <b>Dashboard</b>.', todo: 'ક્લિક કરો: Dashboard' },
       { id: 'db-board', type: 'info', path: '/dashboard', target: '.db-kpi', title: 'Live machine dashboard',
@@ -392,7 +400,7 @@
       { id: 'ou-open', type: 'click', path: '/production_output', target: inCard('.ou-card', '.ou-act'), title: 'Record output', text: 'તમારા ઓર્ડરના કાર્ડમાં <b>Record output</b>.', todo: 'ક્લિક કરો: Record output' },
       { id: 'ou-fill', type: 'fill', path: '/production_output', target: '#ou-form', title: 'શું બન્યું?',
         text: 'Routing માંથી આંકડા પહેલેથી ભર્યા છે:<ul><li><b>Good</b> — વેચાણ લાયક (તૈયાર માલમાં જશે)</li><li><b>Rework</b> — ફરી કામ કરવું પડે (હાલ ફક્ત નોંધ)</li><li><b>Scrap</b> — વેચી શકાય તેવો કચરો (Scrap yard માં)</li><li><b>Process loss</b> — નાનું નુકસાન (ફક્ત નોંધ)</li></ul>જમણે લખ્યું છે કે Record કરતાં શું થશે.',
-        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setVal($('#ou-by'), 'સુરેશભાઈ'); var rk = $('#ou-rack'); if (rk && rk.options.length > 1) setVal(rk, rk.options[1].value); return Promise.resolve(); } } },
+        prefill: { label: 'ડેમો વેલ્યુ ભરો', run: function () { setPerson($('#ou-by')); var rk = $('#ou-rack'); if (rk && rk.options.length > 1) setVal(rk, rk.options[1].value); return Promise.resolve(); } } },
       { id: 'ou-rack', type: 'info', path: '/production_output', target: '#ou-rack', title: 'Rack (નવું)',
         text: '<b>પહેલા:</b> તૈયાર માલ ફક્ત ગોડાઉનમાં જતો.<br><b>હવે:</b> <b>Rack</b> ચૂંટો — Good માલ FG ગોડાઉનના કયા રેકમાં મૂક્યો. એટલે તૈયાર માલ પણ હંમેશા શોધી શકાય.' },
       { id: 'ou-side', type: 'info', path: '/production_output', target: '.ou-side', title: '"Record કરતાં શું થશે?"',
@@ -572,7 +580,7 @@
     }, 8000).then(function (ok) {
       if (!ok) throw new Error('QC lot did not load.');
       var d = $('#qc-date'); if (!d.value) setVal(d, d.max || todayStr());
-      setVal($('#qc-inspector'), 'QC Lab');
+      setPerson($('#qc-inspector'));
       var recv = parseFloat($('#qc-recv').value) || 0;
       setVal($('#qc-sample'), '1');
       setVal($('#qc-pass'), String(recv));                              // poora lot pass
@@ -590,6 +598,7 @@
   // Demo shortcut: is PO ke baaki lots ka QC (sab test pass). Wahi /inward_qc/add route — sirf typing bachti hai.
   function qcRestDemo() {
     var po = state.vars.po;
+    var qcInspectorId = setPerson($('#qc-inspector'));     // demo me jo bhi pehla/login user ho
     var jobs = $$('tr.qc-row').filter(function (r) { return !po || r.textContent.indexOf(po) !== -1; }).map(function (r) {
       var b = $('.btn-inspect-line', r);
       return b ? { grn: b.getAttribute('data-grn-id'), line: parseInt(b.getAttribute('data-line-id'), 10) } : null;
@@ -603,7 +612,7 @@
         if (!line) return null;
         var fd = new FormData();
         fd.append('inspection_date', todayStr());
-        fd.append('inspector', 'QC Lab');
+        fd.append('inspector_user_id', qcInspectorId);
         fd.append('grn_line_id', String(line.id));
         fd.append('sample_size', '1');
         fd.append('passed_qty', String(line.received_qty));

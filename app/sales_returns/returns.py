@@ -11,6 +11,7 @@ from datetime import datetime
 
 from app.dispatch.stock import batch_warehouse
 from app.extensions import db
+from app.auth import service as auth_service
 from app.inventory.money import q2, q4
 from app.models import FGMovement, SalesReturn, SalesReturnLine
 
@@ -99,7 +100,8 @@ def create_return(invoice, return_date, reason, wanted):
     if not picked:
         raise ReturnError("Enter the quantity returned for at least one item.")
 
-    ret = SalesReturn(return_no=next_return_no(return_date), invoice_id=invoice.id, return_date=return_date, reason=reason, status="Posted")
+    ret = SalesReturn(return_no=next_return_no(return_date), invoice_id=invoice.id, return_date=return_date, reason=reason, status="Posted",
+                      created_by_id=auth_service.actor_id())       # W1: kisne banaya (login user, apne aap)
     db.session.add(ret)
     db.session.flush()
     for line, qty, damaged in picked:
@@ -153,4 +155,5 @@ def cancel_return(ret, reason):
     ret.status = "Cancelled"
     ret.cancel_reason = reason
     ret.cancelled_at = datetime.utcnow()
+    ret.cancelled_by_id = auth_service.actor_id()               # W1: kisne cancel kiya
     db.session.flush()

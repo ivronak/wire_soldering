@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_person_picker.html" import person_select, people_js with context %}
 {% block title %}Production output{% endblock %}
 
 {% block page_css %}
@@ -141,7 +142,7 @@
         <div class="flex items-center gap-2 flex-wrap"><span class="ou-no">{{ x.output_no }}</span>
           {% if x.status == 'Posted' %}<span class="ou-chip ok"><i></i>Recorded</span>{% else %}<span class="ou-chip gone"><i></i>Cancelled</span>{% endif %}</div>
         <div class="ou-prod mt-0.5">{{ x.production_order.prod_no }} · {{ x.production_order.product.name if x.production_order.product else '' }}</div>
-        <div class="ou-meta">{{ x.output_date.strftime('%d %b %Y') }} · batch <b>{{ x.batch_no }}</b>{% if x.recorded_by %} · by {{ x.recorded_by }}{% endif %}</div>
+        <div class="ou-meta">{{ x.output_date.strftime('%d %b %Y') }} · batch <b>{{ x.batch_no }}</b>{% if x.recorded_by %} · by {{ x.recorded_by }}{% endif %}{% if x.created_by %} · entered by {{ actor_name(x.created_by) }}{% endif %}{% if x.status == 'Cancelled' and x.cancelled_by %} · cancelled by {{ actor_name(x.cancelled_by) }}{% endif %}</div>
       </div>
       <div class="ou-nums">
         <div><b>{{ '%g'|format(x.good_qty) }}</b><small>Good</small></div>
@@ -180,7 +181,7 @@
     <div><h2 class="text-[17px] font-bold text-ink">Write off as missing</h2><p id="wo-sub" class="text-[12.5px] text-ink-faint"></p></div>
     <input type="hidden" name="production_order_id" id="wo-order" />
     <div id="wo-lines" class="space-y-2"></div>
-    <div><label class="ou-label">Who is responsible? *</label><input type="text" name="written_off_by" id="wo-by" maxlength="60" required class="ou-input" placeholder="Name of the person who took them" autocomplete="off" /></div>
+    <div><label class="ou-label">Who is responsible? *</label>{{ person_select("written_off_by", css="ou-input", select_id="wo-by", required=True, placeholder="Select the person who took them…") }}</div>
     <div><label class="ou-label">Reason *</label><input type="text" name="reason" maxlength="255" required minlength="3" class="ou-input" placeholder="e.g. 80 empty spools not found" autocomplete="off" /></div>
     <p class="text-[12px] text-ink-faint">The quantity is counted as used by this order, so its cost goes into the finished goods cost, and it stays on record under the name above.</p>
     <div class="flex justify-end gap-2"><button type="button" id="wo-cancel" class="ou-btn ghost">Cancel</button><button type="submit" class="ou-btn primary">Write off</button></div>
@@ -217,7 +218,7 @@
               <div><label class="ou-label">Output date *</label><input type="date" name="output_date" id="ou-date" class="ou-input" required /></div>
               <div id="ou-rack-wrap"><label class="ou-label">Rack</label><select name="rack_id" id="ou-rack" class="ou-input"><option value="">No rack</option></select>
                 <p class="ou-help">Where the good goods are kept in the finished goods warehouse.</p></div>
-              <div><label class="ou-label">Recorded by</label><input type="text" name="recorded_by" id="ou-by" maxlength="60" class="ou-input" /></div>
+              <div><label class="ou-label">Recorded by</label>{{ person_select("recorded_by", css="ou-input", select_id="ou-by", placeholder="— not recorded —") }}</div>
               <div><label class="ou-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="ou-input" /></div>
             </div>
             <p id="ou-check" class="text-[12.5px] mt-3"></p>
@@ -256,6 +257,7 @@
 {% endblock %}
 
 {% block page_js %}
+{{ people_js() }}
 <script>
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
   function fmt(x) { return String(Math.round(Number(x) * 100) / 100); }
@@ -306,7 +308,8 @@
     document.getElementById('ou-rework').value = 0;
     document.getElementById('ou-scrap').value = current.scrap;
     document.getElementById('ou-loss').value = current.loss || 0;
-    document.getElementById('ou-by').value = current.operator || '';
+    // Pehle last stage ka operator (agar User ho), warna jo login hai wahi
+    document.getElementById('ou-by').value = current.operator_user_id ? String(current.operator_user_id) : (window.ERP_ME ? String(window.ERP_ME) : '');
     // G2: in-house maal (Flux) FG me nahi, raw material store me jaata hai — rack nahi, aur side ki line bhi alag
     var inhouse = !!current.goes_to_store;
     document.getElementById('ou-rack-wrap').style.display = inhouse ? 'none' : '';

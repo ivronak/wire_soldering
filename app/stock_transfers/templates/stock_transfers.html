@@ -54,7 +54,7 @@
               {% for t in transfers %}
               <tr{% if t.status == 'Cancelled' %} class="opacity-70"{% endif %}>
                 <td class="font-mono font-semibold text-ink">{{ t.transfer_no }}</td>
-                <td class="tabular-nums">{{ t.transfer_date.strftime('%d %b %Y') }}{% if t.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ t.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ t.transfer_date.strftime('%d %b %Y') }}{% if t.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ t.created_at|ist }}{% if t.created_by %} by {{ actor_name(t.created_by) }}{% endif %}{% if t.dispatched_by %} · dispatched by {{ actor_name(t.dispatched_by) }}{% endif %}{% if t.received_by %} · received by {{ actor_name(t.received_by) }}{% endif %}{% if t.cancelled_by %} · cancelled by {{ actor_name(t.cancelled_by) }}{% endif %}</div>{% endif %}</td>
                 <td class="left">{{ t.from_warehouse.name }}<div class="text-[11.5px] text-ink-faint">{{ t.from_warehouse.branch.name if t.from_warehouse.branch else '' }}</div></td>
                 <td class="left">{{ t.to_warehouse.name }}<div class="text-[11.5px] text-ink-faint">{{ t.to_warehouse.branch.name if t.to_warehouse.branch else '' }}{% if t.needs_eway %} · E-Way needed{% endif %}</div></td>
                 <td class="tabular-nums">{{ t.lines|length }}</td>

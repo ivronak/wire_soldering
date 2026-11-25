@@ -8,6 +8,7 @@ from werkzeug.security import safe_join
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.models import Charge, Customer, PaymentTerm, Product, Quotation, QuotationCharge, QuotationLine, QuotationRevision, TaxRate
 from app.tax import line_value
 from app.dispatch.stock import dispatch_state, dispatched_qty
@@ -308,7 +309,8 @@ def quotations_add():
     if error:
         flash(error, "error")
         return redirect(url_for("quotations.quotations_list", new=1))
-    quotation = Quotation(quote_no=next_quote_no(data["quote_date"]), customer_id=data["customer"].id, status="Draft", revision_no=0)
+    quotation = Quotation(quote_no=next_quote_no(data["quote_date"]), customer_id=data["customer"].id, status="Draft", revision_no=0,
+                          created_by_id=auth_service.actor_id())       # W1: kisne banaya (login user, apne aap)
     _fill(quotation, data)
     db.session.add(quotation)
     db.session.commit()
@@ -350,7 +352,8 @@ def quotations_update(quotation_id):
         quotation.status = "Draft"
         db.session.add(QuotationRevision(quotation_id=quotation.id, revision_no=quotation.revision_no, note=reason, snapshot=before,
                                          changes="\n".join(diff_versions(before, after)) or None,
-                                         old_total=before["grand_total"], new_total=after["grand_total"]))
+                                         old_total=before["grand_total"], new_total=after["grand_total"],
+                                         created_by_id=auth_service.actor_id()))     # W1: kisne revise kiya
         flash(f"{quotation.quote_no} revised to R{quotation.revision_no}. Mark it Sent again when you give the new rates to the customer.", "success")
     else:
         flash(f"{quotation.quote_no} updated.", "success")
@@ -408,6 +411,7 @@ def quotations_status(quotation_id):
         flash(f"A {quotation.status} quotation cannot be marked {target or 'that'}.", "error")
         return back
     quotation.status = target
+    quotation.status_by_id = auth_service.actor_id()        # W1: kisne status badla (Sent / Approved / Rejected / Cancelled)
     db.session.commit()
     messages = {"Sent": "marked Sent to the customer.", "Approved": "approved by the customer.",
                 "Rejected": "marked Rejected.", "Cancelled": "cancelled."}
@@ -488,7 +492,8 @@ def quotations_finalize(quotation_id):
         quotation.revision_no += 1
         db.session.add(QuotationRevision(quotation_id=quotation.id, revision_no=quotation.revision_no, note=(f"Final rate / quantity as per customer PO {po_no}" if po_no else "Final rate / quantity at finalize")[:255],
                                          snapshot=before, changes="\n".join(diff_versions(before, after)) or None,
-                                         old_total=before["grand_total"], new_total=after["grand_total"]))
+                                         old_total=before["grand_total"], new_total=after["grand_total"],
+                                         created_by_id=auth_service.actor_id()))     # W1: finalize par rate badla to kisne
 
     # Har product ka production order: Draft, "Needs planning" (andaze ka plan; asli line + machines Production planning page par). Plant ko party ka naam nahi.
     # fix_list #12/#13: koi line "serve from stock" ho sakti hai — uska PO nahi banta, maal in-house (free) stock se Dispatch hota hai.
@@ -539,6 +544,7 @@ def quotations_finalize(quotation_id):
 
     quotation.status = "Ordered"
     quotation.finalized_at = datetime.utcnow()
+    quotation.finalized_by_id = auth_service.actor_id()     # W1: kisne finalize kiya
     persist_schedule()
     db.session.commit()
     message = f"{quotation.quote_no} finalized."

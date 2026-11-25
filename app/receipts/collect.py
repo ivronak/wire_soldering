@@ -10,6 +10,7 @@
 from datetime import datetime
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.models import Quotation, SalesInvoice, SalesReceipt, SalesReceiptAllocation
 
 TOLERANCE = 0.005
@@ -78,7 +79,8 @@ def create_receipt(customer, receipt_date, amount, mode, reference, notes, alloc
         raise ReceiptError("Choose a payment mode.")
     picked = _check_alloc(customer, alloc, amount)
     receipt = SalesReceipt(receipt_no=next_receipt_no(receipt_date), customer_id=customer.id, receipt_date=receipt_date, amount=round(amount, 2),
-                           payment_mode_id=mode.id, reference=reference, notes=notes, status="Posted")
+                           payment_mode_id=mode.id, reference=reference, notes=notes, status="Posted",
+                           created_by_id=auth_service.actor_id())       # W1: kisne receipt li (login user, apne aap)
     db.session.add(receipt)
     db.session.flush()
     for invoice, part in picked:
@@ -111,4 +113,5 @@ def cancel_receipt(receipt, reason):
     receipt.status = "Cancelled"
     receipt.cancel_reason = reason
     receipt.cancelled_at = datetime.utcnow()
+    receipt.cancelled_by_id = auth_service.actor_id()           # W1: kisne cancel kiya
     db.session.flush()

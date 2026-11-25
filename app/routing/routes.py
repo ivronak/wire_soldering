@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
@@ -381,7 +382,7 @@ def routing_list():
         actions[str(cur.id)] = {
             "unit": side["unit"] if side else "KG", "side": bool(side), "materials": stage_material_rows(o, cur),
             "stage_id": cur.id, "order": o.prod_no, "stage": cur.stage_name, "status": cur.status,
-            "operator": cur.operator or "", "qty_in": qty_in if side else (cur.qty_in if cur.qty_in is not None else qty_in),
+            "operator": cur.operator or "", "operator_user_id": cur.operator_user_id, "qty_in": qty_in if side else (cur.qty_in if cur.qty_in is not None else qty_in),
             "planned_hours": cur.planned_hours, "machines": _machine_choices(cur),
             "started_at": cur.started_at.strftime("%d %b %H:%M") if cur.started_at else "",
             "started_iso": cur.started_at.strftime("%Y-%m-%dT%H:%M") if cur.started_at else "",
@@ -427,11 +428,10 @@ def routing_list():
                 "name": deferred.stage_name, "qty_in": deferred.qty_in or 0, "scrap": deferred.scrap_qty or 0,
                 "type_id": deferred.scrap_type_id or "", "kind": deferred.scrap_kind or "Saleable",
             }
-    operators = [r[0] for r in db.session.query(ProductionOrderStage.operator).filter(ProductionOrderStage.operator.isnot(None)).distinct().order_by(ProductionOrderStage.operator).all()]
     return render_template(
         "routing.html", active_nav="routing", tab=tab, orders=shown, summaries=summaries, kpi=kpi, actions=actions,
         scrap_types=[{"id": t.id, "name": t.name} for t in ScrapType.query.filter_by(is_deleted=False, is_active=True).order_by(ScrapType.name).all()],
-        operators=operators, stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed, lab_qc_blocker=lab_qc_blocker,
+        stage_unit=stage_unit, lab_lines=lab_lines, running_count=len(running), done_count=len(finished), today=today, stage_plan=stage_plan, lab_qc_passed=lab_qc_passed, lab_qc_blocker=lab_qc_blocker,
         now=now_ist().strftime("%Y-%m-%dT%H:%M"), pcs_cells=pcs_cells, wait_payload=wait_payload, metal_wait=metal_wait, next_up=next_up, focus_id=focus_id, machine_alerts=machine_alerts, material_alerts=material_alerts, leftover_text=leftover_text,
     )
 
@@ -552,9 +552,9 @@ def start_stage(stage, order, form, target_machine_id=None, kind="swap", assigne
         assign_machine(stage, swap_machine, kind=kind, reason=assign_reason)
         machine_note = f"Machine changed at start: {old_names} -> {swap_machine.name}" + (f", reason: {assign_reason}" if assign_reason else "")
         problem = None
-    operator = (form.get("operator") or "").strip()[:60]
-    if not operator:
-        return False, "Enter the operator's name."
+    operator, operator_error = auth_service.read_picked_user(form, "operator", required=True, label="the operator")
+    if operator_error:
+        return False, operator_error
     # Timing clash lock: agle stage ki machine par doosre order ka garam maal aane wala ho aur ye kaam us gap me poora na ho to roko.
     # Wajah (kam se kam 3 akshar) likh kar "start anyway" ho sakta hai; wajah stage ke notes me jaati hai.
     clash = stage_clash(order, stage, in_production_orders())
@@ -599,7 +599,9 @@ def start_stage(stage, order, form, target_machine_id=None, kind="swap", assigne
         machine_note = f"Not available, left out: {problem['names']}"
     stage.status = "In progress"
     stage.started_at = started_at
-    stage.operator = operator
+    stage.started_by_id = auth_service.actor_id()
+    stage.operator = operator.full_name                  # text snapshot (print / purane code ke liye)
+    stage.operator_user_id = operator.id                 # W2: dropdown se chuna zimmedar
     side = side_stage_info(order, stage)
     stage.qty_in = side["qty"] if side else main_input(order, stage)       # flux stage: flux ki apni qty; baaki: metal chain
     notes = (form.get("notes") or "").strip()
@@ -624,7 +626,9 @@ def start_stage(stage, order, form, target_machine_id=None, kind="swap", assigne
                 continue
             member.status = "In progress"
             member.started_at = started_at
-            member.operator = operator
+            member.started_by_id = auth_service.actor_id()
+            member.operator = operator.full_name
+            member.operator_user_id = operator.id
             member.qty_in = main_input(member.production_order, member)
             _add_note(member, f"Heat {group.heat_no}, melted together with {order.prod_no}")
         if len(members) > 1:
@@ -788,6 +792,7 @@ def routing_cancel_start(stage_id):
         _add_note(member, f"Run cancelled ({reason}) - was started {member.started_at.strftime('%d %b %H:%M')}")
         member.status = "Pending"
         member.started_at = None
+        member.started_by_id = None
         member.qty_in = None
         member.held_at = None
         member.hold_reason = None
@@ -924,9 +929,9 @@ def routing_complete(stage_id):
         if used > line.issued_qty + EPS:
             # Jyada laga (spool 520 bane / metal correction me zyada gaya): store se ek click me extra issue, kisne liya uska naam zaroori
             # (client meeting 2, #14 spool, #12 sab material). Koi % cap nahi.
-            taken_by = (request.form.get(f"extra_by_{line.id}") or "").strip()[:60]
-            if not taken_by:
-                flash(f"{name}: {used:g} {mat_unit} used but only {line.issued_qty:g} {mat_unit} were issued. Write who took the extra {round(used - line.issued_qty, 4):g} {mat_unit} from the store.", "error")
+            taken_by, taken_error = auth_service.read_picked_user(request.form, f"extra_by_{line.id}", required=True, label="who took the extra from the store")
+            if taken_error:
+                flash(f"{name}: {used:g} {mat_unit} used but only {line.issued_qty:g} {mat_unit} were issued. {taken_error}", "error")
                 return _back()
             reason = (request.form.get(f"extra_reason_{line.id}") or "").strip()[:200] or "More used than issued"
             extra_issues.append((line, round(used - line.issued_qty, 4), taken_by, reason))
@@ -1010,9 +1015,14 @@ def routing_complete(stage_id):
                 db.session.rollback()
                 flash(str(stock_error), "error")
                 return _back()
-    operator = (request.form.get("operator") or "").strip()[:60]
-    if operator:
-        stage.operator = operator
+    operator, operator_error = auth_service.read_picked_user(request.form, "operator", label="the operator")
+    if operator_error:
+        db.session.rollback()                    # upar extra issue / used qty ho chuka ho to wapas
+        flash(operator_error, "error")
+        return _back()
+    if operator is not None:
+        stage.operator = operator.full_name
+        stage.operator_user_id = operator.id
     if deferred is not None:
         # Melting stage ka scrap + uska qty_out ab pakka; Casting ka qty_in bhi usi hisaab se
         deferred.scrap_qty = round(prev_scrap, 4)
@@ -1040,6 +1050,7 @@ def routing_complete(stage_id):
         stage.work_stage.billet_weight = billet["weight"]
     stage.status = "Done"
     stage.completed_at = completed_at
+    stage.completed_by_id = auth_service.actor_id()
     stage.qty_out = round(qty_out, 4)
     stage.scrap_qty = round(scrap, 4)
     stage.scrap_type_id = scrap_type.id if scrap_type else None
@@ -1084,6 +1095,7 @@ def routing_reopen(stage_id):
     stage.scrap_photo = None
     stage.status = "In progress"
     stage.completed_at = None
+    stage.completed_by_id = None
     stage.qty_out = None
     stage.scrap_qty = None
     stage.scrap_type_id = None
@@ -1124,15 +1136,15 @@ def routing_lab_qc(stage_id):
     if stage.status == "Pending":
         flash(f"Start {stage.stage_name} before recording its lab test.", "error")
         return _back()
-    tested_by = (request.form.get("tested_by") or "").strip()[:60]
+    tested_by, tested_error = auth_service.read_picked_user(request.form, "tested_by", required=True, label="who did the lab test")
     result = (request.form.get("result") or "").strip()
     remarks = (request.form.get("remarks") or "").strip()[:255] or None
     tested_at, error = _read_when("tested_at")
     if error:
         flash(error, "error")
         return _back()
-    if not tested_by:
-        flash("Enter who did the lab test.", "error")
+    if tested_error:
+        flash(tested_error, "error")
         return _back()
     if result not in ("Pass", "Need correction", "Fail"):
         flash("Choose the lab result: Pass, Need correction or Fail.", "error")
@@ -1152,9 +1164,9 @@ def routing_lab_qc(stage_id):
             flash("Choose a material of this stage and a quantity above zero for the correction.", "error")
             return _back()
         wanted_extra[line_id] = round(wanted_extra.get(line_id, 0) + extra_qty, 4)
-    added_by = (request.form.get("extra_by") or "").strip()[:60]
-    if wanted_extra and not added_by:
-        flash("Write who added the extra material.", "error")
+    added_by, added_error = auth_service.read_picked_user(request.form, "extra_by", required=bool(wanted_extra), label="who added the extra material")
+    if added_error:
+        flash(added_error, "error")
         return _back()
     extra_reason = (request.form.get("extra_reason") or "").strip()[:200] or remarks or "Lab correction"
     tc = request.files.get("tc_file")
@@ -1208,8 +1220,9 @@ def routing_lab_qc(stage_id):
             # "in_input": ye correction agle stage ke input me judta hai ya nahi (flux / side stage / used likha hi nahi — to nahi); correction_in() sirf yahi dikhata hai
             joins_input = side_here is None and counts_to_input(line, side_here) and not (stage.status == "Done" and was_used is None)
             corrections.append({"material": rm.name if rm else "", "qty": extra_qty, "unit": rm.base_unit.code if rm and rm.base_unit else "",
-                                "added_by": added_by, "reason": extra_reason, "issue_no": issue.issue_no, "in_input": bool(joins_input)})
-    row = StageLabQC(stage_id=stage.id, tested_at=tested_at, tested_by=tested_by, result=result, remarks=remarks, corrections=corrections or None)
+                                "added_by": added_by.full_name, "added_by_user_id": added_by.id, "reason": extra_reason, "issue_no": issue.issue_no, "in_input": bool(joins_input)})
+    row = StageLabQC(stage_id=stage.id, tested_at=tested_at, tested_by=tested_by.full_name, tested_by_user_id=tested_by.id, result=result, remarks=remarks, corrections=corrections or None,
+                     created_by_id=auth_service.actor_id())
     db.session.add(row)
     db.session.flush()                      # id chahiye: file ka folder QC id se banta hai
     if has_file:
@@ -1224,7 +1237,7 @@ def routing_lab_qc(stage_id):
         for member in melt_members(stage):
             if member.id == stage.id or member.status == "Pending":
                 continue
-            copy = StageLabQC(stage_id=member.id, tested_at=tested_at, tested_by=tested_by, result=result, tc_file=row.tc_file,
+            copy = StageLabQC(stage_id=member.id, tested_at=tested_at, tested_by=tested_by.full_name, tested_by_user_id=tested_by.id, result=result, tc_file=row.tc_file, created_by_id=auth_service.actor_id(),
                               remarks=((remarks + " | ") if remarks else "") + f"Heat {stage.melt_group.heat_no}, tested with {order.prod_no}"[:255])
             db.session.add(copy)
             mirrored.append(member.production_order.prod_no)

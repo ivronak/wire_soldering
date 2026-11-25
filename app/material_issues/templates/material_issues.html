@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_person_picker.html" import person_select, people_js with context %}
 {% block title %}Material issue{% endblock %}
 
 {% block page_css %}
@@ -278,6 +279,8 @@
         <div class="mi-meta">{{ issue.lines|length }} lot line{{ '' if issue.lines|length == 1 else 's' }}</div>
         {% if rs > 0 and issue.status == 'Posted' %}<span class="mi-chip draft mt-1"><i></i>{{ '%g'|format(rs) }} returned</span>{% endif %}
         {% if issue.issued_by or issue.received_by %}<div class="mi-meta mt-1">{% if issue.issued_by %}by {{ issue.issued_by }}{% endif %}{% if issue.received_by %} → {{ issue.received_by }}{% endif %}</div>{% endif %}
+        {# W1: kisne ERP me entry / cancel ki (login se apne aap) #}
+        {% if issue.created_by %}<div class="mi-meta">Entered by {{ actor_name(issue.created_by) }}{% if issue.status == 'Cancelled' and issue.cancelled_by %} · cancelled by {{ actor_name(issue.cancelled_by) }}{% endif %}</div>{% endif %}
       </div>
       <div class="mi-act">
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ view_data[issue.id] | tojson }}'>View</button>
@@ -309,7 +312,8 @@
         <div class="mi-meta">{{ ret.return_date.strftime('%d %b %Y') }}{% if ret.created_at %} · entered {{ ret.created_at|ist }}{% endif %}</div></div>
       <div><div class="mi-prod">From <b class="font-mono">{{ ret.production_order.prod_no }}</b> · {{ ret.production_order.product.name if ret.production_order.product else '' }}</div>
         <div class="mi-meta">{{ return_text[ret.id] }}</div></div>
-      <div><span class="mi-chip warn"><i></i>{{ ret.reason }}</span>{% if ret.returned_by %}<div class="mi-meta mt-1">by {{ ret.returned_by }}</div>{% endif %}</div>
+      <div><span class="mi-chip warn"><i></i>{{ ret.reason }}</span>{% if ret.returned_by %}<div class="mi-meta mt-1">by {{ ret.returned_by }}</div>{% endif %}
+        {% if ret.created_by %}<div class="mi-meta">Entered by {{ actor_name(ret.created_by) }}{% if ret.status == 'Cancelled' and ret.cancelled_by %} · cancelled by {{ actor_name(ret.cancelled_by) }}{% endif %}</div>{% endif %}</div>
       <div class="mi-act">
         <button type="button" class="btn-view-mi mi-btn ghost" data-issue='{{ return_view[ret.id] | tojson }}'>View</button>
         <a href="{{ url_for('material_issues.material_returns_print', return_id=ret.id) }}" target="_blank" class="mi-btn ghost">Print slip</a>
@@ -345,8 +349,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label class="mi-label">Issue date *</label><input type="date" id="mi-date" name="issue_date" required class="mi-input" /></div>
           <div><label class="mi-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="mi-input" /></div>
-          <div><label class="mi-label">Issued by (store)</label><input type="text" name="issued_by" maxlength="60" class="mi-input" /></div>
-          <div><label class="mi-label">Received by (production)</label><input type="text" name="received_by" maxlength="60" class="mi-input" /></div>
+          <div><label class="mi-label">Issued by (store)</label>{{ person_select("issued_by", css="mi-input", default_me=True, placeholder="— not recorded —") }}</div>
+          <div><label class="mi-label">Received by (production)</label>{{ person_select("received_by", css="mi-input", placeholder="— not recorded —") }}</div>
         </div>
       </section>
       <section class="mi-step">
@@ -387,7 +391,7 @@
           <div><label class="mi-label">Return date *</label><input type="date" id="mr-date" name="return_date" required class="mi-input" /></div>
           <div><label class="mi-label">Why is it coming back? *</label>
             <select name="reason" required class="mi-input">{% for r in reasons %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select></div>
-          <div><label class="mi-label">Returned by</label><input type="text" name="returned_by" maxlength="60" class="mi-input" /></div>
+          <div><label class="mi-label">Returned by</label>{{ person_select("returned_by", css="mi-input", placeholder="— not recorded —") }}</div>
           <div><label class="mi-label">Remarks</label><input type="text" name="remarks" maxlength="255" class="mi-input" /></div>
         </div>
       </section>

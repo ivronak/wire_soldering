@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from flask import render_template, Blueprint, request, redirect, url_for, flash
 from app.extensions import db
+from app.auth import service as auth_service
 from app.models import (
     PurchaseInvoice, PurchaseInvoiceLine, PurchaseInvoiceCharge,
     GRN, TaxRate, Charge,
@@ -254,6 +255,7 @@ def purchase_invoices_add():
         charges_total=data["charges_total"],
         total_amount=data["total_amount"],
         gst_on_charges=True,
+        created_by_id=auth_service.actor_id(),       # W1: kisne banaya
         is_deleted=False,
     )
     db.session.add(invoice)
@@ -269,6 +271,7 @@ def purchase_invoices_add():
     # "Post bill" button dabaya ho to turant post (vendor ledger me Cr), warna Draft
     if (request.form.get("invoice_action") or "draft").strip() == "post":
         post_invoice(invoice)
+        invoice.posted_by_id = auth_service.actor_id()
 
     db.session.commit()
 
@@ -287,6 +290,7 @@ def purchase_invoices_post(inv_id):
         return redirect(list_url("completed"))
 
     post_invoice(invoice)
+    invoice.posted_by_id = auth_service.actor_id()       # W1: kisne post kiya
     db.session.commit()
     flash(f"Bill {invoice.pi_no} posted: {invoice.total_amount:,.2f} added to {invoice.vendor.name}'s payable.", "success")
     return redirect(list_url("completed"))
@@ -307,6 +311,7 @@ def purchase_invoices_cancel(inv_id):
 
     was_posted = invoice.status == "Posted"
     cancel_invoice(invoice)
+    invoice.cancelled_by_id = auth_service.actor_id()    # W1: kisne cancel kiya
     db.session.commit()
     if was_posted:
         flash(f"Bill {invoice.pi_no} cancelled. The payable was reversed and the GRN can be billed again.", "success")

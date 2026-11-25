@@ -250,7 +250,7 @@
                   <div class="font-mono font-semibold text-ink">{{ g.grn_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">Draft GRN · {{ g.po.po_no if g.po else '—' }}</div>
                 </td>
-                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}{% if g.created_by %} by {{ actor_name(g.created_by) }}{% endif %}{% if g.posted_by %} · posted by {{ actor_name(g.posted_by) }}{% endif %}</div>{% endif %}</td>
                 <td class="text-left">{{ g.po.vendor.name if g.po and g.po.vendor else '—' }}</td>
                 <td class="font-mono text-[12.5px]">{{ g.challan_no or '—' }}</td>
                 <td class="tabular-nums text-[12.5px]">{{ g.lines|length }} received</td>
@@ -310,7 +310,7 @@
                   data-status="{{ g.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold {% if g.status == 'Draft' %}text-ink-faint{% else %}text-ink{% endif %}">{{ g.grn_no }}</td>
-                <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.grn_date.strftime('%d %b %Y') if g.grn_date else '—' }}{% if g.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ g.created_at|ist }}{% if g.created_by %} by {{ actor_name(g.created_by) }}{% endif %}{% if g.posted_by %} · posted by {{ actor_name(g.posted_by) }}{% endif %}</div>{% endif %}</td>
                 {# PO number link nahi hai, isliye plain ink text (link jaisa rang sirf asli link ke liye) #}
                 <td><span class="text-ink font-medium">{{ g.po.po_no if g.po else "—" }}</span></td>
                 <td class="text-left {% if g.status == 'Draft' %}text-ink-faint{% endif %}">{{ g.po.vendor.name if g.po and g.po.vendor else "—" }}</td>

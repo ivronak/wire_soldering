@@ -4,6 +4,7 @@
 from datetime import date, datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 
 from app.costing.fixed import apply_fixed_cost, restate_day
 from app.extensions import db
@@ -71,7 +72,7 @@ def output_plan(order):
         "order_id": order.id, "prod_no": order.prod_no, "product": order.product.name if order.product else "",
         "unit": unit, "packed": packed, "counted_from_packing": counted is not None, "unit_weight": weight,
         "planned": order.planned_qty, "customer_qty": customer_qty_of(order), "extra_percent": order.extra_percent or 0, "good": good, "scrap": scrap, "scrap_kg": scrap_kg, "loss": loss, "rework": 0,
-        "operator": last.operator or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
+        "operator": last.operator or "", "operator_user_id": last.operator_user_id or "", "machines": ", ".join(m.machine_name for m in last.machines if m.used),
         "last_stage": last.stage_name, "min_date": last.completed_at.date().isoformat() if last.completed_at else "",
         "materials": material_table(order),
         "leftover_note": leftover_message(order),
@@ -146,8 +147,11 @@ def _read_form():
         rack_id = None                    # in-house maal RM store me jaata hai, rack nahi
     elif rack_raw and (rack_id is None or rack_id not in {rack.id for rack in fg_racks_for(order)}):
         return None, "Choose a rack that belongs to the finished goods warehouse of this order."
+    recorded_by, person_error = auth_service.read_picked_user(request.form, "recorded_by", label="who recorded this output")
+    if person_error:
+        return None, person_error
     return {"order": order, "output_date": output_date, "rack_id": rack_id, "good": round(good, 4), "rework": round(rework, 4), "scrap": round(scrap, 4), "loss": round(loss, 4),
-            "recorded_by": (request.form.get("recorded_by") or "").strip()[:60], "remarks": (request.form.get("remarks") or "").strip()[:255]}, None
+            "recorded_by": recorded_by, "remarks": (request.form.get("remarks") or "").strip()[:255]}, None
 
 
 def _short_note(order):
@@ -171,7 +175,9 @@ def production_output_add():
     batches = ProductionOutput.query.filter(ProductionOutput.batch_no.like(prefix + "%")).count()
     output = ProductionOutput(output_no=f"OUT-{year}-{count + 1:03d}", batch_no=f"{prefix}{batches + 1:03d}", production_order=order,
                               output_date=data["output_date"], good_qty=data["good"], rework_qty=data["rework"], scrap_qty=data["scrap"], loss_qty=data["loss"],
-                              recorded_by=data["recorded_by"], remarks=data["remarks"], status="Posted", is_deleted=False)
+                              recorded_by=data["recorded_by"].full_name if data["recorded_by"] else None, recorded_by_user_id=data["recorded_by"].id if data["recorded_by"] else None,
+                              remarks=data["remarks"], status="Posted", is_deleted=False,
+                              created_by_id=auth_service.actor_id())
     db.session.add(output)
     try:
         post_output(output, order, rack_id=data["rack_id"])
@@ -205,6 +211,7 @@ def production_output_cancel(output_id):
         flash(str(stock_error), "error")
         return redirect(_list_url("recorded"))
     output.status = "Cancelled"
+    output.cancelled_by_id = auth_service.actor_id()
     db.session.flush()
     restate_day(output.output_date)          # us din ke bache hue Approx output ab din ka poora kharcha baantenge (cancel hue output ka hissa unhe milta hai)
     order = output.production_order

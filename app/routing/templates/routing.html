@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_person_picker.html" import person_select, people_js with context %}
 {% block title %}Routing / stages{% endblock %}
 
 {% block page_css %}
@@ -315,7 +316,7 @@
     </div>
     <form id="lq-form" method="post" enctype="multipart/form-data" class="flex-1 overflow-y-auto p-4 space-y-4">
       <div class="rt-box space-y-3">
-        <div><label class="rt-label">Tested by *</label><input type="text" name="tested_by" id="lq-by" maxlength="60" class="rt-input" placeholder="Lab person's name" autocomplete="off" /></div>
+        <div><label class="rt-label">Tested by *</label>{{ person_select("tested_by", css="rt-input", select_id="lq-by", default_me=True, placeholder="Select the lab person…") }}</div>
         <div><label class="rt-label">Tested at</label><input type="datetime-local" name="tested_at" id="lq-when" class="rt-input" /></div>
         <div>
           <label class="rt-label">Result *</label>
@@ -330,7 +331,7 @@
         <div id="lq-corr-rows" class="space-y-2"></div>
         <button type="button" id="lq-corr-add" class="text-[12.5px] font-semibold underline" style="color:#0A3CA6">+ add a material</button>
         <div id="lq-corr-who" style="display:none" class="space-y-3">
-          <div><label class="rt-label">Added by *</label><input type="text" name="extra_by" id="lq-extra-by" maxlength="60" class="rt-input" placeholder="Who put the extra metal in?" autocomplete="off" /></div>
+          <div><label class="rt-label">Added by *</label>{{ person_select("extra_by", css="rt-input", select_id="lq-extra-by", default_me=True, placeholder="Who put the extra metal in?") }}</div>
           <div><label class="rt-label">Reason</label><input type="text" name="extra_reason" maxlength="200" class="rt-input" placeholder="Defaults to the remarks above" autocomplete="off" /></div>
         </div>
       </div>
@@ -372,8 +373,7 @@
       <div class="rt-box space-y-3">
         <div id="rt-start-fields">
           <label class="rt-label">Operator *</label>
-          <input type="text" name="operator" id="rt-operator" maxlength="60" list="rt-operators" class="rt-input" placeholder="Who is doing this stage?" autocomplete="off" />
-          <datalist id="rt-operators">{% for name in operators %}<option value="{{ name }}">{% endfor %}</datalist>
+          {{ person_select("operator", css="rt-input", select_id="rt-operator", placeholder="Who is doing this stage?") }}
         </div>
         {# Timing clash lock: agle stage ki machine par doosre order ka garam maal aane wala hai #}
         <div id="rt-clash-box" style="display:none" class="rounded-lg p-3 rt-pop-warn" role="alert">
@@ -498,6 +498,7 @@
 {% endblock %}
 
 {% block page_js %}
+{{ people_js() }}
 <script>
   // "Start <stage>" box se aaye (?focus=) to us order ka card screen me laao
   (function () { var f = document.getElementById('rt-focus'); if (f) f.scrollIntoView({ block: 'center' }); })();
@@ -520,7 +521,7 @@
     document.getElementById('rt-submit').textContent = start ? 'Start stage' : 'Complete stage';
     document.getElementById('rt-submit').className = 'rt-btn primary';
     document.getElementById('rt-complete-fields').style.display = start ? 'none' : 'block';
-    document.getElementById('rt-operator').value = a.operator || '';
+    document.getElementById('rt-operator').value = a.operator_user_id ? String(a.operator_user_id) : (start ? (window.ERP_ME ? String(window.ERP_ME) : '') : '');
     document.getElementById('rt-operator').required = start;
     when.name = start ? 'started_at' : 'completed_at';
     when.value = NOW;
@@ -616,7 +617,7 @@
           (m.kgpp ? '<tr class="rt-avg" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-1 text-[12px]"></td></tr>' : '') +
             '<tr class="rt-extra" data-for="' + m.id + '" style="display:none"><td colspan="4" class="pb-2"><div class="rounded-lg border border-warning-border bg-warning-bg px-3 py-2 space-y-2">' +
             '<div class="text-[12.5px] rt-extra-msg"></div>' +
-            '<div class="grid grid-cols-2 gap-2"><div><label class="rt-label">Taken by *</label><input type="text" name="extra_by_' + m.id + '" maxlength="60" class="rt-input rt-extra-by" placeholder="Who took them from the store?" autocomplete="off" /></div>' +
+            '<div class="grid grid-cols-2 gap-2"><div><label class="rt-label">Taken by *</label>' + erpPeopleSelect('extra_by_' + m.id, 'rt-input rt-extra-by', '', true, window.ERP_ME) + '</div>' +
             '<div><label class="rt-label">Reason</label><input type="text" name="extra_reason_' + m.id + '" maxlength="200" class="rt-input" placeholder="e.g. lab correction, more spools wound" autocomplete="off" /></div></div>' +
             '<div class="text-[11.5px] text-ink-faint">The extra is issued from the store automatically when you complete the stage. It cannot be more than the free stock in the store.</div></div></td></tr>';
       }).join('');

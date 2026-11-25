@@ -148,7 +148,7 @@
       <div style="min-width:0">
         <div class="flex items-center gap-2 flex-wrap"><span class="po-no">{{ o.prod_no }}</span>{{ status_chip(o) }}{% if o.status == 'Draft' and not o.reviewed %}<span class="po-chip warn"><i></i>Needs review</span>{% elif o.status == 'Draft' and not o.plan_confirmed %}<span class="po-chip warn"><i></i>Needs planning</span>{% endif %}{% set src = sources.get(o.id) %}{% if src and src.kind == 'quotation' %}<span class="po-chip bnd" title="This order is made for this quotation"><i></i>For {{ src.quote_no }}</span>{% else %}<span class="po-chip bnd" title="Made for stock, not for a customer order"><i></i>In-house stock</span>{% endif %}{% if o.bundle_no %}<a href="{{ url_for('production_orders.production_orders_list', bundle=o.bundle_no) }}" class="po-chip bnd" title="Show only the orders of this bundle"><i></i>Bundle {{ o.bundle_no }} · {{ bundles.get(o.bundle_no, 1) }} item{{ '' if bundles.get(o.bundle_no, 1) == 1 else 's' }}</a>{% endif %}</div>
         <div class="po-prod mt-0.5" title="{{ o.product.name if o.product else '' }}">{{ o.product.name if o.product else '—' }}</div>
-        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if src and src.extra %} · customer needs {{ '%g'|format(src.customer_qty) }}, extra {{ '%g'|format(src.extra) }} goes to stock{% endif %} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}{% if o.balance_for %} · balance of {{ o.balance_for.prod_no }}{% endif %}</div>
+        <div class="po-meta">{{ '%.2f'|format(o.planned_qty) }} {{ o.product.base_unit.code if o.product and o.product.base_unit else '' }}{% if src and src.extra %} · customer needs {{ '%g'|format(src.customer_qty) }}, extra {{ '%g'|format(src.extra) }} goes to stock{% endif %} · ordered {{ dshort(o.order_date) }}{% if o.status == 'Released' %} · {{ o.issue_status|lower }}{% endif %}{% if o.balance_for %} · balance of {{ o.balance_for.prod_no }}{% endif %}{% if o.created_by %} · created by {{ actor_name(o.created_by) }}{% endif %}{% if o.released_by %} · released by {{ actor_name(o.released_by) }}{% endif %}</div>
       </div>
 
       <div class="po-scol">
@@ -220,7 +220,7 @@
 
     <div class="po-detail">
       {% if o.status == 'Cancelled' and o.cancel_reason %}
-      <div class="mb-3 text-[13px]" style="color:#B42318"><b>Cancelled:</b> {{ o.cancel_reason }}</div>
+      <div class="mb-3 text-[13px]" style="color:#B42318"><b>Cancelled:</b> {{ o.cancel_reason }}{% if o.cancelled_by %} (by {{ actor_name(o.cancelled_by) }}){% endif %}</div>
       {% endif %}
       <div class="mb-3"><a href="{{ url_for('production_orders.production_orders_print', order_id=o.id) }}" target="_blank" class="po-btn ghost" style="padding:5px 12px">Print order</a></div>
       <div class="grid gap-6 md:grid-cols-2">

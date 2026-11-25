@@ -11,6 +11,7 @@
 from sqlalchemy import func
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.inventory.money import q2, q4, value_for_out
 from app.models import DeliveryChallan, DeliveryChallanLine, FGBatch, FGMovement, ProductionOutput, Quotation, QuotationLine
 
@@ -136,7 +137,8 @@ def create_challan(quotation, challan_date, wanted, transporter=None, vehicle_no
     picks = picks or {}
     reason = (borrow_reason or "").strip()[:255]
     challan = DeliveryChallan(challan_no=next_challan_no(challan_date), quotation_id=quotation.id, challan_date=challan_date,
-                              transporter=transporter, vehicle_no=vehicle_no, notes=notes, status="Dispatched")
+                              transporter=transporter, vehicle_no=vehicle_no, notes=notes, status="Dispatched",
+                              created_by_id=auth_service.actor_id())       # W1: kisne dispatch kiya (login user, apne aap)
     db.session.add(challan)
     db.session.flush()
     for line, qty in wanted.items():
@@ -199,6 +201,7 @@ def cancel_challan(challan, reason):
                                   reverses_movement_id=move.id, note="Reversal: challan cancelled"))
     challan.status = "Cancelled"
     challan.cancel_reason = reason
+    challan.cancelled_by_id = auth_service.actor_id()        # W1: kisne cancel kiya
     db.session.flush()
 
 

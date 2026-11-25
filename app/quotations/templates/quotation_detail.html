@@ -69,7 +69,7 @@
       <div class="flex-1 min-h-0 overflow-auto bg-white border border-slate-300 rounded-lg shadow-sm p-4 space-y-5">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><div class="qd-label">Customer</div><div class="font-semibold text-ink">{{ q.customer.name }}</div><div class="text-[13px] text-ink-faint">{{ q.customer.state.name if q.customer.state else '' }}{% if q.customer.gstin %} · GSTIN {{ q.customer.gstin }}{% endif %}</div></div>
-          <div><div class="qd-label">Quotation date</div><div>{{ q.quote_date.strftime('%d %b %Y') }}</div></div>
+          <div><div class="qd-label">Quotation date</div><div>{{ q.quote_date.strftime('%d %b %Y') }}</div>{% if q.created_by or q.status_by %}<div class="text-[12px] text-ink-faint">{% if q.created_by %}Entered by {{ actor_name(q.created_by) }}{% endif %}{% if q.status_by %} · status set by {{ actor_name(q.status_by) }}{% endif %}</div>{% endif %}</div>
           <div><div class="qd-label">Valid until</div><div>{{ q.valid_until.strftime('%d %b %Y') if q.valid_until else '—' }}</div></div>
           <div><div class="qd-label">Customer needs it by</div><div>{{ q.needed_by_date.strftime('%d %b %Y') if q.needed_by_date else '—' }}</div></div>
           <div><div class="qd-label">Payment terms</div><div>{{ q.payment_terms.name if q.payment_terms else '—' }}</div></div>
@@ -81,7 +81,7 @@
           <div><div class="qd-label">Customer PO</div><div class="font-semibold text-ink">{{ q.customer_po_no or "—" }}</div></div>
           <div><div class="qd-label">PO date</div><div>{{ q.customer_po_date.strftime('%d %b %Y') if q.customer_po_date else '—' }}</div></div>
           <div><div class="qd-label">PO copy</div><div>{% if q.po_file %}<a class="text-accent-text font-semibold hover:underline" href="{{ url_for('quotations.quotations_po_file', quotation_id=q.id) }}" target="_blank">{{ po_file_name }}</a>{% else %}—{% endif %}</div></div>
-          <div><div class="qd-label">Finalized</div><div>{{ q.finalized_at|ist }}</div></div>
+          <div><div class="qd-label">Finalized</div><div>{{ q.finalized_at|ist }}</div>{% if q.finalized_by %}<div class="text-[12px] text-ink-faint">by {{ actor_name(q.finalized_by) }}</div>{% endif %}</div>
           {% if q.bundle_no %}<div class="col-span-2 md:col-span-4 text-[13px] text-ink-muted">All items are in production bundle <b>{{ q.bundle_no }}</b>.</div>{% endif %}
         </div>
         {% endif %}
@@ -191,7 +191,7 @@
             {% for r in revisions %}
             <div class="border border-slate-200 rounded p-3 bg-white">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="font-semibold text-ink">R{{ r.revision_no }} <span class="text-ink-faint font-normal text-[13px]">· {{ r.created_at|ist }}</span></div>
+                <div class="font-semibold text-ink">R{{ r.revision_no }} <span class="text-ink-faint font-normal text-[13px]">· {{ r.created_at|ist }}{% if r.created_by %} · by {{ actor_name(r.created_by) }}{% endif %}</span></div>
                 <div class="text-[13px] tabular-nums text-ink-muted">Total ₹ {{ '{:,.2f}'.format(r.old_total or 0) }} → <b class="text-ink">₹ {{ '{:,.2f}'.format(r.new_total or 0) }}</b></div>
               </div>
               <div class="text-[13.5px] text-ink mt-1">{{ r.note }}</div>

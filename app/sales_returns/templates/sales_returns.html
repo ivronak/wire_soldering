@@ -54,7 +54,7 @@
               {% for r in returns %}
               <tr>
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ r.return_no }}</span>
-                  <div class="text-[12px] text-ink-faint mt-1">{{ r.return_date.strftime('%d %b %Y') }}</div></td>
+                  <div class="text-[12px] text-ink-faint mt-1">{{ r.return_date.strftime('%d %b %Y') }}{% if r.created_by %} · by {{ actor_name(r.created_by) }}{% endif %}</div></td>
                 <td class="font-semibold text-ink">{{ r.customer.name }}</td>
                 <td><span class="font-mono font-bold">{{ r.invoice.invoice_no }}</span></td>
                 <td>
@@ -63,7 +63,7 @@
                     <span class="text-ink-faint text-[12px]">({% if g.good_qty %}{{ '%g'|format(g.good_qty) }} back in stock{% endif %}{% if g.good_qty and g.damaged_qty %}, {% endif %}{% if g.damaged_qty %}{{ '%g'|format(g.damaged_qty) }} damaged{% endif %})</span></div>
                   {% endfor %}
                   <div class="text-[12px] text-ink-faint mt-1">Reason: {{ r.reason }}</div>
-                  {% if r.status == 'Cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled: {{ r.cancel_reason }}</div>{% endif %}
+                  {% if r.status == 'Cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled{% if r.cancelled_by %} by {{ actor_name(r.cancelled_by) }}{% endif %}: {{ r.cancel_reason }}</div>{% endif %}
                 </td>
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.total_amount) }}</td>
                 <td>

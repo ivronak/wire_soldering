@@ -226,6 +226,87 @@ def get_visible_user(actor, user_id):
     return visible_users_query(actor).filter(User.id == user_id).first()
 
 
+# ---------- "kaun ne kiya" helpers (U1; flow doc: user_in_erp_flow_2026_11_24.md) ----------
+# Do tarah ka "kaun":  W1 actor = jisne ERP me button dabaya (session se apne aap, created_by_id jaise columns)
+#                      W2 zimmedar = jisne kaam kiya (operator / inspector / issued_by ... — dropdown se chuna)
+# Developer ka niyam (user, 24 Nov): Developer kisi dropdown me NAHI aata; Developer ne action kiya to DB me uski asli id,
+# par dusron ko (aur print par) "Administrator" dikhta hai.
+
+DEVELOPER_PUBLIC_LABEL = "Administrator"
+
+
+def actor_id():
+    # W1: abhi logged-in user ki id (naye document / cancel / approve par `*_by_id` me jaati hai). Login nahi (CLI / script) = None.
+    user = current()
+    return user.id if user is not None else None
+
+
+def pickable_users_query():
+    # W2 dropdown ki list: active user + active role + role Developer NAHI — dekhne wala chahe Developer khud ho (visible_users_query se alag:
+    # wo "kaun kise manage kare" ka rule hai, ye "kaun kaam ke liye chuna ja sakta hai" ka).
+    return (User.query.join(Role, User.role_id == Role.id)
+            .filter(User.is_active == True, Role.is_active == True,  # noqa: E712
+                    or_(Role.system_key.is_(None), Role.system_key != KIND_DEVELOPER)))
+
+
+def pickable_users():
+    # Dropdown ke liye list, naam se sorted (har naam ke saath role pick_label me dikhta hai)
+    return sorted(pickable_users_query().all(), key=lambda u: ((u.full_name or "").lower(), u.id))
+
+
+def resolve_pickable(raw):
+    # W2 field ki chuni hui id ko server par dobara check karo (crafted POST se Developer / inactive / ajeeb id andar na aaye).
+    # Wapas: User ya None (None = galat id, caller error de).
+    user_id = parse_id(raw)
+    if user_id is None:
+        return None
+    return pickable_users_query().filter(User.id == user_id).first()
+
+
+def pickable_options():
+    # Dropdown ke liye JSON-friendly list [{"id", "label"}] — JS se bane form (jaise Complete stage ka "Taken by") yahi use karte hain
+    return [{"id": u.id, "label": pick_label(u)} for u in pickable_users()]
+
+
+def my_pick_id():
+    # Login user ki id agar wo dropdown me aa sakta hai (Developer nahi aata -> None), warna None. "default = main hi" ke liye.
+    user = current()
+    if user is None:
+        return None
+    return user.id if pickable_users_query().filter(User.id == user.id).first() is not None else None
+
+
+def read_picked_user(form, field, required=False, label="the person"):
+    # W2 field ka common reader: form me `<field>_user_id` aata hai (dropdown se). Wapas (user, error):
+    #   khaali + required nahi   -> (None, None)   field optional tha, kuch nahi chuna
+    #   khaali + required        -> (None, "Choose <label>.")
+    #   galat / Developer / inactive id (crafted POST) -> (None, "Choose <label> from the list.")
+    #   theek                    -> (User, None)  caller `<field>_user_id = user.id` aur text snapshot `<field> = user.full_name` rakhta hai
+    raw = (form.get("%s_user_id" % field) or "").strip()
+    if not raw:
+        return None, ("Choose %s." % label if required else None)
+    user = resolve_pickable(raw)
+    if user is None:
+        return None, "Choose %s from the list." % label
+    return user, None
+
+
+def pick_label(user):
+    # Dropdown me "Ramesh — Operator": role se pata chale banda kaun hai (user ka faisla: role = pehchaan)
+    return "%s — %s" % (user.full_name, user.role.name if user.role else "")
+
+
+def actor_label(user, viewer=None):
+    # W1 / W2 ka naam dikhane ke liye. user None = None (template "—" lagayega).
+    # Developer ka naam sirf Developer viewer ko; baaki sab (viewer None = print / bahar jaane wala document) ko "Administrator".
+    if user is None:
+        return None
+    is_developer = user.role is not None and user.role.system_key == KIND_DEVELOPER
+    if is_developer and not (viewer is not None and viewer.kind == KIND_DEVELOPER):
+        return DEVELOPER_PUBLIC_LABEL
+    return user.full_name
+
+
 # ---------- audit ----------
 
 def audit_label(user):

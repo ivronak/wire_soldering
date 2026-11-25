@@ -233,6 +233,8 @@
 {% endblock %}
 
 {% block page_js %}
+{% from "_person_picker.html" import person_select, people_js with context %}
+{{ people_js() }}
 <script>
   // "Running" ghadi hh:mm:ss: server ne page banate waqt seconds diye; hum page khulne ke baad ke seconds jodte hain, har second badalta hai (browser ki timezone ka koi lena-dena nahi)
   (function () {
@@ -303,7 +305,7 @@
         var q = res.j.requirements, c = res.j.candidate || {}, f = '';
         f += '<div class="dm-form"><div class="font-semibold">' + esc(c.prod_no) + ' &rarr; ' + esc(machine.name) + ' <span class="db-meta">(' + esc(machine.line) + ')</span></div>';
         if (!q.in_plan) f += '<div class="info">Planned machine: ' + esc(c.plan_text) + '. It will be replaced by <b>' + esc(machine.name) + '</b> for this stage' + (q.heat ? ' (and for the other orders in the same melt)' : '') + '. If you cancel the run, the planned machine comes back.</div>';
-        f += '<label>Operator</label><input name="operator" list="dm-ops" maxlength="60" autocomplete="off"><datalist id="dm-ops">' + (res.j.operators || []).map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
+        f += '<label>Operator *</label>' + erpPeopleSelect('operator', '', '', true, window.ERP_ME);
         if (q.lines && q.lines.length) f += '<label>Production line for this order</label><select name="line_id">' + q.lines.map(function (l) { return '<option value="' + l.id + '">' + esc(l.name) + '</option>'; }).join('') + '</select>';
         if (q.under) f += '<div class="why">' + esc(q.under) + '</div><label>Reason (unused line capacity)</label><input name="under_reason" maxlength="255">';
         if (q.clash) f += '<div class="why">' + esc(q.clash) + '</div><label>Reason to start anyway (hot metal clash)</label><input name="clash_reason" maxlength="150">';

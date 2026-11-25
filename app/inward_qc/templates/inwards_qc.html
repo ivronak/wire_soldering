@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_person_picker.html" import person_select, people_js with context %}
 {% from "_po_group.html" import po_group_row %}
 {% block title %}Inward QC{% endblock %}
 
@@ -243,7 +244,7 @@
                   data-status="{{ st }}">
                 <td class="text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ q.qc_no }}</td>
-                <td class="tabular-nums">{{ q.inspection_date.strftime('%d %b %Y') if q.inspection_date else '—' }}{% if q.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ q.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ q.inspection_date.strftime('%d %b %Y') if q.inspection_date else '—' }}{% if q.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ q.created_at|ist }}{% if q.created_by %} by {{ actor_name(q.created_by) }}{% endif %}</div>{% endif %}</td>
                 <td>
                   {% if grn %}
                   {# GRN Closed ho to wo GRN list ke Completed tab me milegi, warna Pending me #}
@@ -376,9 +377,8 @@
         </div>
         <div>
           <label for="qc-inspector" class="block text-[12.5px] font-semibold text-ink mb-1">Inspector *</label>
-          {# Model me text field hai — User master baad me #}
-          <input type="text" id="qc-inspector" name="inspector" required placeholder="Lab inspector name" autocomplete="off"
-            class="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
+          {# W2: Users me se chuno; draft me khali chhod sakte hain, final result ke liye zaroori (server bhi check karta hai) #}
+          {{ person_select("inspector", css="w-full px-2.5 py-2 text-[14px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent", select_id="qc-inspector", default_me=True, placeholder="Select the inspector…") }}
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -611,7 +611,7 @@
     if (!draft) { note.classList.add('hidden'); return; }
     function put(id, value) { document.getElementById(id).value = (value === null || value === undefined) ? '' : value; }
     put('qc-date', draft.inspection_date);
-    put('qc-inspector', draft.inspector);
+    put('qc-inspector', draft.inspector_user_id);
     put('qc-sample', draft.sample_size);
     put('qc-pass', draft.passed_qty);
     put('qc-reject', draft.rejected_qty);

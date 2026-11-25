@@ -5,6 +5,7 @@ import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from flask import abort, Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 from app.extensions import db
 from app.models import (Machines, Product, ProductCategories, ProductionLine, ProductionOrder, ProductionOrderLine, ProductionOrderStage,
                         ProductionOrderStageMachine, QuotationLine, RawMaterial)
@@ -484,6 +485,7 @@ def build_order(product, planned_qty, unit_weight, order_date, needed_by, remark
     prod_no = f"PROD-{year}-{count + 1:03d}"
     order = ProductionOrder(
         prod_no=prod_no,
+        created_by_id=auth_service.actor_id(),
         product_id=product.id,
         order_date=order_date,
         planned_qty=planned_qty,
@@ -924,6 +926,7 @@ def production_orders_release(order_id):
         flash(f"Plan {order.prod_no} first: choose its production line and machines on the Production planning page, then release it.", "error")
         return redirect(_back_url())
     order.status = "Released"
+    order.released_by_id = auth_service.actor_id()
     db.session.commit()
     flash(f"Production order {order.prod_no} released. Its material can now be issued from the Material issue page.", "success")
     return redirect(_back_url())
@@ -970,6 +973,7 @@ def production_orders_cancel(order_id):
     order.status = "Cancelled"
     order.cancel_reason = reason[:255]
     order.cancelled_at = datetime.utcnow()
+    order.cancelled_by_id = auth_service.actor_id()
     order.queue_position = None
     renumber_queue()
     persist_schedule()

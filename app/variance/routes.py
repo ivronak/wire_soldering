@@ -4,6 +4,7 @@
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 
 from app.extensions import db
 from app.models import ProductionOrder, ProductionOutput, StockMovement
@@ -168,11 +169,9 @@ def variance_review(output_id):
     if output.reviewed_at is not None:
         flash("This variance has already been reviewed.", "error")
         return redirect(url_for("variance.variance_list"))
-    by = (request.form.get("reviewed_by") or "").strip()[:60]
-    if not by:
-        flash("Enter your name to mark this as reviewed.", "error")
-        return redirect(url_for("variance.variance_list"))
-    output.reviewed_by = by
+    # Reviewer ab type nahi hota: jo login user ye dabata hai wahi (W1). Text column snapshot hai — Developer ho to "Administrator" (bahar naam nahi jaata)
+    output.reviewed_by_id = auth_service.actor_id()
+    output.reviewed_by = auth_service.actor_label(auth_service.current(), None)
     output.review_note = (request.form.get("review_note") or "").strip()[:255] or None
     output.reviewed_at = now_ist()
     db.session.commit()

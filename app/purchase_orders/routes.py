@@ -2,6 +2,7 @@ from flask import render_template, Blueprint, redirect, url_for, request, flash,
 from app.timeutil import ist_now
 from app.models import PurchaseOrder, PurchaseOrderLine, Vendor, Warehouse, RawMaterial, Unit, TaxRate, PaymentTerm, Charge, PurchaseOrderCharge, PurchaseOrderRevision
 from app.extensions import db
+from app.auth import service as auth_service
 from app.purchase_orders.docket import build_docket, format_qty, format_rate, format_reading, format_inr
 from datetime import datetime
 import os
@@ -119,6 +120,7 @@ def purchase_orders_add():
         status="Draft",
         remarks=remarks,
         payment_terms_id=payment_terms_id,
+        created_by_id=auth_service.actor_id(),       # W1: kisne banayi (login user, apne aap)
         is_deleted=False,
     )
     db.session.add(po)
@@ -300,6 +302,7 @@ def purchase_orders_confirm(po_id):
     po.vendor_invoice_no = vendor_invoice_no or None
     po.vendor_invoice_date = vendor_invoice_date        
     po.status = "Open"
+    po.confirmed_by_id = auth_service.actor_id()       # W1: kisne confirm ki
     db.session.commit()
     # Confirm ke baad PO pending tab se hat jaata hai — user ko batao wo kahan gaya (GRN page ke Pending me)
     flash(f"Purchase Order {po.po_no} confirmed — it is now waiting for goods on the GRN page.", "success")
@@ -321,6 +324,7 @@ def purchase_orders_short_close(po_id):
 
     po.status = "Cancelled"
     po.short_close_reason = reason
+    po.short_closed_by_id = auth_service.actor_id()    # W1: kisne short close ki
     db.session.commit()
     flash(f"Purchase Order {po.po_no} short closed.", "success")
     return redirect(url_for('purchase_orders.purchase_orders_list'))

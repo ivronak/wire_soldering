@@ -127,7 +127,7 @@
   <div class="sc-box mb-3"><h3>Scrap packs</h3><p class="sub">Print the label and stick it on the bag. Scanning its barcode (box at the top) opens the same label.</p>
     {% for pk in packs %}
     <div class="flex flex-wrap items-center justify-between gap-2 py-1.5 border-t border-slate-100 first:border-t-0">
-      <div><span class="sc-no">{{ pk.pack_no }}</span> <span class="sc-meta">· {{ pk.pack_date.strftime('%d %b %Y') }} · {{ pk.items|length }} batch{{ '' if pk.items|length == 1 else 'es' }} · {{ '%g'|format(pk.weight) }} KG now</span></div>
+      <div><span class="sc-no">{{ pk.pack_no }}</span> <span class="sc-meta">· {{ pk.pack_date.strftime('%d %b %Y') }} · {{ pk.items|length }} batch{{ '' if pk.items|length == 1 else 'es' }} · {{ '%g'|format(pk.weight) }} KG now{% if pk.created_by %} · packed by {{ actor_name(pk.created_by) }}{% endif %}</span></div>
       <div class="flex gap-1.5">
         <a href="{{ url_for('scrap.scrap_pack_label', pack_id=pk.id) }}" target="_blank" class="sc-btn" style="padding:4px 10px;font-size:12px">Print label</a>
         {% if can_edit('scrap') %}

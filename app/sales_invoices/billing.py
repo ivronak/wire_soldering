@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 
 from app.costing.full_cost import batch_full_cost
 from app.extensions import db
+from app.auth import service as auth_service
 from app.models import DeliveryChallan, SalesInvoice, SalesInvoiceCharge, SalesInvoiceLine
 
 
@@ -86,7 +87,8 @@ def create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=
         raise BillingError("The chosen challans have no goods.")
 
     invoice = SalesInvoice(invoice_no=next_invoice_no(invoice_date), quotation_id=quotation.id, invoice_date=invoice_date, due_date=due_date_for(quotation, invoice_date),
-                           tax_type="inter" if quotation.is_inter_state else "intra", status="Posted", remarks=remarks)
+                           tax_type="inter" if quotation.is_inter_state else "intra", status="Posted", remarks=remarks,
+                           created_by_id=auth_service.actor_id())       # W1: kisne banaya (login user, apne aap)
     db.session.add(invoice)
     db.session.flush()
 
@@ -145,6 +147,7 @@ def approve_loss(invoice, note):
         raise BillingError("This invoice is not waiting for approval.")
     invoice.loss_note = note
     invoice.loss_approved_at = datetime.utcnow()
+    invoice.loss_approved_by_id = auth_service.actor_id()       # W1: kisne loss approve kiya
     _post(invoice)
     db.session.flush()
 
@@ -165,6 +168,7 @@ def cancel_invoice(invoice, reason):
     invoice.status = "Cancelled"
     invoice.cancel_reason = reason
     invoice.cancelled_at = datetime.utcnow()
+    invoice.cancelled_by_id = auth_service.actor_id()           # W1: kisne cancel kiya
     db.session.flush()
 
 

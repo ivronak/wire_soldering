@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.material_plan.plan import HORIZON_DAYS, draft_po_by_material, material_plan, po_lines_by_vendor
 from app.models import PurchaseOrder, PurchaseOrderLine, RawMaterial, Vendor
 
@@ -88,7 +89,8 @@ def material_plan_create_po():
     count = PurchaseOrder.query.filter(PurchaseOrder.po_no.like(f"PO-{year}-%")).count()
     po = PurchaseOrder(po_no=f"PO-{year}-{count + 1:03d}", vendor_id=vendor.id, warehouse_id=warehouse.id, po_date=today,
                        expected_delivery_date=today + timedelta(days=vendor.lead_time_days) if vendor.lead_time_days is not None else None,
-                       status="Draft", remarks=("Raised from Material plan for " + ", ".join(orders))[:255], payment_terms_id=vendor.payment_terms_id, is_deleted=False)
+                       status="Draft", remarks=("Raised from Material plan for " + ", ".join(orders))[:255], payment_terms_id=vendor.payment_terms_id, is_deleted=False,
+                       created_by_id=auth_service.actor_id())
     db.session.add(po)
     db.session.flush()
     for material, qty, source in picked:

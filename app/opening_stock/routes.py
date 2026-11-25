@@ -6,6 +6,7 @@ from datetime import date, datetime
 from flask import render_template, Blueprint, request, redirect, url_for, flash
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.inventory.posting import post_opening, cancel_opening, InventoryError
 from app.models import OpeningStock, OpeningStockLine, RawMaterial, Warehouse
 
@@ -80,7 +81,8 @@ def opening_stock_add():
     year = data["as_of"].year
     count = OpeningStock.query.filter(OpeningStock.opening_no.like(f"OS-{year}-%")).count()
     sheet = OpeningStock(opening_no=f"OS-{year}-{count + 1:03d}", as_of_date=data["as_of"], warehouse=data["warehouse"],
-                         status="Draft", remarks=data["remarks"] or None, is_deleted=False)
+                         status="Draft", remarks=data["remarks"] or None, is_deleted=False,
+                         created_by_id=auth_service.actor_id())       # W1: kisne banaya (login user, apne aap)
     db.session.add(sheet)
     for material, qty, cost, batch in data["lines"]:
         db.session.add(OpeningStockLine(opening=sheet, raw_material=material, qty=qty, unit_cost=cost, batch_no=batch or None))
@@ -92,6 +94,7 @@ def opening_stock_add():
             flash(str(stock_error), "error")
             return redirect(list_url("pending"))
         sheet.status = "Posted"
+        sheet.posted_by_id = auth_service.actor_id()               # seedha post kiya to wahi user
     db.session.commit()
     if sheet.status == "Posted":
         flash(f"{sheet.opening_no} posted: the opening stock is now in {data['warehouse'].name}.", "success")
@@ -113,6 +116,7 @@ def opening_stock_post(sheet_id):
         flash(str(stock_error), "error")
         return redirect(list_url("pending"))
     sheet.status = "Posted"
+    sheet.posted_by_id = auth_service.actor_id()                    # W1: kisne post kiya
     db.session.commit()
     flash(f"{sheet.opening_no} posted: the opening stock is now in {sheet.warehouse.name}.", "success")
     return redirect(list_url("completed"))
@@ -133,6 +137,7 @@ def opening_stock_cancel(sheet_id):
             flash(str(stock_error), "error")
             return redirect(list_url("completed"))
     sheet.status = "Cancelled"
+    sheet.cancelled_by_id = auth_service.actor_id()                 # W1: kisne cancel kiya
     db.session.commit()
     flash(f"{sheet.opening_no} cancelled." + (" The stock was taken out again." if was_posted else ""), "success")
     return redirect(list_url("pending" if not was_posted else "completed"))

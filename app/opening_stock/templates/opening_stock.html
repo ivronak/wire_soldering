@@ -55,7 +55,7 @@
               {% set total = namespace(v=0) %}{% for l in s.lines %}{% set total.v = total.v + l.qty * l.unit_cost %}{% endfor %}
               <tr{% if s.status == 'Cancelled' %} class="opacity-70"{% endif %}>
                 <td class="font-mono font-semibold text-ink">{{ s.opening_no }}</td>
-                <td class="tabular-nums">{{ s.as_of_date.strftime('%d %b %Y') }}{% if s.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ s.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ s.as_of_date.strftime('%d %b %Y') }}{% if s.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ s.created_at|ist }}{% if s.created_by %} by {{ actor_name(s.created_by) }}{% endif %}{% if s.posted_by %} · posted by {{ actor_name(s.posted_by) }}{% endif %}{% if s.cancelled_by %} · cancelled by {{ actor_name(s.cancelled_by) }}{% endif %}</div>{% endif %}</td>
                 <td class="left">{{ s.warehouse.name }}</td>
                 <td class="tabular-nums">{{ s.lines|length }}</td>
                 <td class="tabular-nums">₹{{ total.v|inr }}</td>

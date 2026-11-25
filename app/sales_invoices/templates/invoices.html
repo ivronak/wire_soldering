@@ -95,15 +95,15 @@
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ i.invoice_no }}</span>
                   <div class="text-[12px] text-ink-faint mt-1">{% if can_do('quotations.quotations_detail', 'GET') %}<a class="hover:underline" href="{{ url_for('quotations.quotations_detail', quotation_id=i.quotation_id) }}">{{ i.quotation.quote_no }}</a>{% else %}{{ i.quotation.quote_no }}{% endif %}
                     · {% for c in i.challans %}{{ c.challan_no }}{% if not loop.last %}, {% endif %}{% endfor %}</div></td>
-                <td>{{ i.invoice_date.strftime('%d %b %Y') }}</td>
+                <td>{{ i.invoice_date.strftime('%d %b %Y') }}{% if i.created_by %}<div class="text-[12px] text-ink-faint">by {{ actor_name(i.created_by) }}</div>{% endif %}</td>
                 <td class="font-semibold text-ink">{{ i.quotation.customer.name }}</td>
                 <td>
                   {% for l in i.lines %}
                   <div class="text-[13.5px]"><b>{{ l.product.name }}</b> — {{ '%g'|format(l.qty) }} × ₹{{ '%.2f'|format(l.net_unit_price) }}
                     {% if tab == 'waiting' %}<span class="text-[12px] {{ 'text-stop font-semibold' if l.loss_per_unit else 'text-ink-faint' }}">(cost ₹{{ '%.2f'|format(l.unit_cost) }}{% if l.loss_per_unit %} · loss ₹{{ '%.2f'|format(l.loss_value) }}{% endif %})</span>{% endif %}</div>
                   {% endfor %}
-                  {% if tab == 'done' and i.loss_note %}<div class="text-[12px] text-ink-faint mt-1">Loss ₹{{ '%.2f'|format(i.loss_amount) }} approved: {{ i.loss_note }}</div>{% endif %}
-                  {% if tab == 'cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled: {{ i.cancel_reason }}</div>{% endif %}
+                  {% if tab == 'done' and i.loss_note %}<div class="text-[12px] text-ink-faint mt-1">Loss ₹{{ '%.2f'|format(i.loss_amount) }} approved{% if i.loss_approved_by %} by {{ actor_name(i.loss_approved_by) }}{% endif %}: {{ i.loss_note }}</div>{% endif %}
+                  {% if tab == 'cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled{% if i.cancelled_by %} by {{ actor_name(i.cancelled_by) }}{% endif %}: {{ i.cancel_reason }}</div>{% endif %}
                 </td>
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(i.total_amount) }}
                   {% if tab == 'done' %}<div class="mt-1"><span class="q-chip {{ 'Part' if i.payment_state == 'Part paid' else i.payment_state }}">{{ i.payment_state }}</span></div>

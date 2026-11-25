@@ -191,7 +191,7 @@
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ o.po_no }}</span></td>
                 <td class="text-left"><span class="font-medium text-ink">{{ o.vendor.name if o.vendor else "—" }}</span></td>
-                <td class="text-[13px] text-ink-muted">{{ o.po_date.strftime('%d-%b-%Y') if o.po_date else "—" }}{% if o.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ o.created_at|ist }}</div>{% endif %}</td>
+                <td class="text-[13px] text-ink-muted">{{ o.po_date.strftime('%d-%b-%Y') if o.po_date else "—" }}{% if o.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ o.created_at|ist }}{% if o.created_by %} by {{ actor_name(o.created_by) }}{% endif %}{% if o.confirmed_by %} · confirmed by {{ actor_name(o.confirmed_by) }}{% endif %}{% if o.short_closed_by %} · short closed by {{ actor_name(o.short_closed_by) }}{% endif %}</div>{% endif %}</td>
                 <td class="text-[13px] text-ink-muted">{{ o.expected_delivery_date.strftime('%d-%b-%Y') if o.expected_delivery_date else "—" }}</td>
                 <td class="text-[13px] text-ink-muted">{{ o.warehouse.name if o.warehouse else "—" }}</td>
                 <td class="text-center">

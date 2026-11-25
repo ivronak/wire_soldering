@@ -344,9 +344,7 @@ def machine_assign_check(machine_id, order_id):
     finally:
         db.session.rollback()          # machine tentative badli thi, wapas
     row = next((r for r in eligible_orders_for_machine(machine) if r["order_id"] == order_id), None)
-    return jsonify({"requirements": requirements, "candidate": row,
-                    "operators": [r[0] for r in db.session.query(ProductionOrderStage.operator).filter(ProductionOrderStage.operator.isnot(None))
-                                  .distinct().order_by(ProductionOrderStage.operator).all()]})
+    return jsonify({"requirements": requirements, "candidate": row})      # operator ab dropdown (Users) se: page ke ERP_PEOPLE se banta hai
 
 
 @dashboard_bp.route("/dashboard/machine/<int:machine_id>/assign/<int:order_id>", methods=["POST"])

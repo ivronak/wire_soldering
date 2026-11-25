@@ -220,3 +220,21 @@ User: "Abhi jaisa hai waise hi rehne de. Admin ko login dena hoga to user ko pas
 
 ### 12.6 D (Role filter) — user ne haan kaha, **BAN GAYA** (24 Nov)
 Users list ke toolbar me "Role" dropdown (`?role=<id>`), ginti ke saath, search + status ke saath chalta hai; Admin ko Developer role option nahi dikhta. Test 9/9. Build order ab: **U1 → U2 → U4 → U5** (U3 = sirf ye filter tha, ho gaya).
+
+### 12.7 U1 BAN GAYA (24 Nov) — helper layer
+`service.actor_id`, `pickable_users_query / pickable_users`, `resolve_pickable`, `pick_label`, `actor_label` + template helpers `actor_name`, `pick_users`, `pick_label`. 35/35 test. Section 10 ke baaki faisle (#2, #3, #5, #6, #7=picker saare active users, #8) user ki "maan ke U1 shuru karo" par **maane gaye**. Agla: **U2** (migration + W1 auto-capture, Manufacturing se).
+
+### 12.8 U2 (Manufacturing) BAN GAYA (24 Nov) — W1 auto-capture
+Migration `a9c4e1f6b2d8`: 8 tables me nullable `*_by_id` (FK users.id; purane rows NULL = "—"). Routes ab login user ko khud store karte hain; variance review ka typed naam hata (login se, text snapshot `actor_label`, Developer = "Administrator"); extra hours `set_by` auto. List me "entered/created/released/cancelled by" dikhta hai. Test 25/25. Agla: U2 ke baaki modules (Procurement, Sales, Inventory), phir U4.
+
+### 12.9 U2 (Procurement) BAN GAYA (24 Nov) — W1 auto-capture
+Migration `b3d7f2a9c1e5`: PO (created/confirmed/short_closed), GRN (created/posted), Inward QC + Rejection memo (created), Purchase invoice (created/posted/cancelled), Purchase return (created/cancelled). Lists me "Entered ... by X" ke saath. Inward QC ka `inspector` text W2 hai (U4). Test 33/33. Agla: U2 Sales, phir Inventory (stock adjustments/transfers/opening stock/scrap).
+
+### 12.10 U2 (Sales) BAN GAYA (24 Nov) — W1 auto-capture
+Migration `c5e8a1d4b7f2`: Quotation (created / status_by / finalized), QuotationRevision (created), Challan (created/cancelled), Sales invoice (created / loss_approved / cancelled), Receipt (created/cancelled), Sales return (created/cancelled). Capture helpers me, taaki har jagah se chale. Test 36/36. Agla: U2 Inventory (stock adjustments, transfers, opening stock, scrap), phir U4.
+
+### 12.11 U2 (Inventory) BAN GAYA — U2 POORA (24 Nov)
+Migration `d6f9b2e5c8a3`: Stock transfer (created/dispatched/received/cancelled), Stock adjustment (created/submitted/approved/cancelled), Opening stock (created/posted/cancelled), Scrap pack (created/unpacked). Test 35/35; chaaron slices ka regression 129/129. Ab migration chain: `f7b1d4e8a2c6 -> a9c4e1f6b2d8 -> b3d7f2a9c1e5 -> c5e8a1d4b7f2 -> d6f9b2e5c8a3`. **Agla: U4** — jahan abhi naam typed hai (issued_by / received_by / returned_by / written_off_by / recorded_by / tested_by / inspector / added_by) wahan Users dropdown (default = login user), purane text rows jaise ke taise.
+
+### 12.12 U4 BAN GAYA (24 Nov) — W2 fields ab Users ka dropdown
+Migration `e7a0c3f6d9b4`: `<field>_user_id` (FK users.id, nullable) + purana text = naam ka snapshot. Fields: Routing operator (start/complete) + Dashboard operator, extra material "taken by", Lab QC tested_by / added_by; Material issue issued_by / received_by (+ Auto-issue ka received_by), return returned_by, write-off written_off_by (Production output page ka form bhi); Production output recorded_by; Inward QC inspector. Picker = active users (active role, Developer nahi), label "Name — Role", default = login user; **server dobara check karta hai** (Developer / inactive / galat id = reject). Required fields required hi rahe; Inward QC me inspector draft me optional, final result me zaroori. Purane text rows waise hi dikhte hain. Test u4 40/40; saare suite 169/169. Migration chain: `... -> d6f9b2e5c8a3 -> e7a0c3f6d9b4`. **Agla: U5** (safai, tracker/memory, deploy checklist: live se pehle floor workers Users me banao).

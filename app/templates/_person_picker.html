@@ -1,0 +1,28 @@
+{# W2 "kisne kaam kiya" dropdown (U4): sab active users, Developer nahi (service.pickable_users), har naam ke saath role.
+   Chuni hui id form me "<field>_user_id" naam se jaati hai; route use service.read_picked_user se dobara check karta hai.
+   Use:  {% from "_person_picker.html" import person_select with context %}   (with context ZAROORI: pick_users / current_user context se aate hain)
+   Use:  {% from "_person_picker.html" import person_select with context %}  {{ person_select("issued_by", css="mi-input", default_me=True) }}
+   default_me=True: login user pehle se chuna hua (agar wo list me ho; Developer list me nahi hota, to "Select..." dikhega). #}
+{% macro person_select(field, css="", select_id="", required=False, default_me=False, placeholder="Select a person…") -%}
+<select name="{{ field }}_user_id"{% if select_id %} id="{{ select_id }}"{% endif %} class="{{ css }}"{% if required %} required{% endif %} autocomplete="off">
+  <option value="">{{ placeholder }}</option>
+  {% for u in pick_users() %}<option value="{{ u.id }}"{% if default_me and current_user.is_authenticated and current_user.id == u.id %} selected{% endif %}>{{ pick_label(u) }}</option>{% endfor %}
+</select>
+{%- endmacro %}
+
+{# JS se bane forms (modal / drawer jinme select runtime par banta hai) ke liye: page me ek baar {{ people_js() }} lagao,
+   phir JS me: erpPeopleSelect("extra_by_5", "rt-input", "", true, window.ERP_ME)  ->  <select name="extra_by_5_user_id">…</select> #}
+{% macro people_js() -%}
+<script>
+window.ERP_PEOPLE = {{ pick_options()|tojson }};
+window.ERP_ME = {{ my_pick_id()|tojson }};
+window.erpPeopleSelect = function (name, cls, id, required, selectedId) {
+  var esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+  var html = '<select name="' + name + '_user_id"' + (id ? ' id="' + id + '"' : '') + ' class="' + (cls || '') + '"' + (required ? ' required' : '') + ' autocomplete="off"><option value="">Select a person…</option>';
+  window.ERP_PEOPLE.forEach(function (p) {
+    html += '<option value="' + p.id + '"' + (String(p.id) === String(selectedId) ? ' selected' : '') + '>' + esc(p.label) + '</option>';
+  });
+  return html + '</select>';
+};
+</script>
+{%- endmacro %}

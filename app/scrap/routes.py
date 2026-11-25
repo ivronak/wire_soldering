@@ -5,6 +5,7 @@ from datetime import date, datetime
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.models import FGBatch, ProductionOrder, ProductionOrderStage, ScrapPack, ScrapPackItem, ScrapType
 from app.routing.routes import side_stage_info
 from app.scrap.barcode import code128_svg
@@ -138,7 +139,8 @@ def scrap_pack_create():
         flash(f"There is no unpacked scrap in the yard for {day.strftime('%d %b %Y')}.", "error")
         return redirect(url_for("scrap.scrap_list", tab="yard"))
     prefix = f"SCP-{day.strftime('%Y%m%d')}-"
-    pack = ScrapPack(pack_no=f"{prefix}{ScrapPack.query.filter(ScrapPack.pack_no.like(prefix + '%')).count() + 1:03d}", pack_date=day, is_deleted=False)
+    pack = ScrapPack(pack_no=f"{prefix}{ScrapPack.query.filter(ScrapPack.pack_no.like(prefix + '%')).count() + 1:03d}", pack_date=day, is_deleted=False,
+                     created_by_id=auth_service.actor_id())       # W1: kisne pack banaya
     db.session.add(pack)
     db.session.flush()
     for batch in batches:
@@ -153,6 +155,7 @@ def scrap_pack_remove(pack_id):
     # Delete nahi: pack hata dete hain (is_deleted) aur uske batch wapas unpacked ho jaate hain. Stock par koi asar nahi.
     pack = ScrapPack.query.filter_by(id=pack_id, is_deleted=False).first_or_404()
     pack.is_deleted = True
+    pack.unpacked_by_id = auth_service.actor_id()                   # W1: kisne pack kholi
     db.session.commit()
     flash(f"Pack {pack.pack_no} is opened. Its batches are free to pack again.", "success")
     return redirect(url_for("scrap.scrap_list", tab="yard"))

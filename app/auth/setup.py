@@ -121,8 +121,14 @@ def init_auth(app):
                 keys = (guard_map.PARTY_KEY[party_type],)       # vendor / customer document: guard jaisa hi ek key
             return service.user_can_any(user, keys, rule.level)
 
+        def actor_name(who, for_print=False):
+            # "Kisne kiya" ka naam: {{ actor_name(po.created_by) }}; print me for_print=True (Developer ka naam kabhi bahar nahi jaata).
+            return service.actor_label(who, None if for_print else user) or "—"
+
         # Sidebar ke drawers (module -> pages): sirf logged-in user ke dekhne layak pages (app/auth/nav.py)
+        # pick_users() / pick_label(u): "kisne kaam kiya" dropdown (active users, Developer nahi) — flow doc user_in_erp_flow_2026_11_24.md
         return {"can": can, "can_edit": can_edit, "can_any": can_any, "can_do": can_do, "me": user,
+                "actor_name": actor_name, "pick_users": service.pickable_users, "pick_label": service.pick_label, "pick_options": service.pickable_options, "my_pick_id": service.my_pick_id,
                 "nav_modules": nav.build_nav(user), "csrf_token_value": generate_csrf}
 
     register_cli(app)

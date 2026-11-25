@@ -51,3 +51,9 @@ Tooling: `scripts/deploy_phase0/update_live_bundle_phase0.sh` (login-aware versi
 - Remove the demo tour completely (`app/tour`, `static/js/tour.js`, `static/js/demo.js`, tour CSS, `DEVELOPER_ONLY_BLUEPRINTS`, base.html tags) — user decision 23 Nov.
 - Remove the `claude_deploy` key from `/root/.ssh/authorized_keys`, rotate the root password (old reminder).
 - Confirm the audit log shows login_ok / user_created rows and no full mobile numbers.
+
+## "Who did it" (U1/U2/U4) — extra deploy notes (24-25 Nov)
+- Two more migrations on top of the Phase 0 chain: `a9c4e1f6b2d8 -> b3d7f2a9c1e5 -> c5e8a1d4b7f2 -> d6f9b2e5c8a3` (nullable `*_by_id` columns) and `e7a0c3f6d9b4` (nullable `*_user_id` columns). Add-only; old rows stay NULL / keep their typed text. Back up the DB first and dry-run on a copy.
+- **Before going live: create every floor worker / store person / inspector as a User (with an active role).** The operator, issued/received/returned by, write-off person, recorded by, inspector and tested-by dropdowns list only active Users (Developer never appears). Without them the required dropdowns (operator, tested by, write-off person, final QC inspector) cannot be filled.
+- Admin sees the Developer's actions as "Administrator"; only a Developer sees the real name.
+

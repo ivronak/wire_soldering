@@ -6,6 +6,7 @@ from datetime import date, datetime
 from flask import render_template, Blueprint, request, redirect, url_for, flash
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.inventory.lookups import warehouse_lot_options
 from app.inventory.posting import balance, post_adjustment, InventoryError
 from app.models import AdjustmentReason, StockAdjustment, StockAdjustmentLine, StockLot, StockMovement, Warehouse
@@ -101,12 +102,14 @@ def stock_adjustments_add():
     count = StockAdjustment.query.filter(StockAdjustment.adj_no.like(f"SA-{year}-%")).count()
     adjustment = StockAdjustment(
         adj_no=f"SA-{year}-{count + 1:03d}", adj_date=data["date"], adj_type=data["type"], warehouse=data["warehouse"],
-        reason=data["reason"], status="Draft", remarks=data["remarks"] or None, is_deleted=False)
+        reason=data["reason"], status="Draft", remarks=data["remarks"] or None, is_deleted=False,
+        created_by_id=auth_service.actor_id())       # W1: kisne banaya (login user, apne aap)
     db.session.add(adjustment)
     for lot, qty in data["lines"]:
         db.session.add(StockAdjustmentLine(adjustment=adjustment, lot=lot, entered_qty=qty))
     if (request.form.get("adj_action") or "draft").strip() == "submit":
         adjustment.status = "Pending approval"
+        adjustment.submitted_by_id = auth_service.actor_id()       # seedha submit kiya to wahi user
     db.session.commit()
     if adjustment.status == "Pending approval":
         flash(f"{adjustment.adj_no} submitted. Stock changes only after it is approved.", "success")
@@ -122,6 +125,7 @@ def stock_adjustments_submit(adj_id):
         flash("Only a draft can be submitted.", "error")
         return redirect(list_url("pending"))
     adjustment.status = "Pending approval"
+    adjustment.submitted_by_id = auth_service.actor_id()           # W1: kisne approval ke liye bheja
     db.session.commit()
     flash(f"{adjustment.adj_no} submitted for approval.", "success")
     return redirect(list_url("pending"))
@@ -141,6 +145,7 @@ def stock_adjustments_approve(adj_id):
         return redirect(list_url("pending"))
     adjustment.approval_note = (request.form.get("approval_note") or "").strip()[:255] or None
     adjustment.status = "Posted"
+    adjustment.approved_by_id = auth_service.actor_id()            # W1: kisne approve kiya (stock isi se badla)
     db.session.commit()
     flash(f"{adjustment.adj_no} approved and posted. The stock was updated.", "success")
     return redirect(list_url("completed"))
@@ -153,6 +158,7 @@ def stock_adjustments_cancel(adj_id):
         flash("A posted adjustment cannot be cancelled. Make an opposite adjustment instead.", "error")
         return redirect(list_url("completed"))
     adjustment.status = "Cancelled"
+    adjustment.cancelled_by_id = auth_service.actor_id()           # W1: kisne cancel kiya
     db.session.commit()
     flash(f"{adjustment.adj_no} cancelled. The stock was not changed.", "success")
     return redirect(list_url("pending"))

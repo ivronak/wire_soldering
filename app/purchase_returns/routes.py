@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import render_template, Blueprint, request, redirect, url_for, flash
 from app.extensions import db
+from app.auth import service as auth_service
 from app.models import (
     PurchaseReturn, PurchaseReturnLine, PurchaseReturnCharge,
     PurchaseInvoice, PurchaseInvoiceLine, Charge,
@@ -175,6 +176,7 @@ def purchase_returns_add():
         charges_total = data["charges_total"],
         total_amount = data["total_amount"],
         gst_on_charges = True,
+        created_by_id = auth_service.actor_id(),     # W1: kisne banaya
         is_deleted = False,
     )
     db.session.add(purchase_return)
@@ -204,7 +206,7 @@ def purchase_returns_add():
     vendor_name = data["invoice"].vendor.name
     flash(f"Return {pr_no} posted. {vendor_name} will credit you ₹{data['total_amount']:,.2f}.", "success")
     # Purchase invoice ka Edit wala user (jise Purchase return page ka View nahi) save ke baad 403 page na dekhe -> invoice page par wapas
-    from app.auth import registry as auth_registry, service as auth_service
+    from app.auth import registry as auth_registry     # auth_service upar module level par import hai
     if auth_service.user_can(auth_service.current(), "purchase_returns", auth_registry.LEVEL_VIEW):
         return redirect(url_for("purchase_returns.purchase_return_list"))
     return redirect(url_for("purchase_invoices.purchase_invoices_list", tab="completed"))
@@ -218,6 +220,7 @@ def purchase_returns_cancel(ret_id):
         return redirect(url_for("purchase_returns.purchase_return_list"))
 
     cancel_return(purchase_return)
+    purchase_return.cancelled_by_id = auth_service.actor_id()    # W1: kisne cancel kiya
     db.session.commit()
     flash(f"Return {purchase_return.pr_no} cancelled. The credit of ₹{purchase_return.total_amount:,.2f} was taken back, "
           f"and the quantity can be returned again.", "success")

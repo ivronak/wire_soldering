@@ -122,7 +122,7 @@
                   data-status="{{ r.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ r.pr_no }}</td>
-                <td class="tabular-nums">{{ r.return_date.strftime('%d %b %Y') if r.return_date else '—' }}{% if r.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ r.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ r.return_date.strftime('%d %b %Y') if r.return_date else '—' }}{% if r.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ r.created_at|ist }}{% if r.created_by %} by {{ actor_name(r.created_by) }}{% endif %}{% if r.cancelled_by %} · cancelled by {{ actor_name(r.cancelled_by) }}{% endif %}</div>{% endif %}</td>
                 <td class="text-left">{{ inv.vendor.name if inv and inv.vendor else '—' }}</td>
                 <td>
                   <div class="font-mono font-semibold text-ink">{{ inv.pi_no if inv else '—' }}</div>

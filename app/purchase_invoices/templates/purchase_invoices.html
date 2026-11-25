@@ -246,7 +246,7 @@
                 <td class="text-left">
                   <div class="font-medium text-ink">Vendor invoice {{ inv.vendor_invoice_no }}</div>
                   <div class="text-[11.5px] text-ink-faint">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }} · {{ inv.lines|length }} line{{ '' if inv.lines|length == 1 else 's' }}</div>
-                  {% if inv.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ inv.created_at|ist }}</div>{% endif %}
+                  {% if inv.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ inv.created_at|ist }}{% if inv.created_by %} by {{ actor_name(inv.created_by) }}{% endif %}{% if inv.posted_by %} · posted by {{ actor_name(inv.posted_by) }}{% endif %}{% if inv.cancelled_by %} · cancelled by {{ actor_name(inv.cancelled_by) }}{% endif %}</div>{% endif %}
                 </td>
                 <td class="tabular-nums font-semibold text-ink">₹{{ '{:,.2f}'.format(inv.total_amount or 0) }}</td>
                 <td>—</td>
@@ -310,7 +310,7 @@
                   data-status="{{ inv.status|lower }}">
                 <td class="text-[12.5px] text-ink-faint tabular-nums">{{ loop.index }}</td>
                 <td class="font-mono font-semibold text-ink">{{ inv.pi_no }}</td>
-                <td class="tabular-nums">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}{% if inv.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ inv.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '—' }}{% if inv.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ inv.created_at|ist }}{% if inv.created_by %} by {{ actor_name(inv.created_by) }}{% endif %}{% if inv.posted_by %} · posted by {{ actor_name(inv.posted_by) }}{% endif %}{% if inv.cancelled_by %} · cancelled by {{ actor_name(inv.cancelled_by) }}{% endif %}</div>{% endif %}</td>
                 <td class="text-left">{{ inv.vendor.name if inv.vendor else '—' }}</td>
                 <td class="font-mono text-[12.5px]">{{ inv.vendor_invoice_no }}</td>
                 <td class="tabular-nums">{{ inv.lines|length }}</td>

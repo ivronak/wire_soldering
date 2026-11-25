@@ -6,6 +6,7 @@ from app.inventory.posting import qc_passed_to_stock, InventoryError
 from app.models import InwardQC, GRN, GRNLine, RejectionMemo, RMQCParameter, InwardQCResult
 from app.raw_materials.routes import qc_parameter_to_dict
 from app.extensions import db
+from app.auth import service as auth_service
 from datetime import datetime
 
 inward_qc_bp = Blueprint("inward_qc", __name__, template_folder="templates")
@@ -53,6 +54,7 @@ def latest_draft_payload(line_id):
         "qc_no": d.qc_no,
         "inspection_date": d.inspection_date.strftime("%Y-%m-%d") if d.inspection_date else "",
         "inspector": d.inspector or "",
+        "inspector_user_id": d.inspector_user_id or "",
         "sample_size": d.sample_size,
         "passed_qty": d.passed_qty,
         "rejected_qty": d.rejected_qty,
@@ -196,7 +198,6 @@ def inward_qc_grn_lines(grn_id):
 @inward_qc_bp.route('/inward_qc/add', methods=['POST'])
 def inward_qc_add():
     inspection_date_raw = (request.form.get('inspection_date') or "").strip()
-    inspector = (request.form.get('inspector') or "").strip()
     grn_line_id = int(request.form.get('grn_line_id')) if (request.form.get('grn_line_id') or "").strip() else None
     sample_size = float(request.form.get('sample_size') or 0) 
     passed_qty = float(request.form.get('passed_qty') or 0) 
@@ -204,6 +205,11 @@ def inward_qc_add():
     remarks = (request.form.get('remarks') or "").strip()
     qc_action = (request.form.get("qc_action") or "draft").strip()
 
+    # Inspector = dropdown se chuna User (W2). Draft me optional, final result me zaroori; Developer / inactive / galat id reject
+    inspector, inspector_error = auth_service.read_picked_user(request.form, "inspector", required=(qc_action != "draft"), label="the inspector")
+    if inspector_error:
+        flash(inspector_error, "error")
+        return redirect(url_for('inward_qc.inward_qc_list'))
 
     if not inspection_date_raw or not grn_line_id :
         return redirect(url_for('inward_qc.inward_qc_list'))
@@ -281,12 +287,14 @@ def inward_qc_add():
         qc_no=qc_no,
         grn_line_id=grn_line_id,
         inspection_date=inspection_date,
-        inspector=inspector,
+        inspector=inspector.full_name if inspector else "",
+        inspector_user_id=inspector.id if inspector else None,
         sample_size=sample_size,
         passed_qty=passed_qty,
         rejected_qty=rejected_qty,
         status=status,
         remarks=remarks,
+        created_by_id=auth_service.actor_id(),       # W1: kisne save kiya (inspector naam alag, wo W2 hai)
         is_deleted=False,
     )            
 
@@ -344,6 +352,7 @@ def inward_qc_add():
             memo_date = inspection_date,
             rejected_qty = rejected_qty,
             reason = reason,
+            created_by_id = auth_service.actor_id(),     # memo apne aap bana, jis user ne QC kiya wahi
         ))    
 
 

@@ -4,6 +4,7 @@
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 
 from app.extensions import db
 from app.models import MachineExtraHours, Machines
@@ -101,6 +102,8 @@ def production_planning_extra_hours():
         db.session.add(row)
     row.extra_hours = round(hours, 2)
     row.reason = reason or None
+    row.set_by_id = auth_service.actor_id()                                                         # W1: kisne set kiya (auto)
+    row.set_by = auth_service.actor_label(auth_service.current(), None)       # text snapshot (Developer ho to "Administrator")
     db.session.flush()
     persist_schedule()
     db.session.commit()

@@ -195,7 +195,7 @@
         html += '<section class="cv-box"><h3>Reviewed</h3><p class="text-[13.5px]">By <b>' + esc(d.reviewed.by) + '</b> on ' + esc(d.reviewed.at) + (d.reviewed.note ? '<br>Note: ' + esc(d.reviewed.note) : '') + '</p></section>';
       } {# Review form JS se banta hai aur POST karta hai -> sirf variance Edit wale ko #}{% if can_edit('variance') %}else {
         html += '<section class="cv-box"><h3>Mark as reviewed</h3><p class="sub">Once you have looked at this and understood any difference, mark it reviewed.</p>' +
-          '<form method="post" action="/consumption_variance/review/' + d.output_id + '" class="space-y-2"><input class="cv-input" name="reviewed_by" maxlength="60" placeholder="Your name" required>' +
+          '<form method="post" action="/consumption_variance/review/' + d.output_id + '" class="space-y-2"><p class="text-[12.5px] text-ink-muted">You are marking this reviewed as <b>' + esc({{ (me.full_name or '')|tojson }}) + '</b> (taken from your login).</p>' +
           '<input class="cv-input" name="review_note" maxlength="255" placeholder="Note, e.g. extra tin because of a spill (optional)"><button type="submit" class="cv-btn primary">Mark reviewed</button></form></section>';
       }{% endif %}
     }

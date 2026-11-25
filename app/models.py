@@ -448,6 +448,14 @@ class PurchaseOrder(CreatedAtMixin, db.Model):
     # "aur GRN nahi aayega" mark karna, status "Cancelled" ho jata hai
     short_close_reason = db.Column(db.String(255), nullable=True)
 
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="PurchaseOrder.created_by_id")
+    confirmed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    confirmed_by = db.relationship("User", foreign_keys="PurchaseOrder.confirmed_by_id")
+    short_closed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    short_closed_by = db.relationship("User", foreign_keys="PurchaseOrder.short_closed_by_id")
+
     # F9: nayi PO me GST charges + items ke total par lagta hai (True). Purani PO (jo vendor ko ja chuki) ka total
     # na badle, isliye unme server_default False — wahi purana line-wise GST aur charges bina tax ke.
     gst_on_charges = db.Column(db.Boolean, default=True, server_default=db.false(), nullable=False)
@@ -591,6 +599,12 @@ class GRN(CreatedAtMixin, db.Model):
     transporter = db.Column(db.String(100), nullable=True)
     vehicle_no = db.Column(db.String(20), nullable=True)
     gross_weight = db.Column(db.Float, nullable=True)
+
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="GRN.created_by_id")
+    posted_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    posted_by = db.relationship("User", foreign_keys="GRN.posted_by_id")
     status = db.Column(db.String(20), default="Pending QC", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
 
@@ -711,6 +725,9 @@ class InwardQC(CreatedAtMixin, db.Model):
     inspection_date = db.Column(db.Date, nullable=False)
     # Auth/User master baad me — abhi naam text
     inspector = db.Column(db.String(100), nullable=False)
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    inspector_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    inspector_user = db.relationship("User", foreign_keys="InwardQC.inspector_user_id")
 
     sample_size = db.Column(db.Float, nullable=False)
     passed_qty = db.Column(db.Float, nullable=False)
@@ -718,6 +735,10 @@ class InwardQC(CreatedAtMixin, db.Model):
 
     # F11: QC report / certificate ki file (optional). DB me path hamesha "/" se: "inward_qc/<id>/<naam>" (UPLOAD_FOLDER ke andar)
     report_file = db.Column(db.String(255), nullable=True)
+
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="InwardQC.created_by_id")
 
     # Draft / Passed / Partial / Failed
     status = db.Column(db.String(20), default="Draft", nullable=False)
@@ -827,6 +848,14 @@ class ProductionOrder(CreatedAtMixin, db.Model):
     # Balance order: kami poori karne ke liye bana naya order, original order ki id yahan (card par "Balance of PROD-...").
     balance_for_id = db.Column(db.Integer, db.ForeignKey("production_orders.id"), nullable=True)
     balance_for = db.relationship("ProductionOrder", remote_side=[id], foreign_keys=[balance_for_id])
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="ProductionOrder.created_by_id")
+    released_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    released_by = db.relationship("User", foreign_keys="ProductionOrder.released_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="ProductionOrder.cancelled_by_id")
+
 
     @property
     def issue_status(self):
@@ -970,6 +999,10 @@ class RejectionMemo(CreatedAtMixin, db.Model):
     reason = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), default="Issued", nullable=False)
 
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="RejectionMemo.created_by_id")
+
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
 class RMQCParameter(CreatedAtMixin, db.Model):
@@ -1084,6 +1117,14 @@ class PurchaseInvoice(CreatedAtMixin, db.Model):
     tax_total = db.Column(db.Float, default=0, nullable=False)
     charges_total = db.Column(db.Float, default=0, nullable=False)  # freight / other charges: Add (+) aur Minus (-) ka jod
     total_amount = db.Column(db.Float, default=0, nullable=False)   # vendor ko dena baaki
+
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="PurchaseInvoice.created_by_id")
+    posted_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    posted_by = db.relationship("User", foreign_keys="PurchaseInvoice.posted_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="PurchaseInvoice.cancelled_by_id")
 
     # Client rule: ek GRN = ek bill. Purane bills (lot-wise bane the) me ye khaali hai.
     grn_id = db.Column(db.Integer, db.ForeignKey("grns.id"), nullable=True)
@@ -1339,6 +1380,12 @@ class PurchaseReturn(CreatedAtMixin, db.Model):
     return_date = db.Column(db.Date, nullable=False)
     reason = db.Column(db.String(255), nullable=False)       # PRD: reason zaroori
 
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="PurchaseReturn.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="PurchaseReturn.cancelled_by_id")
+
     # Posted -> Cancelled (Draft nahi: return seedha post hota hai)
     status = db.Column(db.String(20), default="Posted", nullable=False)
 
@@ -1546,6 +1593,17 @@ class MaterialIssue(CreatedAtMixin, db.Model):
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
     issued_by = db.Column(db.String(60), nullable=True)      # store se kisne diya (slip par)
     received_by = db.Column(db.String(60), nullable=True)    # production me kisne liya
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    issued_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    issued_by_user = db.relationship("User", foreign_keys="MaterialIssue.issued_by_user_id")
+    received_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    received_by_user = db.relationship("User", foreign_keys="MaterialIssue.received_by_user_id")
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="MaterialIssue.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="MaterialIssue.cancelled_by_id")
+
 
 
 class MaterialIssueLine(CreatedAtMixin, db.Model):
@@ -1614,7 +1672,16 @@ class MaterialReturn(CreatedAtMixin, db.Model):
     status = db.Column(db.String(20), default="Posted", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
     returned_by = db.Column(db.String(60), nullable=True)
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    returned_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    returned_by_user = db.relationship("User", foreign_keys="MaterialReturn.returned_by_user_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="MaterialReturn.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="MaterialReturn.cancelled_by_id")
+
 
 
 class MaterialWriteOff(CreatedAtMixin, db.Model):
@@ -1633,7 +1700,14 @@ class MaterialWriteOff(CreatedAtMixin, db.Model):
     qty = db.Column(db.Float, nullable=False)
     reason = db.Column(db.String(255), nullable=False)
     written_off_by = db.Column(db.String(60), nullable=False)
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    written_off_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    written_off_by_user = db.relationship("User", foreign_keys="MaterialWriteOff.written_off_by_user_id")
     write_off_date = db.Column(db.Date, nullable=False)
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="MaterialWriteOff.created_by_id")
+
 
 
 class MaterialReturnLine(CreatedAtMixin, db.Model):
@@ -1679,6 +1753,15 @@ class StockTransfer(CreatedAtMixin, db.Model):
     vehicle_no = db.Column(db.String(30), nullable=True)
     eway_bill_no = db.Column(db.String(30), nullable=True)      # alag GSTIN ki branch ke beech zaroori
     remarks = db.Column(db.String(255), nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="StockTransfer.created_by_id")
+    dispatched_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    dispatched_by = db.relationship("User", foreign_keys="StockTransfer.dispatched_by_id")
+    received_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    received_by = db.relationship("User", foreign_keys="StockTransfer.received_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="StockTransfer.cancelled_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
@@ -1741,6 +1824,15 @@ class StockAdjustment(CreatedAtMixin, db.Model):
     status = db.Column(db.String(20), default="Draft", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
     approval_note = db.Column(db.String(255), nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="StockAdjustment.created_by_id")
+    submitted_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    submitted_by = db.relationship("User", foreign_keys="StockAdjustment.submitted_by_id")
+    approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    approved_by = db.relationship("User", foreign_keys="StockAdjustment.approved_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="StockAdjustment.cancelled_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
@@ -1792,6 +1884,13 @@ class OpeningStock(CreatedAtMixin, db.Model):
 
     status = db.Column(db.String(20), default="Draft", nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="OpeningStock.created_by_id")
+    posted_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    posted_by = db.relationship("User", foreign_keys="OpeningStock.posted_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="OpeningStock.cancelled_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
 
@@ -1875,6 +1974,9 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     started_at = db.Column(db.DateTime, nullable=True)       # IST (naive)
     completed_at = db.Column(db.DateTime, nullable=True)
     operator = db.Column(db.String(60), nullable=True)
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    operator_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    operator_user = db.relationship("User", foreign_keys="ProductionOrderStage.operator_user_id")
     qty_in = db.Column(db.Float, nullable=True)              # KG jo is stage me aaya (pichhle stage ka out; pehle stage me batch KG)
     qty_out = db.Column(db.Float, nullable=True)             # KG jo ye stage poora karke aage gaya
     scrap_qty = db.Column(db.Float, nullable=True)           # KG jo is stage me kharab hua
@@ -1894,6 +1996,12 @@ class ProductionOrderStage(CreatedAtMixin, db.Model):
     held_at = db.Column(db.DateTime, nullable=True)
     hold_reason = db.Column(db.String(120), nullable=True)
     hold_minutes = db.Column(db.Float, default=0, server_default="0", nullable=False)
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    started_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    started_by = db.relationship("User", foreign_keys="ProductionOrderStage.started_by_id")
+    completed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    completed_by = db.relationship("User", foreign_keys="ProductionOrderStage.completed_by_id")
+
 
     def worked_seconds(self, now):
         # Machine ne asal me kitni der kaam kiya: start se (ab ya finish tak) minus jitni der hold raha. Hold chal raha ho to timer wahi ruka hua dikhta hai.
@@ -1972,6 +2080,9 @@ class ProductionOutput(CreatedAtMixin, db.Model):
     total_value = db.Column(db.Float, default=0, nullable=False)                 # WIP se use hue RM ki kul value (Rs)
     unit_cost = db.Column(db.Float, default=0, nullable=False)                   # total_value / good_qty
     recorded_by = db.Column(db.String(60), nullable=True)
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    recorded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    recorded_by_user = db.relationship("User", foreign_keys="ProductionOutput.recorded_by_user_id")
     remarks = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(12), default="Posted", nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
@@ -1985,6 +2096,14 @@ class ProductionOutput(CreatedAtMixin, db.Model):
     fixed_cost_per_kg = db.Column(db.Float, default=0, server_default="0", nullable=False)
     fixed_cost_total = db.Column(db.Float, default=0, server_default="0", nullable=False)
     fixed_cost_basis = db.Column(db.String(8), nullable=True)
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="ProductionOutput.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="ProductionOutput.cancelled_by_id")
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    reviewed_by_user = db.relationship("User", foreign_keys="ProductionOutput.reviewed_by_id")
+
 
 
 class FixedCostPeriod(CreatedAtMixin, db.Model):
@@ -2012,6 +2131,10 @@ class MachineExtraHours(CreatedAtMixin, db.Model):
     extra_hours = db.Column(db.Float, nullable=False, default=0)
     reason = db.Column(db.String(120), nullable=True)
     set_by = db.Column(db.String(60), nullable=True)
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    set_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    set_by_user = db.relationship("User", foreign_keys="MachineExtraHours.set_by_id")
+
 
 
 class FixedCostMonth(CreatedAtMixin, db.Model):
@@ -2108,11 +2231,18 @@ class StageLabQC(CreatedAtMixin, db.Model):
     stage = db.relationship("ProductionOrderStage", foreign_keys=[stage_id], backref=db.backref("lab_qcs", order_by="StageLabQC.id"))
     tested_at = db.Column(db.DateTime, nullable=False)
     tested_by = db.Column(db.String(60), nullable=False)
+    # W2 "zimmedar" (U4): dropdown se chuna user; upar wala text column uska naam-snapshot hai (print / purane rows ke liye)
+    tested_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    tested_by_user = db.relationship("User", foreign_keys="StageLabQC.tested_by_user_id")
     result = db.Column(db.String(20), nullable=False)            # "Pass" / "Need correction" / "Fail"
     remarks = db.Column(db.String(255), nullable=True)
     tc_file = db.Column(db.String(255), nullable=True)           # UPLOAD_FOLDER ke andar ka relative path (Pass par zaroori)
     # Correction me store se jo extra maal auto-issue hua (client meeting 2, #12): [{material, qty, unit, added_by, reason, issue_no}]
     corrections = db.Column(db.JSON, nullable=True)
+    # --- kaun ne kiya (W1, login user se apne aap; purane rows NULL) ---
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="StageLabQC.created_by_id")
+
 
 
 class Rack(CreatedAtMixin, db.Model):
@@ -2137,6 +2267,11 @@ class ScrapPack(CreatedAtMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     pack_no = db.Column(db.String(20), unique=True, nullable=False)
     pack_date = db.Column(db.Date, nullable=False)                 # kis din ka scrap (batch ki mfg_date)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="ScrapPack.created_by_id")
+    unpacked_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    unpacked_by = db.relationship("User", foreign_keys="ScrapPack.unpacked_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
@@ -2188,6 +2323,13 @@ class Quotation(CreatedAtMixin, db.Model):
     customer_po_date = db.Column(db.Date, nullable=True)
     po_file = db.Column(db.String(255), nullable=True)                        # uploads ke andar relative path, hamesha "/" se joda hua
     finalized_at = db.Column(db.DateTime, nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="Quotation.created_by_id")
+    status_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    status_by = db.relationship("User", foreign_keys="Quotation.status_by_id")
+    finalized_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    finalized_by = db.relationship("User", foreign_keys="Quotation.finalized_by_id")
     bundle_no = db.Column(db.String(20), nullable=True)
     revision_no = db.Column(db.Integer, default=0, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
@@ -2286,6 +2428,9 @@ class QuotationRevision(CreatedAtMixin, db.Model):
     snapshot = db.Column(db.JSON, nullable=False)
     old_total = db.Column(db.Float, nullable=True)
     new_total = db.Column(db.Float, nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="QuotationRevision.created_by_id")
 
 
 class DeliveryChallan(CreatedAtMixin, db.Model):
@@ -2304,6 +2449,11 @@ class DeliveryChallan(CreatedAtMixin, db.Model):
     status = db.Column(db.String(12), default="Dispatched", nullable=False)   # Dispatched / Cancelled
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="DeliveryChallan.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="DeliveryChallan.cancelled_by_id")
     # S4: jis Sales Invoice me is challan ka maal bill hua. Khaali = abhi bill nahi bana (invoice cancel hone par wapas khaali)
     invoice_id = db.Column(db.Integer, db.ForeignKey("sales_invoices.id"), nullable=True)
     invoice = db.relationship("SalesInvoice", foreign_keys=[invoice_id], backref=db.backref("challans", order_by="DeliveryChallan.id"))
@@ -2363,6 +2513,13 @@ class SalesInvoice(CreatedAtMixin, db.Model):
 
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="SalesInvoice.created_by_id")
+    loss_approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    loss_approved_by = db.relationship("User", foreign_keys="SalesInvoice.loss_approved_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="SalesInvoice.cancelled_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
@@ -2523,6 +2680,11 @@ class SalesReceipt(CreatedAtMixin, db.Model):
     status = db.Column(db.String(12), default="Posted", nullable=False)       # Posted / Cancelled
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="SalesReceipt.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="SalesReceipt.cancelled_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property
@@ -2565,6 +2727,11 @@ class SalesReturn(CreatedAtMixin, db.Model):
     total_amount = db.Column(db.Float, default=0, nullable=False)               # customer ko itna credit
     cancel_reason = db.Column(db.String(255), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    # W1 "kisne kiya" (U2): login user se apne aap bharta hai; purane rows me NULL (list me "—")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="SalesReturn.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="SalesReturn.cancelled_by_id")
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
     @property

@@ -7,6 +7,7 @@ from datetime import date, datetime
 from flask import render_template, Blueprint, request, redirect, url_for, flash
 
 from app.extensions import db
+from app.auth import service as auth_service
 from app.inventory.lookups import warehouse_lot_options
 from app.inventory.posting import balance, dispatch_transfer, receive_transfer, transfer_cancelled, InventoryError
 from app.models import StockLot, StockTransfer, StockTransferLine, Warehouse
@@ -100,7 +101,8 @@ def stock_transfers_add():
     transfer = StockTransfer(
         transfer_no=f"ST-{year}-{count + 1:03d}", transfer_date=data["date"], from_warehouse=data["source"],
         to_warehouse=data["destination"], status="Draft", vehicle_no=data["vehicle"] or None,
-        eway_bill_no=data["eway"] or None, remarks=data["remarks"] or None, is_deleted=False)
+        eway_bill_no=data["eway"] or None, remarks=data["remarks"] or None, is_deleted=False,
+        created_by_id=auth_service.actor_id())       # W1: kisne banaya (login user, apne aap)
     db.session.add(transfer)
     for lot, qty in data["lines"]:
         db.session.add(StockTransferLine(transfer=transfer, lot=lot, qty=qty))
@@ -118,6 +120,7 @@ def stock_transfers_add():
             flash(str(stock_error), "error")
             return redirect(list_url("pending"))
         transfer.status = "In transit"
+        transfer.dispatched_by_id = auth_service.actor_id()         # seedha dispatch kiya to wahi user
     db.session.commit()
     if transfer.status == "In transit":
         flash(f"{transfer.transfer_no} dispatched: the goods left {data['source'].name} and are in transit.", "success")
@@ -147,6 +150,7 @@ def stock_transfers_dispatch(transfer_id):
         flash(str(stock_error), "error")
         return redirect(list_url("pending"))
     transfer.status = "In transit"
+    transfer.dispatched_by_id = auth_service.actor_id()             # W1: kisne dispatch kiya
     db.session.commit()
     flash(f"{transfer.transfer_no} dispatched: the goods left {transfer.from_warehouse.name} and are in transit.", "success")
     return redirect(list_url("pending"))
@@ -160,6 +164,7 @@ def stock_transfers_receive(transfer_id):
         return redirect(list_url("pending"))
     receive_transfer(transfer, date.today())
     transfer.status = "Received"
+    transfer.received_by_id = auth_service.actor_id()               # W1: kisne receive kiya
     db.session.commit()
     flash(f"{transfer.transfer_no} received: the goods are now in {transfer.to_warehouse.name}.", "success")
     return redirect(list_url("completed"))
@@ -175,6 +180,7 @@ def stock_transfers_cancel(transfer_id):
     if was_in_transit:
         transfer_cancelled(transfer)        # maal wapas source me (ulti rows)
     transfer.status = "Cancelled"
+    transfer.cancelled_by_id = auth_service.actor_id()              # W1: kisne cancel kiya
     db.session.commit()
     flash(f"{transfer.transfer_no} cancelled." + (f" The goods went back to {transfer.from_warehouse.name}." if was_in_transit else ""), "success")
     return redirect(list_url("completed"))

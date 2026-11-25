@@ -2,6 +2,7 @@ from flask import render_template, Blueprint, redirect, url_for, request, flash,
 from app.inventory.posting import receive_grn, store_warehouse_for, InventoryError
 from app.models import GRN, PurchaseOrder, GRNLine, Rack
 from app.extensions import db
+from app.auth import service as auth_service
 from datetime import datetime
 
 grns_bp = Blueprint("grns", __name__, template_folder="templates")
@@ -151,6 +152,8 @@ def grns_add():
         gross_weight=gross_weight,
         status=status,
         remarks=remarks,
+        created_by_id=auth_service.actor_id(),       # W1: kisne banayi
+        posted_by_id=auth_service.actor_id() if status != "Draft" else None,   # seedha post kiya to wahi post karne wala
         is_deleted=False,
     )
     db.session.add(grn)
@@ -241,6 +244,7 @@ def grns_post(grn_id):
         return redirect(url_for('grns.grns_list'))
 
     grn.status = "Pending QC"
+    grn.posted_by_id = auth_service.actor_id()          # W1: kisne post kiya
     refresh_po_status(grn.po)
     try:
         receive_grn(grn)

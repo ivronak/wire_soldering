@@ -87,13 +87,13 @@
               {% for r in receipts %}
               <tr>
                 <td><span class="inline-block font-mono text-[13px] font-bold text-ink bg-mist border border-slate-200 rounded px-2 py-1">{{ r.receipt_no }}</span>
-                  <div class="text-[12px] text-ink-faint mt-1">{{ r.receipt_date.strftime('%d %b %Y') }}</div></td>
+                  <div class="text-[12px] text-ink-faint mt-1">{{ r.receipt_date.strftime('%d %b %Y') }}{% if r.created_by %} · by {{ actor_name(r.created_by) }}{% endif %}</div></td>
                 <td class="font-semibold text-ink">{{ r.customer.name }}</td>
                 <td>{{ r.payment_mode.name }}{% if r.reference %}<div class="text-[12px] text-ink-faint">{{ r.reference }}</div>{% endif %}</td>
                 <td>
                   {% for a in r.allocations %}<div class="text-[13.5px]"><span class="font-mono font-bold">{{ a.invoice.invoice_no }}</span> — ₹ {{ '{:,.2f}'.format(a.amount) }}</div>{% endfor %}
                   {% if r.status == 'Posted' and r.on_account > 0.004 %}<div class="mt-1"><span class="q-chip Adv">On account ₹ {{ '{:,.2f}'.format(r.on_account) }}</span></div>{% endif %}
-                  {% if r.status == 'Cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled: {{ r.cancel_reason }}</div>{% endif %}
+                  {% if r.status == 'Cancelled' %}<div class="text-[12px] text-ink-faint mt-1">Cancelled{% if r.cancelled_by %} by {{ actor_name(r.cancelled_by) }}{% endif %}: {{ r.cancel_reason }}</div>{% endif %}
                   {% if r.notes %}<div class="text-[12px] text-ink-faint mt-1">{{ r.notes }}</div>{% endif %}
                 </td>
                 <td class="num font-semibold tabular-nums">{{ '{:,.2f}'.format(r.amount) }}</td>

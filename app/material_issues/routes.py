@@ -6,6 +6,7 @@
 from datetime import date, datetime
 
 from flask import render_template, Blueprint, request, redirect, url_for, flash, abort
+from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 
 from app.extensions import db
 from app.inventory.money import q4
@@ -204,8 +205,12 @@ def read_issue_form():
     except ValueError:
         return None, "Enter a valid issue date."
     remarks = (request.form.get("remarks") or "").strip()[:255]
-    issued_by = (request.form.get("issued_by") or "").strip()[:60]
-    received_by = (request.form.get("received_by") or "").strip()[:60]
+    issued_by, person_error = auth_service.read_picked_user(request.form, "issued_by", label="who issued it (store)")
+    if person_error:
+        return None, person_error
+    received_by, person_error = auth_service.read_picked_user(request.form, "received_by", label="who received it (production)")
+    if person_error:
+        return None, person_error
 
     wanted = []          # (production_order_line, qty)
     i = 0
@@ -253,10 +258,11 @@ def read_issue_form():
                 break
         if left > 0.00005:
             return None, f"{name}: only {qty - left:g} {unit} is free in the store, but {qty:g} {unit} was asked."
-    return {"order": order, "issue_date": issue_date, "remarks": remarks, "issued_by": issued_by, "received_by": received_by, "allocation": allocation}, None
+    return {"order": order, "issue_date": issue_date, "remarks": remarks, "issued_by": issued_by, "received_by": received_by, "allocation": allocation}, None       # issued_by / received_by = User ya None
 
 
 def auto_issue_extra(order, order_line, qty, received_by, remarks):
+    # received_by = dropdown se chuna User (W2: kisne store se liya); text snapshot uska naam
     """Production ko store se ek click me extra maal (client meeting 2, #14): jaise 500 spool diye the par 520 bane to 20 aur.
     Normal issue jaisa hi: FIFO lot, stock WIP me, naam + reason ke saath. Store me kam ho to InventoryError (kuch save nahi hota)."""
     qty = q4(qty)
@@ -274,7 +280,7 @@ def auto_issue_extra(order, order_line, qty, received_by, remarks):
     today = date.today()
     count = MaterialIssue.query.filter(MaterialIssue.issue_no.like(f"MI-{today.year}-%")).count()
     issue = MaterialIssue(issue_no=f"MI-{today.year}-{count + 1:03d}", production_order=order, issue_date=today, status="Draft",
-                          remarks=remarks[:255], is_deleted=False, issued_by="Auto-issue", received_by=received_by[:60])
+                          remarks=remarks[:255], is_deleted=False, issued_by="Auto-issue", received_by=received_by.full_name[:60], received_by_user_id=received_by.id, created_by_id=auth_service.actor_id())
     db.session.add(issue)
     for lot, take in allocation:
         db.session.add(MaterialIssueLine(issue=issue, production_order_line=order_line, raw_material_id=order_line.raw_material_id, lot=lot, qty=take))
@@ -297,7 +303,9 @@ def material_issues_add():
     issue_no = f"MI-{year}-{count + 1:03d}"
     issue = MaterialIssue(issue_no=issue_no, production_order=data["order"], issue_date=data["issue_date"],
                           status="Draft", remarks=data["remarks"], is_deleted=False,
-                          issued_by=data["issued_by"], received_by=data["received_by"])
+                          issued_by=data["issued_by"].full_name if data["issued_by"] else None, issued_by_user_id=data["issued_by"].id if data["issued_by"] else None,
+                          received_by=data["received_by"].full_name if data["received_by"] else None, received_by_user_id=data["received_by"].id if data["received_by"] else None,
+                          created_by_id=auth_service.actor_id())
     db.session.add(issue)
     for line, lot, qty in data["allocation"]:
         db.session.add(MaterialIssueLine(issue=issue, production_order_line=line, raw_material_id=line.raw_material_id, lot=lot, qty=qty))
@@ -351,6 +359,7 @@ def material_issues_cancel(issue_id):
             return redirect(list_url("issued"))
         issue_cancelled(issue)          # stock wapas store me (ulti rows)
     issue.status = "Cancelled"
+    issue.cancelled_by_id = auth_service.actor_id()
     db.session.commit()
     flash(f"Material issue {issue.issue_no} cancelled." + (" The material went back to the store." if was_posted else ""), "success")
     return redirect(list_url("issue" if not was_posted else "issued"))
@@ -375,7 +384,9 @@ def read_return_form():
     if reason not in RETURN_REASONS:
         return None, "Choose why the material is being returned."
     remarks = (request.form.get("remarks") or "").strip()[:255]
-    returned_by = (request.form.get("returned_by") or "").strip()[:60]
+    returned_by, person_error = auth_service.read_picked_user(request.form, "returned_by", label="who returned it")
+    if person_error:
+        return None, person_error
 
     wanted = []
     seen = set()
@@ -424,7 +435,9 @@ def material_returns_add():
     count = MaterialReturn.query.filter(MaterialReturn.return_no.like(f"MR-{year}-%")).count()
     return_no = f"MR-{year}-{count + 1:03d}"
     ret = MaterialReturn(return_no=return_no, production_order=data["order"], return_date=data["return_date"], reason=data["reason"],
-                         remarks=data["remarks"], returned_by=data["returned_by"], status="Posted", is_deleted=False)
+                         remarks=data["remarks"], returned_by=data["returned_by"].full_name if data["returned_by"] else None,
+                         returned_by_user_id=data["returned_by"].id if data["returned_by"] else None, status="Posted", is_deleted=False,
+                         created_by_id=auth_service.actor_id())
     db.session.add(ret)
     for line, qty in data["lines"]:
         db.session.add(MaterialReturnLine(material_return=ret, issue_line=line, raw_material_id=line.raw_material_id, lot=line.lot, qty=qty))
@@ -448,10 +461,10 @@ def material_writeoff_add():
     if order is None or order.is_deleted or order.status != "In production":
         flash("Material can be written off only for an order that is in production.", "error")
         return back
-    by = (request.form.get("written_off_by") or "").strip()[:60]
+    by, by_error = auth_service.read_picked_user(request.form, "written_off_by", required=True, label="the person responsible")
     reason = (request.form.get("reason") or "").strip()[:255]
-    if not by or len(reason) < 3:
-        flash("Write who is responsible and the reason for the write-off.", "error")
+    if by_error or len(reason) < 3:
+        flash(by_error or "Write the reason for the write-off.", "error")
         return back
     rows = []
     i = 0
@@ -477,11 +490,11 @@ def material_writeoff_add():
         return back
     for line, qty in rows:
         db.session.add(MaterialWriteOff(production_order=order, order_line_id=line.id, raw_material_id=line.raw_material_id, qty=qty,
-                                        reason=reason, written_off_by=by, write_off_date=date.today()))
+                                        reason=reason, written_off_by=by.full_name, written_off_by_user_id=by.id, write_off_date=date.today(), created_by_id=auth_service.actor_id()))
         line.used_qty = q4((line.used_qty or 0) + qty)
     db.session.commit()
     flash("Written off as missing: " + "; ".join(f"{q:g} {l.raw_material.base_unit.code if l.raw_material and l.raw_material.base_unit else ''} {l.raw_material.name if l.raw_material else ''}".replace("  ", " ") for l, q in rows)
-          + f". It is recorded under {by}.", "success")
+          + f". It is recorded under {by.full_name}.", "success")
     return back
 
 
@@ -505,6 +518,7 @@ def material_returns_cancel(return_id):
         flash(str(stock_error), "error")
         return redirect(list_url("returns"))
     ret.status = "Cancelled"
+    ret.cancelled_by_id = auth_service.actor_id()
     db.session.commit()
     flash(f"Material return {ret.return_no} cancelled. The material went back to WIP.", "success")
     return redirect(list_url("returns"))

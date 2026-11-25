@@ -54,7 +54,7 @@
               {% for a in adjustments %}
               <tr{% if a.status == 'Cancelled' %} class="opacity-70"{% endif %}>
                 <td class="font-mono font-semibold text-ink">{{ a.adj_no }}</td>
-                <td class="tabular-nums">{{ a.adj_date.strftime('%d %b %Y') }}{% if a.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ a.created_at|ist }}</div>{% endif %}</td>
+                <td class="tabular-nums">{{ a.adj_date.strftime('%d %b %Y') }}{% if a.created_at %}<div class="text-[11px] text-ink-faint">Entered {{ a.created_at|ist }}{% if a.created_by %} by {{ actor_name(a.created_by) }}{% endif %}{% if a.submitted_by %} · submitted by {{ actor_name(a.submitted_by) }}{% endif %}{% if a.approved_by %} · approved by {{ actor_name(a.approved_by) }}{% endif %}{% if a.cancelled_by %} · cancelled by {{ actor_name(a.cancelled_by) }}{% endif %}</div>{% endif %}</td>
                 <td>{{ type_labels[a.adj_type] }}{% if a.status == 'Posted' %}<div class="text-[11.5px] tabular-nums {{ 'text-success' if a.net_qty >= 0 else 'text-stop' }}">Net {{ '+' if a.net_qty > 0 else '' }}{{ a.net_qty|qty }}</div>{% endif %}</td>
                 <td class="left">{{ a.warehouse.name }}</td>
                 <td class="left">{{ a.reason.name }}</td>
