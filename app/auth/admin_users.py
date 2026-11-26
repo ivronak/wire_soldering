@@ -17,6 +17,14 @@ admin_users_bp = Blueprint("admin_users", __name__, url_prefix="/admin/users", t
 
 ROLE_ORDER = {service.KIND_DEVELOPER: 0, service.KIND_ADMIN: 1}      # Developer, Admin upar; baaki custom roles naam se
 
+def generate_next_user_code():
+    
+    last_user = User.query.order_by(User.id.desc()).first()
+    if not last_user:
+        return "USR-001"
+
+    next_user = last_user.id + 1
+    return f"USR-{next_user:03d}"    
 
 def _locked_mobile_hashes():
     now = utc_now()
@@ -72,9 +80,10 @@ def _render_list(drawer=None, status_code=200):
     roles = service.assignable_roles(actor)
     if drawer and drawer.get("target") is not None and drawer["target"].role not in roles:
         roles.append(drawer["target"].role)     # user ka mojooda role hamesha dropdown me (unchanged save ho sake — peer manager / inactive role par bhi)
+    next_user=generate_next_user_code()    
     return render_template("admin/users.html", rows=rows, q=q, status=status, total=total, active_count=active_count,
                            inactive_count=total - active_count, active_nav="users", can_add=service.user_can(actor, "users", 2),
-                           roles=roles, drawer=drawer, role_options=role_options, role_counts=role_counts, role_filter=role_filter), status_code
+                           roles=roles, drawer=drawer, role_options=role_options, role_counts=role_counts, role_filter=role_filter, next_code=next_user), status_code
 
 
 @admin_users_bp.route("/")
@@ -114,7 +123,7 @@ def users_new():
     if error:
         return _render_list(drawer={"mode": "add", "target": None, "values": values, "error": error}, status_code=400)
     temp_password = security.generate_temp_password()
-    user = User(full_name=values["full_name"], mobile=mobile, password_hash=security.hash_password(temp_password),
+    user = User(code=generate_next_user_code(), full_name=values["full_name"], mobile=mobile, password_hash=security.hash_password(temp_password),
                 role_id=role.id, must_change_password=True, created_by_id=actor.id)
     db.session.add(user)
     db.session.flush()

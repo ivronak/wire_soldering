@@ -2884,6 +2884,7 @@ class User(UserMixin, CreatedAtMixin, db.Model):   # UserMixin = Flask-Login ke 
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=True)
     full_name = db.Column(db.String(100), nullable=False)
     mobile = db.Column(db.String(15), unique=True, nullable=False)       # normalize hoke (sirf 10 digit); inactive users ka bhi unique rehta hai
     password_hash = db.Column(db.String(255), nullable=False)

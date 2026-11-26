@@ -51,13 +51,14 @@
         <col style="width:4%" /><col style="width:22%" /><col style="width:14%" /><col style="width:18%" /><col style="width:10%" /><col style="width:14%" /><col />
       </colgroup>
       <thead>
-        <tr><th>#</th><th>Name</th><th>Mobile (login)</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr>
+        <tr><th>#</th><th>Code</th><th>Name</th><th>Mobile (login)</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for row in rows %}
         {% set u = row.user %}
         <tr class="{% if not u.is_active %}row-muted{% endif %}">
           <td>{{ loop.index }}</td>
+          <td>{{ u.code }}</td>
           <td class="font-semibold text-ink">{{ u.full_name }}{% if me and u.id == me.id %} <span class="text-[11px] font-medium text-ink-faint">(you)</span>{% endif %}</td>
           <td>{{ u.mobile }}</td>
           <td>
@@ -118,6 +119,12 @@
     </div>
     <form id="user-form" method="post" action="{{ url_for('admin_users.users_new') }}" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       <div id="user-error" class="{% if not (drawer and drawer.error) %}hidden {% endif %}px-3 py-2 rounded border bg-stop-bg border-stop-border text-stop text-[13px]" role="alert">{{ drawer.error if drawer and drawer.error else '' }}</div>
+      <div>
+        <label for="chg-code" class="block text-[12.5px] font-semibold text-ink mb-1">Charge code</label>
+        <input type="text" id="chg-code" name="code" value="{{ next_code }}" disabled
+          class="w-full px-2.5 py-2.5 text-[14.5px] font-mono uppercase border border-slate-200 bg-mist text-ink-faint rounded" />
+        <p class="text-[11.5px] text-ink-faint mt-1">Auto-generated, read-only — this field is disabled so it is never actually sent with the form; the route generates the real code itself.</p>
+      </div>
       <div>
         <label for="user-full-name" class="block text-[12.5px] font-semibold text-ink mb-1">Full name *</label>
         <input id="user-full-name" name="full_name" type="text" maxlength="100" required autocomplete="off"
