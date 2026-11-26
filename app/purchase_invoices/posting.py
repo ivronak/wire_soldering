@@ -7,6 +7,9 @@
 # Vendor ko paisa DENA hai => Cr => balance plus ki taraf badhta hai.
 
 
+from app.accounts.autopost import SRC_PURCHASE, SRC_PURCHASE_RETURN, post_purchase_invoice, post_purchase_return, reverse_for
+from app.auth import service as auth_service
+from app.extensions import db
 from app.inventory.posting import bill_to_stock, bill_cancelled
 
 
@@ -17,6 +20,8 @@ def post_invoice(invoice):
     ledger.current_balance = round(ledger.current_balance + invoice.total_amount, 2)
     invoice.status = "Posted"
     bill_to_stock(invoice)
+    db.session.flush()
+    post_purchase_invoice(invoice, created_by_id=auth_service.actor_id())      # Accounts A4: voucher (Dr Stock + Input GST, Cr Vendor)
 
 
 def cancel_invoice(invoice):
@@ -26,6 +31,7 @@ def cancel_invoice(invoice):
         ledger = invoice.vendor.ledger
         ledger.current_balance = round(ledger.current_balance - invoice.total_amount, 2)
         bill_cancelled(invoice)         # C5: lot wapas PO rate (estimate) par
+        reverse_for(SRC_PURCHASE, invoice.id, "Bill cancelled", created_by_id=auth_service.actor_id())      # Accounts A4: voucher ulta
     invoice.status = "Cancelled"
 
 from app.inventory.posting import return_to_stock, return_cancelled
@@ -39,6 +45,8 @@ def post_return(purchase_return):
     ledger = purchase_return.invoice.vendor.ledger
     ledger.current_balance =  round(ledger.current_balance - purchase_return.total_amount, 2)
     purchase_return.status = "Posted"
+    db.session.flush()
+    post_purchase_return(purchase_return, created_by_id=auth_service.actor_id())      # Accounts A4: debit note voucher
 
 def cancel_return(purchase_return):
     # Return cancel karo: ledger ka asar wapas (reverse). Sirf Posted par; pehle se Cancelled par dobara nahi.
@@ -46,4 +54,5 @@ def cancel_return(purchase_return):
         return_cancelled(purchase_return)      # stock wapas (ulti rows)
         ledger = purchase_return.invoice.vendor.ledger
         ledger.current_balance = round(ledger.current_balance + purchase_return.total_amount, 2)
+        reverse_for(SRC_PURCHASE_RETURN, purchase_return.id, "Debit note cancelled", created_by_id=auth_service.actor_id())      # Accounts A4
     purchase_return.status = "Cancelled"

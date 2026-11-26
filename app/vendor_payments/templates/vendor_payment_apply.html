@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Apply advance{% endblock %}
+
+{# Accounts A6: Payment ka On account (advance) hissa vendor ke baaki bills par lagana. #}
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('vendor_payments.payments_list', tab='done') }}" class="underline">Accounts / Vendor payments</a> / Apply advance</div>
+  <h1 class="text-[20px] font-bold text-ink leading-tight">Apply advance — {{ p.payment_no }}</h1>
+  <p class="text-[12.5px] text-ink-faint mt-0.5">{{ p.vendor.name }} · ₹ {{ '{:,.2f}'.format(p.on_account) }} is on account</p>
+</div>
+<div class="bg-white border border-slate-300 rounded-lg shadow-sm p-4 overflow-auto min-h-0">
+  <form method="post">
+    <table class="w-full text-[14px] mb-4">
+      <thead class="bg-mist text-ink-faint text-[12px] uppercase"><tr><th class="text-left px-3 py-2">Bill</th><th class="text-left px-3 py-2">Vendor bill no.</th><th class="text-left px-3 py-2">Due on</th><th class="text-right px-3 py-2">Due now</th><th class="text-right px-3 py-2" style="width:160px">Apply (₹)</th></tr></thead>
+      <tbody>
+        {% for b in bills %}
+        <tr class="border-t border-slate-100"><td class="px-3 py-2 font-semibold">{{ b.pi_no }}</td><td class="px-3 py-2">{{ b.vendor_invoice_no }}</td><td class="px-3 py-2">{{ b.due_on.strftime('%d %b %Y') }}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{{ '{:,.2f}'.format(b.outstanding) }}</td>
+          <td class="px-3 py-2"><input type="number" step="0.01" min="0" max="{{ b.outstanding }}" name="alloc_{{ b.id }}" aria-label="Apply to {{ b.pi_no }}" class="w-full px-2 py-1.5 border border-slate-300 rounded text-right" /></td></tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-ink-faint py-6">This vendor has no unpaid bills.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if bills %}<button type="submit" class="px-4 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Apply</button>{% endif %}
+    <a href="{{ url_for('vendor_payments.payments_list', tab='done') }}" class="ml-2 text-[13.5px] underline text-ink-muted">Back</a>
+  </form>
+</div>
+{% endblock %}

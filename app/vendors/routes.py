@@ -2,6 +2,8 @@ from flask import render_template, redirect, url_for, Blueprint, request, flash
 from app.models import ChartOfAccountsGroup, Ledger, Vendor, State, VendorType, PaymentTerm
 from app.extensions import db
 from app.validators import check_tax_ids
+from app.accounts.opening import post_opening
+from app.auth import service as auth_service
 
 # Vendor ke grade ke fixed choices (client ne A, B, C maange hain)
 VENDOR_GRADES = ("A", "B", "C")
@@ -136,6 +138,8 @@ def vendors_add():
     )
     db.session.add(ledger)
     db.session.flush()
+    # Accounts A2: opening balance ab voucher se bhi likhta hai (zero ho to kuch nahi banta)
+    post_opening(ledger, signed_opening, created_by_id=auth_service.actor_id(), narration="Opening balance - %s" % name)
 
     # Step 3: ab Vendor banao — ledger.id already pata hai
     db.session.add(Vendor(
@@ -242,6 +246,8 @@ def vendors_edit(v_id):
     ledger.current_balance = ledger.current_balance + (new_op_bal-old_op_bal)
     ledger.gstin = gstin or None
     db.session.flush()
+    # Accounts A2: opening balance badla to sirf farak ka Opening voucher (purana voucher kabhi edit nahi hota)
+    post_opening(ledger, new_op_bal - old_op_bal, created_by_id=auth_service.actor_id(), narration="Opening balance changed - %s" % name)
 
     v.name = name
     v.contact_person=contact_person

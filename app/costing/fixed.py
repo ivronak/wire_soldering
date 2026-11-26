@@ -8,6 +8,7 @@
 #   common per-KG rate par restate hote hain (restate_day) — 'Final' wale kabhi nahi chhue jaate.
 from datetime import date
 
+from app.accounts.fixedcost import sync_day, sync_output
 from app.extensions import db
 from app.models import FixedCostMonth, FixedCostPeriod, ProductionOrder, ProductionOutput
 
@@ -72,6 +73,7 @@ def apply_fixed_cost(output):
     output.fixed_cost_basis = basis
     if basis == "Approx":
         restate_day(day)          # us din ke pehle wale Approx output bhi ab din ke total KG ke hisaab se (din ka kharcha do baar nahi lagta)
+    sync_day(day)          # accounts: maal ki cost me jo fixed cost judta hai uska voucher (Dr Stock, Cr Fixed Cost Payable)
 
 
 def restate_day(day):
@@ -116,6 +118,9 @@ def finalize_month(start, final_amount):
         o.fixed_cost_per_kg = row.final_per_kg
         o.fixed_cost_total = round(row.final_per_kg * kg, 2)
         o.fixed_cost_basis = "Final"
+    db.session.flush()
+    for o in outputs:
+        sync_output(o)          # Final rate se jo farak aaya wahi accounts me jaata hai
     return True, row
 
 

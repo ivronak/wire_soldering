@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Chart of accounts{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Accounts / Chart of accounts</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Chart of accounts</h1>
+    <p class="text-[12.5px] text-ink-faint mt-0.5">Groups and ledgers that every accounting entry is posted to. System ledgers are used by automatic posting and cannot be changed.</p>
+  </div>
+</div>
+
+<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <div class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex items-center gap-2.5 shrink-0">
+    <form method="get" action="{{ url_for('accounts.chart_page') }}" class="relative flex-1 min-w-[160px] max-w-xs">
+      <input type="text" name="q" value="{{ q }}" placeholder="Search group or ledger…" autocomplete="off"
+        class="w-full px-3 py-2 text-[13.5px] border border-slate-300 rounded focus:ring-1 focus:ring-accent focus:border-accent" />
+    </form>
+    <span class="text-[12.5px] text-ink-faint">{{ rows|length }} group{{ '' if rows|length == 1 else 's' }}</span>
+  </div>
+
+  <div class="flex-1 overflow-y-auto">
+    <table class="w-full text-[13.5px]">
+      <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide sticky top-0">
+        <tr><th class="text-left px-4 py-2 font-semibold">Group / ledger</th><th class="text-left px-4 py-2 font-semibold w-32">Type</th><th class="text-left px-4 py-2 font-semibold w-40">Opening</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-t border-slate-200 bg-slate-50">
+          <td class="px-4 py-2 font-semibold text-ink" style="padding-left: {{ 16 + r.depth * 22 }}px">
+            {{ r.group.name }}
+            {% if r.is_party %}<span class="font-normal text-ink-faint"> · {{ r.ledger_count }} ledger{{ '' if r.ledger_count == 1 else 's' }} (one per {{ 'customer' if r.group.name == 'Sundry Debtors' else 'vendor' }})</span>{% endif %}
+          </td>
+          <td class="px-4 py-2 text-ink-faint">{{ r.group.classification|capitalize }}</td>
+          <td class="px-4 py-2"></td>
+        </tr>
+        {% for l in r.ledgers %}
+        <tr class="border-t border-slate-100">
+          <td class="px-4 py-1.5 text-ink" style="padding-left: {{ 16 + (r.depth + 1) * 22 }}px">{{ l.name }}</td>
+          <td class="px-4 py-1.5">{% if l.is_system %}<span class="inline-block px-2 py-0.5 text-[11.5px] rounded bg-slate-100 text-ink-faint border border-slate-200">System</span>{% else %}Custom{% endif %}</td>
+          <td class="px-4 py-1.5 text-ink-faint">{% if l.opening_balance %}{{ '%.2f'|format(l.opening_balance) }} {{ l.opening_balance_type }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr><td colspan="3" class="px-4 py-10 text-center text-ink-faint">No group or ledger matches your search.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

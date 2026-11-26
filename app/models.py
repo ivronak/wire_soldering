@@ -1,7 +1,7 @@
 from flask_login import UserMixin
 from sqlalchemy import event, text
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.timeutil import utc_now
 from app.tax import calc_tax, split_tax, line_value
 
@@ -324,7 +324,11 @@ class ChartOfAccountsGroup(CreatedAtMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    classification = db.Column(db.String(20), nullable=False)
+    classification = db.Column(db.String(20), nullable=False)       # ASSET / LIABILITY / EQUITY / INCOME / EXPENSE
+    # Accounts A1: group ke andar sub-group (Tally jaisa tree) + system group (Admin hata / badal nahi sakta)
+    parent_id = db.Column(db.Integer, db.ForeignKey("chart_of_accounts_groups.id"), nullable=True)
+    parent = db.relationship("ChartOfAccountsGroup", remote_side=[id], foreign_keys=[parent_id])
+    is_system = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
 
 class Ledger(CreatedAtMixin, db.Model):
     __tablename__ = "ledgers"
@@ -339,6 +343,10 @@ class Ledger(CreatedAtMixin, db.Model):
     opening_balance_type = db.Column(db.String(2), default="Cr", nullable=False)
     current_balance = db.Column(db.Float, default=0, nullable=False)
     gstin = db.Column(db.String(15), nullable=True)
+    # Accounts A1: system ledger (Sales, Cash, GST...) ki pehchaan. Party ledger (Customer / Vendor) me ye khali rehta hai.
+    system_key = db.Column(db.String(40), unique=True, nullable=True)
+    is_system = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
+    is_active = db.Column(db.Boolean, default=True, server_default=db.true(), nullable=False)
 
 class Vendor(CreatedAtMixin, db.Model):
     __tablename__ = "vendors"
@@ -1135,6 +1143,31 @@ class PurchaseInvoice(CreatedAtMixin, db.Model):
 
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+    # Accounts A5: bill ka hisaab — kitna diya (Posted payments ki allocation), kitna debit note (Posted purchase return), kitna dena baaki
+    @property
+    def paid(self):
+        return round(sum(a.amount for a in self.payment_allocations if a.payment and a.payment.status == "Posted"), 2)
+
+    @property
+    def credited(self):
+        return round(sum(r.total_amount for r in self.returns if r.status == "Posted"), 2)
+
+    @property
+    def outstanding(self):
+        if self.status != "Posted" or self.is_deleted:
+            return 0.0
+        return round(max(self.total_amount - self.paid - self.credited, 0), 2)
+
+    @property
+    def due_on(self):
+        # Vendor ke payment terms ke days se (terms na ho to bill ki date par hi due)
+        terms = self.vendor.payment_terms if self.vendor else None
+        days = terms.days if terms is not None and terms.days is not None else 0
+        return self.invoice_date + timedelta(days=days)
+
+    def days_overdue(self, as_on):
+        return (as_on - self.due_on).days
+
     @property
     def po(self):
         # Bill kis PO ka hai (list me PO-wise grouping ke liye). Naye bill me GRN se; purane (lot-wise) bill me pehli line ke GRN se.
@@ -1574,6 +1607,60 @@ def _stock_movement_no_update(mapper, connection, target):
 def _stock_movement_no_delete(mapper, connection, target):
     raise RuntimeError("Stock ledger rows are never deleted. Add a reversing row instead.")
 
+
+
+# ======================= Accounts A1: Voucher + entries (double-entry journal) =======================
+# Ek Voucher = ek accounting event; uski VoucherEntry rows = Dr / Cr lines. Har voucher me Sum(Dr) = Sum(Cr) (posting.py check karta hai).
+# Entries kabhi edit / delete nahi hoti — galti ho to ulta (reversal) voucher. Flow doc: accounts_flow_2026_11_25.md
+class Voucher(CreatedAtMixin, db.Model):
+    __tablename__ = "vouchers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    voucher_no = db.Column(db.String(24), unique=True, nullable=False)          # SV-2026-0001
+    voucher_type = db.Column(db.String(20), nullable=False)                    # Sales / Receipt / Payment / Purchase / Journal / Contra / Credit note / Debit note / Opening
+    voucher_date = db.Column(db.Date, nullable=False)
+    narration = db.Column(db.String(255), nullable=True)
+    # Kis document se bana (auto-posting): source_type = "sales_invoice" / "receipt" ..., source_id = uski id. Manual voucher me khali.
+    source_type = db.Column(db.String(30), nullable=True)
+    source_id = db.Column(db.Integer, nullable=True)
+    status = db.Column(db.String(12), default="Posted", server_default="Posted", nullable=False)   # Posted / Reversed
+    reverses_voucher_id = db.Column(db.Integer, db.ForeignKey("vouchers.id"), nullable=True)       # ye voucher kisko ulta karta hai
+    reversal_reason = db.Column(db.String(255), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+    entries = db.relationship("VoucherEntry", back_populates="voucher", order_by="VoucherEntry.id")
+
+    @property
+    def total_amount(self):
+        return round(sum(e.amount for e in self.entries if e.side == "Dr"), 2)
+
+
+class VoucherEntry(db.Model):
+    __tablename__ = "voucher_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    voucher_id = db.Column(db.Integer, db.ForeignKey("vouchers.id"), nullable=False, index=True)
+    voucher = db.relationship("Voucher", back_populates="entries")
+    ledger_id = db.Column(db.Integer, db.ForeignKey("ledgers.id"), nullable=False, index=True)
+    ledger = db.relationship("Ledger", foreign_keys=[ledger_id])
+    side = db.Column(db.String(2), nullable=False)                             # "Dr" ya "Cr"
+    amount = db.Column(db.Float, nullable=False)                               # hamesha plus, 2 decimal
+    narration = db.Column(db.String(255), nullable=True)
+
+
+@event.listens_for(VoucherEntry, "before_update")
+def _voucher_entry_no_update(mapper, connection, target):
+    raise RuntimeError("Voucher entries are never edited. Reverse the voucher instead.")
+
+
+@event.listens_for(VoucherEntry, "before_delete")
+def _voucher_entry_no_delete(mapper, connection, target):
+    raise RuntimeError("Voucher entries are never deleted. Reverse the voucher instead.")
+
+
+@event.listens_for(Voucher, "before_delete")
+def _voucher_no_delete(mapper, connection, target):
+    raise RuntimeError("Vouchers are never deleted. Reverse the voucher instead.")
 
 
 # ======================= Material issue (RM store se production / WIP ko) =======================
@@ -2660,6 +2747,9 @@ class PaymentMode(CreatedAtMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    # Accounts A3: is mode ka paisa kis ledger me jaata hai (Cash-in-hand / Bank Accounts). Pehli receipt par apne aap ban jaata hai (accounts/autopost.py)
+    ledger_id = db.Column(db.Integer, db.ForeignKey("ledgers.id", name="fk_payment_modes_ledger"), nullable=True)
+    ledger = db.relationship("Ledger", foreign_keys=[ledger_id])
 
 
 class SalesReceipt(CreatedAtMixin, db.Model):
@@ -2882,3 +2972,48 @@ class LoginAttempt(db.Model):
     failed_count = db.Column(db.Integer, default=0, nullable=False)
     locked_until = db.Column(db.DateTime, nullable=True)
     last_failed_at = db.Column(db.DateTime, nullable=True)
+
+
+class VendorPayment(CreatedAtMixin, db.Model):
+    # Accounts A5: vendor ko diya hua paisa (Payment voucher). Vendor ledger me Dr (balance minus = dena kam). Kuch bills ke against (allocations),
+    # jo bacha wo "On account" (advance). Cancel = ulta voucher + allocations khatam. Receipt ka mirror.
+    __tablename__ = "vendor_payments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    payment_no = db.Column(db.String(20), unique=True, nullable=False)        # VP-2026-001
+    vendor_id = db.Column(db.Integer, db.ForeignKey("vendors.id"), nullable=False)
+    vendor = db.relationship("Vendor", foreign_keys=[vendor_id])
+    payment_date = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_mode_id = db.Column(db.Integer, db.ForeignKey("payment_modes.id"), nullable=False)
+    payment_mode = db.relationship("PaymentMode", foreign_keys=[payment_mode_id])
+    reference = db.Column(db.String(60), nullable=True)                        # UTR / cheque number
+    notes = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(12), default="Posted", nullable=False)       # Posted / Cancelled
+    cancel_reason = db.Column(db.String(255), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by = db.relationship("User", foreign_keys="VendorPayment.created_by_id")
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_by = db.relationship("User", foreign_keys="VendorPayment.cancelled_by_id")
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def allocated(self):
+        return round(sum(a.amount for a in self.allocations), 2)
+
+    @property
+    def on_account(self):
+        return round(self.amount - self.allocated, 2)
+
+
+class VendorPaymentAllocation(CreatedAtMixin, db.Model):
+    # Payment ka itna paisa is bill ke against laga (bill-by-bill)
+    __tablename__ = "vendor_payment_allocations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    payment_id = db.Column(db.Integer, db.ForeignKey("vendor_payments.id"), nullable=False)
+    payment = db.relationship("VendorPayment", foreign_keys=[payment_id], backref=db.backref("allocations", order_by="VendorPaymentAllocation.id"))
+    invoice_id = db.Column(db.Integer, db.ForeignKey("purchase_invoices.id"), nullable=False)
+    invoice = db.relationship("PurchaseInvoice", foreign_keys=[invoice_id], backref=db.backref("payment_allocations", order_by="VendorPaymentAllocation.id"))
+    amount = db.Column(db.Float, nullable=False)

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ v.voucher_no }}{% endblock %}
+
+{# Accounts A6: ek voucher ki poori detail — Dr / Cr lines. Manual voucher ko yahin se reverse karte hain. #}
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('vouchers.vouchers_list') }}" class="underline">Accounts / Vouchers</a> / {{ v.voucher_no }}</div>
+  <h1 class="text-[20px] font-bold text-ink leading-tight">{{ v.voucher_type }} voucher {{ v.voucher_no }}</h1>
+  <p class="text-[12.5px] text-ink-faint mt-0.5">
+    {{ v.voucher_date.strftime('%d %b %Y') }} · {{ source }}{% if v.created_by %} · entered by {{ actor_name(v.created_by) }}{% endif %}
+    · {% if v.reverses_voucher_id %}Reversal{% elif v.status == 'Reversed' %}<b class="text-stop">Reversed</b>{% else %}Posted{% endif %}
+  </p>
+</div>
+
+<div class="bg-white border border-slate-300 rounded-lg shadow-sm p-4 overflow-auto min-h-0">
+  {% if v.narration %}<div class="text-[13.5px] text-ink mb-3">{{ v.narration }}</div>{% endif %}
+  {% if v.reversal_reason %}<div class="text-[13px] text-ink-muted mb-3">Reversal reason: {{ v.reversal_reason }}</div>{% endif %}
+  <table class="w-full text-[13.5px] mb-4">
+    <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide"><tr><th class="text-left px-3 py-2">Ledger</th><th class="text-left px-3 py-2">Note</th><th class="text-right px-3 py-2">Debit (₹)</th><th class="text-right px-3 py-2">Credit (₹)</th></tr></thead>
+    <tbody>
+      {% for e in v.entries %}
+      <tr class="border-t border-slate-100">
+        <td class="px-3 py-2"><a href="{{ url_for('ledger_statement.statement_page', ledger=e.ledger_id) }}" class="underline text-accent-text">{{ e.ledger.name }}</a> <span class="text-ink-faint text-[12px]">{{ e.ledger.group.name }}</span></td>
+        <td class="px-3 py-2 text-ink-muted">{{ e.narration or '' }}</td>
+        <td class="px-3 py-2 text-right tabular-nums">{% if e.side == 'Dr' %}{{ '{:,.2f}'.format(e.amount) }}{% endif %}</td>
+        <td class="px-3 py-2 text-right tabular-nums">{% if e.side == 'Cr' %}{{ '{:,.2f}'.format(e.amount) }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr class="border-t-2 border-slate-300 font-bold"><td class="px-3 py-2" colspan="2">Total</td><td class="px-3 py-2 text-right tabular-nums">{{ '{:,.2f}'.format(v.total_amount) }}</td><td class="px-3 py-2 text-right tabular-nums">{{ '{:,.2f}'.format(v.total_amount) }}</td></tr></tfoot>
+  </table>
+
+  {% if v.source_type == 'manual' and v.status == 'Posted' and not v.reverses_voucher_id and can_edit('vouchers') %}
+  <form method="post" action="{{ url_for('vouchers.voucher_reverse', voucher_id=v.id) }}" class="flex gap-2 max-w-xl">
+    <input type="text" name="reason" required minlength="3" placeholder="Reason to reverse this voucher" aria-label="Reason to reverse" class="flex-1 px-3 py-2 text-[13.5px] border border-slate-300 rounded" />
+    <button type="submit" class="px-3 py-2 text-[13.5px] border border-slate-300 rounded hover:bg-slate-100" onclick="return confirm('Reverse this voucher?')">Reverse</button>
+  </form>
+  {% elif v.status == 'Posted' and not v.reverses_voucher_id and v.source_type != 'manual' %}
+  <p class="text-[12.5px] text-ink-faint">This voucher was made automatically. To undo it, cancel the original document ({{ source }}).</p>
+  {% endif %}
+</div>
+{% endblock %}

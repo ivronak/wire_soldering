@@ -3,6 +3,8 @@
 # aur live_schedule (agla kaun si machine par aane wala hai).
 from flask import Blueprint, flash, jsonify, render_template, request
 
+from app.auth import service as auth_service
+from app.dashboard.overview import build_overview
 from app.extensions import db
 
 from app.models import Machines, ProductionLine, ProductionOrder, ProductionOrderStage, ProductionOrderStageMachine, WorkStage
@@ -386,4 +388,8 @@ def machine_queue_assign(machine_id, order_id):
 
 @dashboard_bp.route("/dashboard")
 def dashboard_page():
-    return render_template("dashboard.html", active_nav="dashboard", board=machine_board())
+    """Do tab: default = Overview (app/dashboard/overview.py, ?period=month|7d|6m|fy), ?tab=board = live machine board."""
+    if request.args.get("tab") == "board":
+        return render_template("dashboard.html", active_nav="dashboard", board=machine_board(), tab="board")
+    data = build_overview(auth_service.current(), request.args.get("period") or "month")
+    return render_template("overview.html", active_nav="dashboard", data=data, tab="overview")

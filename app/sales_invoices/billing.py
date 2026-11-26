@@ -11,6 +11,7 @@
 #   * Ledger sign rule (project): Cr = plus, Dr = minus. Customer se paisa LENA hai => Dr => current_balance ghatta hai.
 from datetime import datetime, timedelta
 
+from app.accounts.autopost import SRC_INVOICE, post_sales_invoice, reverse_for
 from app.costing.full_cost import batch_full_cost
 from app.extensions import db
 from app.auth import service as auth_service
@@ -68,6 +69,8 @@ def _post(invoice):
     ledger = invoice.quotation.customer.ledger
     ledger.current_balance = round(ledger.current_balance - invoice.total_amount, 2)
     invoice.status = "Posted"
+    db.session.flush()                                  # Accounts A3: voucher (Dr Customer / Cr Sales + GST, COGS) — total / cost ke baad hi yahan aate hain
+    post_sales_invoice(invoice, created_by_id=auth_service.actor_id())
 
 
 def create_invoice(quotation, challans, invoice_date, rates, discounts, remarks=None, charges=None):
@@ -163,6 +166,7 @@ def cancel_invoice(invoice, reason):
     if invoice.status == "Posted":
         ledger = invoice.quotation.customer.ledger
         ledger.current_balance = round(ledger.current_balance + invoice.total_amount, 2)
+        reverse_for(SRC_INVOICE, invoice.id, reason, created_by_id=auth_service.actor_id())      # Accounts A3: voucher ulta
     for challan in list(invoice.challans):
         challan.invoice_id = None
     invoice.status = "Cancelled"

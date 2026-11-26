@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Trial balance{% endblock %}
+
+{# Accounts A7: Trial balance — as_on tak har ledger ka closing Dr / Cr. Customer / Vendor groups ek line me (ledger statement se detail). #}
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('reports.reports_index') }}" class="underline">Accounts / Reports</a> / Trial balance</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Trial balance</h1>
+  </div>
+  <form method="get" class="flex items-center gap-2">
+    <label for="tb-on" class="text-[13px] text-ink-muted">As on</label><input type="date" id="tb-on" name="as_on" value="{{ as_on.isoformat() }}" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
+  </form>
+</div>
+<div class="flex-1 overflow-auto min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm">
+  <table class="w-full text-[13.5px]">
+    <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide sticky top-0"><tr><th class="text-left px-4 py-2">Ledger</th><th class="text-right px-4 py-2" style="width:180px">Debit (₹)</th><th class="text-right px-4 py-2" style="width:180px">Credit (₹)</th></tr></thead>
+    <tbody>
+      {% for g in groups %}
+      <tr class="border-t border-slate-200 bg-slate-50 font-semibold">
+        <td class="px-4 py-1.5">{{ g.group.name }}{% if g.party %} <span class="font-normal text-ink-faint">· {{ g.count }} ledger{{ '' if g.count == 1 else 's' }} (open the Receivables / Payables pages for the list)</span>{% endif %}</td>
+        <td class="px-4 py-1.5 text-right tabular-nums">{% if g.dr %}{{ money(g.dr) }}{% endif %}</td><td class="px-4 py-1.5 text-right tabular-nums">{% if g.cr %}{{ money(g.cr) }}{% endif %}</td>
+      </tr>
+      {% for l, dr, cr in g.ledgers %}
+      <tr class="border-t border-slate-100"><td class="px-4 py-1" style="padding-left: 32px"><a href="{{ url_for('ledger_statement.statement_page', ledger=l.id) }}" class="underline text-accent-text">{{ l.name }}</a></td>
+        <td class="px-4 py-1 text-right tabular-nums">{% if dr %}{{ money(dr) }}{% endif %}</td><td class="px-4 py-1 text-right tabular-nums">{% if cr %}{{ money(cr) }}{% endif %}</td></tr>
+      {% endfor %}
+      {% else %}
+      <tr><td colspan="3" class="text-center text-ink-faint py-10">No entries yet.</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="border-t-2 border-slate-300 font-bold"><tr><td class="px-4 py-2">Total</td><td class="px-4 py-2 text-right tabular-nums" id="tb-dr">{{ money(total_dr) }}</td><td class="px-4 py-2 text-right tabular-nums" id="tb-cr">{{ money(total_cr) }}</td></tr></tfoot>
+  </table>
+  {% if total_dr != total_cr %}<p class="px-4 py-2 text-[13px] text-stop font-semibold">Total debit and total credit differ by ₹ {{ money((total_dr - total_cr)|abs) }}. Please report this.</p>{% endif %}
+</div>
+{% endblock %}

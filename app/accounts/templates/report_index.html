@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Accounts reports{% endblock %}
+
+{# Accounts A7: reports ka hub. #}
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium">Accounts / Reports</div>
+  <h1 class="text-[20px] font-bold text-ink leading-tight">Accounts reports</h1>
+  <p class="text-[12.5px] text-ink-faint mt-0.5">All reports are built from vouchers, so they always agree with each other.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 overflow-auto min-h-0">
+  {% for url, title, text in (
+    (url_for('reports.daybook'), 'Day book', 'Every voucher of a day or period, with its debit and credit lines.'),
+    (url_for('reports.cashbook'), 'Cash / Bank book', 'Money in and out of the cash and bank ledgers with a running balance.'),
+    (url_for('reports.trial_balance'), 'Trial balance', 'Closing balance of every ledger as on a date. Total debit equals total credit.'),
+    (url_for('reports.profit_loss'), 'Profit & loss', 'Income, direct and indirect expenses for a period, with gross and net profit.'),
+    (url_for('reports.balance_sheet'), 'Balance sheet', 'Assets against liabilities, capital and profit as on a date.')) %}
+  <a href="{{ url }}" class="block bg-white border border-slate-300 rounded-lg px-4 py-3 hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+    <div class="text-[15px] font-bold text-ink">{{ title }}</div>
+    <div class="text-[13px] text-ink-muted mt-1">{{ text }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

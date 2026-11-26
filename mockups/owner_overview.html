@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview (mockup)</title>
+<!-- Sirf mockup: sab number nakli (fake) hain, koi database nahi. CSS andar hi hai taaki bina internet ke bhi khule. -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "IBM Plex Sans", system-ui, sans-serif; background: #F5F7FA; color: #0F172A; padding: 24px; font-size: 14px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; }
+  .sub { color: #64748B; margin: 2px 0 18px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #64748B; margin: 18px 0 8px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .card { display: block; text-decoration: none; color: inherit; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 16px; }
+  .card:hover { border-color: #0B5BEF; }
+  .label { color: #475569; }
+  .value { font-size: 24px; font-weight: 700; margin: 4px 0; font-variant-numeric: tabular-nums; }
+  .note { font-size: 12.5px; color: #64748B; }
+  .bad { color: #B91C1C; font-weight: 600; }
+  .warn { color: #B45309; font-weight: 600; }
+  ul { list-style: none; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; }
+  li a { display: flex; justify-content: space-between; gap: 12px; padding: 11px 16px; text-decoration: none; color: inherit; border-top: 1px solid #EEF2F6; }
+  li:first-child a { border-top: 0; }
+  li a:hover { background: #EDF3FF; }
+  .tag { white-space: nowrap; color: #0A3CA6; }
+  .demo { background: #FEF3E2; border: 1px solid #FBD9A5; color: #92400E; border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="demo">Mockup with sample numbers. Nothing here is saved or real.</div>
+  <h1>Overview</h1>
+  <p class="sub">26 November 2026</p>
+
+  <h2>Money</h2>
+  <div class="grid">
+    <a class="card" href="#"><div class="label">To receive from customers</div><div class="value">₹ 30,800</div><div class="note"><span class="bad">₹ 12,000 overdue</span> · 1 customer</div></a>
+    <a class="card" href="#"><div class="label">To pay to vendors</div><div class="value">₹ 31,319</div><div class="note">Nothing overdue</div></a>
+    <a class="card" href="#"><div class="label">Cash and bank</div><div class="value">₹ 10,000</div><div class="note">Cash ₹ 0 · Bank ₹ 10,000</div></a>
+  </div>
+
+  <h2>Today and this month</h2>
+  <div class="grid">
+    <a class="card" href="#"><div class="label">Sales (without GST)</div><div class="value">₹ 60,000</div><div class="note">Today ₹ 60,000 · This month</div></a>
+    <a class="card" href="#"><div class="label">Collections</div><div class="value">₹ 40,000</div><div class="note">Today ₹ 40,000 · This month</div></a>
+    <a class="card" href="#"><div class="label">Net profit this month</div><div class="value">₹ 21,056</div><div class="note">As booked in accounts</div></a>
+  </div>
+
+  <h2>Factory</h2>
+  <div class="grid">
+    <a class="card" href="#"><div class="label">Machines running</div><div class="value">3</div><div class="note"><span class="warn">1 on hold</span> · <span class="bad">1 unavailable</span></div></a>
+    <a class="card" href="#"><div class="label">Orders in production</div><div class="value">4</div><div class="note"><span class="bad">1 running late</span></div></a>
+    <a class="card" href="#"><div class="label">Good output today</div><div class="value">102 pcs</div><div class="note">Scrap 2 pcs</div></a>
+  </div>
+
+  <h2>Stock</h2>
+  <div class="grid">
+    <a class="card" href="#"><div class="label">Stock value</div><div class="value">₹ 15,374</div><div class="note">Raw material and finished goods</div></a>
+    <a class="card" href="#"><div class="label">Low stock materials</div><div class="value">2</div><div class="note">Tin ingot, Rosin</div></a>
+  </div>
+
+  <h2>Needs attention</h2>
+  <ul>
+    <li><a href="#"><span><span class="bad">Late order:</span> PROD-2026-004 was due on 24 Nov</span><span class="tag">Open order</span></a></li>
+    <li><a href="#"><span><span class="warn">Approval:</span> 1 invoice below cost is waiting</span><span class="tag">Open invoices</span></a></li>
+    <li><a href="#"><span><span class="bad">Overdue:</span> Auto Components Ltd, ₹ 12,000, 6 days late</span><span class="tag">Open receivables</span></a></li>
+    <li><a href="#"><span><span class="warn">QC pending:</span> 2 material lots are waiting for inspection</span><span class="tag">Open inward QC</span></a></li>
+  </ul>
+</div>
+</body>
+</html>

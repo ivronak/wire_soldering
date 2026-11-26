@@ -9,6 +9,7 @@
 #   * Bank / cash ledger me Dr abhi nahi (Accounting phase me vouchers aayenge — tab sirf yahi file badlegi).
 from datetime import datetime
 
+from app.accounts.autopost import SRC_RECEIPT, post_receipt, reverse_for
 from app.extensions import db
 from app.auth import service as auth_service
 from app.models import Quotation, SalesInvoice, SalesReceipt, SalesReceiptAllocation
@@ -88,6 +89,7 @@ def create_receipt(customer, receipt_date, amount, mode, reference, notes, alloc
     ledger = customer.ledger
     ledger.current_balance = round(ledger.current_balance + receipt.amount, 2)      # Cr: lena kam
     db.session.flush()
+    post_receipt(receipt, created_by_id=auth_service.actor_id())       # Accounts A3: voucher (Dr Cash / Bank, Cr Customer)
     return receipt
 
 
@@ -110,6 +112,7 @@ def cancel_receipt(receipt, reason):
         raise ReceiptError("This receipt is already cancelled.")
     ledger = receipt.customer.ledger
     ledger.current_balance = round(ledger.current_balance - receipt.amount, 2)
+    reverse_for(SRC_RECEIPT, receipt.id, reason, created_by_id=auth_service.actor_id())      # Accounts A3: voucher ulta
     receipt.status = "Cancelled"
     receipt.cancel_reason = reason
     receipt.cancelled_at = datetime.utcnow()

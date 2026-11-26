@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Balance sheet{% endblock %}
+
+{# Accounts A7: Balance Sheet — as_on tak. Left: capital + liabilities + profit; right: assets. #}
+{% macro side(rows) %}
+  {% for r in rows %}
+  <tr class="border-t border-slate-200 bg-slate-50 font-semibold"><td class="px-4 py-1.5">{{ r.group.name }}{% if r.group.name in ('Sundry Debtors', 'Sundry Creditors') %} <span class="font-normal text-ink-faint">· {{ r.count }}</span>{% endif %}</td><td class="px-4 py-1.5 text-right tabular-nums">{{ money(r.amount) }}</td></tr>
+  {% for l, v in r.ledgers %}<tr class="border-t border-slate-100"><td class="px-4 py-1" style="padding-left: 32px"><a href="{{ url_for('ledger_statement.statement_page', ledger=l.id) }}" class="underline text-accent-text">{{ l.name }}</a></td><td class="px-4 py-1 text-right tabular-nums">{{ money(v) }}</td></tr>{% endfor %}
+  {% endfor %}
+{% endmacro %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('reports.reports_index') }}" class="underline">Accounts / Reports</a> / Balance sheet</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Balance sheet</h1>
+  </div>
+  <form method="get" class="flex items-center gap-2">
+    <label for="bs-on" class="text-[13px] text-ink-muted">As on</label><input type="date" id="bs-on" name="as_on" value="{{ as_on.isoformat() }}" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
+  </form>
+</div>
+<div class="flex-1 overflow-auto min-h-0">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
+    <div class="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+      <table class="w-full text-[13.5px]">
+        <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide"><tr><th class="text-left px-4 py-2">Capital and liabilities</th><th class="text-right px-4 py-2" style="width:170px">₹</th></tr></thead>
+        <tbody>
+          {{ side(bs.liabilities) }}
+          <tr class="border-t border-slate-200 bg-slate-50 font-semibold"><td class="px-4 py-1.5">{{ 'Profit and loss account (profit to date)' if bs.profit >= 0 else 'Profit and loss account (loss to date)' }}</td><td class="px-4 py-1.5 text-right tabular-nums">{{ money(bs.profit) }}</td></tr>
+        </tbody>
+        <tfoot class="border-t-2 border-slate-300 font-bold"><tr><td class="px-4 py-2">Total</td><td class="px-4 py-2 text-right tabular-nums" id="bs-liab">{{ money(bs.liab_total) }}</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+      <table class="w-full text-[13.5px]">
+        <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide"><tr><th class="text-left px-4 py-2">Assets</th><th class="text-right px-4 py-2" style="width:170px">₹</th></tr></thead>
+        <tbody>{{ side(bs.assets) }}</tbody>
+        <tfoot class="border-t-2 border-slate-300 font-bold"><tr><td class="px-4 py-2">Total</td><td class="px-4 py-2 text-right tabular-nums" id="bs-assets">{{ money(bs.asset_total) }}</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+  {% if bs.difference != 0 %}<p class="text-[13px] text-stop font-semibold mb-2">Assets and liabilities differ by ₹ {{ money(bs.difference|abs) }}. Please report this.</p>{% endif %}
+  <div class="bg-white border border-slate-300 rounded-lg px-4 py-3 text-[13px] text-ink-muted">
+    <b class="text-ink">Stock check.</b> Stock-in-hand in the books: ₹ {{ money(bs.stock_books) }} · stock per inventory records (raw material + finished goods): ₹ {{ money(bs.stock_inventory) }}.
+    They can differ because the books also carry the fixed cost (rent, salary, power) added to unsold finished goods, which the inventory records do not hold, and because the opening stock was entered before accounts started.
+  </div>
+</div>
+{% endblock %}

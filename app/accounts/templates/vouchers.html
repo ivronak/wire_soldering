@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Vouchers{% endblock %}
+
+{# Accounts A6: Vouchers list. Auto-posting wale (invoice, receipt...) aur manual (Payment / Receipt / Journal / Contra) sab yahan. #}
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">Accounts / Vouchers</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Vouchers</h1>
+    <p class="text-[12.5px] text-ink-faint mt-0.5">Every accounting entry. Vouchers are never edited or deleted — a mistake is fixed by reversing it.</p>
+  </div>
+  {% if can_edit('vouchers') %}
+  <div class="flex gap-1.5">
+    {% for t in ('Payment', 'Receipt', 'Journal', 'Contra') %}<a href="{{ url_for('vouchers.voucher_new', type=t) }}" class="px-3 py-2 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">+ {{ t }}</a>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <form method="get" class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex items-center gap-2.5 flex-wrap shrink-0">
+    <select name="type" aria-label="Voucher type" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded">
+      <option value="">All types</option>
+      {% for t in types %}<option value="{{ t }}" {% if t == vtype %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+    <input type="date" name="from" value="{{ date_from.isoformat() if date_from else '' }}" aria-label="From date" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <input type="date" name="to" value="{{ date_to.isoformat() if date_to else '' }}" aria-label="To date" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <input type="text" name="q" value="{{ q }}" placeholder="Voucher no. or narration…" class="px-3 py-1.5 text-[13.5px] border border-slate-300 rounded w-60" />
+    <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold border border-slate-300 rounded hover:bg-slate-100">Filter</button>
+    <span class="ml-auto text-[12.5px] text-ink-faint">{{ total }} voucher{{ '' if total == 1 else 's' }}{% if total > rows|length %} (showing latest {{ rows|length }}){% endif %}</span>
+  </form>
+  <div class="flex-1 overflow-auto min-h-0">
+    <table class="w-full text-[13.5px]">
+      <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide sticky top-0">
+        <tr><th class="text-left px-4 py-2">Voucher</th><th class="text-left px-4 py-2">Date</th><th class="text-left px-4 py-2">Type</th><th class="text-left px-4 py-2">Narration</th><th class="text-left px-4 py-2">Source</th><th class="text-right px-4 py-2">Amount (₹)</th><th class="text-left px-4 py-2">Status</th></tr>
+      </thead>
+      <tbody>
+        {% for v in rows %}
+        <tr class="border-t border-slate-100 hover:bg-slate-50">
+          <td class="px-4 py-2 font-semibold"><a href="{{ url_for('vouchers.voucher_view', voucher_id=v.id) }}" class="text-accent-text underline">{{ v.voucher_no }}</a></td>
+          <td class="px-4 py-2">{{ v.voucher_date.strftime('%d %b %Y') }}</td>
+          <td class="px-4 py-2">{{ v.voucher_type }}</td>
+          <td class="px-4 py-2 text-ink-muted">{{ v.narration or '' }}</td>
+          <td class="px-4 py-2 text-ink-faint">{{ source_text(v) }}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{ '{:,.2f}'.format(v.total_amount) }}</td>
+          <td class="px-4 py-2">{% if v.reverses_voucher_id %}Reversal{% elif v.status == 'Reversed' %}<span class="text-stop">Reversed</span>{% else %}Posted{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-ink-faint py-10">No vouchers match.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

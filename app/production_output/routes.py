@@ -6,6 +6,7 @@ from datetime import date, datetime
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from app.auth import service as auth_service      # W1 'kisne kiya': auth_service.actor_id() = logged-in user ki id
 
+from app.accounts.fixedcost import sync_day
 from app.costing.fixed import apply_fixed_cost, restate_day
 from app.extensions import db
 from app.inventory.posting import InventoryError
@@ -214,6 +215,7 @@ def production_output_cancel(output_id):
     output.cancelled_by_id = auth_service.actor_id()
     db.session.flush()
     restate_day(output.output_date)          # us din ke bache hue Approx output ab din ka poora kharcha baantenge (cancel hue output ka hissa unhe milta hai)
+    sync_day(output.output_date)          # accounts: cancel hue output ka fixed cost voucher ulta, baaki outputs ka badla hua hissa
     order = output.production_order
     order.status = "In production"
     order.queue_position = None

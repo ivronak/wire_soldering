@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}New vendor payment{% endblock %}
+
+{# Accounts A5: Naya vendor payment. Pehle vendor chuno (GET) -> uske baaki bills dikhte hain -> har bill ke saamne kitna de rahe ho likho (bill-by-bill). Jo bache wo On account. #}
+{% block page_css %}
+<style>
+  .bill-table { width: 100%; border-collapse: collapse; }
+  .bill-table th { background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px 8px; text-align: left; }
+  .bill-table td { padding: 8px; border-bottom: 1px solid #E2E8F1; font-size: 14px; }
+  .bill-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="shrink-0">
+        <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('vendor_payments.payments_list') }}" class="underline">Accounts / Vendor payments</a> / New</div>
+        <h1 class="text-[20px] font-bold text-ink leading-tight">New vendor payment</h1>
+      </div>
+
+      <div class="bg-white border border-slate-300 rounded-lg shadow-sm p-4 overflow-auto min-h-0">
+        <form method="get" class="flex items-end gap-2 mb-4">
+          <div class="grow max-w-md">
+            <label for="vendor-pick" class="text-[12.5px] font-semibold text-ink-muted">Vendor</label>
+            <select id="vendor-pick" name="v" class="ql-input">
+              <option value="">Choose a vendor…</option>
+              {% for v in vendors %}<option value="{{ v.id }}" {% if vendor and vendor.id == v.id %}selected{% endif %}>{{ v.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="px-3 py-2 text-[13.5px] font-semibold border border-slate-300 rounded hover:bg-slate-100">Show bills</button>
+        </form>
+
+        {% if vendor %}
+        <div class="text-[13px] text-ink-muted mb-3">
+          Ledger balance: <b class="tabular-nums">₹ {{ '{:,.2f}'.format(balance|abs) }} {{ 'we owe' if balance > 0 else ('advance given' if balance < 0 else 'nil') }}</b>
+          {% if advance > 0.004 %} · Advance already on account: <b class="tabular-nums">₹ {{ '{:,.2f}'.format(advance) }}</b>{% endif %}
+        </div>
+        <form method="post" action="{{ url_for('vendor_payments.payments_add') }}">
+          <input type="hidden" name="vendor_id" value="{{ vendor.id }}" />
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <div><label for="pay-date" class="text-[12.5px] font-semibold text-ink-muted">Date</label><input type="date" id="pay-date" name="payment_date" value="{{ today }}" max="{{ today }}" required class="ql-input" /></div>
+            <div><label for="pay-amount" class="text-[12.5px] font-semibold text-ink-muted">Amount (₹)</label><input type="number" step="0.01" min="0.01" id="pay-amount" name="amount" required class="ql-input" /></div>
+            <div><label for="pay-mode" class="text-[12.5px] font-semibold text-ink-muted">Payment mode</label>
+              <select id="pay-mode" name="payment_mode_id" required class="ql-input">{% for m in modes %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></div>
+            <div><label for="pay-ref" class="text-[12.5px] font-semibold text-ink-muted">Reference (UTR / cheque no.)</label><input type="text" id="pay-ref" name="reference" maxlength="60" class="ql-input" /></div>
+          </div>
+          <div class="mb-4"><label for="pay-notes" class="text-[12.5px] font-semibold text-ink-muted">Notes</label><input type="text" id="pay-notes" name="notes" maxlength="255" class="ql-input" /></div>
+
+          <div class="text-[11.5px] font-bold uppercase tracking-wide text-ink-faint mb-1">Apply to bills (optional — whatever is left stays on account)</div>
+          <table class="bill-table mb-4">
+            <thead><tr><th>Bill</th><th>Vendor bill no.</th><th>Due on</th><th class="num">Bill total</th><th class="num">Due now</th><th class="num" style="width:160px">Pay now (₹)</th></tr></thead>
+            <tbody>
+              {% for b in bills %}
+              <tr>
+                <td class="font-semibold">{{ b.pi_no }}</td><td>{{ b.vendor_invoice_no }}</td><td>{{ b.due_on.strftime('%d %b %Y') }}</td>
+                <td class="num">{{ '{:,.2f}'.format(b.total_amount) }}</td><td class="num">{{ '{:,.2f}'.format(b.outstanding) }}</td>
+                <td><input type="number" step="0.01" min="0" max="{{ b.outstanding }}" name="alloc_{{ b.id }}" class="ql-input num" aria-label="Pay against {{ b.pi_no }}" /></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-ink-faint py-4 text-center">This vendor has no unpaid bills. The payment will be kept on account.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <button type="submit" class="px-4 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Save payment</button>
+          <a href="{{ url_for('vendor_payments.payments_list') }}" class="ml-2 text-[13.5px] underline text-ink-muted">Back</a>
+        </form>
+        {% endif %}
+      </div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title|default("Ledger statement") }}{% endblock %}
+
+{# Accounts A6: Ledger statement — opening, har voucher entry, running balance, closing. Voucher number par click = voucher detail. #}
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium">{{ crumb|default("Accounts / Ledger statement") }}</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">{{ page_title|default("Ledger statement") }}</h1>
+    <p class="text-[12.5px] text-ink-faint mt-0.5">{{ page_sub|default("All entries of one ledger with a running balance (Dr = debit, Cr = credit)") }}</p>
+  </div>
+</div>
+
+<div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+  <form method="get" class="px-3.5 py-2.5 border-b border-slate-200 bg-mist flex items-center gap-2.5 flex-wrap shrink-0">
+    <select name="ledger" required aria-label="Ledger" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded min-w-[260px]">
+      <option value="">Choose a ledger…</option>
+      {% set ns = namespace(g='') %}
+      {% for l in ledgers %}{% if l.group != ns.g %}{% if ns.g %}</optgroup>{% endif %}<optgroup label="{{ l.group }}">{% set ns.g = l.group %}{% endif %}<option value="{{ l.id }}" {% if ledger and ledger.id == l.id %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+      {% if ns.g %}</optgroup>{% endif %}
+    </select>
+    <label class="text-[13px] text-ink-muted" for="st-from">From</label><input type="date" id="st-from" name="from" value="{{ date_from.isoformat() }}" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <label class="text-[13px] text-ink-muted" for="st-to">To</label><input type="date" id="st-to" name="to" value="{{ date_to.isoformat() }}" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
+  </form>
+
+  <div class="flex-1 overflow-auto min-h-0">
+    {% if data %}
+    {% set opening, rows, closing, dr_total, cr_total = data %}
+    <div class="px-4 py-2 text-[14px] font-semibold text-ink">{{ ledger.name }} <span class="font-normal text-ink-faint">· {{ ledger.group.name }}</span></div>
+    <table class="w-full text-[13.5px]">
+      <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide sticky top-0">
+        <tr><th class="text-left px-4 py-2">Date</th><th class="text-left px-4 py-2">Voucher</th><th class="text-left px-4 py-2">Narration</th><th class="text-right px-4 py-2">Debit (₹)</th><th class="text-right px-4 py-2">Credit (₹)</th><th class="text-right px-4 py-2">Balance</th></tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-slate-200 bg-slate-50"><td class="px-4 py-2" colspan="5">Opening balance</td><td class="px-4 py-2 text-right tabular-nums font-semibold">{{ dr_cr(opening) }}</td></tr>
+        {% for r in rows %}
+        <tr class="border-t border-slate-100">
+          <td class="px-4 py-1.5">{{ r.voucher.voucher_date.strftime('%d %b %Y') }}</td>
+          <td class="px-4 py-1.5"><a href="{{ url_for('vouchers.voucher_view', voucher_id=r.voucher.id) }}" class="underline text-accent-text">{{ r.voucher.voucher_no }}</a> <span class="text-ink-faint text-[12px]">{{ r.voucher.voucher_type }}</span></td>
+          <td class="px-4 py-1.5 text-ink-muted">{{ r.entry.narration or r.voucher.narration or '' }}</td>
+          <td class="px-4 py-1.5 text-right tabular-nums">{% if r.dr %}{{ '{:,.2f}'.format(r.dr) }}{% endif %}</td>
+          <td class="px-4 py-1.5 text-right tabular-nums">{% if r.cr %}{{ '{:,.2f}'.format(r.cr) }}{% endif %}</td>
+          <td class="px-4 py-1.5 text-right tabular-nums">{{ dr_cr(r.running) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-ink-faint py-8">No entries in this period.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="border-t-2 border-slate-300 font-bold">
+        <tr><td class="px-4 py-2" colspan="3">Total</td><td class="px-4 py-2 text-right tabular-nums">{{ '{:,.2f}'.format(dr_total) }}</td><td class="px-4 py-2 text-right tabular-nums">{{ '{:,.2f}'.format(cr_total) }}</td><td class="px-4 py-2 text-right tabular-nums">{{ dr_cr(closing) }}</td></tr>
+        <tr><td class="px-4 py-2" colspan="5">Closing balance</td><td class="px-4 py-2 text-right tabular-nums">{{ dr_cr(closing) }}</td></tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <p class="text-center text-ink-faint py-10">Choose a ledger to see its statement.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

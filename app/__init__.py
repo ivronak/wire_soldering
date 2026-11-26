@@ -25,10 +25,16 @@ from app.vendor_types.routes import vendor_types_bp
 from app.production_orders.routes import production_orders_bp
 from app.production_planning.routes import production_planning_bp
 from app.costing.routes import costing_bp
+from app.accounts.routes import accounts_bp
 from app.payment_terms.routes import payment_terms_bp
 from app.payment_modes.routes import payment_modes_bp
 from app.receipts.routes import receipts_bp
 from app.aging.routes import aging_bp
+from app.vendor_payments.routes import vendor_payments_bp
+from app.payables.routes import payables_bp
+from app.accounts.vouchers import vouchers_bp
+from app.accounts.statement import ledger_statement_bp
+from app.accounts.report_routes import reports_bp
 from app.sales_returns.routes import sales_returns_bp
 from app.customer_statement.routes import customer_statement_bp
 from app.sales_profit.routes import sales_profit_bp
@@ -113,10 +119,16 @@ def create_app():
     app.register_blueprint(production_orders_bp)
     app.register_blueprint(production_planning_bp)
     app.register_blueprint(costing_bp)
+    app.register_blueprint(accounts_bp)
     app.register_blueprint(payment_terms_bp)
     app.register_blueprint(payment_modes_bp)
     app.register_blueprint(receipts_bp)
     app.register_blueprint(aging_bp)
+    app.register_blueprint(vendor_payments_bp)
+    app.register_blueprint(payables_bp)
+    app.register_blueprint(vouchers_bp)
+    app.register_blueprint(ledger_statement_bp)
+    app.register_blueprint(reports_bp)
     app.register_blueprint(sales_returns_bp)
     app.register_blueprint(customer_statement_bp)
     app.register_blueprint(sales_profit_bp)
@@ -149,6 +161,9 @@ def create_app():
         if user is None or not auth_service.user_can(user, "stock"):
             return {"stock_alert_count": 0}
         return {"stock_alert_count": alert_count()}
+
+    from app.accounts.cli import register_cli as register_accounts_cli
+    register_accounts_cli(app)       # flask accounts-backfill / accounts-tally
 
     # "flask inventory-backfill": inventory banne se pehle ke GRN / QC / Return ki stock rows banata hai (dobara chalao to double nahi hoga)
     @app.cli.command("inventory-backfill")

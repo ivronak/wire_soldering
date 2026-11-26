@@ -571,6 +571,13 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 
 *(Chhote updates jo Key Decisions jitne bade nahi hain, lekin future context ke liye useful hain. Naya entry sabse upar.)*
 
+- **2026-11-25 — Accounts: fixed cost ka voucher (user ne "pehle fix karo" kaha).** Output post par Journal voucher: Dr Stock-in-hand, Cr **Fixed Cost Payable** (naya system ledger, Current Liabilities). Kyun: COGS batch cost (material + fixed) se pehle se banta tha par stock me fixed kabhi nahi jaata tha, isliye books stock ~2,353 kam tha. Ab profit nahi badla, stock + liability badhe. Restate / month Final / cancel par sirf farak ka naya voucher (`app/accounts/fixedcost.py`, hooks `costing/fixed.py` + cancel route). Migration `d3f7a2b9c1e5`; purane outputs ke liye `flask accounts-backfill`. Uncommitted, live nahi. Baaki: asli rent/salary payment manual voucher; output-free dino ka fixed cost.
+
+### 2026-11-25 — Accounts demo rule (user ka kehna, bar bar yaad rakhna)
+- Narrated demo me HAR form browser me khud type karna hai (PO, GRN, QC, bill, production order, issue, stages, output, dispatch, invoice, receipt, payment). Script se entry banana mana hai.
+- Samjhana 10th ke student jaisa: kirana example, aur highlight karke 'yaha dekho -> account me yaha gaya'. Demo sirf DB copy par; kamiyan `accounts_gaps_2026_11_25.md` me likhna.
+- Flux ka alag voucher zaroori nahi (stock ke andar hi shift); production voucher sirf fixed cost + scrap ke liye soch sakte hain (decision baaki).
+
 ### 2026-11-25 — "Who did it" (U1/U2/U4) done
 - W1 = automatic `*_by_id` from the login user (U2, all modules); W2 = responsible person picked from Users dropdown, stored as `<field>_user_id` + text name snapshot (U4). Picker = active users with active role, Developer never offered, default = logged-in user, server re-validates. Developer's actions show as "Administrator" to everyone else. Old text rows unchanged. Flow doc: `user_in_erp_flow_2026_11_24.md` (12.7-12.12). Deploy notes: runbook section "Who did it". Hold-reason datalist in Routing is a reason list, not a person, so it stays.
 
@@ -651,3 +658,5 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 ### Nrupex re-theme + masters unified (2026-11-24, uncommitted)
 **User ne kaha:** web ka colour theme logo jaisa (audit pehle), UI/UX improve; phir 'product master jaisa baki masters me bhi'.
 **Faisle:** accent = royal blue #0B5BEF (azure #00A0F8 sirf gradient/glow — text ke liye 2.8:1 fail), ink near-black #0B1220, cool greys. Colours SIRF `app/static/js/theme.js` me (Tailwind tokens + CSS vars); tokens: accent/info(cyan)/done(violet)/success/warning/stop/neutral/cat1-7. Meaning rules: running=accent, pending/low stock/partial=warning amber, inactive/cancelled/short-closed=neutral grey, red sirf breakdown/rejected/overdue/loss/destructive, settled(Ordered/Credited)=violet, categorical (warehouse type, icons, Gantt)=cat tokens. Print accent = logo blue #0A3CA6 + print-color-adjust. Masters row actions = `_row_actions.html` macros + `erp-view.js` (generic read-only drawer; raw_materials/vendors/customers keep own richer drawer). Status text Active/Inactive (not In use/Stopped). **Open:** customers/vendors/warehouses me Delete route nahi (add karna ho to soft-delete route + permission), machines me status badge + picker duplicate, logo PNG opaque (transparent/SVG chahiye), docket.py short-closed red/open green vs screen, inventory/routes.py scrap tone 'bad' red (SCRAP neutral hona chahiye), confirm dialogs variant text-matching stopgap.
+
+- **2026-11-26 — Dashboard v2:** user ne cards-only Overview reject kiya. Dashboard me trend (period filter, KPI delta, chart), paisa (cash, aging), aur kaam (attention, orders, reorder) chahiye. Charts bina library (HTML/CSS/SVG), read-only, har panel apni page permission se. Sales GST ke bina. Plan: `dashboard_flow_2026_11_26.md`.

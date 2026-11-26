@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Vendor payments{% endblock %}
+
+{# Accounts A5: Vendor payments. To pay = vendors jinko bill ka paisa dena baaki. Payment = vendor ko diya paisa, bill ke against ya On account. #}
+{% block page_css %}
+<style>
+  .d-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 10px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .d-table tbody td { padding: 11px 10px; font-size: 14px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
+  .d-table tbody tr:nth-child(even) { background: #F8FAFD; }
+  .d-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .d-table a:focus-visible, .d-table button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Accounts / Vendor payments</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Vendor payments</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">Money paid to vendors · applied to bills, anything left stays on account</p>
+        </div>
+        {% if can_edit('vendor_payments') %}<a href="{{ url_for('vendor_payments.payments_new') }}" class="px-3.5 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">+ New payment</a>{% endif %}
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-end gap-1 px-3.5 pt-1.5 border-b border-slate-200 bg-white shrink-0">
+          {% for key, label in (('todo', 'To pay'), ('done', 'Payments'), ('cancelled', 'Cancelled')) %}
+          <a href="{{ url_for('vendor_payments.payments_list', tab=key) }}"
+            class="px-3 py-2 -mb-px text-[13.5px] border-b-2 {% if tab == key %}border-accent text-accent-text font-semibold{% else %}border-transparent text-ink-faint hover:text-ink{% endif %}">
+            {{ label }} <span class="tabular-nums">({{ counts[key] }})</span>
+          </a>
+          {% endfor %}
+          {% if tab == 'todo' %}<span class="ml-auto pb-2 text-[13px] text-ink-muted">Total to pay: <b class="text-ink tabular-nums">₹ {{ '{:,.2f}'.format(total_due) }}</b></span>{% endif %}
+        </div>
+
+        <div class="flex-1 overflow-auto min-h-0">
+          {% if tab == 'todo' %}
+          <table class="d-table">
+            <colgroup><col style="width:22%"><col style="width:40%"><col style="width:14%"><col style="width:12%">{% if can_edit('vendor_payments') %}<col style="width:12%">{% endif %}</colgroup>
+            <thead><tr><th>Vendor</th><th>Bills not paid</th><th class="num">Due (₹)</th><th class="num">Advance (₹)</th>{% if can_edit('vendor_payments') %}<th>Action</th>{% endif %}</tr></thead>
+            <tbody>
+              {% for r in todo %}
+              <tr>
+                <td class="font-semibold text-ink">{{ r.name }}</td>
+                <td class="text-[13px]">{% for b in r.bills %}<div>{{ b.pi_no }} <span class="text-ink-faint">({{ b.vendor_invoice_no }}, due {{ b.due_on.strftime('%d %b %Y') }})</span> — ₹ {{ '{:,.2f}'.format(b.outstanding) }}</div>{% endfor %}</td>
+                <td class="num font-semibold">{{ '{:,.2f}'.format(r.due) }}</td>
+                <td class="num">{% if r.advance > 0.004 %}{{ '{:,.2f}'.format(r.advance) }}{% else %}—{% endif %}</td>
+                {% if can_edit('vendor_payments') %}<td><a href="{{ url_for('vendor_payments.payments_new', v=r.id) }}" class="text-accent-text underline">Pay</a></td>{% endif %}
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-ink-faint py-10">No bills are waiting for payment.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <table class="d-table">
+            <colgroup><col style="width:11%"><col style="width:10%"><col style="width:20%"><col style="width:12%"><col style="width:12%"><col style="width:20%"><col style="width:15%"></colgroup>
+            <thead><tr><th>No.</th><th>Date</th><th>Vendor</th><th>Mode</th><th class="num">Amount (₹)</th><th>Applied to</th><th>{% if tab == 'done' %}Action{% else %}Cancelled{% endif %}</th></tr></thead>
+            <tbody>
+              {% for p in payments %}
+              <tr>
+                <td class="font-semibold">{{ p.payment_no }}</td>
+                <td>{{ p.payment_date.strftime('%d %b %Y') }}</td>
+                <td>{{ p.vendor.name }}</td>
+                <td>{{ p.payment_mode.name }}{% if p.reference %}<div class="text-[12px] text-ink-faint">{{ p.reference }}</div>{% endif %}</td>
+                <td class="num">{{ '{:,.2f}'.format(p.amount) }}{% if p.created_by %}<div class="text-[12px] text-ink-faint">by {{ actor_name(p.created_by) }}</div>{% endif %}</td>
+                <td class="text-[13px]">{% for a in p.allocations %}<div>{{ a.invoice.pi_no }} — ₹ {{ '{:,.2f}'.format(a.amount) }}</div>{% endfor %}{% if p.on_account > 0.004 %}<div class="text-ink-faint">On account — ₹ {{ '{:,.2f}'.format(p.on_account) }}</div>{% endif %}</td>
+                <td>
+                  {% if tab == 'done' %}
+                    {% if can_edit('vendor_payments') %}
+                    {% if p.on_account > 0.004 %}<a href="{{ url_for('vendor_payments.payments_apply', payment_id=p.id) }}" class="text-accent-text underline text-[13px] block mb-1">Apply advance to bills</a>{% endif %}
+                    <form method="post" action="{{ url_for('vendor_payments.payments_cancel', payment_id=p.id) }}" class="flex gap-1">
+                      <input type="text" name="reason" required minlength="3" placeholder="Reason" class="w-full px-2 py-1 text-[13px] border border-slate-300 rounded" aria-label="Reason to cancel {{ p.payment_no }}" />
+                      <button type="submit" class="px-2 py-1 text-[13px] border border-slate-300 rounded hover:bg-slate-100" onclick="return confirm('Cancel this payment?')">Cancel</button>
+                    </form>
+                    {% endif %}
+                  {% else %}
+                    <div class="text-[12.5px]">{{ p.cancel_reason }}</div>
+                    {% if p.cancelled_by %}<div class="text-[12px] text-ink-faint">by {{ actor_name(p.cancelled_by) }}</div>{% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-center text-ink-faint py-10">Nothing here yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
+      </div>
+{% endblock %}

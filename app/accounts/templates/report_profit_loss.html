@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Profit &amp; loss{% endblock %}
+
+{# Accounts A7: Profit & Loss — period ke liye. Income - direct = gross profit; gross - indirect = net profit. #}
+{% macro section(title, rows, total) %}
+  <tr class="border-t border-slate-200 bg-slate-50 font-semibold"><td class="px-4 py-1.5">{{ title }}</td><td class="px-4 py-1.5 text-right tabular-nums">{{ money(total) }}</td></tr>
+  {% for l, v in rows %}<tr class="border-t border-slate-100"><td class="px-4 py-1" style="padding-left: 32px"><a href="{{ url_for('ledger_statement.statement_page', ledger=l.id) }}" class="underline text-accent-text">{{ l.name }}</a></td><td class="px-4 py-1 text-right tabular-nums">{{ money(v) }}</td></tr>{% endfor %}
+{% endmacro %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+  <div>
+    <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('reports.reports_index') }}" class="underline">Accounts / Reports</a> / Profit &amp; loss</div>
+    <h1 class="text-[20px] font-bold text-ink leading-tight">Profit &amp; loss</h1>
+  </div>
+  <form method="get" class="flex items-center gap-2">
+    <label for="pl-from" class="text-[13px] text-ink-muted">From</label><input type="date" id="pl-from" name="from" value="{{ date_from.isoformat() }}" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <label for="pl-to" class="text-[13px] text-ink-muted">To</label><input type="date" id="pl-to" name="to" value="{{ date_to.isoformat() }}" class="px-2 py-1.5 text-[13.5px] border border-slate-300 rounded" />
+    <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
+  </form>
+</div>
+<div class="flex-1 overflow-auto min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm">
+  <table class="w-full text-[13.5px]">
+    <thead class="bg-mist text-ink-faint text-[12px] uppercase tracking-wide"><tr><th class="text-left px-4 py-2">Particulars</th><th class="text-right px-4 py-2" style="width:200px">Amount (₹)</th></tr></thead>
+    <tbody>
+      {{ section('Income', pl.income, pl.income_total) }}
+      {{ section('Direct expenses (purchases and cost of goods sold)', pl.direct, pl.direct_total) }}
+      <tr class="border-t-2 border-slate-300 font-bold"><td class="px-4 py-2">{{ 'Gross profit' if pl.gross >= 0 else 'Gross loss' }}</td><td class="px-4 py-2 text-right tabular-nums" id="pl-gross">{{ money(pl.gross|abs) }}</td></tr>
+      {{ section('Indirect expenses', pl.indirect, pl.indirect_total) }}
+      <tr class="border-t-2 border-slate-300 font-bold text-[15px]"><td class="px-4 py-2.5">{{ 'Net profit' if pl.net >= 0 else 'Net loss' }}</td><td class="px-4 py-2.5 text-right tabular-nums {% if pl.net < 0 %}text-stop{% endif %}" id="pl-net">{{ money(pl.net|abs) }}</td></tr>
+    </tbody>
+  </table>
+  <p class="px-4 py-2 text-[12.5px] text-ink-faint">Cost of goods sold is booked when a sales invoice is posted, using the cost of the dispatched batches. Fixed cost (rent, salary, power) is added to the stock value when production output is recorded, so it reaches Cost of Goods Sold only for the goods that are sold.</p>
+</div>
+{% endblock %}

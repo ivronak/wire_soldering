@@ -309,6 +309,10 @@ def purchase_invoices_cancel(inv_id):
         flash(f"{invoice.pi_no} has an active return ({purchase_return.pr_no}). Cancel the return first.", "error")
         return redirect(list_url("completed"))
 
+    if invoice.paid > 0.004:      # Accounts A5: bill ke against paisa diya ja chuka hai
+        flash(f"{invoice.pi_no} has payments of ₹{invoice.paid:,.2f} against it. Cancel those vendor payments first.", "error")
+        return redirect(list_url("completed"))
+
     was_posted = invoice.status == "Posted"
     cancel_invoice(invoice)
     invoice.cancelled_by_id = auth_service.actor_id()    # W1: kisne cancel kiya

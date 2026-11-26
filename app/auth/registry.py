@@ -8,7 +8,7 @@ LEVEL_EDIT = 2    # dekhna + add / edit / cancel (sab badlav)
 LEVEL_NAMES = {LEVEL_VIEW: "View", LEVEL_EDIT: "View + Edit"}
 
 # Sidebar jaise module order me (base.html ke 6 module). "group" sirf Masters ke andar ka upar-header hai.
-MODULES = ["Dashboard", "Masters", "Procurement", "Sales", "Inventory", "Manufacturing"]
+MODULES = ["Dashboard", "Masters", "Procurement", "Sales", "Inventory", "Manufacturing", "Accounts"]
 ADMIN_MODULE = "Administration"
 
 # (key, label, module, group, endpoint)
@@ -65,6 +65,13 @@ _PAGES = [
     ("scrap", "Scrap / waste", "Manufacturing", None, "scrap.scrap_list"),
     ("variance", "Consumption variance", "Manufacturing", None, "variance.variance_list"),
     ("costing", "Costing", "Manufacturing", None, "costing.costing_page"),
+    # Accounts module (A1): abhi sirf Chart of accounts (dekhna). Vouchers / reports aage ke steps me jodenge.
+    ("chart_of_accounts", "Chart of accounts", "Accounts", None, "accounts.chart_page"),
+    ("vendor_payments", "Vendor payments", "Accounts", None, "vendor_payments.payments_list"),
+    ("payables", "Payables", "Accounts", None, "payables.payables_aging"),
+    ("vouchers", "Vouchers", "Accounts", None, "vouchers.vouchers_list"),
+    ("ledger_statement", "Ledger statement", "Accounts", None, "ledger_statement.statement_page"),
+    ("accounts_reports", "Reports", "Accounts", None, "reports.reports_index"),
 ]
 
 # Administration pages (P0-7 me bane: app/auth/admin_*.py).

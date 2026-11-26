@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Payables aging{% endblock %}
+
+{# Accounts A5: Payables aging. Vendor-wise: kitna dena hai aur kitne din late. Row ke neeche bills ki list. #}
+{% block page_css %}
+<style>
+  .d-table { width: 100%; min-width: 900px; border-collapse: collapse; table-layout: fixed; }
+  .d-table thead th { position: sticky; top: 0; z-index: 5; background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 11px 8px; text-align: left; border-bottom: 1px solid #D4DBE6; }
+  .d-table tbody td { padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #E2E8F1; vertical-align: top; }
+  .d-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .d-table tfoot td { padding: 11px 8px; font-size: 14px; font-weight: 700; background: #E9EEF6; border-top: 2px solid #D4DBE6; }
+  .zero { color: #5A6577; }
+  .late1 { color: #B45309; font-weight: 600; }
+  .late2 { color: #C2410C; font-weight: 700; }
+  .late3 { color: #B42318; font-weight: 700; }
+  .late4 { color: #7F1D1D; font-weight: 800; }
+  .bill-list { font-size: 12.5px; color: #475266; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% macro money(v) %}{% if v and v|abs > 0.004 %}{{ '{:,.2f}'.format(v) }}{% else %}<span class="zero">—</span>{% endif %}{% endmacro %}
+
+{% block content %}
+      <div class="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+        <div>
+          <div class="text-[12.5px] text-ink-faint font-medium">Accounts / Payables</div>
+          <h1 class="text-[20px] font-bold text-ink leading-tight">Payables aging</h1>
+          <p class="text-[12.5px] text-ink-faint mt-0.5">How much we owe each vendor, and for how many days past the due date</p>
+        </div>
+        <form method="get" class="flex items-center gap-2">
+          <label for="as-on" class="text-[13px] text-ink-muted">Aging as on</label>
+          <input type="date" id="as-on" name="as_on" value="{{ as_on.isoformat() }}" class="px-2 py-1.5 text-[14px] border border-slate-300 rounded" />
+          <button type="submit" class="px-3 py-1.5 text-[13px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Show</button>
+          {% if as_on != today %}<a href="{{ url_for('payables.payables_aging') }}" class="text-[13px] text-accent-text underline">Today</a>{% endif %}
+        </form>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Total payable</div><div class="text-[20px] font-bold text-ink tabular-nums">₹ {{ '{:,.2f}'.format(totals.net) }}</div></div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Not yet due</div><div class="text-[20px] font-bold text-ink tabular-nums">₹ {{ '{:,.2f}'.format(totals.current) }}</div></div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Overdue</div><div class="text-[20px] font-bold text-stop tabular-nums">₹ {{ '{:,.2f}'.format(overdue) }}</div></div>
+        <div class="bg-white border border-slate-300 rounded-lg px-4 py-3"><div class="text-[12px] text-ink-faint">Advance paid (on account)</div><div class="text-[20px] font-bold text-ink tabular-nums">₹ {{ '{:,.2f}'.format(totals.advance) }}</div></div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="flex-1 overflow-auto min-h-0">
+          <table class="d-table">
+            <colgroup><col style="width:21%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:11%"><col style="width:11%"><col style="width:11%"></colgroup>
+            <thead>
+              <tr><th>Vendor</th><th class="num">Not yet due</th><th class="num">1-30 days</th><th class="num">31-60 days</th><th class="num">61-90 days</th><th class="num">Over 90</th>
+                  <th class="num">Unpaid bills</th><th class="num">Advance (−)</th><th class="num">Other*</th></tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+              <tr>
+                <td class="font-semibold text-ink">{{ r.name }}
+                  <div class="text-[12px] font-normal text-ink-faint">Net ₹ {{ '{:,.2f}'.format(r.net) }}{% if r.oldest is not none and r.oldest > 0 %} · oldest {{ r.oldest }} days late{% endif %}</div>
+                  {% if r.lines %}<div class="bill-list">{% for ln in r.lines %}<div>{{ ln.no }} ({{ ln.vendor_no }}) · due {{ ln.due.strftime('%d %b %Y') }} · ₹ {{ '{:,.2f}'.format(ln.outstanding) }}{% if ln.late > 0 %} · {{ ln.late }} d late{% endif %}</div>{% endfor %}</div>{% endif %}
+                </td>
+                <td class="num">{{ money(r.current) }}</td>
+                <td class="num late1">{{ money(r.b1) }}</td>
+                <td class="num late2">{{ money(r.b2) }}</td>
+                <td class="num late3">{{ money(r.b3) }}</td>
+                <td class="num late4">{{ money(r.b4) }}</td>
+                <td class="num font-semibold">{{ money(r.bills) }}</td>
+                <td class="num">{{ money(r.advance) }}</td>
+                <td class="num">{{ money(r.other) }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="9" class="text-center text-ink-faint py-10">Nothing is payable.</td></tr>
+              {% endfor %}
+            </tbody>
+            {% if rows %}
+            <tfoot><tr><td>Total</td><td class="num">{{ money(totals.current) }}</td><td class="num">{{ money(totals.b1) }}</td><td class="num">{{ money(totals.b2) }}</td><td class="num">{{ money(totals.b3) }}</td><td class="num">{{ money(totals.b4) }}</td>
+              <td class="num">{{ money(totals.bills) }}</td><td class="num">{{ money(totals.advance) }}</td><td class="num">{{ money(totals.other) }}</td></tr></tfoot>
+            {% endif %}
+          </table>
+        </div>
+        <div class="px-3.5 py-2 text-[12px] text-ink-faint border-t border-slate-200">*Other = part of the vendor's ledger that is not from any bill (for example an opening balance). Net payable = Unpaid bills − Advance + Other, and always matches the vendor ledger.</div>
+      </div>
+{% endblock %}

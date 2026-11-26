@@ -16,7 +16,7 @@ Rule = namedtuple("Rule", ["kind", "keys", "level", "json"])
 
 # blueprint -> page key (blueprint = module jaisa simple case)
 BLUEPRINT_PAGE = {
-    "aging": "receivables", "charges": "charges", "costing": "costing", "customer_statement": "statement",
+    "accounts": "chart_of_accounts", "vendor_payments": "vendor_payments", "payables": "payables", "vouchers": "vouchers", "ledger_statement": "ledger_statement", "reports": "accounts_reports", "aging": "receivables", "charges": "charges", "costing": "costing", "customer_statement": "statement",
     "customers": "customers", "dashboard": "dashboard", "dispatch": "dispatch", "grns": "grns", "inventory": "stock",
     "inward_qc": "inward_qc", "machines": "machines", "material_issues": "material_issues", "material_plan": "material_plan",
     "opening_stock": "opening_stock", "payment_modes": "payment_modes", "payment_terms": "payment_terms",

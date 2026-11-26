@@ -9,6 +9,7 @@
 #   * Cancel tabhi jab wapas aaya maal stock me abhi hai (dobara dispatch na ho gaya ho). Stock ki rows kabhi delete nahi — ulti row.
 from datetime import datetime
 
+from app.accounts.autopost import SRC_RETURN, post_sales_return, reverse_for
 from app.dispatch.stock import batch_warehouse
 from app.extensions import db
 from app.auth import service as auth_service
@@ -133,6 +134,7 @@ def create_return(invoice, return_date, reason, wanted):
     ledger = invoice.quotation.customer.ledger
     ledger.current_balance = round(ledger.current_balance + ret.total_amount, 2)      # Cr: lena kam
     db.session.flush()
+    post_sales_return(ret, created_by_id=auth_service.actor_id())      # Accounts A3: voucher (credit note + COGS ulta)
     return ret
 
 
@@ -152,6 +154,7 @@ def cancel_return(ret, reason):
                                   reverses_movement_id=move.id, note="Reversal: credit note cancelled"))
     ledger = ret.invoice.quotation.customer.ledger
     ledger.current_balance = round(ledger.current_balance - ret.total_amount, 2)
+    reverse_for(SRC_RETURN, ret.id, reason, created_by_id=auth_service.actor_id())      # Accounts A3: voucher ulta
     ret.status = "Cancelled"
     ret.cancel_reason = reason
     ret.cancelled_at = datetime.utcnow()

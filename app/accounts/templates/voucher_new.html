@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}New {{ vtype }} voucher{% endblock %}
+
+{# Accounts A6: Naya manual voucher. Lines: ledger + Dr/Cr + amount. Neeche Dr / Cr ka jod live dikhta hai (server phir bhi check karta hai). #}
+{% block page_css %}
+<style>
+  .vl-table { width: 100%; border-collapse: collapse; }
+  .vl-table th { background: #E9EEF6; color: #475266; font-size: 12px; font-weight: 600; text-transform: uppercase; padding: 8px; text-align: left; }
+  .vl-table td { padding: 6px 4px; border-bottom: 1px solid #E2E8F1; }
+  .ql-input { width: 100%; padding: 7px 8px; font-size: 14px; border: 1px solid #C7D0DE; border-radius: 4px; background: #fff; }
+  .ql-input:focus { outline: none; border-color: #0B5BEF; box-shadow: 0 0 0 2px rgba(11,91,239,.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shrink-0">
+  <div class="text-[12.5px] text-ink-faint font-medium"><a href="{{ url_for('vouchers.vouchers_list') }}" class="underline">Accounts / Vouchers</a> / New</div>
+  <h1 class="text-[20px] font-bold text-ink leading-tight">New voucher</h1>
+</div>
+
+<div class="bg-white border border-slate-300 rounded-lg shadow-sm p-4 overflow-auto min-h-0">
+  <div class="flex gap-1.5 mb-4" role="tablist" aria-label="Voucher type">
+    {% for t in types %}<a href="{{ url_for('vouchers.voucher_new', type=t) }}" class="px-3 py-1.5 text-[13.5px] rounded border {% if t == vtype %}bg-accent text-white border-accent-dark font-semibold{% else %}border-slate-300 hover:bg-slate-100{% endif %}">{{ t }}</a>{% endfor %}
+  </div>
+  <p class="text-[12.5px] text-ink-faint mb-3">
+    {% if vtype == 'Payment' %}Money going out: credit a Cash / Bank ledger, debit where it went (expense, vendor, loan...).
+    {% elif vtype == 'Receipt' %}Money coming in: debit a Cash / Bank ledger, credit where it came from (customer, income, capital...).
+    {% elif vtype == 'Contra' %}Moving money between Cash and Bank ledgers (for example a cash deposit into the bank).
+    {% else %}Any adjustment between ledgers other than Cash / Bank.{% endif %}
+    Total debit must equal total credit.
+  </p>
+  <form method="post" action="{{ url_for('vouchers.voucher_add') }}" id="v-form">
+    <input type="hidden" name="voucher_type" value="{{ vtype }}" />
+    <input type="hidden" name="line_count" id="line-count" value="4" />
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div><label for="v-date" class="text-[12.5px] font-semibold text-ink-muted">Date</label><input type="date" id="v-date" name="voucher_date" value="{{ today }}" max="{{ today }}" required class="ql-input" /></div>
+      <div class="md:col-span-2"><label for="v-narr" class="text-[12.5px] font-semibold text-ink-muted">Narration</label><input type="text" id="v-narr" name="narration" maxlength="255" class="ql-input" /></div>
+    </div>
+    <table class="vl-table mb-2" id="lines">
+      <thead><tr><th>Ledger</th><th style="width:90px">Dr / Cr</th><th style="width:160px">Amount (₹)</th></tr></thead>
+      <tbody id="lines-body">
+        {% for n in range(4) %}
+        <tr>
+          <td><select name="ledger_{{ n }}" class="ql-input" aria-label="Ledger, line {{ n + 1 }}">
+            <option value="">—</option>
+            {% set ns = namespace(g='') %}
+            {% for l in ledgers %}{% if l.group != ns.g %}{% if ns.g %}</optgroup>{% endif %}<optgroup label="{{ l.group }}">{% set ns.g = l.group %}{% endif %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}
+            {% if ns.g %}</optgroup>{% endif %}
+          </select></td>
+          <td><select name="side_{{ n }}" class="ql-input" aria-label="Debit or credit, line {{ n + 1 }}"><option value="Dr" {% if n % 2 == 0 %}selected{% endif %}>Dr</option><option value="Cr" {% if n % 2 == 1 %}selected{% endif %}>Cr</option></select></td>
+          <td><input type="number" step="0.01" min="0.01" name="amount_{{ n }}" class="ql-input amt" style="text-align:right" aria-label="Amount, line {{ n + 1 }}" /></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" id="add-line" class="text-[13px] underline text-accent-text mb-3">+ Add a line</button>
+    <div class="text-[13.5px] mb-4" aria-live="polite">Debit <b id="t-dr" class="tabular-nums">0.00</b> · Credit <b id="t-cr" class="tabular-nums">0.00</b> · <span id="t-diff"></span></div>
+    <button type="submit" id="save" class="px-4 py-2 text-[13.5px] font-semibold text-white bg-accent border border-accent-dark rounded hover:bg-accent-dark">Post voucher</button>
+    <a href="{{ url_for('vouchers.vouchers_list') }}" class="ml-2 text-[13.5px] underline text-ink-muted">Cancel</a>
+  </form>
+</div>
+
+<script>
+  // Sirf jod dikhane ke liye (Dr = Cr ka indicator) aur extra line jodne ke liye. Asli check server karta hai.
+  (function () {
+    var body = document.getElementById('lines-body');
+    function totals() {
+      var dr = 0, cr = 0;
+      body.querySelectorAll('tr').forEach(function (row) {
+        var amt = parseFloat(row.querySelector('.amt').value) || 0;
+        if (row.querySelector('select[name^="side_"]').value === 'Dr') { dr += amt; } else { cr += amt; }
+      });
+      document.getElementById('t-dr').textContent = dr.toFixed(2);
+      document.getElementById('t-cr').textContent = cr.toFixed(2);
+      var diff = Math.round((dr - cr) * 100) / 100;
+      document.getElementById('t-diff').textContent = diff === 0 ? (dr > 0 ? 'Balanced' : '') : 'Difference ' + Math.abs(diff).toFixed(2) + (diff > 0 ? ' (more debit)' : ' (more credit)');
+    }
+    body.addEventListener('input', totals);
+    body.addEventListener('change', totals);
+    document.getElementById('add-line').addEventListener('click', function () {
+      var rows = body.querySelectorAll('tr');
+      var n = rows.length;
+      var copy = rows[0].cloneNode(true);
+      copy.querySelectorAll('select, input').forEach(function (el) {
+        el.name = el.name.replace(/_\d+$/, '_' + n);
+        if (el.tagName === 'INPUT') { el.value = ''; } else if (el.name.indexOf('ledger_') === 0) { el.value = ''; }
+      });
+      body.appendChild(copy);
+      document.getElementById('line-count').value = n + 1;
+    });
+    totals();
+  })();
+</script>
+{% endblock %}

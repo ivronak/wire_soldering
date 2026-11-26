@@ -127,6 +127,7 @@
   </div>
   <div class="text-[12.5px] text-ink-faint">As of {{ board.now.strftime('%d %b %Y, %I:%M %p') }}</div>
 </div>
+{% include "_dashboard_tabs.html" %}
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
   <div class="db-kpi"><span class="k">Machines</span><span class="v">{{ board.total.machines }}</span><span class="h">on all lines</span></div>
