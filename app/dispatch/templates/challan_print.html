@@ -43,7 +43,7 @@
         {% if c.status == 'Cancelled' %}<div class="remarks"><span class="lbl">Cancelled</span><p>{{ c.cancel_reason }}</p></div>{% endif %}
         <div class="sign-head">For Nrupex Solder LLP</div>
         <div class="signs">
-          <div class="sign"><div class="name"></div><div class="line">Dispatched by</div></div>
+          <div class="sign"><div class="name">{{ print_name(c.created_by) }}</div><div class="line">Dispatched by</div></div>
           <div class="sign"><div class="name"></div><div class="line">Received by (sign and stamp)</div></div>
         </div>
       </div>

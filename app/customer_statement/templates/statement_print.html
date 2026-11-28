@@ -47,7 +47,7 @@
       <div class="side">
         <div class="remarks"><span class="lbl">Note</span><p>Dr = amount to be paid by the customer. Cr = credit in the customer's favour. Please report any difference within 7 days.</p></div>
         <div class="sign-head">For Nrupex Solder LLP</div>
-        <div class="signs"><div class="sign"><div class="name"></div><div class="line">Authorised signatory</div></div></div>
+        <div class="signs"><div class="sign"><div class="name">{{ print_name(me) }}</div><div class="line">Prepared by</div></div><div class="sign"><div class="name"></div><div class="line">Authorised signatory</div></div></div>
       </div>
       <div class="totals">
         <div class="row"><span>Opening balance</span><span class="num">{{ bal(data.opening) }}</span></div>

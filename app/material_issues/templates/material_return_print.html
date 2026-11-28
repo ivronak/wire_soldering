@@ -37,7 +37,7 @@
         {% if ret.remarks %}<div class="remarks"><span class="lbl">Remarks</span><p>{{ ret.remarks }}</p></div>{% endif %}
         <div class="sign-head">For Nrupex Solder LLP</div>
         <div class="signs">
-          <div class="sign"><div class="name">{{ ret.returned_by or '' }}</div><div class="line">Returned by (production)</div></div>
+          <div class="sign"><div class="name">{{ print_name(ret.returned_by_user, ret.returned_by) }}</div><div class="line">Returned by (production)</div></div>
           <div class="sign"><div class="name"></div><div class="line">Received by (store)</div></div>
         </div>
       </div>

@@ -87,7 +87,8 @@
     .endkeep { break-inside: avoid; page-break-inside: avoid; }
     .signs { display: flex; gap: 28px; margin-top: 16px; }
     .sign { width: 190px; font-size: 12.5px; color: #475266; }
-    .sign .line { margin-top: 28px; border-top: 1px solid #0B1220; padding-top: 5px; color: #0B1220; font-weight: 600; font-size: 12px; }
+    .sign .name { min-height: 18px; font-weight: 600; color: #0B1220; font-size: 13px; }
+    .sign .line { margin-top: 10px; border-top: 1px solid #0B1220; padding-top: 5px; color: #0B1220; font-weight: 600; font-size: 12px; }
     footer.foot { margin-top: 12px; padding-top: 6px; border-top: 1px solid #D4DBE6; font-size: 10.5px; color: #5A6577; display: flex; justify-content: space-between; gap: 12px; }
     @media print {
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -410,10 +411,10 @@
     {% endif %}
 
     {# Sign lines + footer: aakhri return (ya "No returns.") ke saath ek hi page par rehte hain, akele nahi girte.
-       Sign lines PO print jaisi (login nahi hai, isliye naam nahi). Client mana kare to ye block hata do #}
+       Sign lines PO print jaisi (Prepared by / Approved by me naam + user code). Client mana kare to ye block hata do #}
       <div class="signs">
-        <div class="sign"><div class="line">Prepared by</div></div>
-        <div class="sign"><div class="line">Approved by</div></div>
+        <div class="sign"><div class="name">{{ print_name(po.created_by) }}</div><div class="line">Prepared by</div></div>
+        <div class="sign"><div class="name">{{ print_name(po.confirmed_by) }}</div><div class="line">Approved by</div></div>
       </div>
       <footer class="foot">
         <span>Procurement docket · {{ po.po_no }}</span>

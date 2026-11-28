@@ -38,8 +38,8 @@
         {% if issue.remarks %}<div class="remarks"><span class="lbl">Remarks</span><p>{{ issue.remarks }}</p></div>{% endif %}
         <div class="sign-head">For Nrupex Solder LLP</div>
         <div class="signs">
-          <div class="sign"><div class="name">{{ issue.issued_by or '' }}</div><div class="line">Issued by (store)</div></div>
-          <div class="sign"><div class="name">{{ issue.received_by or '' }}</div><div class="line">Received by (production)</div></div>
+          <div class="sign"><div class="name">{{ print_name(issue.issued_by_user, issue.issued_by) }}</div><div class="line">Issued by (store)</div></div>
+          <div class="sign"><div class="name">{{ print_name(issue.received_by_user, issue.received_by) }}</div><div class="line">Received by (production)</div></div>
         </div>
       </div>
       <div class="totals">

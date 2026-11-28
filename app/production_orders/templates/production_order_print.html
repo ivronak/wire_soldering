@@ -66,8 +66,8 @@
         {% if order.status == 'Cancelled' and order.cancel_reason %}<div class="remarks"><span class="lbl">Cancelled</span><p>{{ order.cancel_reason }}</p></div>{% endif %}
         <div class="sign-head">For Nrupex Solder LLP</div>
         <div class="signs">
-          <div class="sign"><div class="line">Prepared by</div></div>
-          <div class="sign"><div class="line">Approved by</div></div>
+          <div class="sign"><div class="name">{{ print_name(order.created_by) }}</div><div class="line">Prepared by</div></div>
+          <div class="sign"><div class="name">{{ print_name(order.released_by) }}</div><div class="line">Approved by</div></div>
         </div>
       </div>
       <div class="totals">

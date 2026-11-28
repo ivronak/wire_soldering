@@ -307,6 +307,15 @@ def actor_label(user, viewer=None):
     return user.full_name
 
 
+def print_name(user, typed=None):
+    # Print / slip ke "created by / approved by" jaise fields: "Naam (USR-0003)". Judta hai: har *_print.html template.
+    # Developer ka bhi asli naam aata hai (user ka faisla 28 Nov — sirf print ke in fields ke liye; screen par actor_label waisa hi).
+    # user na ho (purane document) to `typed` = pehle haath se likha naam; wo bhi na ho to khaali (haath se sign ke liye).
+    if user is None:
+        return typed or ""
+    return "%s (%s)" % (user.full_name, user.code) if user.code else user.full_name
+
+
 # ---------- audit ----------
 
 def audit_label(user):

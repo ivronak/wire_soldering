@@ -32,7 +32,7 @@
     {% set unit = order.product.base_unit.code if order.product and order.product.base_unit else '' %}
     <div class="meta">
       <div><span class="lbl">Tested on</span><span class="val">{{ qc.tested_at.strftime('%d %b %Y, %H:%M') }}</span></div>
-      <div><span class="lbl">Tested by</span><span class="val">{{ qc.tested_by }}</span></div>
+      <div><span class="lbl">Tested by</span><span class="val">{{ print_name(qc.tested_by_user, qc.tested_by) }}</span></div>
       <div><span class="lbl">Stage</span><span class="val">{{ stage.stage_name }}</span></div>
       <div><span class="lbl">Batch</span><span class="val">{{ '%g'|format(batch_kg) }} KG</span></div>
       {% if heat_no %}<div><span class="lbl">Heat number</span><span class="val">{{ heat_no }}</span></div>{% endif %}

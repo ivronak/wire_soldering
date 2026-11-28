@@ -78,7 +78,8 @@
     .sign-head { margin-top: 28px; font-size: 12.5px; color: #475266; }
     .signs { display: flex; gap: 28px; }
     .sign { width: 190px; font-size: 12.5px; color: #475266; }
-    .sign .line { margin-top: 36px; border-top: 1px solid #0B1220; padding-top: 5px; color: #0B1220; font-weight: 600; font-size: 12px; }
+    .sign .name { min-height: 18px; font-weight: 600; color: #0B1220; font-size: 13px; }
+    .sign .line { margin-top: 18px; border-top: 1px solid #0B1220; padding-top: 5px; color: #0B1220; font-weight: 600; font-size: 12px; }
     .totals { width: 268px; border: 1px solid #E2E8F1; border-radius: 8px; overflow: hidden; font-size: 13px; }
     .totals .row { display: flex; justify-content: space-between; padding: 6px 14px; color: #475266; }
     .totals .grand {
@@ -182,12 +183,11 @@
           <p>{{ po.remarks }}</p>
         </div>
         {% endif %}
-        {# §10.10: login abhi nahi hai, isliye naam print nahi hote — haath se sign ke liye do khaali lines.
-           Login aane par "Prepared by" me banane wale ka naam khud aa sakta hai. #}
+        {# Sign lines: Prepared by = PO banane wala, Approved by = PO confirm karne wala (naam + user code). Haath ke sign ke liye line waisi hi. #}
         <div class="sign-head">For Nrupex Solder LLP</div>
         <div class="signs">
-          <div class="sign"><div class="line">Prepared by</div></div>
-          <div class="sign"><div class="line">Approved by</div></div>
+          <div class="sign"><div class="name">{{ print_name(po.created_by) }}</div><div class="line">Prepared by</div></div>
+          <div class="sign"><div class="name">{{ print_name(po.confirmed_by) }}</div><div class="line">Approved by</div></div>
         </div>
       </div>
       {% set sm = po.summary %}

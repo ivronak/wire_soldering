@@ -662,3 +662,5 @@ Logo file: `mockups/assets/wire_soldering_logo.png` (coil/W mark, ink + copper).
 - **2026-11-26 — Dashboard v2:** user ne cards-only Overview reject kiya. Dashboard me trend (period filter, KPI delta, chart), paisa (cash, aging), aur kaam (attention, orders, reorder) chahiye. Charts bina library (HTML/CSS/SVG), read-only, har panel apni page permission se. Sales GST ke bina. Plan: `dashboard_flow_2026_11_26.md`.
 
 - **2026-11-26 — Deploy tarika (user ka faisla):** hamesha `git push` GitHub par -> server par `git pull` -> migrate -> restart. Git bundle NAHI banana.
+
+- **2026-11-28 — Print / slip ke "by" fields me naam + user code (user ka faisla):** har print par "Naam (USR-0003)". Developer ka bhi ASLI naam aata hai — pehle wala niyam ("print par Developer = Administrator") sirf in fields ke liye BADAL gaya; screen par purana niyam waisa hi. PO: Prepared = banane wala, Approved = confirm karne wala. Production order: Approved = release karne wala. Invoice / quotation / receipt / credit note / statement me naya "Prepared by". Helper `auth/service.print_name`.

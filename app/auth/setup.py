@@ -128,7 +128,7 @@ def init_auth(app):
         # Sidebar ke drawers (module -> pages): sirf logged-in user ke dekhne layak pages (app/auth/nav.py)
         # pick_users() / pick_label(u): "kisne kaam kiya" dropdown (active users, Developer nahi) — flow doc user_in_erp_flow_2026_11_24.md
         return {"can": can, "can_edit": can_edit, "can_any": can_any, "can_do": can_do, "me": user,
-                "actor_name": actor_name, "pick_users": service.pickable_users, "pick_label": service.pick_label, "pick_options": service.pickable_options, "my_pick_id": service.my_pick_id,
+                "actor_name": actor_name, "print_name": service.print_name, "pick_users": service.pickable_users, "pick_label": service.pick_label, "pick_options": service.pickable_options, "my_pick_id": service.my_pick_id,
                 "nav_modules": nav.build_nav(user), "csrf_token_value": generate_csrf}
 
     register_cli(app)

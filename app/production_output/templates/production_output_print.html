@@ -11,7 +11,7 @@
       <div><span class="lbl">Output date</span><span class="val">{{ output.output_date.strftime('%d %b %Y') }}</span></div>
       <div><span class="lbl">Batch no.</span><span class="val">{{ output.batch_no }}</span></div>
       <div><span class="lbl">Production order</span><span class="val">{{ order.prod_no }}</span></div>
-      <div><span class="lbl">Recorded by</span><span class="val">{{ output.recorded_by or '—' }}</span></div>
+      <div><span class="lbl">Recorded by</span><span class="val">{{ print_name(output.recorded_by_user, output.recorded_by) or '—' }}</span></div>
     </div>
     <div class="supplier">
       <span class="lbl">Product</span>
@@ -55,7 +55,7 @@
         {% if output.remarks %}<div class="remarks"><span class="lbl">Remarks</span><p>{{ output.remarks }}</p></div>{% endif %}
         <div class="sign-head">For Nrupex Solder LLP</div>
         <div class="signs">
-          <div class="sign"><div class="name">{{ output.recorded_by or '' }}</div><div class="line">Recorded by (production)</div></div>
+          <div class="sign"><div class="name">{{ print_name(output.recorded_by_user, output.recorded_by) }}</div><div class="line">Recorded by (production)</div></div>
           <div class="sign"><div class="name"></div><div class="line">Checked by (stores)</div></div>
         </div>
       </div>
