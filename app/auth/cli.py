@@ -7,6 +7,7 @@
 import click
 
 from app.auth import lockout, security, service
+from app.auth.admin_users import generate_next_user_code
 from app.extensions import db
 from app.models import Role, User
 
@@ -46,8 +47,9 @@ def register_cli(app):
         role = Role.query.filter_by(system_key=service.KIND_DEVELOPER).first()
         if role is None:
             raise click.ClickException("The Developer role is missing. Run 'flask db upgrade' first.")
-        user = User(full_name=name.strip() or "Developer", mobile=mobile, password_hash=security.hash_password(password),
-                    role_id=role.id, must_change_password=False)
+        # code wahi function banata hai jo Users screen use karti hai, taaki dono jagah ek hi series chale
+        user = User(code=generate_next_user_code(), full_name=name.strip() or "Developer", mobile=mobile,
+                    password_hash=security.hash_password(password), role_id=role.id, must_change_password=False)
         db.session.add(user)
         db.session.flush()
         service.audit("developer_created", target_type="user", target_id=user.id, label="server CLI")
