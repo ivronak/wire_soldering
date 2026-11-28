@@ -17,14 +17,13 @@ admin_users_bp = Blueprint("admin_users", __name__, url_prefix="/admin/users", t
 
 ROLE_ORDER = {service.KIND_DEVELOPER: 0, service.KIND_ADMIN: 1}      # Developer, Admin upar; baaki custom roles naam se
 
-def generate_next_user_code():
-    
-    last_user = User.query.order_by(User.id.desc()).first()
-    if not last_user:
-        return "USR-001"
 
-    next_user = last_user.id + 1
-    return f"USR-{next_user:03d}"    
+def generate_next_user_code():
+    # Agla user code (USR-0001 jaisa, 4 digit) = aakhri user ki id + 1. users_new me save hota hai aur Add drawer me dikhta hai.
+    last_user = User.query.order_by(User.id.desc()).first()
+    next_id = last_user.id + 1 if last_user else 1
+    return f"USR-{next_id:04d}"
+
 
 def _locked_mobile_hashes():
     now = utc_now()
